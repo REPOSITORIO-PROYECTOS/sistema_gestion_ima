@@ -69,3 +69,6 @@ coverage.xml
 # Other
 *.sqlite3
 *.db
+
+*.README.md
+*.md
