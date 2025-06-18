@@ -18,10 +18,10 @@ from gestion.stock import articulos as stock_articulos # Para artículos simulad
 from config import (
     GOOGLE_SHEET_ID,
     # Hojas de Caja
-    SHEET_NAME_CAJA_APERTURAS, SHEET_NAME_CAJA_REGISTROS,
+    SHEET_NAME_CAJA_SESIONES , SHEET_NAME_CAJA_MOVIMIENTOS,
     # Hojas de Compras
-    SHEET_NAME_PROVEEDORES, SHEET_NAME_ORDENES_COMPRA,
-    SHEET_NAME_ITEMS_OC, SHEET_NAME_ARTICULOS,
+    SHEET_NAME_TERCEROS, SHEET_NAME_DOC_COMPRA_DETALLE,
+    SHEET_NAME_DOC_COMPRA_DETALLE, SHEET_NAME_ARTICULOS,
     # Hojas de Auth/Config (si se usan desde sheets)
     SHEET_NAME_ADMIN_TOKEN, SHEET_NAME_CONFIG_HORARIOS
 )
@@ -61,9 +61,9 @@ def verificar_conexion_y_hojas_requeridas():
 
         # Lista de todas las hojas que deberían existir para las pruebas
         required_sheets = [
-            SHEET_NAME_CAJA_APERTURAS, SHEET_NAME_CAJA_REGISTROS,
-            SHEET_NAME_PROVEEDORES, SHEET_NAME_ORDENES_COMPRA,
-            SHEET_NAME_ITEMS_OC, SHEET_NAME_ARTICULOS,
+            SHEET_NAME_CAJA_SESIONES , SHEET_NAME_CAJA_MOVIMIENTOS,
+            SHEET_NAME_TERCEROS, SHEET_NAME_DOC_COMPRA_DETALLE,
+            SHEET_NAME_DOC_COMPRA_DETALLE, SHEET_NAME_ARTICULOS,
             # Opcional: SHEET_NAME_ADMIN_TOKEN, SHEET_NAME_CONFIG_HORARIOS (si los usas desde sheets)
         ]
         missing_sheets = []

@@ -372,7 +372,7 @@ def menu_admin_operaciones():
             # Lógica:
             # 1. Pedir ID del registro a eliminar (de la hoja CajaRegistros)
             # 2. Confirmar fuertemente la acción.
-            # 3. g_handler.delete_row(SHEET_NAME_CAJA_REGISTROS, row_index) o similar
+            # 3. g_handler.delete_row(SHEET_NAME_CAJA_MOVIMIENTOS, row_index) o similar
             # 4. Registrar esta eliminación en un log de auditoría.
             input("Presione Enter para continuar...")
         elif op_admin == '0':

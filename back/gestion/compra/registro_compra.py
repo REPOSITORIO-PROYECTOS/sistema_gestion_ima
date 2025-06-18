@@ -1,7 +1,7 @@
 # gestion/compra/registro_compra.py
 import gspread
 from utils.sheets_google_handler import GoogleSheetsHandler
-from config import SHEET_NAME_ORDENES_COMPRA, SHEET_NAME_ITEMS_OC, SHEET_NAME_PROVEEDORES, SHEET_NAME_ARTICULOS
+from config import SHEET_NAME_DOC_COMPRA_DETALLE, SHEET_NAME_DOC_COMPRA_DETALLE, SHEET_NAME_TERCEROS, SHEET_NAME_ARTICULOS
 from datetime import datetime
 from . import proveedores_compra # Para obtener datos del proveedor
 from gestion.stock import articulos as stock_articulos # Para obtener datos del artículo (necesitaremos crear este módulo)
@@ -10,7 +10,7 @@ from . import modifica_stock_compra # Para llamar al ingreso de stock
 
 def generar_id_orden_compra(g_handler):
     """Genera un ID de Orden de Compra (ej. OC2023-001)."""
-    registros = g_handler.get_all_records(SHEET_NAME_ORDENES_COMPRA)
+    registros = g_handler.get_all_records(SHEET_NAME_DOC_COMPRA_DETALLE)
     year_prefix = f"OC{datetime.now().year}-"
     
     max_num = 0
@@ -101,14 +101,14 @@ def crear_orden_de_compra(id_proveedor: str, usuario_creador: str, items_oc: lis
         ]
         # Columnas: ID_OrdenCompra, FechaCreacion, ID_Proveedor, NombreProveedor, FechaEntregaEstimada,
         #           Estado, UsuarioCreador, Observaciones, TotalEstimado
-        if not g_handler.append_row(SHEET_NAME_ORDENES_COMPRA, orden_data):
+        if not g_handler.append_row(SHEET_NAME_DOC_COMPRA_DETALLE, orden_data):
             return {"status": "error", "message": "Error al guardar la cabecera de la Orden de Compra."}
 
         # Guardar los ítems de la Orden de Compra
         # gspread permite append_rows para múltiples filas
         rows_to_append_items = []
         for item_dict in items_oc_para_guardar:
-            # Asegurar el orden de las columnas para la hoja SHEET_NAME_ITEMS_OC
+            # Asegurar el orden de las columnas para la hoja SHEET_NAME_DOC_COMPRA_DETALLE
             # ID_ItemOC, ID_OrdenCompra, ID_Articulo, DescripcionArticulo, CantidadPedida,
             # CostoUnitarioEstimado, SubtotalEstimado, CantidadRecibida, CostoUnitarioReal, FechaRecepcionItem
             row = [
@@ -120,14 +120,14 @@ def crear_orden_de_compra(id_proveedor: str, usuario_creador: str, items_oc: lis
             rows_to_append_items.append(row)
         
         # Usar batch append si gspread lo soporta bien o append_rows
-        ws_items = g_handler.get_worksheet(SHEET_NAME_ITEMS_OC)
+        ws_items = g_handler.get_worksheet(SHEET_NAME_DOC_COMPRA_DETALLE)
         if ws_items:
             ws_items.append_rows(rows_to_append_items, value_input_option='USER_ENTERED') # USER_ENTERED para que Google interprete tipos
             print(f"Orden de Compra {id_orden_compra} creada con {len(items_oc_para_guardar)} ítems.")
             return {"status": "success", "id_orden_compra": id_orden_compra, "message": "Orden de Compra creada exitosamente."}
         else:
             # Aquí podrías querer "deshacer" la inserción de la cabecera de la OC o marcarla como errónea.
-            return {"status": "error", "message": f"Hoja '{SHEET_NAME_ITEMS_OC}' no encontrada. Ítems no guardados."}
+            return {"status": "error", "message": f"Hoja '{SHEET_NAME_DOC_COMPRA_DETALLE}' no encontrada. Ítems no guardados."}
 
     except Exception as e:
         print(f"Error en crear_orden_de_compra: {e}")
@@ -150,8 +150,8 @@ def registrar_recepcion_mercaderia(id_orden_compra: str, items_recibidos: list, 
         fecha_recep_str = fecha_recepcion if fecha_recepcion else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         # Obtener la OC y sus ítems
-        ws_items_oc = g_handler.get_worksheet(SHEET_NAME_ITEMS_OC)
-        if not ws_items_oc: return {"status": "error", "message": f"Hoja '{SHEET_NAME_ITEMS_OC}' no encontrada."}
+        ws_items_oc = g_handler.get_worksheet(SHEET_NAME_DOC_COMPRA_DETALLE)
+        if not ws_items_oc: return {"status": "error", "message": f"Hoja '{SHEET_NAME_DOC_COMPRA_DETALLE}' no encontrada."}
         
         all_items_sheet = ws_items_oc.get_all_records()
         items_de_esta_oc = [item_row for item_row in all_items_sheet if item_row.get('ID_OrdenCompra') == id_orden_compra]
@@ -262,7 +262,7 @@ def registrar_recepcion_mercaderia(id_orden_compra: str, items_recibidos: list, 
             nuevo_estado_oc = "RECIBIDA PARCIAL"
         
         # Actualizar estado en la hoja OrdenesDeCompra
-        ws_oc = g_handler.get_worksheet(SHEET_NAME_ORDENES_COMPRA)
+        ws_oc = g_handler.get_worksheet(SHEET_NAME_DOC_COMPRA_DETALLE)
         if ws_oc:
             try:
                 cell_oc_estado = ws_oc.find(id_orden_compra, in_column=1) # ID_OrdenCompra es col 1

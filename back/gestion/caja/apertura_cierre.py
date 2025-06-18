@@ -2,7 +2,7 @@
 import gspread
 from datetime import datetime
 from utils.sheets_google_handler import GoogleSheetsHandler
-from config import SHEET_NAME_CAJA_APERTURAS # Usaremos este nombre de hoja configurado
+from config import SHEET_NAME_CAJA_SESIONES  # Usaremos este nombre de hoja configurado
 
 # Inicializamos el handler una vez si se va a usar frecuentemente en este módulo
 # O se puede instanciar dentro de cada función si se prefiere
@@ -29,7 +29,7 @@ def abrir_caja(saldo_inicial: float, usuario: str):
 
         # Generar un ID de sesión simple (podrías hacerlo más robusto)
         # Por ejemplo, buscando el último ID y sumando 1, o usando un timestamp
-        registros_sesiones = g_handler.get_all_records(SHEET_NAME_CAJA_APERTURAS)
+        registros_sesiones = g_handler.get_all_records(SHEET_NAME_CAJA_SESIONES )
         ultimo_id = 0
         if registros_sesiones:
             try:
@@ -40,7 +40,7 @@ def abrir_caja(saldo_inicial: float, usuario: str):
                 print("Advertencia: No se pudo determinar el último ID_Sesion numérico. Usando timestamp.")
                 ultimo_id = int(now.timestamp()) # Alternativa si falla la numeración
             except KeyError:
-                print(f"Advertencia: La columna 'ID_Sesion' no existe en la hoja '{SHEET_NAME_CAJA_APERTURAS}'. Usando timestamp.")
+                print(f"Advertencia: La columna 'ID_Sesion' no existe en la hoja '{SHEET_NAME_CAJA_SESIONES }'. Usando timestamp.")
                 ultimo_id = int(now.timestamp())
 
         id_sesion = ultimo_id + 1
@@ -50,7 +50,7 @@ def abrir_caja(saldo_inicial: float, usuario: str):
         # Columnas esperadas: ID_Sesion, FechaApertura, HoraApertura, SaldoInicial, UsuarioApertura, Estado,
         #                     FechaCierre, HoraCierre, SaldoFinalContado, Diferencia
 
-        if g_handler.append_row(SHEET_NAME_CAJA_APERTURAS, data_row):
+        if g_handler.append_row(SHEET_NAME_CAJA_SESIONES , data_row):
             print(f"Caja abierta por {usuario} con ${saldo_inicial:.2f}. ID Sesión: {id_sesion}")
             return {"status": "success", "id_sesion": id_sesion, "message": "Caja abierta exitosamente."}
         else:
@@ -71,9 +71,9 @@ def cerrar_caja(id_sesion: int, saldo_final_contado: float, usuario_cierre: str,
         if not g_handler.client:
             return {"status": "error", "message": "No se pudo conectar a Google Sheets."}
 
-        ws = g_handler.get_worksheet(SHEET_NAME_CAJA_APERTURAS)
+        ws = g_handler.get_worksheet(SHEET_NAME_CAJA_SESIONES )
         if not ws:
-            return {"status": "error", "message": f"Hoja '{SHEET_NAME_CAJA_APERTURAS}' no encontrada."}
+            return {"status": "error", "message": f"Hoja '{SHEET_NAME_CAJA_SESIONES }' no encontrada."}
 
         # Encontrar la fila de la sesión
         # Asumiendo que 'ID_Sesion' es la primera columna (índice 1 para gspread)
@@ -145,7 +145,7 @@ def obtener_estado_caja_actual():
             print("No se pudo conectar a Google Sheets para obtener estado de caja.")
             return None
 
-        registros = g_handler.get_all_records(SHEET_NAME_CAJA_APERTURAS)
+        registros = g_handler.get_all_records(SHEET_NAME_CAJA_SESIONES )
         if not registros:
             return None # No hay sesiones registradas
 

@@ -1,252 +1,426 @@
 # gestion/fiscal.py
-import win32com.client # Para interactuar con OCX en Windows
-import time
-import pywintypes # Para manejar errores COM
 
-# ProgID del OCX de Epson. ¡DEBES OBTENER EL CORRECTO DE LA DOCUMENTACIÓN DE EPSON!
-# Estos son solo ejemplos comunes, pueden variar.
-# EPSON_OCX_PROGID = "EPSONFiscalDriver.Printer"
-EPSON_OCX_PROGID = "IFiscal.EpsonFiscal" # Otro ProgID que ha sido usado por Epson
+import os
+from datetime import datetime
+from pysimpleafipws import AfipWs # O la librería que elijas (pyafipws, etc.)
+import traceback # Para un mejor log de errores
 
-# Estado de conexión global para el objeto de la impresora
-epson_printer_obj = None
+# --- CONFIGURACIÓN GLOBAL DEFAULTS (pueden ser sobrescritos por config de empresa) ---
+# Estos podrían incluso venir de un config.py general de la aplicación si son comunes.
+PTO_VENTA_DEFAULT = int(os.getenv("AFIP_PTO_VENTA_DEFAULT", 1))
+MODO_PRODUCCION_DEFAULT = os.getenv("AFIP_MODO_PRODUCCION_DEFAULT", "False").lower() == "true"
 
-def conectar_epson_fiscal(puerto_com="COM1", velocidad_baudios=9600):
+# Cache de conectores AFIP por CUIT para reutilizar sesiones WSAA
+# Clave: CUIT, Valor: {'connector': objeto_AfipWs}
+# PySimpleAfipWs maneja internamente la validez y renovación del Ticket de Acceso (TA)
+afip_connectors_cache = {}
+
+class AfipFiscalError(Exception):
+    """Excepción personalizada para errores fiscales de AFIP."""
+    pass
+
+# --- FUNCIONES PRIVADAS DEL MÓDULO ---
+
+def _get_afip_connector(cuit_empresa: str, cert_path_empresa: str, key_path_empresa: str, modo_produccion_empresa: bool):
     """
-    Establece la conexión con la impresora fiscal Epson TM-T900FA.
-    Los parámetros de puerto y velocidad pueden variar o ser manejados por el driver.
-    Consulta la documentación de Epson para los métodos exactos y sus parámetros.
+    Crea o reutiliza una instancia del conector AfipWs para una empresa específica.
+    Levanta AfipFiscalError si falla la creación o validación de archivos.
     """
-    global epson_printer_obj
-    if epson_printer_obj:
-        print("Ya existe una conexión con la impresora Epson.")
-        return epson_printer_obj
+    global afip_connectors_cache
 
+    # Clave para el caché puede incluir el modo producción si un mismo CUIT opera en ambos
+    cache_key = f"{cuit_empresa}_{'prod' if modo_produccion_empresa else 'homo'}"
+
+    cached_data = afip_connectors_cache.get(cache_key)
+    if cached_data:
+        # Aquí asumimos que si los parámetros de inicialización no han cambiado
+        # y el conector existe, es válido. PySimpleAfipWs maneja el TA.
+        print(f"INFO: Utilizando conector AFIP existente en caché para CUIT {cuit_empresa} (Producción: {modo_produccion_empresa}).")
+        return cached_data['connector']
+
+    print(f"INFO: Creando nuevo conector AFIP para CUIT {cuit_empresa} (Producción: {modo_produccion_empresa})...")
     try:
-        print(f"Intentando conectar a Epson Fiscal con ProgID: {EPSON_OCX_PROGID}")
-        epson_printer_obj = win32com.client.Dispatch(EPSON_OCX_PROGID)
-        print("Objeto OCX Epson creado.")
+        if not cert_path_empresa or not os.path.exists(cert_path_empresa):
+            raise AfipFiscalError(f"Archivo de certificado no encontrado o ruta no especificada para CUIT {cuit_empresa}: {cert_path_empresa}")
+        if not key_path_empresa or not os.path.exists(key_path_empresa):
+            raise AfipFiscalError(f"Archivo de clave privada no encontrado o ruta no especificada para CUIT {cuit_empresa}: {key_path_empresa}")
 
-        # --- Métodos de Conexión (EJEMPLOS - VERIFICAR CON DOCUMENTACIÓN EPSON) ---
-        # Algunas versiones del driver Epson manejan el puerto automáticamente o
-        # lo configuras en la utilidad de configuración del driver.
-        # Otras pueden requerir que especifiques el puerto.
-
-        # Ejemplo 1: Si el OCX tiene un método Connect o OpenPort
-        # epson_printer_obj.OpenPort(puerto_com, velocidad_baudios) # Nombre y parámetros ficticios
-        # print(f"Puerto {puerto_com} abierto a {velocidad_baudios} baudios.")
-
-        # Ejemplo 2: Si el OCX requiere inicializar
-        # epson_printer_obj.Initialize() # Nombre ficticio
-
-        # Ejemplo 3: O simplemente al crearlo ya está listo y se configura el puerto
-        # desde el panel de control del driver fiscal Epson.
-        # Este es a menudo el caso: el driver se encarga de la comunicación de bajo nivel.
-
-        # Verificar estado (método ficticio, consultar documentación Epson)
-        # status_code = epson_printer_obj.GetPrinterStatus()
-        # print(f"Estado inicial de la impresora: {status_code}")
-        # if status_code != 0: # Asumiendo 0 es OK
-        #     raise Exception(f"Impresora Epson no lista. Estado: {status_code} - {epson_printer_obj.GetLastErrorMessage()}")
-
-        print("Conexión con impresora fiscal Epson establecida (o lista para usar).")
-        return epson_printer_obj
-    except pywintypes.com_error as e:
-        print(f"Error COM al instanciar o usar el OCX Epson: {e}")
-        print(f"Verifica que el driver fiscal Epson esté instalado y el ProgID '{EPSON_OCX_PROGID}' sea correcto.")
-        epson_printer_obj = None
-        return None
-    except Exception as e:
-        print(f"Error al conectar con la impresora fiscal Epson: {e}")
-        epson_printer_obj = None
-        return None
-
-def desconectar_epson_fiscal():
-    """Cierra la conexión con la impresora fiscal Epson."""
-    global epson_printer_obj
-    if epson_printer_obj:
-        try:
-            # --- Métodos de Desconexión (EJEMPLOS - VERIFICAR CON DOCUMENTACIÓN EPSON) ---
-            # epson_printer_obj.ClosePort() # Nombre ficticio
-            # epson_printer_obj.Finalize() # Nombre ficticio
-            print("Conexión con impresora fiscal Epson cerrada.")
-        except Exception as e:
-            print(f"Error al desconectar la impresora Epson: {e}")
-        finally:
-            epson_printer_obj = None # Liberar el objeto
-    else:
-        print("No había conexión activa con la impresora Epson para cerrar.")
-
-
-def emitir_factura_epson(factura_data: dict):
-    """
-    Emite una factura utilizando el OCX de la Epson TM-T900FA.
-    factura_data: Diccionario con los datos de la factura.
-    ¡LOS NOMBRES DE LOS MÉTODOS Y PARÁMETROS SON EJEMPLOS! DEBES USAR LOS REALES DE EPSON.
-    """
-    global epson_printer_obj
-    if not epson_printer_obj:
-        print("Error: Impresora Epson no conectada. Llama a conectar_epson_fiscal() primero.")
-        return False
-
-    try:
-        # --- TIPO DE COMPROBANTE ---
-        # Los códigos de tipo de comprobante los define AFIP y el driver Epson.
-        # Ej: "T" (Ticket), "B" (Factura B), "A" (Factura A), "NDB", "NDC", etc.
-        tipo_comprobante_epson = "T" # Por defecto Ticket (Consumidor Final)
-        if factura_data.get("tipo_afip", "").upper() == "FACTURA_B": # Suponiendo que tienes un campo así
-            tipo_comprobante_epson = "B"
-        elif factura_data.get("tipo_afip", "").upper() == "FACTURA_A":
-            tipo_comprobante_epson = "A"
-        # ... otros tipos
-
-        # epson_printer_obj.OpenFiscalReceipt(tipo_comprobante_epson)
-        # O métodos más específicos como:
-        # epson_printer_obj.AbrirComprobante("TICKETFACTURA","B") # Parámetros ficticios
-
-        # --- DATOS DEL CLIENTE (si no es consumidor final anónimo) ---
-        # epson_printer_obj.SetCustomerData(
-        #     factura_data.get('cliente_nombre', 'Consumidor Final'),
-        #     factura_data.get('cliente_cuit_o_dni', '0'), # CUIT, DNI, o "0"
-        #     factura_data.get('cliente_iva_condicion', 'CONSUMIDOR_FINAL'), # Ej: "RESPONSABLE_INSCRIPTO"
-        #     factura_data.get('cliente_domicilio', 'S/D')
-        # )
-
-        # --- ITEMS ---
-        for item in factura_data.get('items', []):
-            # epson_printer_obj.PrintLineItem(
-            #     item.get('nombre', 'Producto'),
-            #     item.get('cantidad', 1.0),
-            #     item.get('precio_unitario', 0.0), # Precio unitario SIN IVA o CON IVA según pida el driver
-            #     item.get('tasa_iva', 21.00), # Ej: 21.00 para 21%, 10.50 para 10.5%, 0.00 para exento
-            #     "Unidad", # Unidad de medida
-            #     "M", # "M" para monto, "B" para bonificación (ver doc Epson)
-            #     0.0, # Impuestos internos (si aplica)
-            #     item.get('codigo_interno', '')
-            # )
-            print(f"  DEBUG (Epson): Imprimiendo Item: {item.get('nombre')}, Cant: {item.get('cantidad')}, Precio: {item.get('precio_unitario')}, IVA: {item.get('tasa_iva', 21.0)}")
-            time.sleep(0.1) # Pequeña pausa, a veces ayuda
-
-        # --- SUBTOTALES Y DESCUENTOS (si los hay y el driver lo maneja así) ---
-        # epson_printer_obj.PrintSubtotal()
-        # epson_printer_obj.GeneralDiscount("Descuento general", 10.00, "M") # Monto o porcentaje
-
-        # --- PAGOS ---
-        # El driver Epson usualmente permite múltiples formas de pago.
-        # epson_printer_obj.AddPayment(
-        #     factura_data.get('metodo_pago_descripcion', 'Efectivo'), # Descripción para el ticket
-        #     factura_data.get('total', 0.0), # Monto del pago
-        #     factura_data.get('metodo_pago_codigo_epson', '0') # Código de forma de pago según Epson
-        # )
-        print(f"  DEBUG (Epson): Agregando Pago: {factura_data.get('metodo_pago', 'EFECTIVO')}, Monto: {factura_data.get('total', 0.0)}")
-
-        # --- CERRAR COMPROBANTE ---
-        # epson_printer_obj.CloseFiscalReceipt()
-        print("  DEBUG (Epson): Cerrando comprobante fiscal.")
-
-        # Manejo de errores específico del OCX
-        # if epson_printer_obj.GetLastFiscalError() != 0:
-        #    error_msg = epson_printer_obj.GetLastFiscalErrorMessage()
-        #    raise Exception(f"Error fiscal Epson: {error_msg}")
-
-        print(f"Factura para {factura_data.get('cliente', 'Consumidor Final')} (simulada para Epson) enviada.")
-        return True
-
-    except pywintypes.com_error as e:
-        print(f"Error COM durante la emisión de factura Epson: {e}")
-        # Intentar cancelar el comprobante si es posible
-        # try: epson_printer_obj.CancelDocument() # Método ficticio
-        # except: pass
-        return False
-    except Exception as e:
-        print(f"Error al emitir factura con Epson: {e}")
-        return False
-
-def obtener_estado_impresora_epson():
-    """Obtiene y muestra el estado de la impresora fiscal Epson."""
-    global epson_printer_obj
-    if not epson_printer_obj:
-        print("Impresora Epson no conectada.")
-        return None
-    try:
-        # --- MÉTODO PARA OBTENER ESTADO (EJEMPLO - VERIFICAR CON DOC EPSON) ---
-        # status_code_printer = epson_printer_obj.GetPrinterStatus()
-        # status_code_fiscal = epson_printer_obj.GetFiscalStatus()
-        # status_message = epson_printer_obj.GetStatusDescription(status_code_printer) # Ficticio
-
-        # print(f"Estado Impresora Epson: Código Printer={status_code_printer}, Código Fiscal={status_code_fiscal}")
-        # print(f"Mensaje Estado: {status_message}")
-        # return {"printer_status": status_code_printer, "fiscal_status": status_code_fiscal, "message": status_message}
-        print("DEBUG (Epson): Obteniendo estado (simulado).")
-        return {"printer_status": 0, "fiscal_status": 0, "message": "OK (Simulado)"}
-
-    except Exception as e:
-        print(f"Error al obtener estado de la impresora Epson: {e}")
-        return None
-
-# La función `obtener_facturas_del_dia_para_imprimir()` que ya tenías, se mantiene igual.
-# ... (tu función existente) ...
-
-def enviar_facturas_a_impresora_fiscal(lista_facturas_del_dia: list):
-    """
-    Función principal para enviar una lista de facturas a la Epson TM-T900FA.
-    """
-    print("\n--- Enviando Facturas a Impresora Fiscal Epson TM-T900FA ---")
-    if not lista_facturas_del_dia:
-        print("No hay facturas para imprimir.")
-        return {"status": "warning", "message": "No hay facturas."}
-
-    # Conectar solo una vez al inicio
-    if not epson_printer_obj:
-        if not conectar_epson_fiscal(): # Intenta conectar
-            return {"status": "error", "message": "Fallo al conectar con la impresora Epson."}
-
-    # Verificar estado antes de empezar
-    estado_inicial = obtener_estado_impresora_epson()
-    if estado_inicial and (estado_inicial.get("printer_status") != 0 or estado_inicial.get("fiscal_status") != 0):
-         print(f"Impresora Epson no está lista. Estado: {estado_inicial.get('message')}")
-         # desconectar_epson_fiscal() # Desconectar si no se pudo operar
-         return {"status": "error", "message": f"Impresora no lista: {estado_inicial.get('message')}"}
-
-
-    exitos = 0
-    errores = 0
-    for i, factura_data in enumerate(lista_facturas_del_dia):
-        print(f"\nProcesando factura {i+1}/{len(lista_facturas_del_dia)} para {factura_data.get('cliente')} - Total: ${factura_data.get('total'):.2f}")
+        connector = AfipWs(
+            cuit=cuit_empresa,
+            cert_path=cert_path_empresa,
+            key_path=key_path_empresa,
+            production=modo_produccion_empresa
+        )
         
-        # Adaptar `factura_data` si es necesario para que coincida con lo que espera `emitir_factura_epson`
-        # Por ejemplo, si necesitas el CUIT para Factura A, asegúrate de que esté en `factura_data`.
-        # También, el precio unitario podría necesitar ser enviado SIN IVA, y el OCX calcula el IVA. ¡VER DOC!
+        # Opcional: Realizar una llamada dummy para forzar la autenticación y verificar conexión
+        # try:
+        #     connector.wsfev1.get_server_status() 
+        # except Exception as auth_e:
+        #     raise AfipFiscalError(f"Fallo al autenticar/probar conexión con AFIP para CUIT {cuit_empresa}: {auth_e}")
 
-        if emitir_factura_epson(factura_data):
-            exitos += 1
-            print("Factura emitida correctamente.")
-        else:
-            errores += 1
-            print(f"Error al emitir factura para {factura_data.get('cliente')}. Verifique la impresora y el log.")
-            # Opcional: Preguntar si continuar o abortar
-            # if input("Hubo un error. ¿Continuar con las siguientes facturas? (s/n): ").lower() != 's':
-            #     print("Proceso de impresión abortado por el usuario.")
-            #     break
-        
-        # Es buena práctica verificar el estado de la impresora después de cada operación
-        # estado_actual = obtener_estado_impresora_epson()
-        # if estado_actual and (estado_actual.get("printer_status") != 0 or estado_actual.get("fiscal_status") != 0):
-        #    print(f"Error en impresora después de la factura {i+1}. Estado: {estado_actual.get('message')}")
-        #    break # Detener si la impresora entra en error
+        afip_connectors_cache[cache_key] = {'connector': connector}
+        print(f"INFO: Conector AFIP creado y cacheado para CUIT {cuit_empresa} (Producción: {modo_produccion_empresa}).")
+        return connector
 
-        time.sleep(1) # Pausa entre facturas
+    except Exception as e:
+        if cache_key in afip_connectors_cache:
+            del afip_connectors_cache[cache_key]
+        # No imprimir traceback aquí, dejar que la función que llama lo maneje si es necesario.
+        # Solo relanzar como AfipFiscalError con un mensaje claro.
+        raise AfipFiscalError(f"Fallo al crear conector AFIP para CUIT {cuit_empresa}: {str(e)}")
 
-    # Desconectar al final si todas las operaciones terminaron o si se usó de forma transaccional
-    # Si la conexión es persistente durante la ejecución del programa, no desconectar aquí.
-    # Por ahora, la dejamos conectada si se logró conectar, para el próximo uso.
-    # desconectar_epson_fiscal()
 
-    if errores > 0:
-        message = f"{exitos} facturas enviadas. {errores} facturas con error."
-        status = "partial_success" if exitos > 0 else "error"
-    else:
-        message = f"Todas las {exitos} facturas enviadas exitosamente a Epson."
-        status = "success"
+def _mapear_tipo_comprobante_afip(tipo_factura_sistema: str) -> int:
+    tipo_map = {
+        "FACTURA_A": 1, "A": 1, "FACTURA_B": 6, "B": 6, "FACTURA_C": 11, "C": 11,
+        "NOTA_CREDITO_A": 3, "NCA": 3, "NOTA_CREDITO_B": 8, "NCB": 8, "NOTA_CREDITO_C": 13, "NCC": 13,
+        "NOTA_DEBITO_A": 2, "NDA": 2, "NOTA_DEBITO_B": 7, "NDB": 7, "NOTA_DEBITO_C": 12, "NDC": 12,
+    }
+    mapped_value = tipo_map.get(str(tipo_factura_sistema).upper().replace(" ", "_"))
+    if mapped_value is None:
+        raise AfipFiscalError(f"Tipo de comprobante del sistema no mapeado a AFIP: '{tipo_factura_sistema}'")
+    return mapped_value
+
+def _mapear_tipo_doc_receptor_afip(tipo_doc_sistema: str) -> int:
+    tipo_map = {"CUIT": 80, "CUIL": 86, "DNI": 96, "CONSUMIDOR_FINAL": 99, "PASAPORTE": 94, "CDI": 87, "LE": 0, "LC": 1, "CI_EXTRANJERA": 91}
+    mapped_value = tipo_map.get(str(tipo_doc_sistema).upper())
+    if mapped_value is None: # Si no se encuentra, default a Consumidor Final o error
+        print(f"ADVERTENCIA: Tipo de documento receptor '{tipo_doc_sistema}' no mapeado, usando Consumidor Final (99).")
+        return 99
+        # raise AfipFiscalError(f"Tipo de documento receptor no mapeado: '{tipo_doc_sistema}'")
+    return mapped_value
+
+def _mapear_codigo_iva_afip(tasa_iva_sistema: float) -> int:
+    try:
+        tasa_iva_sistema = float(tasa_iva_sistema)
+        if tasa_iva_sistema == 0: return 3
+        if tasa_iva_sistema == 10.5: return 4
+        if tasa_iva_sistema == 21: return 5
+        if tasa_iva_sistema == 27: return 6
+        if tasa_iva_sistema == 5: return 8
+        if tasa_iva_sistema == 2.5: return 9
+    except ValueError:
+        pass # El error se lanzará abajo
+    raise AfipFiscalError(f"Tasa de IVA del sistema no mapeada a código AFIP: '{tasa_iva_sistema}'")
+
+
+# --- FUNCIONES PÚBLICAS DEL MÓDULO ---
+
+def obtener_configuracion_fiscal_empresa(id_empresa: any) -> dict:
+    """
+    DEBES IMPLEMENTAR ESTA FUNCIÓN DE FORMA SEGURA.
+    Obtiene la configuración fiscal (CUIT, rutas de cert/key, pto vta, modo_prod)
+    para una empresa específica desde tu sistema de almacenamiento (BD, archivos, etc.).
+    Levanta AfipFiscalError si no se encuentra o la config es inválida.
+    """
+    print(f"DEBUG: Buscando configuración fiscal para empresa ID: {id_empresa}...")
+    # --- EJEMPLO CON DATOS HARCODEADOS (SOLO PARA PRUEBAS INICIALES) ---
+    # ¡¡¡ EN PRODUCCIÓN, ESTO DEBE VENIR DE UNA FUENTE SEGURA Y DINÁMICA !!!
+    # Almacenar los archivos .key y .crt en un lugar seguro del servidor, NO en la BD.
+    # La BD solo almacena las RUTAS a estos archivos.
     
-    return {"status": status, "message": message}
+    # Asegúrate que estas rutas sean VÁLIDAS en tu entorno de desarrollo/prueba.
+    base_path_certs_keys = "C:/AFIP_CREDENCIALES_EMPRESAS" # EJEMPLO: Carpeta base segura
+    
+    config_empresas_prueba = {
+        "EMPRESA_TEST_1": { # Usa un ID que identifique a tu cliente/empresa
+            "cuit": "20111111110", # CUIT de prueba de AFIP Homologación
+            "cert_path": os.path.join(base_path_certs_keys, "empresa_test_1", "certificado_homo.crt"),
+            "key_path": os.path.join(base_path_certs_keys, "empresa_test_1", "claveprivada_homo.key"),
+            "punto_venta_default": 1,
+            "modo_produccion": False # Siempre empezar con False (Homologación)
+        },
+        "EMPRESA_PROD_EJEMPLO": {
+            "cuit": "20222222220", # CUIT REAL de una empresa
+            "cert_path": os.path.join(base_path_certs_keys, "empresa_prod_ejemplo", "certificado_prod.crt"),
+            "key_path": os.path.join(base_path_certs_keys, "empresa_prod_ejemplo", "claveprivada_prod.key"),
+            "punto_venta_default": 2,
+            "modo_produccion": True # Solo cuando estés listo para producción real
+        }
+    }
+    # --- FIN EJEMPLO HARCODEADO ---
+
+    config = config_empresas_prueba.get(str(id_empresa))
+    if not config:
+        raise AfipFiscalError(f"No se encontró configuración fiscal para la empresa ID: {id_empresa}")
+    
+    # Validaciones básicas
+    if not all(k in config for k in ["cuit", "cert_path", "key_path", "punto_venta_default", "modo_produccion"]):
+        raise AfipFiscalError(f"Configuración fiscal incompleta para la empresa ID: {id_empresa}.")
+    
+    print(f"DEBUG: Configuración fiscal encontrada para {id_empresa}: CUIT {config['cuit']}, ModoProd: {config['modo_produccion']}")
+    return config
+
+
+def emitir_factura_electronica(id_empresa_cliente: any, factura_data: dict):
+    """
+    Emite una factura electrónica para una empresa cliente específica.
+    Levanta AfipFiscalError en caso de problemas de configuración o errores de AFIP.
+    Devuelve un diccionario con los datos del CAE y el comprobante si es exitoso.
+    """
+    print(f"INFO: Iniciando emisión de factura para Empresa ID: {id_empresa_cliente}")
+    config_fiscal = obtener_configuracion_fiscal_empresa(id_empresa_cliente) # Puede levantar AfipFiscalError
+
+    cuit_emisor = config_fiscal["cuit"]
+    punto_venta_a_usar = int(factura_data.get('punto_venta', config_fiscal["punto_venta_default"]))
+
+    try:
+        connector = _get_afip_connector(
+            cuit_emisor,
+            config_fiscal["cert_path"],
+            config_fiscal["key_path"],
+            config_fiscal["modo_produccion"]
+        )
+
+        tipo_cbte_afip = _mapear_tipo_comprobante_afip(factura_data.get('tipo_comprobante', ''))
+        
+        print(f"INFO: Emitiendo para CUIT: {cuit_emisor}, PtoVta: {punto_venta_a_usar}, TipoCbteSistema: {factura_data.get('tipo_comprobante', '')} (AFIP: {tipo_cbte_afip})")
+
+        fecha_cbte_obj = factura_data.get('fecha_comprobante', datetime.now())
+        if isinstance(fecha_cbte_obj, str):
+            try:
+                fecha_cbte_obj = datetime.strptime(fecha_cbte_obj, "%Y-%m-%d")
+            except ValueError:
+                raise AfipFiscalError(f"Formato de 'fecha_comprobante' incorrecto: {factura_data.get('fecha_comprobante')}. Usar YYYY-MM-DD.")
+
+        concepto_cbte = int(factura_data.get('concepto_afip', 1)) # 1: Productos, 2: Servicios, 3: Productos y Servicios
+        doc_tipo_receptor = _mapear_tipo_doc_receptor_afip(factura_data.get('cliente_tipo_doc', 'CONSUMIDOR_FINAL'))
+        doc_nro_receptor_str = str(factura_data.get('cliente_nro_doc', '0')).strip()
+        
+        if doc_tipo_receptor != 99 and not doc_nro_receptor_str: # No es Consumidor Final y no hay nro doc
+             raise AfipFiscalError("Número de documento del receptor es requerido si no es Consumidor Final.")
+        try:
+            doc_nro_receptor = int(doc_nro_receptor_str) if doc_nro_receptor_str else 0
+        except ValueError:
+            raise AfipFiscalError(f"Número de documento del receptor no es un número válido: '{doc_nro_receptor_str}'")
+
+
+        imp_total = round(float(factura_data.get('importe_total', 0.0)), 2)
+        imp_neto = round(float(factura_data.get('importe_neto_gravado', 0.0)), 2)
+        imp_iva = round(float(factura_data.get('importe_iva', 0.0)), 2)
+        imp_exento = round(float(factura_data.get('importe_exento', 0.0)), 2)
+        imp_no_gravado = round(float(factura_data.get('importe_no_gravado', 0.0)), 2)
+        imp_trib = round(float(factura_data.get('importe_otros_tributos', 0.0)), 2)
+
+        suma_componentes = round(imp_neto + imp_iva + imp_no_gravado + imp_exento + imp_trib, 2)
+        if abs(suma_componentes - imp_total) > 0.019: # Aumentar un poco la tolerancia por múltiples redondeos
+            raise AfipFiscalError(f"Descuadre de importes: Total ({imp_total}) vs Suma de Componentes ({suma_componentes}). Diferencia: {abs(suma_componentes - imp_total)}")
+
+        array_iva = []
+        if 'items_iva' in factura_data and factura_data['items_iva'] and isinstance(factura_data['items_iva'], list):
+            for item_iva_data in factura_data['items_iva']:
+                if not isinstance(item_iva_data, dict): continue # Saltar si no es un dict
+                array_iva.append({
+                    'Id': _mapear_codigo_iva_afip(item_iva_data.get('tasa_iva')),
+                    'BaseImp': round(float(item_iva_data.get('base_imponible', 0.0)), 2),
+                    'Importe': round(float(item_iva_data.get('importe_iva_item', 0.0)), 2)
+                })
+        elif imp_neto > 0 and imp_iva > 0: # Caso simplificado: un solo tipo de IVA deducido
+            tasa_iva_estimada = round((imp_iva / imp_neto) * 100, 1) if imp_neto != 0 else 21.0
+            array_iva.append({'Id': _mapear_codigo_iva_afip(tasa_iva_estimada), 'BaseImp': imp_neto, 'Importe': imp_iva})
+        elif imp_exento > 0 and imp_neto == 0 and imp_iva == 0 : # Solo exento
+             array_iva.append({'Id': _mapear_codigo_iva_afip(0), 'BaseImp': imp_exento, 'Importe': 0.00}) # WSFEV1 puede requerir esto
+        
+        # Si no hay IVA (ej. Factura C de monotributista), array_iva puede ser None o lista vacía.
+        # PySimpleAfipWs lo maneja si se pasa None.
+        if not array_iva and (tipo_cbte_afip in [1, 6, 3, 8, 2, 7]) and (imp_neto > 0 or imp_iva > 0) : # A y B deben tener IVA si hay neto
+            raise AfipFiscalError("Facturas A/B con importe neto > 0 deben detallar IVA.")
+
+
+        mon_id = str(factura_data.get('moneda_id', 'PES')).upper()
+        mon_cotiz = float(factura_data.get('moneda_cotiz', 1.0))
+        if mon_id != 'PES' and mon_cotiz <= 0:
+            raise AfipFiscalError("Cotización de moneda extranjera debe ser mayor a 0.")
+
+        # Parámetros para emitir_comprobante de PySimpleAfipWs
+        params_emision = {
+            "punto_venta": punto_venta_a_usar,
+            "tipo_comprobante": tipo_cbte_afip,
+            "fecha_comprobante": fecha_cbte_obj, # PySimpleAfipWs espera objeto datetime
+            "concepto": concepto_cbte,
+            "tipo_documento_comprador": doc_tipo_receptor,
+            "numero_documento_comprador": doc_nro_receptor,
+            "importe_total": imp_total,
+            "importe_neto_gravado": imp_neto,
+            "importe_iva": imp_iva,
+            "importe_exento": imp_exento,
+            "importe_no_gravado": imp_no_gravado,
+            "importe_otros_tributos": imp_trib,
+            "items_iva": array_iva if array_iva else None,
+            "comprobantes_asociados": factura_data.get('comprobantes_asociados'), # Lista de dicts
+            "otros_tributos": factura_data.get('otros_tributos'), # Lista de dicts
+            "moneda_id": mon_id,
+            "moneda_cotizacion": mon_cotiz,
+            # Campos para servicios si Concepto es 2 o 3
+            "fecha_servicio_desde": factura_data.get('fecha_servicio_desde'), # "YYYYMMDD" o datetime
+            "fecha_servicio_hasta": factura_data.get('fecha_servicio_hasta'), # "YYYYMMDD" o datetime
+            "fecha_vencimiento_pago": factura_data.get('fecha_vencimiento_pago') # "YYYYMMDD" o datetime
+        }
+        
+        # Limpiar Nones de los parámetros opcionales
+        params_emision_limpio = {k: v for k, v in params_emision.items() if v is not None}
+
+        print(f"INFO: Llamando a AFIP WSFEV1 emitir_comprobante para CUIT {cuit_emisor} con params: {params_emision_limpio}")
+        resultado = connector.wsfev1.emitir_comprobante(**params_emision_limpio)
+        
+        # `resultado` es un diccionario con la respuesta parseada.
+        # Campos clave: 'cae', 'fecha_vencimiento_cae', 'numero_comprobante', 'resultado' (A:Aprobado, R:Rechazado, P:Parcial)
+        # 'observaciones_array', 'eventos_array', 'errores_array'
+
+        if resultado.get('resultado','').upper() != 'A': # No Aprobado
+            msg_error = f"AFIP no aprobó el comprobante para CUIT {cuit_emisor}. Resultado: {resultado.get('resultado')}. "
+            if resultado.get('errores_array'):
+                msg_error += "Errores: " + " ".join([f"Cod: {e.get('Code', '')} Msg: {e.get('Msg', '')}" for e in resultado['errores_array']])
+            elif resultado.get('observaciones_array'):
+                 msg_error += "Observaciones: " + " ".join([f"Cod: {e.get('Code', '')} Msg: {e.get('Msg', '')}" for e in resultado['observaciones_array']])
+            else:
+                msg_error += f"Respuesta AFIP completa: {resultado}"
+            raise AfipFiscalError(msg_error)
+
+        cae = resultado.get('cae')
+        fecha_vto_cae_str = resultado.get('fecha_vencimiento_cae') # Formato YYYYMMDD
+        nro_cbte_emitido = resultado.get('numero_comprobante')
+
+        if not cae or not fecha_vto_cae_str:
+            raise AfipFiscalError(f"AFIP aprobó pero no devolvió CAE o Fecha Vto. CAE. CUIT {cuit_emisor}. Respuesta: {resultado}")
+        
+        try:
+            fecha_vto_cae_obj = datetime.strptime(fecha_vto_cae_str, "%Y%m%d")
+        except ValueError:
+            fecha_vto_cae_obj = fecha_vto_cae_str # Mantener como string si no se puede parsear
+
+        print(f"INFO: CAE Obtenido para CUIT {cuit_emisor}: {cae}, Vto: {fecha_vto_cae_str}, Cbte Nro: {nro_cbte_emitido}")
+        return {
+            "status": "success", "message": "Factura autorizada por AFIP.",
+            "cuit_emisor": cuit_emisor, "cae": cae, "fecha_vencimiento_cae": fecha_vto_cae_obj, # Devolver objeto datetime
+            "numero_comprobante_emitido": nro_cbte_emitido, "punto_venta": punto_venta_a_usar,
+            "tipo_comprobante_afip": tipo_cbte_afip, "raw_response_afip": resultado
+        }
+
+    except AfipFiscalError as afe:
+        # Errores ya logueados o específicos de AFIP
+        print(f"ERROR_FISCAL: {afe} (CUIT: {cuit_emisor if 'cuit_emisor' in locals() else 'N/A'}, EmpresaID: {id_empresa_cliente})")
+        return {"status": "error", "message": str(afe)}
+    except Exception as e:
+        # Errores inesperados de la librería, conexión, etc.
+        print(f"ERROR_INESPERADO: Emitiendo factura para Empresa ID {id_empresa_cliente}, CUIT {cuit_emisor if 'cuit_emisor' in locals() else 'N/A'}: {e}")
+        traceback.print_exc()
+        return {"status": "error", "message": f"Error inesperado durante la comunicación con AFIP: {str(e)}"}
+
+
+def consultar_estado_servidores_afip_para_empresa(id_empresa: any):
+    """Consulta el estado de los servidores de AFIP usando las credenciales de una empresa."""
+    config_fiscal = obtener_configuracion_fiscal_empresa(id_empresa)
+    cuit_emisor = config_fiscal["cuit"]
+    try:
+        connector = _get_afip_connector(
+            cuit_emisor,
+            config_fiscal["cert_path"],
+            config_fiscal["key_path"],
+            config_fiscal["modo_produccion"]
+        )
+        status_data = connector.wsfev1.get_server_status()
+        print(f"INFO: Estado Servidores AFIP (para CUIT {cuit_emisor}): {status_data}")
+        return {"status": "success", "data": status_data, "cuit_consultado": cuit_emisor}
+    except AfipFiscalError as afe:
+        print(f"ERROR_FISCAL: Consultando estado AFIP para empresa ID {id_empresa}: {afe}")
+        return {"status": "error", "message": str(afe), "cuit_consultado": cuit_emisor}
+    except Exception as e:
+        print(f"ERROR_INESPERADO: Consultando estado AFIP para empresa ID {id_empresa}: {e}")
+        traceback.print_exc()
+        return {"status": "error", "message": str(e), "cuit_consultado": cuit_emisor}
+
+def obtener_ultimo_comprobante_autorizado(id_empresa: any, punto_venta: int, tipo_comprobante_afip: int):
+    """Obtiene el último número de comprobante autorizado para un PtoVta y TipoCbte."""
+    config_fiscal = obtener_configuracion_fiscal_empresa(id_empresa)
+    cuit_emisor = config_fiscal["cuit"]
+    try:
+        connector = _get_afip_connector(
+            cuit_emisor,
+            config_fiscal["cert_path"],
+            config_fiscal["key_path"],
+            config_fiscal["modo_produccion"]
+        )
+        ultimo_nro = connector.wsfev1.get_ultimo_cmp_auth(punto_venta, tipo_comprobante_afip)
+        print(f"INFO: Último comprobante para CUIT {cuit_emisor}, PtoVta {punto_venta}, Tipo {tipo_comprobante_afip}: {ultimo_nro}")
+        return {"status": "success", "ultimo_numero": ultimo_nro if ultimo_nro is not None else 0}
+    except AfipFiscalError as afe:
+        print(f"ERROR_FISCAL: Obteniendo último comprobante para CUIT {cuit_emisor}: {afe}")
+        return {"status": "error", "message": str(afe)}
+    except Exception as e:
+        print(f"ERROR_INESPERADO: Obteniendo último comprobante para CUIT {cuit_emisor}: {e}")
+        traceback.print_exc()
+        return {"status": "error", "message": str(e)}
+
+
+# --- Flujo de ejemplo de uso MULTI-CLIENTE ---
+if __name__ == '__main__':
+    print("--- INICIO EJEMPLO DE FACTURACIÓN ELECTRÓNICA AFIP (MULTI-CLIENTE) ---")
+    
+    # Simular que este ID viene de la sesión de caja del cliente actual
+    # DEBE COINCIDIR CON UNA DE LAS CLAVES EN `config_empresas_prueba`
+    # dentro de `obtener_configuracion_fiscal_empresa`
+    id_empresa_a_facturar = "EMPRESA_TEST_1" 
+    
+    print(f"\n--- Probando para Empresa ID: {id_empresa_a_facturar} ---")
+
+    # 1. Verificar estado de servidores (opcional, bueno para diagnóstico)
+    # print("\n1. Consultando estado de servidores AFIP...")
+    # estado_servidores = consultar_estado_servidores_afip_para_empresa(id_empresa_a_facturar)
+    # if estado_servidores["status"] == "success":
+    #     if estado_servidores["data"].get("AppServer") != "OK" or \
+    #        estado_servidores["data"].get("DbServer") != "OK" or \
+    #        estado_servidores["data"].get("AuthServer") != "OK":
+    #         print(f"  ADVERTENCIA: Servidores AFIP no totalmente OK: {estado_servidores['data']}")
+    # else:
+    #     print(f"  ERROR: No se pudo obtener estado de servidores: {estado_servidores['message']}")
+
+    # 2. Obtener último comprobante (ejemplo)
+    print("\n2. Consultando último comprobante autorizado...")
+    try:
+        pv = obtener_configuracion_fiscal_empresa(id_empresa_a_facturar)["punto_venta_default"]
+        tipo_cbte_b_afip = _mapear_tipo_comprobante_afip("FACTURA_B")
+        res_ultimo_cbte = obtener_ultimo_comprobante_autorizado(id_empresa_a_facturar, pv, tipo_cbte_b_afip)
+        if res_ultimo_cbte["status"] == "success":
+            print(f"  Última Factura B para PtoVta {pv}: {res_ultimo_cbte['ultimo_numero']}")
+        else:
+            print(f"  ERROR al obtener último comprobante: {res_ultimo_cbte['message']}")
+    except AfipFiscalError as e:
+         print(f"  ERROR al obtener datos para consultar último comprobante: {e}")
+
+
+    # 3. Preparar datos de una factura de ejemplo
+    print("\n3. Preparando datos para factura de ejemplo...")
+    factura_ejemplo = {
+        'tipo_comprobante': "FACTURA_B",
+        'fecha_comprobante': datetime.now().strftime("%Y-%m-%d"), # "YYYY-MM-DD"
+        # 'punto_venta': pv, # Si no se pasa, usa el default de la empresa
+        'cliente_tipo_doc': "DNI",
+        'cliente_nro_doc': "20000000", # DNI de prueba
+        'importe_neto_gravado': 100.00,
+        'importe_iva': 21.00,
+        'importe_total': 121.00,
+        'items_iva': [{'tasa_iva': 21.0, 'base_imponible': 100.00, 'importe_iva_item': 21.00}],
+        'moneda_id': "PES", 'moneda_cotiz': 1.0,
+        'concepto_afip': 1 # Productos
+    }
+
+    print(f"\n4. Intentando emitir Factura de ejemplo para Empresa ID: {id_empresa_a_facturar}...")
+    resultado_emision = emitir_factura_electronica(id_empresa_a_facturar, factura_ejemplo)
+    
+    print("\n--- Resultado Final de la Emisión ---")
+    print(resultado_emision)
+
+    if resultado_emision and resultado_emision.get("status") == "success":
+        print(f"\n  ¡ÉXITO!")
+        print(f"  CUIT Emisor: {resultado_emision.get('cuit_emisor')}")
+        print(f"  CAE: {resultado_emision.get('cae')}")
+        print(f"  Vence CAE: {resultado_emision.get('fecha_vencimiento_cae').strftime('%Y-%m-%d') if isinstance(resultado_emision.get('fecha_vencimiento_cae'), datetime) else resultado_emision.get('fecha_vencimiento_cae')}")
+        print(f"  Nro Cbte Emitido: {resultado_emision.get('numero_comprobante_emitido')}")
+        print(f"  Punto de Venta: {resultado_emision.get('punto_venta')}")
+        print(f"  Tipo Cbte AFIP: {resultado_emision.get('tipo_comprobante_afip')}")
+    else:
+        print(f"\n  FALLO LA EMISIÓN.")
+        print(f"  Mensaje: {resultado_emision.get('message', 'Sin mensaje específico.')}")
+
+    print("\n--- FIN EJEMPLO ---")

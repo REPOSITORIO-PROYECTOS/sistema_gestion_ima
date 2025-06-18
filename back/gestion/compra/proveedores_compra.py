@@ -1,12 +1,13 @@
 # gestion/compra/proveedores_compra.py
 
 from utils.sheets_google_handler import GoogleSheetsHandler
-from config import SHEET_NAME_PROVEEDORES
+from config import SHEET_NAME_TERCEROS
 from datetime import datetime
+import gspread
 
 def generar_id_proveedor(g_handler):
     """Genera un nuevo ID de proveedor secuencial (ej. PROV001, PROV002)."""
-    registros = g_handler.get_all_records(SHEET_NAME_PROVEEDORES)
+    registros = g_handler.get_all_records(SHEET_NAME_TERCEROS)
     if not registros:
         return "PROV001"
     
@@ -36,7 +37,7 @@ def agregar_proveedor(razon_social: str, cuit: str, direccion: str = "", telefon
             return {"status": "error", "message": "Razón Social y CUIT son obligatorios."}
 
         # Verificar si el CUIT ya existe (opcional, pero recomendado)
-        proveedores = g_handler.get_all_records(SHEET_NAME_PROVEEDORES)
+        proveedores = g_handler.get_all_records(SHEET_NAME_TERCEROS)
         for prov in proveedores:
             if prov.get('CUIT') == cuit and prov.get('Activo', 'SI').upper() == 'SI':
                 return {"status": "error", "message": f"Ya existe un proveedor activo con CUIT {cuit}."}
@@ -60,7 +61,7 @@ def agregar_proveedor(razon_social: str, cuit: str, direccion: str = "", telefon
         # Columnas esperadas: ID_Proveedor, RazonSocial, CUIT, Direccion, Telefono, Email,
         #                     PersonaContacto, CondicionesPago, Observaciones, Activo, FechaAlta
 
-        if g_handler.append_row(SHEET_NAME_PROVEEDORES, data_row):
+        if g_handler.append_row(SHEET_NAME_TERCEROS, data_row):
             print(f"Proveedor '{razon_social}' agregado con ID {id_proveedor}.")
             return {"status": "success", "id_proveedor": id_proveedor, "message": "Proveedor agregado exitosamente."}
         else:
@@ -78,7 +79,7 @@ def buscar_proveedor(termino_busqueda: str, campo_busqueda: str = "RazonSocial")
         if not g_handler.client:
             return [] # O un dict de error
 
-        proveedores = g_handler.get_all_records(SHEET_NAME_PROVEEDORES)
+        proveedores = g_handler.get_all_records(SHEET_NAME_TERCEROS)
         resultados = []
 
         if not termino_busqueda: # Devolver todos si no hay término
@@ -115,9 +116,9 @@ def modificar_proveedor(id_proveedor: str, nuevos_datos: dict):
         if not g_handler.client:
             return {"status": "error", "message": "No se pudo conectar a Google Sheets."}
 
-        ws = g_handler.get_worksheet(SHEET_NAME_PROVEEDORES)
+        ws = g_handler.get_worksheet(SHEET_NAME_TERCEROS)
         if not ws:
-            return {"status": "error", "message": f"Hoja '{SHEET_NAME_PROVEEDORES}' no encontrada."}
+            return {"status": "error", "message": f"Hoja '{SHEET_NAME_TERCEROS}' no encontrada."}
 
         try:
             # Asumiendo que ID_Proveedor es la columna 1

@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from utils.sheets_google_handler import GoogleSheetsHandler
-from config import SHEET_NAME_CAJA_REGISTROS
+from config import SHEET_NAME_CAJA_MOVIMIENTOS
 from . import modifica_stock_caja # Para llamar a la función de modificar stock
 from . import apertura_cierre # Para obtener ID de sesión actual
 from gestion.contabilidad.clientes_contabilidad import gestion_clientes, cuentas_corrientes
@@ -51,7 +51,7 @@ def registrar_movimiento(id_sesion_caja: int, tipo_movimiento: str, descripcion:
             str(detalles_adicionales) if detalles_adicionales else ""
         ]
 
-        if g_handler.append_row(SHEET_NAME_CAJA_REGISTROS, data_row):
+        if g_handler.append_row(SHEET_NAME_CAJA_MOVIMIENTOS, data_row):
             print(f"Movimiento '{tipo_movimiento}' registrado: {descripcion}, Monto: {monto}, Usuario: {usuario}")
             return {"status": "success", "id_registro": id_registro, "message": "Movimiento registrado."}
         else:
