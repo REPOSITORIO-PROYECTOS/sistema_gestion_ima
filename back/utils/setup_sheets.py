@@ -9,7 +9,7 @@ import traceback # Para imprimir tracebacks más detallados en caso de error
 
 try:
     # Importar las NUEVAS constantes de config.py
-    from config import (
+    from back.config import (
         GOOGLE_SHEET_ID as CONFIG_GOOGLE_SHEET_ID,
         GOOGLE_SERVICE_ACCOUNT_FILE as CONFIG_SERVICE_ACCOUNT_FILE,
 

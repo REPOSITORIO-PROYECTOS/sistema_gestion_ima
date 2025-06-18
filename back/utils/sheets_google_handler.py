@@ -4,7 +4,7 @@ from google.oauth2.service_account import Credentials
 import datetime
 import uuid
 # Importar los NUEVOS nombres de hojas desde config
-from config import (
+from back.config import (
     GOOGLE_SHEET_ID, GOOGLE_SERVICE_ACCOUNT_FILE,
     SHEET_NAME_TERCEROS,
     SHEET_NAME_DOC_VENTA_CABECERA, SHEET_NAME_DOC_VENTA_DETALLE, SHEET_NAME_DOC_VENTA_PAGOS,

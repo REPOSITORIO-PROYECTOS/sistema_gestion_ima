@@ -1,5 +1,5 @@
 # gestion/contabilidad/clientes_contabilidad/gestion_clientes.py
-from utils.sheets_google_handler import GoogleSheetsHandler
+from back.utils.sheets_google_handler import GoogleSheetsHandler
 from config import SHEET_NAME_CLIENTES
 from datetime import datetime
 

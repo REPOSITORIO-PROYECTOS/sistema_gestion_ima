@@ -1,7 +1,7 @@
 # gestion/compra/proveedores_compra.py
 
-from utils.sheets_google_handler import GoogleSheetsHandler
-from config import SHEET_NAME_TERCEROS
+from back.utils.sheets_google_handler import GoogleSheetsHandler
+from back.config import SHEET_NAME_TERCEROS
 from datetime import datetime
 import gspread
 

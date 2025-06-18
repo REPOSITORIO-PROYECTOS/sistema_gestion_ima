@@ -1,8 +1,8 @@
 # gestion/caja/apertura_cierre.py
 import gspread
 from datetime import datetime
-from utils.sheets_google_handler import GoogleSheetsHandler
-from config import SHEET_NAME_CAJA_SESIONES  # Usaremos este nombre de hoja configurado
+from back.utils.sheets_google_handler import GoogleSheetsHandler
+from back.config import SHEET_NAME_CAJA_SESIONES  # Usaremos este nombre de hoja configurado
 
 # Inicializamos el handler una vez si se va a usar frecuentemente en este módulo
 # O se puede instanciar dentro de cada función si se prefiere

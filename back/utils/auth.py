@@ -5,8 +5,8 @@ import random
 import time
 from datetime import datetime, timedelta
 
-from utils.sheets_google_handler import GoogleSheetsHandler
-from config import (
+from back.utils.sheets_google_handler import GoogleSheetsHandler
+from back.config import (
     ADMIN_TOKEN_KEYWORDS,
     ADMIN_TOKEN_DURATION_SECONDS,
     SHEET_NAME_ADMIN_TOKEN,

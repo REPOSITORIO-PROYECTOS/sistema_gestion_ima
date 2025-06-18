@@ -1,10 +1,10 @@
 # gestion/compra/registro_compra.py
 import gspread
-from utils.sheets_google_handler import GoogleSheetsHandler
-from config import SHEET_NAME_DOC_COMPRA_DETALLE, SHEET_NAME_DOC_COMPRA_DETALLE, SHEET_NAME_TERCEROS, SHEET_NAME_ARTICULOS
+from back.utils.sheets_google_handler import GoogleSheetsHandler
+from back.config import SHEET_NAME_DOC_COMPRA_DETALLE, SHEET_NAME_DOC_COMPRA_DETALLE, SHEET_NAME_TERCEROS, SHEET_NAME_ARTICULOS
 from datetime import datetime
 from . import proveedores_compra # Para obtener datos del proveedor
-from gestion.stock import articulos as stock_articulos # Para obtener datos del artículo (necesitaremos crear este módulo)
+from back.gestion.stock import articulos as stock_articulos # Para obtener datos del artículo (necesitaremos crear este módulo)
 from . import modifica_stock_compra # Para llamar al ingreso de stock
 
 

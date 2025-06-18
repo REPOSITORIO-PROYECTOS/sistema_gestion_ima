@@ -1,10 +1,10 @@
 # gestion/compra/modifica_stock_compra.py
 
-from utils.sheets_google_handler import GoogleSheetsHandler
-from config import SHEET_NAME_MOVIMIENTOS_STOCK # Necesitaremos esta hoja
+from back.utils.sheets_google_handler import GoogleSheetsHandler
+from back.config import SHEET_NAME_MOVIMIENTOS_STOCK # Necesitaremos esta hoja
 from datetime import datetime
-# from gestion.stock import articulos as stock_articulos # Para actualizar el stock en la hoja Articulos
-# from gestion.stock import movimientos as stock_movimientos # Para registrar el movimiento
+# from back.gestion.stock import articulos as stock_articulos # Para actualizar el stock en la hoja Articulos
+# from back.gestion.stock import movimientos as stock_movimientos # Para registrar el movimiento
 
 # ---- SIMULACIÓN HASTA QUE TENGAMOS EL MÓDULO STOCK REAL ----
 # Supondremos que existe una función en stock.articulos para actualizar

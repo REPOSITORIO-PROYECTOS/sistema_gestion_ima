@@ -3,12 +3,12 @@ import sys
 import time # para el bucle principal
 from datetime import datetime
 
-from gestion.caja import apertura_cierre, registro_caja, cliente_publico
-from gestion import auth # Importamos nuestro módulo de autenticación y token
+from back.gestion.caja import apertura_cierre, registro_caja, cliente_publico
+from back.gestion import auth # Importamos nuestro módulo de autenticación y token
 # from gestion import fiscal # Para la impresora fiscal
-from gestion.caja.registro_caja import calcular_vuelto # Import directo para la calculadora
-from config import GOOGLE_SHEET_ID, SHEET_NAME_CONFIG_HORARIOS, CURRENT_USER_FILE # y otras configs
-from utils.sheets_google_handler import GoogleSheetsHandler
+from back.gestion.caja.registro_caja import calcular_vuelto # Import directo para la calculadora
+from back.config import GOOGLE_SHEET_ID, SHEET_NAME_CONFIG_HORARIOS, CURRENT_USER_FILE # y otras configs
+from back.utils.sheets_google_handler import GoogleSheetsHandler
 
 
 # --- Variables Globales de Sesión de la Aplicación ---

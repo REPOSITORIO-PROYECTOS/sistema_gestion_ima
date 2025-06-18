@@ -1,12 +1,12 @@
 # gestion/caja/registro_caja.py
 
 from datetime import datetime
-from utils.sheets_google_handler import GoogleSheetsHandler
-from config import SHEET_NAME_CAJA_MOVIMIENTOS
+from back.utils.sheets_google_handler import GoogleSheetsHandler
+from back.config import SHEET_NAME_CAJA_MOVIMIENTOS
 from . import modifica_stock_caja # Para llamar a la función de modificar stock
 from . import apertura_cierre # Para obtener ID de sesión actual
-from gestion.contabilidad.clientes_contabilidad import gestion_clientes, cuentas_corrientes
-from gestion.facturacion import motor_facturacion
+from back.gestion.contabilidad.clientes_contabilidad import gestion_clientes, cuentas_corrientes
+from back.gestion.facturacion import motor_facturacion
 import json 
 from config import EMISOR_CONDICION_IVA # Para determinar tipo de comprobante
 

@@ -1,21 +1,26 @@
 # test_general_flujos.py
 
 import sys
+import os
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.insert(0, parent_dir)
+
 from datetime import datetime, timedelta
 
 # --- Importaciones de Módulos de Caja ---
-from gestion.caja import apertura_cierre as caja_ap_ci
-from gestion.caja import registro_caja as caja_reg
-from gestion.caja import cliente_publico as caja_cli
-from gestion import auth as auth_module # Para el token de admin si es necesario
+from back.gestion.caja import apertura_cierre as caja_ap_ci
+from back.gestion.caja import registro_caja as caja_reg
+from back.gestion.caja import cliente_publico as caja_cli
+from back.gestion import auth as auth_module # Para el token de admin si es necesario
 
 # --- Importaciones de Módulos de Compras ---
-from gestion.compra import proveedores_compra
-from gestion.compra import registro_compra as compra_reg
-from gestion.stock import articulos as stock_articulos # Para artículos simulados
+from back.gestion.compra import proveedores_compra
+from back.gestion.compra import registro_compra as compra_reg
+from back.gestion.stock import articulos as stock_articulos# Para artículos simulados
 
 # --- Importaciones de Configuración y Utils ---
-from config import (
+from back.config import (
     GOOGLE_SHEET_ID,
     # Hojas de Caja
     SHEET_NAME_CAJA_SESIONES , SHEET_NAME_CAJA_MOVIMIENTOS,
@@ -25,7 +30,7 @@ from config import (
     # Hojas de Auth/Config (si se usan desde sheets)
     SHEET_NAME_ADMIN_TOKEN, SHEET_NAME_CONFIG_HORARIOS
 )
-from utils.sheets_google_handler import GoogleSheetsHandler
+from back.utils.sheets_google_handler import GoogleSheetsHandler
 
 
 # ---- Variables Globales de Prueba ----

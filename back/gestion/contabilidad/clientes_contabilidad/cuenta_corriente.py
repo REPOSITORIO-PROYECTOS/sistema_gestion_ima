@@ -1,5 +1,5 @@
 # gestion/contabilidad/clientes_contabilidad/cuentas_corrientes.py
-from config import SHEET_NAME_MOVIMIENTOS_CC_CLIENTE, SHEET_NAME_CLIENTES # Re-importar SHEET_NAME_CLIENTES
+from back.config import SHEET_NAME_MOVIMIENTOS_CC_CLIENTE, SHEET_NAME_CLIENTES # Re-importar SHEET_NAME_CLIENTES
 
 def generar_id_movimiento_cc(g_handler):
     # ... Lógica para generar ID único para movimientos CC ...
