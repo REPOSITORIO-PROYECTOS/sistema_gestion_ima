@@ -1,160 +1,163 @@
-# C:\Users\ticia\SISTEMAS\sistema_gestion_ima\back\utils\setup_sheets.py
-
-import gspread
-from google.oauth2.service_account import Credentials
-import time
-import os
+# back/utils/setup_sheets.py
 import sys
-import traceback # Para imprimir tracebacks más detallados en caso de error
+import os
+import gspread
+
+# --- Configuración del Path para importaciones ---
+current_dir = os.path.dirname(os.path.abspath(__file__))
+back_dir = os.path.dirname(current_dir)
+project_root_dir = os.path.dirname(back_dir)
+if project_root_dir not in sys.path:
+    sys.path.insert(0, project_root_dir)
+# --- Fin Configuración del Path ---
 
 try:
-    # Importar las NUEVAS constantes de config.py
+    # Importar las variables de config.py que definen los NOMBRES de las hojas
     from back.config import (
-        GOOGLE_SHEET_ID as CONFIG_GOOGLE_SHEET_ID,
-        GOOGLE_SERVICE_ACCOUNT_FILE as CONFIG_SERVICE_ACCOUNT_FILE,
-
-        SHEET_NAME_TERCEROS,
-        SHEET_NAME_DOC_VENTA_CABECERA, SHEET_NAME_DOC_VENTA_DETALLE, SHEET_NAME_DOC_VENTA_PAGOS,
-        SHEET_NAME_DOC_COMPRA_DETALLE, SHEET_NAME_DOC_COMPRA_DETALLE,
-        SHEET_NAME_ARTICULOS, SHEET_NAME_STOCK_CONFIG_LISTAS,
-        SHEET_NAME_CAJA_SESIONES, SHEET_NAME_CAJA_MOVIMIENTOS, SHEET_NAME_STOCK_MOVIMIENTOS,
-        SHEET_NAME_CONTABILIDAD_PLAN_CONFIG, SHEET_NAME_CONTABILIDAD_ASIENTOS,
-        SHEET_NAME_ADMIN_TOKEN, SHEET_NAME_USUARIOS, SHEET_NAME_CONFIG_HORARIOS_CAJA
+        CONFIGURACION_GLOBAL_SHEET, USUARIOS_SHEET, TERCEROS_SHEET, ARTICULOS_SHEET,
+        CAJA_SESIONES_SHEET, CAJA_MOVIMIENTOS_SHEET, STOCK_MOVIMIENTOS_SHEET,
+        COMPRAS_CABECERA_SHEET, COMPRAS_DETALLE_SHEET,
+        # VENTAS_CABECERA_SHEET, VENTAS_DETALLE_SHEET, VENTAS_PAGOS_SHEET, # Si las usas
+        # ADMIN_TOKEN_SHEET, # Si la usas
+        # STOCK_LISTAS_CONFIG_SHEET, # Si la usas
+        # CONTABILIDAD_PLAN_SHEET, CONTABILIDAD_ASIENTOS_SHEET, # Si la usas
     )
-    from utils.sheets_google_handler import GoogleSheetsHandler
-    print("Módulos 'config' y 'utils.sheets_google_handler' importados con nuevas constantes de hoja.")
-
+    from back.utils.sheets_google_handler import GoogleSheetsHandler
 except ImportError as e:
-    print(f"Error crítico importando módulos: {e}")
-    traceback.print_exc()
-    print("\nVerifica:")
-    print("1. Que 'config.py' esté en la carpeta 'back/' y defina TODAS las constantes de hoja listadas arriba.")
-    print("2. Que 'sheets_google_handler.py' esté en 'back/utils/'.")
-    print("3. Que hayas creado 'back/__init__.py' y 'back/utils/__init__.py'.")
-    print("4. Que estés ejecutando desde 'C:\\Users\\ticia\\SISTEMAS\\sistema_gestion_ima\\back>' con: python -m utils.setup_sheets")
+    print(f"Error al importar módulos necesarios: {e}")
+    print("Asegúrate de que config.py y sheets_google_handler.py estén correctos y accesibles.")
+    sys.exit(1)
+except FileNotFoundError as e:
+    print(f"Error crítico de configuración al iniciar (FileNotFound): {e}")
+    sys.exit(1)
+except ValueError as e:
+    print(f"Error crítico de configuración al iniciar (ValueError): {e}")
+    sys.exit(1)
+except Exception as e_general_import:
+    print(f"Error general durante la importación: {e_general_import}")
     sys.exit(1)
 
-# Lista de las NUEVAS constantes de nombres de hojas que quieres configurar
-# (Esta lista ahora contiene los VALORES string de los nombres de hoja,
-# ya que las variables se evalúan a sus strings cuando se añaden a la lista)
-SHEET_NAME_CONSTANTS_TO_SETUP = [
-    SHEET_NAME_TERCEROS,
-    SHEET_NAME_DOC_VENTA_CABECERA, SHEET_NAME_DOC_VENTA_DETALLE, SHEET_NAME_DOC_VENTA_PAGOS,
-    SHEET_NAME_DOC_COMPRA_DETALLE, SHEET_NAME_DOC_COMPRA_DETALLE,
-    SHEET_NAME_ARTICULOS, SHEET_NAME_STOCK_CONFIG_LISTAS,
-    SHEET_NAME_CAJA_SESIONES, SHEET_NAME_CAJA_MOVIMIENTOS, SHEET_NAME_STOCK_MOVIMIENTOS,
-    SHEET_NAME_CONTABILIDAD_PLAN_CONFIG, SHEET_NAME_CONTABILIDAD_ASIENTOS,
-    SHEET_NAME_ADMIN_TOKEN, SHEET_NAME_USUARIOS, SHEET_NAME_CONFIG_HORARIOS_CAJA
-]
 
-SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.file']
-
-def _create_or_update_sheet(spreadsheet_obj, g_handler_instance, sheet_name_actual_string):
-    headers = g_handler_instance.get_default_headers(sheet_name_actual_string)
-    if not headers:
-        print(f"  ADVERTENCIA: No se encontraron cabeceras para '{sheet_name_actual_string}'. Saltando.")
-        return False
-    
-    worksheet = None
+def crear_hojas_y_cabeceras_propuestas():
+    print("Iniciando la creación/verificación de hojas de cálculo según la estructura propuesta...")
     try:
-        worksheet = spreadsheet_obj.worksheet(sheet_name_actual_string)
-        print(f"  Hoja '{sheet_name_actual_string}' existe. Limpiando...")
-        worksheet.clear()
-        
-        if worksheet.row_count < 2:
-             worksheet.resize(rows=2) # Redimensiona a 2 filas si tiene menos.
-        # Si clear() eliminó todas las columnas, también podríamos necesitar reajustarlas:
-        if worksheet.col_count < len(headers):
-            worksheet.resize(cols=len(headers) + 2) # +2 por si acaso
-
-    except gspread.exceptions.WorksheetNotFound:
-        print(f"  Creando hoja '{sheet_name_actual_string}'...")
-        # Al crear, asegurar que tenga al menos 2 filas y suficientes columnas.
-        worksheet = spreadsheet_obj.add_worksheet(title=sheet_name_actual_string, rows="2", cols=len(headers) + 2) # +2 columnas por si acaso
-    
-    if not worksheet: # Si por alguna razón worksheet sigue siendo None
-        print(f"  ERROR: No se pudo obtener o crear la referencia a la hoja '{sheet_name_actual_string}'.")
-        return False
-
-    try:
-        # Usar argumentos nombrados para worksheet.update para evitar DeprecationWarning
-        worksheet.update(values=[headers], range_name='A1', value_input_option='USER_ENTERED')
-        
-        
-        # Una verificación final antes de congelar:
-        if worksheet.row_count < 2:
-            print(f"  Añadiendo fila explícitamente antes de congelar para '{sheet_name_actual_string}' (filas: {worksheet.row_count}).")
-            worksheet.add_rows(1)
-
-        worksheet.freeze(rows=1)
-        print(f"  Cabeceras establecidas y fila congelada para '{sheet_name_actual_string}'.")
-        return True
+        handler = GoogleSheetsHandler()
+        if not handler.client or not handler.spreadsheet:
+            print("No se pudo establecer la conexión con Google Sheets. Abortando.")
+            return
     except Exception as e:
-        print(f"  ERROR estableciendo cabeceras o congelando para '{sheet_name_actual_string}': {e}")
-        traceback.print_exc()
-        return False
+        print(f"Error al inicializar GoogleSheetsHandler: {e}")
+        print("Verifica tu GOOGLE_SHEET_ID y el archivo de credenciales en .env y config.py.")
+        return
 
-def main():
-    print("--- Iniciando Configuración de Estructura de Google Sheets (AGLOMERADA) ---")
-    target_google_sheet_id = CONFIG_GOOGLE_SHEET_ID
-    target_service_account_file = CONFIG_SERVICE_ACCOUNT_FILE
+    # Mapa de descripción lógica a la VARIABLE de config.py que contiene el nombre real de la hoja
+    hojas_a_procesar_mapa = {
+        "1. Configuración Global": CONFIGURACION_GLOBAL_SHEET,
+        "2. Usuarios del Sistema": USUARIOS_SHEET,
+        "3. Terceros (Clientes/Proveedores)": TERCEROS_SHEET,
+        "4. Catálogo de Artículos": ARTICULOS_SHEET,
+        "5. Sesiones de Caja": CAJA_SESIONES_SHEET,
+        "6. Movimientos de Caja": CAJA_MOVIMIENTOS_SHEET,
+        "7. Movimientos de Stock": STOCK_MOVIMIENTOS_SHEET,
+        "8. Documentos de Compra (Cabeceras)": COMPRAS_CABECERA_SHEET,
+        "9. Detalle de Documentos de Compra": COMPRAS_DETALLE_SHEET,
+        # ---- DESCOMENTA Y AJUSTA SI LAS USAS ----
+        # "10. Documentos de Venta (Cabeceras)": VENTAS_CABECERA_SHEET,
+        # "11. Detalle de Documentos de Venta": VENTAS_DETALLE_SHEET,
+        # "12. Pagos de Ventas": VENTAS_PAGOS_SHEET,
+        # "13. Tokens de Administrador (si hoja separada)": ADMIN_TOKEN_SHEET,
+        # "14. Configuración de Listas de Stock": STOCK_LISTAS_CONFIG_SHEET,
+        # "15. Plan de Cuentas Contable": CONTABILIDAD_PLAN_SHEET,
+        # "16. Asientos Contables": CONTABILIDAD_ASIENTOS_SHEET,
+    }
 
-    if not target_google_sheet_id:
-        print("Error Crítico: GOOGLE_SHEET_ID no está definido en config.py.")
-        sys.exit(1)
-    if not target_service_account_file:
-        print("Error Crítico: GOOGLE_SERVICE_ACCOUNT_FILE no está definido en config.py.")
-        sys.exit(1)
-    if not os.path.exists(target_service_account_file):
-        print(f"Error Crítico: El archivo de credenciales '{target_service_account_file}' no se encontró.")
-        sys.exit(1)
+    hojas_creadas_ok = 0
+    hojas_existentes_ok = 0
+    hojas_con_error_creacion = 0
+    hojas_con_error_cabeceras = 0
+    hojas_saltadas = 0
 
-    print(f"Usando Spreadsheet ID: {target_google_sheet_id}")
-    print(f"Usando credenciales: {target_service_account_file}")
+    print("\n--- Inicio del Proceso de Hojas ---")
+    for descripcion_logica, nombre_hoja_real_valor in sorted(hojas_a_procesar_mapa.items()):
+        print(f"\nProcesando: '{descripcion_logica}' (Nombre real target: '{nombre_hoja_real_valor}')...")
 
-    if not SHEET_NAME_CONSTANTS_TO_SETUP:
-        print("Advertencia: No hay hojas definidas en 'SHEET_NAME_CONSTANTS_TO_SETUP' para procesar. Saliendo.")
-        sys.exit(0)
-    
-    print(f"\nSe intentarán crear/actualizar las siguientes hojas (nombres según config.py):")
-    for sheet_name_value in SHEET_NAME_CONSTANTS_TO_SETUP:
-        print(f" - Nombre de hoja: \"{sheet_name_value}\"")
-
-    confirm = input("\nPresiona Enter para continuar, o 'n' para cancelar: ")
-    if confirm.lower() == 'n':
-        print("Operación cancelada por el usuario."); sys.exit(0)
-
-    try:
-        creds = Credentials.from_service_account_file(target_service_account_file, scopes=SCOPES)
-        client = gspread.authorize(creds)
-        spreadsheet = client.open_by_key(target_google_sheet_id) # Usar open_by_key
-        print(f"\nConectado a Spreadsheet: '{spreadsheet.title}'")
-    except Exception as e:
-        print(f"\nError fatal conectando a Google Sheets: {e}")
-        traceback.print_exc()
-        sys.exit(1)
-
-    g_handler = GoogleSheetsHandler(sheet_id=target_google_sheet_id)
-    print("\nProcesando hojas:")
-    processed_count, failed_count = 0, 0
-
-    for sheet_name_value in SHEET_NAME_CONSTANTS_TO_SETUP:
-        if not sheet_name_value: # Debería ser un string no vacío
-            print(f"  ERROR: Valor de hoja inválido (vacío o None). Saltando.");
-            failed_count +=1;
+        if not nombre_hoja_real_valor or nombre_hoja_real_valor.endswith("_Default"):
+            print(f"  SALTANDO: El nombre para '{descripcion_logica}' ('{nombre_hoja_real_valor}') es un default. Define la clave correspondiente en .env con el nombre real de la hoja.")
+            hojas_saltadas += 1
             continue
-        
-        print(f"Procesando hoja: '{sheet_name_value}'...")
-        if _create_or_update_sheet(spreadsheet, g_handler, sheet_name_value):
-            processed_count += 1
-        else:
-            failed_count +=1
-        time.sleep(1.5) # Pausa para no saturar la API
 
-    print("\n--- Proceso de creación/actualización de hojas completado. ---")
-    print(f"Hojas procesadas exitosamente: {processed_count}")
-    print(f"Hojas con fallos o advertencias: {failed_count}")
-    print("Por favor, revisa tu Google Spreadsheet y los mensajes de consola.")
+        worksheet = None
+        try:
+            worksheet = handler.spreadsheet.worksheet(nombre_hoja_real_valor)
+            print(f"  INFO: Hoja '{nombre_hoja_real_valor}' ya existe.")
+            hojas_existentes_ok +=1
+            # Verificar y añadir cabeceras si A1 está vacía
+            if not worksheet.acell('A1', value_render_option='UNFORMATTED_VALUE').value: # Comprobar si A1 tiene contenido
+                print(f"  INFO: Hoja '{nombre_hoja_real_valor}' existe pero A1 está vacía. Intentando añadir cabeceras...")
+                headers = handler.get_default_headers(nombre_hoja_real_valor)
+                if headers:
+                    worksheet.update('A1', [headers], value_input_option='USER_ENTERED')
+                    worksheet.freeze(rows=1)
+                    print(f"  ÉXITO: Cabeceras añadidas a la hoja existente '{nombre_hoja_real_valor}'.")
+                else:
+                    print(f"  ADVERTENCIA: No se definieron cabeceras para '{nombre_hoja_real_valor}' en get_default_headers. No se añadieron.")
+                    hojas_con_error_cabeceras +=1
+            else:
+                print(f"  INFO: Hoja '{nombre_hoja_real_valor}' ya tiene contenido en A1, se asume que tiene cabeceras.")
 
-if __name__ == '__main__':
-    main()
+        except gspread.exceptions.WorksheetNotFound:
+            print(f"  INFO: Hoja '{nombre_hoja_real_valor}' no encontrada. Creándola...")
+            headers = handler.get_default_headers(nombre_hoja_real_valor)
+            if not headers:
+                print(f"  ERROR: No se pueden crear cabeceras para la nueva hoja '{nombre_hoja_real_valor}' (no definidas en get_default_headers). Hoja NO creada.")
+                hojas_con_error_creacion += 1
+                continue
+            try:
+                num_cols = len(headers) if headers else 20 # Mínimo 20 columnas si no hay headers definidos
+                new_worksheet = handler.spreadsheet.add_worksheet(title=nombre_hoja_real_valor, rows="100", cols=str(num_cols))
+                if headers: # Solo escribir si hay cabeceras
+                    new_worksheet.update('A1', [headers], value_input_option='USER_ENTERED')
+                    new_worksheet.freeze(rows=1)
+                print(f"  ÉXITO: Hoja '{nombre_hoja_real_valor}' creada con cabeceras.")
+                hojas_creadas_ok += 1
+            except Exception as e_create:
+                print(f"  ERROR: No se pudo crear la hoja '{nombre_hoja_real_valor}': {e_create}")
+                hojas_con_error_creacion += 1
+        except Exception as e_general:
+            print(f"  ERROR: Error inesperado procesando la hoja '{nombre_hoja_real_valor}': {e_general}")
+            hojas_con_error_creacion += 1 # Contar como error de creación si falla la verificación
+
+    print("\n--- Resumen de Creación/Verificación de Hojas ---")
+    print(f"Hojas nuevas creadas exitosamente: {hojas_creadas_ok}")
+    print(f"Hojas existentes verificadas (y cabeceras añadidas si fue necesario): {hojas_existentes_ok}")
+    print(f"Hojas saltadas (nombre default o no definido en .env): {hojas_saltadas}")
+    print(f"Hojas con error durante la creación: {hojas_con_error_creacion}")
+    print(f"Hojas existentes a las que no se pudo añadir cabeceras (si aplica): {hojas_con_error_cabeceras}")
+
+    total_errores = hojas_con_error_creacion + hojas_con_error_cabeceras
+    if total_errores > 0:
+        print("\nATENCIÓN: Algunas hojas no pudieron ser configuradas correctamente. Revisa los mensajes de error.")
+    elif hojas_saltadas > 0:
+        print("\nADVERTENCIA: Algunas hojas fueron saltadas. Asegúrate de definirlas correctamente en tu archivo .env (quitando '_Default' de su nombre en config.py o definiendo la clave ENV correspondiente).")
+    else:
+        print("\n¡Proceso completado! Todas las hojas especificadas deberían estar listas en tu Google Spreadsheet.")
+
+
+if __name__ == "__main__":
+    print("=======================================================")
+    print("=== SCRIPT DE CONFIGURACIÓN DE HOJAS DE SPREADSHEET ===")
+    print("=======================================================")
+    # ... (resto del if __name__ == "__main__" sin cambios) ...
+    print("Este script intentará conectar a tu Google Spreadsheet y crear las hojas")
+    print("definidas en 'back/config.py' con sus cabeceras por defecto si no existen.")
+    print("Asegúrate de que tu archivo '.env' esté configurado con GOOGLE_SHEET_ID")
+    print("y que GOOGLE_SERVICE_ACCOUNT_FILE apunte a tu 'credencial_IA.json'.")
+    print("Además, las claves como 'SHEET_NAME_CAJA_SESIONES' en .env deben tener los")
+    print("nombres REALES que quieres para tus pestañas en Google Sheets.")
+    print("-------------------------------------------------------")
+    
+    confirm = input("¿Deseas continuar y crear/verificar estas hojas? (s/n): ").lower()
+    if confirm == 's':
+        crear_hojas_y_cabeceras_propuestas()
+    else:
+        print("Operación cancelada por el usuario.")

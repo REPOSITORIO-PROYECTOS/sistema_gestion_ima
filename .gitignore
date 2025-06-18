@@ -10,6 +10,12 @@ env/
 .env # IMPORTANT: For local environment variables, should not be committed.
      # Commit a .env.example or similar if you want to show required variables.
 
+# Archivos sensibles - ¡NO SUBIR A GIT!
+.env
+credentials.json
+credencial_IA.json 
+credencial_IA.json
+
 # Distribution / packaging
 .Python
 build/

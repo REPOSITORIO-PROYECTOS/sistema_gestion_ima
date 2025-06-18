@@ -1,75 +1,74 @@
-# C:\Users\ticia\SISTEMAS\sistema_gestion_ima\back\config.py
-
+# back/config.py
 import os
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
-if os.path.exists(dotenv_path):
-    load_dotenv(dotenv_path)
+# --- Carga de .env ---
+print("--- Cargando config.py (Versión Estructura Base Estable) ---")
+dotenv_path = find_dotenv(usecwd=True, raise_error_if_not_found=False)
+if dotenv_path and os.path.exists(dotenv_path):
+    print(f"DEBUG_CFG: Cargando .env desde: '{dotenv_path}'")
+    load_dotenv(dotenv_path=dotenv_path, override=True)
 else:
-    load_dotenv()
+    print("DEBUG_CFG: No se encontró .env o la ruta no existe, usando defaults o variables de sistema.")
+    load_dotenv(override=True) # Intentar cargar de todas formas
+# --- Fin Carga .env ---
 
-# --- CONFIGURACIÓN DE GOOGLE SHEETS ---
+
+# --- Variables de Conexión ---
 GOOGLE_SHEET_ID = os.getenv('GOOGLE_SHEET_ID')
-GOOGLE_SERVICE_ACCOUNT_FILE = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'credentials.json')
+GOOGLE_SERVICE_ACCOUNT_FILE = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', "credencial_IA.json") # Default simple
 
-# --- NOMBRES DE HOJAS DE CÁLCULO (ESTRUCTURA AGLOMERADA) ---
+# --- Nombres de Variables Python para las Hojas ---
+# Leemos de .env usando las claves (SHEET_NAME_ENV_...)
+# Si la clave no está en .env, se usa el valor string default que es el nombre deseado de la hoja.
 
-# 1. TERCEROS (Clientes y Proveedores)
-SHEET_NAME_TERCEROS = os.getenv('SHEET_NAME_TERCEROS', "Terceros")
+# Configuración y Administración
+CONFIGURACION_GLOBAL_SHEET = os.getenv('SHEET_NAME_CONFIGURACION_GLOBAL', 'ConfiguracionGlobal')
+USUARIOS_SHEET = os.getenv('SHEET_NAME_USUARIOS', 'Usuarios')
+# ADMIN_TOKEN_SHEET ahora se manejaría dentro de CONFIGURACION_GLOBAL_SHEET o USUARIOS_SHEET
+# Si aún quieres una hoja separada para tokens (no recomendado con ConfiguracionGlobal),
+# deberías añadir SHEET_NAME_ENV_ADMIN_TOKEN a tu .env y luego:
+# ADMIN_TOKEN_SHEET = os.getenv('SHEET_NAME_ENV_ADMIN_TOKEN', 'AdminTokens_Default')
 
-# 2. DOCUMENTOS DE VENTA
-SHEET_NAME_DOC_VENTA_CABECERA = os.getenv('SHEET_NAME_DOC_VENTA_CABECERA', "Documentos_Venta_Cabecera")
-SHEET_NAME_DOC_VENTA_DETALLE = os.getenv('SHEET_NAME_DOC_VENTA_DETALLE', "Documentos_Venta_Detalle")
-SHEET_NAME_DOC_VENTA_PAGOS = os.getenv('SHEET_NAME_DOC_VENTA_PAGOS', "Documentos_Venta_Pagos")
+# Terceros (Clientes y Proveedores)
+TERCEROS_SHEET = os.getenv('SHEET_NAME_TERCEROS', 'Terceros')
 
-# 3. DOCUMENTOS DE COMPRA
-SHEET_NAME_DOC_COMPRA_DETALLE = os.getenv('SHEET_NAME_DOC_COMPRA_DETALLE', "Documentos_Compra_Cabecera")
-SHEET_NAME_DOC_COMPRA_DETALLE = os.getenv('SHEET_NAME_DOC_COMPRA_DETALLE', "Documentos_Compra_Detalle")
+# Artículos y Stock
+ARTICULOS_SHEET = os.getenv('SHEET_NAME_ARTICULOS', 'Articulos')
+STOCK_MOVIMIENTOS_SHEET = os.getenv('SHEET_NAME_STOCK_MOVIMIENTOS', 'StockMovimientos')
+# Si necesitas listas de configuración de stock (categorías, marcas, etc.)
+# STOCK_LISTAS_CONFIG_SHEET = os.getenv('SHEET_NAME_ENV_STOCK_LISTAS_CONFIG', 'StockConfigListas')
 
-# 4. ARTÍCULOS Y CONFIGURACIÓN DE STOCK
-SHEET_NAME_ARTICULOS = os.getenv('SHEET_NAME_ARTICULOS', "Articulos")
-SHEET_NAME_STOCK_CONFIG_LISTAS = os.getenv('SHEET_NAME_STOCK_CONFIG_LISTAS', "Stock_Config_Listas") # Para Categorías, Marcas, etc.
+# Caja
+CAJA_SESIONES_SHEET = os.getenv('SHEET_NAME_CAJA_SESIONES', 'CajaSesiones')
+CAJA_MOVIMIENTOS_SHEET = os.getenv('SHEET_NAME_CAJA_MOVIMIENTOS', 'CajaMovimientos')
 
-# 5. CAJA Y MOVIMIENTOS DE STOCK (Se mantienen similares)
-SHEET_NAME_CAJA_SESIONES = os.getenv('SHEET_NAME_CAJA_SESIONES', "Sesiones_Caja") # Antes SHEET_NAME_CAJA_SESIONES 
-SHEET_NAME_CAJA_MOVIMIENTOS = os.getenv('SHEET_NAME_CAJA_MOVIMIENTOS', "Movimientos_Caja") # Antes SHEET_NAME_CAJA_MOVIMIENTOS
-SHEET_NAME_STOCK_MOVIMIENTOS = os.getenv('SHEET_NAME_STOCK_MOVIMIENTOS', "Movimientos_Stock")
+# Compras
+COMPRAS_CABECERA_SHEET = os.getenv('SHEET_NAME_COMPRAS_CABECERA', 'Compras')
+COMPRAS_DETALLE_SHEET = os.getenv('SHEET_NAME_COMPRAS_DETALLE', 'ComprasDetalle')
 
-# 6. CONTABILIDAD (Simplificada)
-SHEET_NAME_CONTABILIDAD_PLAN_CONFIG = os.getenv('SHEET_NAME_CONTABILIDAD_PLAN_CONFIG', "Contabilidad_PlanCuentas_Y_Config")
-SHEET_NAME_CONTABILIDAD_ASIENTOS = os.getenv('SHEET_NAME_CONTABILIDAD_ASIENTOS', "Contabilidad_Asientos_Resumidos")
+# Ventas (si decides tener hojas separadas y no integrar en CajaMovimientos)
+# VENTAS_CABECERA_SHEET = os.getenv('SHEET_NAME_VENTAS_CABECERA', 'Ventas')
+# VENTAS_DETALLE_SHEET = os.getenv('SHEET_NAME_VENTAS_DETALLE', 'VentasDetalle')
+# VENTAS_PAGOS_SHEET = os.getenv('SHEET_NAME_VENTAS_PAGOS', 'VentasPagos')
 
-# 7. CONFIGURACIÓN Y USUARIOS (Se mantienen)
-SHEET_NAME_ADMIN_TOKEN = os.getenv('SHEET_NAME_ADMIN_TOKEN', 'AdminToken')
-SHEET_NAME_USUARIOS = os.getenv('SHEET_NAME_USUARIOS', 'Usuarios')
-SHEET_NAME_CONFIG_HORARIOS_CAJA = os.getenv('SHEET_NAME_CONFIG_HORARIOS_CAJA', 'ConfigHorariosCaja')
+# Contabilidad (si la implementas)
+# CONTABILIDAD_PLAN_SHEET = os.getenv('SHEET_NAME_CONTABILIDAD_PLAN', 'ContabilidadPlanCuentas')
+# CONTABILIDAD_ASIENTOS_SHEET = os.getenv('SHEET_NAME_CONTABILIDAD_ASIENTOS', 'ContabilidadAsientos')
 
-# --- VALIDACIÓN DE CONFIGURACIONES ESENCIALES ---
-if not GOOGLE_SHEET_ID:
-    raise ValueError("GOOGLE_SHEET_ID no está configurado.")
-if not GOOGLE_SERVICE_ACCOUNT_FILE:
-    raise ValueError("GOOGLE_SERVICE_ACCOUNT_FILE no está configurado.")
-elif not os.path.isabs(GOOGLE_SERVICE_ACCOUNT_FILE):
-    possible_path = os.path.join(os.path.dirname(__file__), GOOGLE_SERVICE_ACCOUNT_FILE)
-    if os.path.exists(possible_path):
-        GOOGLE_SERVICE_ACCOUNT_FILE = possible_path
-if not os.path.exists(GOOGLE_SERVICE_ACCOUNT_FILE):
-    raise FileNotFoundError(f"Archivo de credenciales '{GOOGLE_SERVICE_ACCOUNT_FILE}' no encontrado.")
 
-print(f"Config (config.py): Spreadsheet ID: {GOOGLE_SHEET_ID}")
-print(f"Config (config.py): Credentials File: {GOOGLE_SERVICE_ACCOUNT_FILE}")
-
-# --- OTRAS CONFIGURACIONES ---
+# Otras configuraciones
 ADMIN_TOKEN_DURATION_SECONDS = int(os.getenv('ADMIN_TOKEN_DURATION_SECONDS', 8 * 60 * 60))
 
-# Variables que tu test_general_flujos.py podría estar usando y que ahora tienen nuevos nombres:
-# Mapeo para compatibilidad con los tests originales, si es necesario ajustarlos luego.
-# O mejor, ajustar los tests para usar las nuevas constantes.
-# Por ahora, el setup_sheets.py usará las nuevas constantes directamente.
-# SHEET_NAME_CAJA_SESIONES  = SHEET_NAME_CAJA_SESIONES
-# SHEET_NAME_CAJA_MOVIMIENTOS = SHEET_NAME_CAJA_MOVIMIENTOS
-# SHEET_NAME_TERCEROS -> ahora parte de SHEET_NAME_TERCEROS
-# SHEET_NAME_DOC_COMPRA_DETALLE -> ahora parte de SHEET_NAME_DOC_COMPRA_DETALLE
-# SHEET_NAME_DOC_COMPRA_DETALLE -> ahora parte de SHEET_NAME_DOC_COMPRA_DETALLE
-# SHEET_NAME_ARTICULOS -> se mantiene SHEET_NAME_ARTICULOS
+# --- Verificaciones Críticas ---
+if not GOOGLE_SHEET_ID:
+    raise ValueError("CRÍTICO: GOOGLE_SHEET_ID no está configurado en .env.")
+if not GOOGLE_SERVICE_ACCOUNT_FILE:
+     raise ValueError("CRÍTICO: GOOGLE_SERVICE_ACCOUNT_FILE no está configurado en .env.")
+if not os.path.exists(GOOGLE_SERVICE_ACCOUNT_FILE):
+    raise FileNotFoundError(
+        f"CRÍTICO: Archivo de credenciales '{GOOGLE_SERVICE_ACCOUNT_FILE}' (definido por GOOGLE_SERVICE_ACCOUNT_FILE) no encontrado. "
+        f"Verifica el valor en tu .env y la existencia del archivo en el servidor."
+    )
+print(f"DEBUG_CFG: Configuración cargada. Usando GOOGLE_SERVICE_ACCOUNT_FILE='{GOOGLE_SERVICE_ACCOUNT_FILE}'")
+print(f"DEBUG_CFG: Hoja de Sesiones de Caja se llamará: '{CAJA_SESIONES_SHEET}'") # Ejemplo de verificación

@@ -1,469 +1,362 @@
-# main.py
-import sys
-import time # para el bucle principal
-from datetime import datetime
+# back/main.py
+from fastapi import FastAPI, HTTPException, Body, Depends, Header
+from typing import List, Dict, Any, Optional
+from pydantic import BaseModel, Field # Para validación de datos
+import sys # Para la verificación inicial
+from fastapi.middleware.cors import CORSMiddleware
+# --- Importaciones de Módulos del Backend ---
+# (Asegúrate de que estas importaciones funcionen correctamente después de arreglar los ImportErrors en config.py y otros módulos)
+try:
+    from back.gestion.caja import apertura_cierre as mod_apertura_cierre
+    from back.gestion.caja import registro_caja as mod_registro_caja
+    from back.gestion.caja import cliente_publico as mod_cliente_publico
+    from back.gestion import auth as mod_auth
+    from back.config import GOOGLE_SHEET_ID, SHEET_NAME_CONFIG_HORARIOS # y otras que necesites directamente
+    from back.utils.sheets_google_handler import GoogleSheetsHandler
+    # from .gestion import fiscal # Descomenta cuando esté listo y lo uses
+except ImportError as e:
+    print(f"ERROR CRÍTICO AL IMPORTAR MÓDULOS DEL BACKEND EN main.py: {e}")
+    print("La API podría no funcionar correctamente. Por favor, arregla los ImportErrors.")
+    # Considera lanzar el error para detener la app si las importaciones son esenciales para el arranque
+    # raise e
 
-from back.gestion.caja import apertura_cierre, registro_caja, cliente_publico
-from back.gestion import auth # Importamos nuestro módulo de autenticación y token
-# from gestion import fiscal # Para la impresora fiscal
-from back.gestion.caja.registro_caja import calcular_vuelto # Import directo para la calculadora
-from back.config import GOOGLE_SHEET_ID, SHEET_NAME_CONFIG_HORARIOS, CURRENT_USER_FILE # y otras configs
-from back.utils.sheets_google_handler import GoogleSheetsHandler
+# --- Inicialización de FastAPI ---
+app = FastAPI(
+    title="API Sistema de Gestión IMA",
+    description="API para interactuar con el backend del sistema de gestión.",
+    version="0.2.0" # Incrementada versión
+)
 
+origins = [
+    "http://localhost", # Si el frontend corre en el mismo server pero diferente puerto
+    "http://localhost:3000", # Ejemplo para React/Vue/Angular en desarrollo
+    "https://swingjugos.netlify.app/", # Tu frontend en producción
+]
 
-# --- Variables Globales de Sesión de la Aplicación ---
-current_user = None
-current_session_id = None # ID de la sesión de caja actual
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-def display_header():
-    print("\n===================================")
-    print("    SISTEMA DE GESTIÓN DE CAJA    ")
-    print("===================================")
-    if current_user:
-        print(f"Usuario Actual: {current_user}")
-    if current_session_id:
-        print(f"ID Sesión Caja Activa: {current_session_id}")
-    print("-----------------------------------")
-
-def set_current_user():
-    global current_user
-    display_header()
-    print("\n--- Identificación de Usuario ---")
-    
-    # Intentar cargar el último usuario conocido para esta PC
-    last_user = auth.obtener_usuario_actual_local()
-    if last_user:
-        print(f"Último usuario en esta terminal: {last_user}")
-        usar_ultimo = input(f"¿Continuar como {last_user}? (s/n): ").lower()
-        if usar_ultimo == 's':
-            # Aquí deberías validar si 'last_user' es un usuario válido del sistema
-            # Por ahora, lo aceptamos.
-            current_user = last_user
-            print(f"Usuario actual: {current_user}")
-            return
-
-    while not current_user:
-        username = input("Ingrese su nombre de usuario: ").strip()
-        if not username:
-            print("El nombre de usuario no puede estar vacío.")
-            continue
-        # Aquí deberías validar si 'username' existe en tu sistema de usuarios
-        # (ej. en una hoja 'Usuarios' de Google Sheets).
-        # Por ahora, aceptamos cualquier nombre.
-        current_user = username
-        auth.guardar_usuario_actual_local(current_user) # Guardar para la próxima vez
-        print(f"Usuario actual establecido: {current_user}")
-
-
-def check_active_cash_session():
-    global current_session_id
-    display_header()
-    print("\nVerificando estado de caja...")
-    sesion_abierta = apertura_cierre.obtener_estado_caja_actual()
-    if sesion_abierta:
-        current_session_id = int(sesion_abierta.get('ID_Sesion')) # Asegurar int
-        print(f"Hay una caja abierta. Sesión ID: {current_session_id}")
-        print(f"  Abierta por: {sesion_abierta.get('UsuarioApertura')} el {sesion_abierta.get('FechaApertura')} a las {sesion_abierta.get('HoraApertura')}")
-        print(f"  Saldo Inicial: {sesion_abierta.get('SaldoInicial')}")
-    else:
-        current_session_id = None
-        print("No hay ninguna caja abierta actualmente.")
-
-
-def menu_abrir_caja():
-    global current_session_id
-    if not current_user:
-        print("Error: Debe identificarse un usuario primero.")
-        set_current_user()
-        if not current_user: return
-
-    display_header()
-    if current_session_id:
-        print(f"Error: Ya hay una caja abierta (Sesión ID: {current_session_id}). No se puede abrir otra.")
-        return
-
-    print("\n--- Abrir Caja ---")
-    try:
-        saldo_inicial_str = input("Ingrese el saldo inicial de caja: ")
-        saldo_inicial = float(saldo_inicial_str.replace(',', '.'))
-        if saldo_inicial < 0:
-            print("El saldo inicial no puede ser negativo.")
-            return
-    except ValueError:
-        print("Error: Saldo inicial inválido. Debe ser un número.")
-        return
-
-    resultado = apertura_cierre.abrir_caja(saldo_inicial=saldo_inicial, usuario=current_user)
-    print(resultado.get("message"))
-    if resultado["status"] == "success":
-        current_session_id = resultado["id_sesion"]
-
-
-def menu_registrar_venta():
-    if not current_user:
-        print("Error: Debe identificarse un usuario primero."); set_current_user();
-        if not current_user: return
-    if not current_session_id:
-        print("Error: No hay una caja abierta. Abra una caja primero."); return
-
-    display_header()
-    print("\n--- Registrar Venta ---")
-    
-    # Selección de cliente
-    id_cliente = input("Ingrese ID o nombre del cliente (dejar vacío para Público General): ")
-    cliente_nombre = cliente_publico.obtener_cliente_para_venta(id_cliente if id_cliente else None)
-    print(f"Cliente seleccionado: {cliente_nombre}")
-
-    articulos_vendidos = []
-    continuar_agregando = True
-    while continuar_agregando:
-        print(f"\nAgregando artículo {len(articulos_vendidos) + 1}:")
-        id_articulo = input("  ID Artículo: ")
-        # Aquí podrías tener una función que busque el artículo y su precio en la hoja de Stock
-        # Por ahora, pedimos los datos manualmente
-        nombre_articulo = input("  Nombre Artículo: ")
-        try:
-            cantidad = int(input("  Cantidad: "))
-            precio_unitario = float(input("  Precio Unitario: ").replace(',', '.'))
-            if cantidad <= 0 or precio_unitario < 0:
-                print("Cantidad y precio deben ser positivos.")
-                continue
-        except ValueError:
-            print("Cantidad o precio inválido.")
-            continue
-        
-        subtotal = cantidad * precio_unitario
-        articulos_vendidos.append({
-            "id_articulo": id_articulo,
-            "nombre": nombre_articulo, # Idealmente se obtiene del stock
-            "cantidad": cantidad,
-            "precio_unitario": precio_unitario,
-            "subtotal": subtotal
-        })
-        if input("¿Agregar otro artículo? (s/n): ").lower() != 's':
-            continuar_agregando = False
-
-    if not articulos_vendidos:
-        print("No se agregaron artículos. Venta cancelada.")
-        return
-
-    total_venta = sum(item['subtotal'] for item in articulos_vendidos)
-    print(f"\nTotal de la Venta: ${total_venta:.2f}")
-
-    metodo_pago = input("Método de pago (EJ: EFECTIVO, TARJETA, TRANSFERENCIA): ").upper()
-    monto_recibido_str = input(f"Monto recibido ({metodo_pago}): ")
-    try:
-        monto_recibido = float(monto_recibido_str.replace(',', '.'))
-    except ValueError:
-        print("Monto recibido inválido.")
-        return
-
-    # Calculadora de vuelto
-    vuelto = calcular_vuelto(total_venta, monto_recibido, metodo_pago)
-    if vuelto is None and metodo_pago == "EFECTIVO" and monto_recibido < total_venta : # Si es None porque faltó dinero
-        print("Pago insuficiente. Venta no registrada.")
-        return
-    
-    confirmar = input("¿Confirmar y registrar esta venta? (s/n): ").lower()
-    if confirmar == 's':
-        resultado = registro_caja.registrar_venta(
-            id_sesion_caja=current_session_id,
-            articulos_vendidos=articulos_vendidos,
-            cliente=cliente_nombre,
-            metodo_pago=metodo_pago,
-            usuario=current_user,
-            total_venta=total_venta
-        )
-        print(resultado.get("message"))
-    else:
-        print("Venta cancelada por el usuario.")
-
-def menu_registrar_movimiento_caja(tipo_movimiento: str):
-    if not current_user:
-        print("Error: Debe identificarse un usuario primero."); set_current_user();
-        if not current_user: return
-    if not current_session_id:
-        print("Error: No hay una caja abierta. Abra una caja primero."); return
-
-    display_header()
-    print(f"\n--- Registrar {tipo_movimiento.capitalize()} de Caja ---")
-    descripcion = input(f"Descripción del {tipo_movimiento}: ")
-    try:
-        monto_str = input(f"Monto del {tipo_movimiento}: ")
-        monto = float(monto_str.replace(',', '.'))
-        if monto <= 0:
-            print("El monto debe ser positivo.")
-            return
-    except ValueError:
-        print("Monto inválido.")
-        return
-
-    resultado = registro_caja.registrar_movimiento(
-        id_sesion_caja=current_session_id,
-        tipo_movimiento=tipo_movimiento.upper(),
-        descripcion=descripcion,
-        monto=monto,
-        usuario=current_user
-    )
-    print(resultado.get("message"))
-
-
-def menu_cerrar_caja():
-    global current_session_id
-    if not current_user:
-        print("Error: Debe identificarse un usuario primero."); set_current_user();
-        if not current_user: return
-    if not current_session_id:
-        print("Error: No hay una caja abierta para cerrar."); return
-
-    display_header()
-    print("\n--- Cerrar Caja ---")
-    print("¡ATENCIÓN! Para cerrar la caja se requiere TOKEN DE ADMINISTRADOR.")
-
-    if not auth.solicitar_y_verificar_admin_token():
-        print("Autorización fallida. No se puede cerrar la caja.")
-        return
-
-    try:
-        saldo_final_str = input("Ingrese el SALDO FINAL CONTADO en caja (dinero real): ")
-        saldo_final_contado = float(saldo_final_str.replace(',', '.'))
-        if saldo_final_contado < 0:
-            print("El saldo final no puede ser negativo.")
-            return
-    except ValueError:
-        print("Saldo final inválido.")
-        return
-
-    # Opcional: Calcular saldo teórico esperado sumando movimientos de la sesión
-    # Esto es más complejo y requiere leer todos los registros de la sesión actual.
-    # saldo_teorico = calcular_saldo_teorico(current_session_id) # Función a implementar
-
-    resultado = apertura_cierre.cerrar_caja(
-        id_sesion=current_session_id,
-        saldo_final_contado=saldo_final_contado,
-        usuario_cierre=current_user # Quién está operando el sistema al cerrar
-        # saldo_teorico_esperado=saldo_teorico # Si lo calculas
-    )
-    print(resultado.get("message"))
-    if resultado["status"] == "success":
-        current_session_id = None # La caja ya no está activa
-
-def menu_configurar_horarios_caja():
-    if not current_user:
-        print("Error: Debe identificarse un usuario primero."); set_current_user();
-        if not current_user: return
-
-    display_header()
-    print("\n--- Configurar Horarios de Apertura/Cierre Automático ---")
-    print("¡ATENCIÓN! Esta acción requiere TOKEN DE ADMINISTRADOR.")
-
-    if not auth.solicitar_y_verificar_admin_token():
-        print("Autorización fallida.")
-        return
-
-    # Lógica para configurar horarios (guardar en SHEET_NAME_CONFIG_HORARIOS)
-    # Por ejemplo: Lunes-Apertura: 08:00, Lunes-Cierre: 20:00, etc.
-    print("Configuración de horarios (funcionalidad placeholder):")
-    try:
-        g_handler = GoogleSheetsHandler()
-        ws_config = g_handler.get_worksheet(SHEET_NAME_CONFIG_HORARIOS)
-        if not ws_config:
-            print(f"Creando hoja '{SHEET_NAME_CONFIG_HORARIOS}' para configuración...")
-            # g_handler.sheet.add_worksheet(title=SHEET_NAME_CONFIG_HORARIOS, rows="10", cols="5")
-            # ws_config = g_handler.get_worksheet(SHEET_NAME_CONFIG_HORARIOS)
-            # ws_config.append_row(["Dia", "Tipo", "Hora", "Activado"]) # Cabeceras
-            print("Hoja de configuración de horarios no existe y la creación automática no está implementada aquí.")
-            print("Por favor, cree la hoja manualmente con columnas: Dia, Tipo (Apertura/Cierre), Hora (HH:MM), Activado (SI/NO)")
-            return
-
-        print("Horarios actuales (si existen):")
-        records = ws_config.get_all_records()
-        for rec in records:
-            print(f"  - {rec.get('Dia')} {rec.get('Tipo')}: {rec.get('Hora')} (Activado: {rec.get('Activado')})")
-
-        dia = input("Día (Lunes, Martes, ..., Domingo, TODOS): ").capitalize()
-        tipo_op = input("Tipo (Apertura/Cierre): ").capitalize()
-        hora = input("Hora (HH:MM, ej. 08:00): ")
-        activado = input("¿Activar este horario? (SI/NO): ").upper()
-
-        # Validaciones básicas (puedes expandir)
-        if dia not in ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo", "Todos"]:
-            print("Día inválido."); return
-        if tipo_op not in ["Apertura", "Cierre"]:
-            print("Tipo de operación inválido."); return
-        try:
-            datetime.strptime(hora, "%H:%M")
-        except ValueError:
-            print("Formato de hora inválido."); return
-        if activado not in ["SI", "NO"]:
-            print("Valor para 'Activado' inválido."); return
-
-        # Aquí buscarías si ya existe una configuración para ese día y tipo para actualizarla,
-        # o agregar una nueva fila.
-        # Por simplicidad, solo agregamos:
-        ws_config.append_row([dia, tipo_op, hora, activado])
-        print("Horario guardado/actualizado.")
-        print("NOTA: La ejecución automática de estos horarios requiere un programador de tareas externo.")
-
-    except Exception as e:
-        print(f"Error configurando horarios: {e}")
-
-
-def menu_imprimir_facturas_dia():
-    # from gestion import fiscal # Mover import aquí para evitar error si el módulo no existe aún
-    # Este import se movió al inicio del archivo `main.py` para que esté disponible
-    # pero se comenta si el módulo `fiscal` aún no está completamente definido o da problemas.
-    # Asegúrate de crear `gestion/fiscal.py` con las funciones `obtener_facturas_del_dia_para_imprimir` y `enviar_facturas_a_impresora_fiscal`.
-    # Si no está listo, puedes comentar esta opción del menú o la llamada.
-    try:
-        from gestion import fiscal
-    except ImportError:
-        print("Módulo 'fiscal' no encontrado o con errores. Función no disponible.")
-        return
-
-    if not current_user:
-        print("Error: Debe identificarse un usuario primero."); set_current_user();
-        if not current_user: return
-    if not current_session_id:
-        print("Error: No hay una sesión de caja activa para obtener facturas."); return
-
-    display_header()
-    print("\n--- Imprimir Facturas del Día (Sesión Actual) ---")
-    # No requiere token de admin para imprimir, pero sí para reimprimir o anular (no implementado)
-
-    facturas = fiscal.obtener_facturas_del_dia_para_imprimir(current_session_id)
-    if facturas:
-        print(f"Se encontraron {len(facturas)} facturas.")
-        confirmar = input("¿Desea enviarlas a la impresora fiscal? (s/n): ").lower()
-        if confirmar == 's':
-            resultado = fiscal.enviar_facturas_a_impresora_fiscal(facturas)
-            print(resultado.get("message"))
-    else:
-        print("No se encontraron facturas para la sesión actual para imprimir.")
-
-
-def menu_admin_operaciones():
-    display_header()
-    print("\n--- Operaciones de Administrador ---")
-    print("¡ATENCIÓN! Estas acciones requieren TOKEN DE ADMINISTRADOR.")
-
-    if not auth.solicitar_y_verificar_admin_token():
-        print("Autorización fallida.")
-        return
-
-    while True:
-        display_header() # Mostrar usuario y sesión
-        print("\n--- Menú Administrador ---")
-        print("1. Forzar generación de nuevo Token de Administrador")
-        print("2. Eliminar registro de caja (¡PELIGROSO!)")
-        # print("3. Modificar horario de apertura/cierre (ya en menú principal con token)")
-        print("0. Volver al menú principal")
-        
-        op_admin = input("Seleccione una opción de administrador: ")
-
-        if op_admin == '1':
-            nuevo_token = auth.generar_y_guardar_admin_token(forzar_nuevo=True)
-            print(f"Se ha generado un nuevo token de administrador: {nuevo_token}")
-            print("El token anterior ya no es válido.")
-            input("Presione Enter para continuar...")
-        elif op_admin == '2':
-            print("Eliminar registro de caja (Funcionalidad NO IMPLEMENTADA AÚN)")
-            print("Esta acción es muy delicada y requiere cuidado.")
-            # Lógica:
-            # 1. Pedir ID del registro a eliminar (de la hoja CajaRegistros)
-            # 2. Confirmar fuertemente la acción.
-            # 3. g_handler.delete_row(SHEET_NAME_CAJA_MOVIMIENTOS, row_index) o similar
-            # 4. Registrar esta eliminación en un log de auditoría.
-            input("Presione Enter para continuar...")
-        elif op_admin == '0':
-            break
-        else:
-            print("Opción no válida.")
-
-def main_loop():
-    global current_user, current_session_id
-
-    # Generar/cargar token de admin al inicio (solo para que exista, el admin lo "conoce")
-    auth.generar_y_guardar_admin_token()
-
-    set_current_user()
-    check_active_cash_session() # Verificar si ya hay una caja abierta al iniciar
-
-    while True:
-        display_header()
-        print("\n--- Menú Principal ---")
-        if not current_session_id:
-            print("1. Abrir Caja")
-        else:
-            print(f"AVISO: Caja ABIERTA (Sesión ID: {current_session_id})")
-            print("2. Registrar Venta")
-            print("3. Registrar Ingreso de Caja")
-            print("4. Registrar Egreso de Caja")
-            print("5. Cerrar Caja")
-            print("6. Imprimir Facturas del Día (Sesión Actual)")
-
-        print("7. Cambiar Usuario")
-        print("8. Configurar Horarios de Apertura/Cierre (Admin)")
-        print("9. Operaciones de Administrador (Admin)")
-        print("0. Salir")
-        
-        opcion = input("Seleccione una opción: ")
-
-        if opcion == '1' and not current_session_id:
-            menu_abrir_caja()
-        elif opcion == '2' and current_session_id:
-            menu_registrar_venta()
-        elif opcion == '3' and current_session_id:
-            menu_registrar_movimiento_caja("INGRESO")
-        elif opcion == '4' and current_session_id:
-            menu_registrar_movimiento_caja("EGRESO")
-        elif opcion == '5' and current_session_id:
-            menu_cerrar_caja()
-        elif opcion == '6' and current_session_id:
-            menu_imprimir_facturas_dia()
-        elif opcion == '7':
-            set_current_user()
-            # Al cambiar de usuario, no cambiamos la sesión de caja si está abierta,
-            # ya que la caja pertenece a la apertura, no al usuario que la opera momentáneamente.
-            # Las operaciones se registrarán con el nuevo 'current_user'.
-        elif opcion == '8':
-            menu_configurar_horarios_caja()
-        elif opcion == '9':
-            menu_admin_operaciones()
-        elif opcion == '0':
-            print("Saliendo del sistema...")
-            break
-        else:
-            print("Opción no válida. Intente de nuevo.")
-        
-        if opcion not in ['7', '8', '9', '0']: # Para no recargar estado de caja innecesariamente
-            check_active_cash_session() # Actualizar estado de la sesión por si cambió
-
-        input("\nPresione Enter para continuar...")
-
-
-if __name__ == "__main__":
+# --- Verificación Inicial (similar al if __name__ == "__main__" de tu CLI) ---
+# Esto se ejecutará una vez cuando la aplicación FastAPI se inicie.
+try:
     if not GOOGLE_SHEET_ID:
-        print("Error Crítico: GOOGLE_SHEET_ID no está configurado en .env o config.py")
-        print("El sistema no puede funcionar sin esto.")
-        sys.exit(1)
-    try:
-        # Intento de conexión inicial para verificar credenciales y Sheet ID
-        print("Verificando conexión inicial a Google Sheets...")
-        g_handler_test = GoogleSheetsHandler()
-        if not g_handler_test.client:
-            print("Fallo en la conexión inicial a Google Sheets. Verifique credenciales y Sheet ID.")
-            sys.exit(1)
-        print("Conexión a Google Sheets verificada.")
-        # Aquí también podrías verificar la existencia de las hojas principales.
-    except FileNotFoundError as fnf_error:
-        print(f"Error de archivo de credenciales: {fnf_error}")
-        sys.exit(1)
-    except ValueError as val_error:
-        print(f"Error de configuración: {val_error}")
-        sys.exit(1)
-    except Exception as e:
-        print(f"Error inesperado durante la inicialización: {e}")
-        # sys.exit(1) # Podrías salir, o intentar continuar si no es crítico
+        raise ValueError("Error Crítico: GOOGLE_SHEET_ID no está configurado.")
+    print("Verificando conexión inicial a Google Sheets para la API...")
+    g_handler_test = GoogleSheetsHandler()
+    if not g_handler_test.client:
+        raise ConnectionError("Fallo en la conexión inicial a Google Sheets para la API.")
+    print("Conexión a Google Sheets para la API verificada.")
+    # Generar token de admin al inicio si no existe, para pruebas de admin
+    mod_auth.generar_y_guardar_admin_token()
+except Exception as e_init:
+    print(f"Error fatal durante la inicialización de la API: {e_init}")
+    # En un entorno de producción, podrías querer que la app no inicie si falla esta verificación.
+    # Por ahora, solo imprimimos el error.
+    # sys.exit(1) # Descomentar para salir si la inicialización falla
 
-    main_loop()
+
+# --- Modelos Pydantic para Request/Response (Validación de Datos) ---
+class RespuestaGenerica(BaseModel):
+    status: str
+    message: str
+    data: Optional[Dict[str, Any]] = None
+
+class AbrirCajaRequest(BaseModel):
+    saldo_inicial: float = Field(..., gt=-0.00001) # gt=0 para asegurar que no sea negativo
+    usuario: str
+
+class AbrirCajaResponseData(BaseModel):
+    id_sesion: int
+
+class SesionInfo(BaseModel):
+    ID_Sesion: Any # Puede ser int o str dependiendo de cómo se guarde/lea
+    UsuarioApertura: Optional[str] = None
+    FechaApertura: Optional[str] = None
+    HoraApertura: Optional[str] = None
+    SaldoInicial: Optional[float] = None
+    # Añade más campos si los devuelve obtener_estado_caja_actual
+
+class EstadoCajaResponse(BaseModel):
+    status: str
+    caja_abierta: bool
+    sesion_info: Optional[SesionInfo] = None
+    message: Optional[str] = None
+
+class ArticuloVendido(BaseModel):
+    id_articulo: str
+    nombre: str
+    cantidad: int = Field(..., gt=0)
+    precio_unitario: float = Field(..., ge=0)
+    subtotal: float
+
+class RegistrarVentaRequest(BaseModel):
+    id_sesion_caja: int
+    articulos_vendidos: List[ArticuloVendido]
+    cliente: Optional[str] = "Público General" # Asumir default si no se provee
+    metodo_pago: str
+    usuario: str
+    total_venta: float # El frontend debería calcularlo y enviarlo
+    # monto_recibido: Optional[float] = None # Para cálculo de vuelto si se hace en backend
+
+class RegistrarVentaResponseData(BaseModel):
+    id_registro_base: Any # Puede ser str o int
+
+class MovimientoCajaRequest(BaseModel):
+    id_sesion_caja: int
+    # tipo_movimiento: str # Se define en la ruta del endpoint
+    descripcion: str
+    monto: float = Field(..., gt=0)
+    usuario: str
+
+class MovimientoCajaResponseData(BaseModel):
+    id_registro: Any
+
+class CerrarCajaRequest(BaseModel):
+    id_sesion: int
+    saldo_final_contado: float = Field(..., ge=0)
+    usuario_cierre: str
+    token_admin: str # El token de admin se envía en el cuerpo
+
+class CerrarCajaResponseData(BaseModel):
+    id_sesion: int
+    diferencia: float
+
+# --- Dependencia para Verificar Token de Administrador ---
+async def verificar_token_admin_dependencia(x_admin_token: Optional[str] = Header(None)):
+    """
+    Dependencia para verificar el token de admin pasado en la cabecera X-Admin-Token.
+    Si se pasa en el cuerpo de la request (ej. CerrarCajaRequest), esa verificación se hará en el endpoint.
+    Esta dependencia es para proteger endpoints enteros.
+    """
+    if not x_admin_token:
+        raise HTTPException(status_code=401, detail="Cabecera X-Admin-Token requerida para esta operación.")
+    if not mod_auth.verificar_admin_token(x_admin_token):
+        raise HTTPException(status_code=403, detail="Token de Administrador inválido o expirado.")
+    return True # Token válido
+
+# --- Endpoints de la API para Caja ---
+
+@app.get("/", tags=["General"])
+async def read_root():
+    return {"message": "Bienvenido a la API del Sistema de Gestión IMA. El backend está ejecutándose."}
+
+@app.get("/caja/estado", response_model=EstadoCajaResponse, tags=["Caja"])
+async def api_obtener_estado_caja():
+    """Verifica si hay una caja abierta y devuelve su información."""
+    try:
+        sesion_data = mod_apertura_cierre.obtener_estado_caja_actual()
+        if sesion_data:
+            # Convertir ID_Sesion a int si es necesario y está presente
+            if 'ID_Sesion' in sesion_data and sesion_data['ID_Sesion'] is not None:
+                try:
+                    sesion_data['ID_Sesion'] = int(sesion_data['ID_Sesion'])
+                except ValueError:
+                    # Manejar caso donde ID_Sesion no es un int válido, o dejarlo como está
+                    pass 
+            return EstadoCajaResponse(status="success", caja_abierta=True, sesion_info=SesionInfo(**sesion_data))
+        else:
+            return EstadoCajaResponse(status="success", caja_abierta=False, message="No hay ninguna caja abierta actualmente.")
+    except Exception as e:
+        print(f"Error en api_obtener_estado_caja: {e}")
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
+
+@app.post("/caja/abrir", response_model=RespuestaGenerica, tags=["Caja"])
+async def api_abrir_caja(request_data: AbrirCajaRequest):
+    """Abre una nueva sesión de caja."""
+    try:
+        # Aquí podrías añadir lógica para validar si el usuario tiene permiso para abrir caja,
+        # o si está dentro de horarios permitidos (usando SHEET_NAME_CONFIG_HORARIOS).
+        resultado = mod_apertura_cierre.abrir_caja(
+            saldo_inicial=request_data.saldo_inicial,
+            usuario=request_data.usuario
+        )
+        if resultado.get("status") == "success":
+            return RespuestaGenerica(status="success", message=resultado.get("message"), data={"id_sesion": resultado.get("id_sesion")})
+        else:
+            raise HTTPException(status_code=400, detail=resultado.get("message", "Error al abrir caja."))
+    except Exception as e:
+        print(f"Error en api_abrir_caja: {e}")
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
+
+
+@app.post("/caja/ventas/registrar", response_model=RespuestaGenerica, tags=["Caja - Ventas"])
+async def api_registrar_venta(request_data: RegistrarVentaRequest):
+    """Registra una nueva venta en la sesión de caja activa."""
+    try:
+        # Convertir lista de ArticuloVendido (Pydantic) a lista de dicts si la función backend espera dicts
+        articulos_dict_list = [dict(art) for art in request_data.articulos_vendidos]
+
+        # Validar si la sesión de caja está abierta (podría hacerse como dependencia o aquí)
+        sesion_activa = mod_apertura_cierre.obtener_estado_caja_actual()
+        if not sesion_activa or int(sesion_activa.get("ID_Sesion")) != request_data.id_sesion_caja:
+             raise HTTPException(status_code=400, detail=f"La sesión de caja {request_data.id_sesion_caja} no está activa o no coincide.")
+
+        # Obtener nombre del cliente (tu CLI lo hacía así)
+        nombre_cliente = mod_cliente_publico.obtener_cliente_para_venta(request_data.cliente if request_data.cliente else None)
+
+        resultado = mod_registro_caja.registrar_venta(
+            id_sesion_caja=request_data.id_sesion_caja,
+            articulos_vendidos=articulos_dict_list,
+            cliente=nombre_cliente,
+            metodo_pago=request_data.metodo_pago.upper(),
+            usuario=request_data.usuario,
+            total_venta=request_data.total_venta
+        )
+        # Cálculo de vuelto (si el frontend no lo hace)
+        # vuelto = mod_registro_caja.calcular_vuelto(request_data.total_venta, request_data.monto_recibido, request_data.metodo_pago)
+
+        if resultado.get("status") == "success":
+            return RespuestaGenerica(status="success", message=resultado.get("message"), data={"id_registro_base": resultado.get("id_registro_base")}) #, "vuelto": vuelto
+        else:
+            raise HTTPException(status_code=400, detail=resultado.get("message", "Error al registrar venta."))
+    except Exception as e:
+        print(f"Error en api_registrar_venta: {e}")
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
+
+@app.post("/caja/ingresos/registrar", response_model=RespuestaGenerica, tags=["Caja - Movimientos"])
+async def api_registrar_ingreso(request_data: MovimientoCajaRequest):
+    """Registra un ingreso de efectivo en la caja."""
+    try:
+        # Asumiendo que tu mod_registro_caja.registrar_movimiento ahora es más específico o tienes una función dedicada
+        # Si registrar_movimiento ya no existe, usa registrar_ingreso_efectivo
+        if hasattr(mod_registro_caja, 'registrar_ingreso_efectivo'):
+            resultado = mod_registro_caja.registrar_ingreso_efectivo(
+                id_sesion_caja=request_data.id_sesion_caja,
+                concepto=request_data.descripcion,
+                monto=request_data.monto,
+                usuario=request_data.usuario
+            )
+        elif hasattr(mod_registro_caja, 'registrar_movimiento'): # Fallback si aún tienes registrar_movimiento genérico
+             resultado = mod_registro_caja.registrar_movimiento(
+                id_sesion_caja=request_data.id_sesion_caja,
+                tipo_movimiento="INGRESO",
+                descripcion=request_data.descripcion,
+                monto=request_data.monto,
+                usuario=request_data.usuario
+            )
+        else:
+            raise HTTPException(status_code=501, detail="Función de registro de ingreso no implementada en el backend.")
+
+        if resultado.get("status") == "success":
+            return RespuestaGenerica(status="success", message=resultado.get("message"), data={"id_registro": resultado.get("id_registro")})
+        else:
+            raise HTTPException(status_code=400, detail=resultado.get("message", "Error al registrar ingreso."))
+    except Exception as e:
+        print(f"Error en api_registrar_ingreso: {e}")
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
+
+@app.post("/caja/egresos/registrar", response_model=RespuestaGenerica, tags=["Caja - Movimientos"])
+async def api_registrar_egreso(request_data: MovimientoCajaRequest):
+    """Registra un egreso de efectivo de la caja."""
+    try:
+        # Similar al ingreso, usa la función específica si existe
+        if hasattr(mod_registro_caja, 'registrar_egreso_efectivo'):
+            resultado = mod_registro_caja.registrar_egreso_efectivo(
+                id_sesion_caja=request_data.id_sesion_caja,
+                concepto=request_data.descripcion,
+                monto=request_data.monto,
+                usuario=request_data.usuario
+            )
+        elif hasattr(mod_registro_caja, 'registrar_movimiento'): # Fallback
+            resultado = mod_registro_caja.registrar_movimiento(
+                id_sesion_caja=request_data.id_sesion_caja,
+                tipo_movimiento="EGRESO",
+                descripcion=request_data.descripcion,
+                monto=request_data.monto,
+                usuario=request_data.usuario
+            )
+        else:
+            raise HTTPException(status_code=501, detail="Función de registro de egreso no implementada en el backend.")
+
+        if resultado.get("status") == "success":
+            return RespuestaGenerica(status="success", message=resultado.get("message"), data={"id_registro": resultado.get("id_registro")})
+        else:
+            raise HTTPException(status_code=400, detail=resultado.get("message", "Error al registrar egreso."))
+    except Exception as e:
+        print(f"Error en api_registrar_egreso: {e}")
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
+
+
+@app.post("/caja/cerrar", response_model=RespuestaGenerica, tags=["Caja"])
+async def api_cerrar_caja(request_data: CerrarCajaRequest):
+    """Cierra la sesión de caja activa. Requiere token de administrador en el cuerpo."""
+    try:
+        # Verificar token de admin enviado en el cuerpo de la request
+        if not mod_auth.verificar_admin_token(request_data.token_admin):
+            raise HTTPException(status_code=403, detail="Token de Administrador inválido o expirado.")
+
+        resultado = mod_apertura_cierre.cerrar_caja(
+            id_sesion=request_data.id_sesion,
+            saldo_final_contado=request_data.saldo_final_contado,
+            usuario_cierre=request_data.usuario_cierre
+        )
+        if resultado.get("status") == "success":
+            return RespuestaGenerica(status="success", message=resultado.get("message"), data={"id_sesion": resultado.get("id_sesion"), "diferencia": resultado.get("diferencia")})
+        else:
+            # Los errores específicos (ej: "ya cerrada", "no encontrada") deberían venir en el message
+            raise HTTPException(status_code=400, detail=resultado.get("message", "Error al cerrar caja."))
+    except Exception as e:
+        print(f"Error en api_cerrar_caja: {e}")
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
+
+
+# --- Endpoints de Administración (Protegidos) ---
+# Ejemplo de cómo proteger un endpoint con una dependencia
+@app.post("/admin/nuevo-token", response_model=RespuestaGenerica, tags=["Administración"], dependencies=[Depends(verificar_token_admin_dependencia)])
+async def api_generar_nuevo_token_admin(usuario_solicitante: str = Body(..., embed=True)):
+    """Genera un nuevo token de administrador. Requiere un token de admin válido en la cabecera X-Admin-Token."""
+    try:
+        # El usuario_solicitante podría ser el usuario admin que está pidiendo generar el token
+        # para un nuevo periodo o para otro admin (si tuvieras esa lógica).
+        # Por ahora, simplemente lo usamos para el registro.
+        nuevo_token = mod_auth.generar_y_guardar_admin_token(usuario_generador=usuario_solicitante, forzar_nuevo=True)
+        return RespuestaGenerica(status="success", message=f"Nuevo token de admin generado para {usuario_solicitante}.", data={"nuevo_token": nuevo_token})
+    except Exception as e:
+        print(f"Error en api_generar_nuevo_token_admin: {e}")
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
+
+
+# --- Endpoints para Configuración de Horarios (Ejemplo) ---
+# (La lógica de tu CLI para esto era un placeholder, necesitarías definirla mejor)
+class HorarioConfigRequest(BaseModel):
+    dia: str
+    tipo_operacion: str # "Apertura" o "Cierre"
+    hora: str # Formato HH:MM
+    activado: bool
+
+@app.post("/admin/config/horarios", tags=["Administración - Configuración"], dependencies=[Depends(verificar_token_admin_dependencia)])
+async def api_configurar_horario_caja(config_data: HorarioConfigRequest):
+    """Configura un horario de apertura/cierre automático (Placeholder). Requiere token de admin."""
+    # Aquí iría la lógica para guardar en SHEET_NAME_CONFIG_HORARIOS
+    # similar a tu menu_configurar_horarios_caja pero adaptado para API.
+    # Por ahora, es un placeholder.
+    print(f"Recibido para configurar horario: {config_data}")
+    # g_handler = GoogleSheetsHandler()
+    # ws_config = g_handler.get_worksheet(SHEET_NAME_CONFIG_HORARIOS)
+    # ... (validaciones y lógica de guardado) ...
+    return {"status": "info", "message": "Funcionalidad de configuración de horarios en desarrollo.", "data_recibida": dict(config_data)}
+
+
+# --- CORS (Cross-Origin Resource Sharing) ---
+# Descomenta y ajusta si tu frontend se sirve desde un dominio diferente
+# from fastapi.middleware.cors import CORSMiddleware
+# origins = [
+#    "http://localhost", # Si el frontend corre en el mismo server pero diferente puerto
+#    "http://localhost:3000", # Ejemplo para React/Vue/Angular en desarrollo
+#    "https://tu-dominio-frontend.com", # Tu frontend en producción
+# ]
+# app.add_middleware(
+#    CORSMiddleware,
+#    allow_origins=origins,
+#    allow_credentials=True,
+#    allow_methods=["*"],
+#    allow_headers=["*"],
+# )
+
+# Para ejecutar esta API (desde la raíz del proyecto sistema_gestion_ima/):
+# Con venv activado:  uvicorn back.main:app --host 0.0.0.0 --port 8000 --reload
