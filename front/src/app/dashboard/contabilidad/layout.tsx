@@ -1,4 +1,5 @@
 import NavContabilidad from "@/components/interface/NavContabilidad";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 
 const links = [
@@ -13,8 +14,10 @@ function ContabilidadLayout({ children } : { children: React.ReactNode }) {
 
   return (
     <>
-      <NavContabilidad links={links}/>
+    <ProtectedRoute allowedRoles={["admin", "contable"]}>
 
+      <NavContabilidad links={links}/>
+      
       <main className="w-full relative overflow-y-auto">
 
         <div className="sm:py-6 xl:py-8">
@@ -22,6 +25,7 @@ function ContabilidadLayout({ children } : { children: React.ReactNode }) {
         </div>
 
       </main>
+    </ProtectedRoute>
     </>
   );
 }

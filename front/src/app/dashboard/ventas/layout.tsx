@@ -1,13 +1,14 @@
+"use client"
 
-function VentasLayout({ children }: { children: React.ReactNode }) {
+import ProtectedRoute from "@/components/ProtectedRoute"
 
-  return (
+/* -------------------------------------------- PANEL VENTAS -------------------------------------------- */
 
-    <div>
+export default function VentasLayout({ children }: { children: React.ReactNode }) {
+
+  return ( 
+    <ProtectedRoute allowedRoles={["admin", "cajero"]}>
       {children}
-    </div>
-    
+    </ProtectedRoute>
   )
 }
-
-export default VentasLayout;

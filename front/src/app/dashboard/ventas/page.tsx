@@ -5,9 +5,9 @@ import { Input } from "@/components/ui/input";
 import FormVentas from "./FormVentas";
 import { useState } from "react";
 
+/* -------------------------------------------- PANEL VENTAS -------------------------------------------- */
 
 function DashboardVenta() {
-
 
   /* Funcion para añadir items al panel de productos principal */
 
@@ -44,7 +44,6 @@ function DashboardVenta() {
           Historial de Pedidos
         </a>
       </div>
-
 
 
       {/* Bloque Form Cajero + Resumen de Productos */}

@@ -1,43 +1,81 @@
 "use client"
 
-import Link from 'next/link'
+/* -------------------------------------------- LOGIN INICIAL -------------------------------------------- */
+
 import Image from 'next/image'
 import "../styles/globals.css"
 
-function Login() {
-  
-  return (
+import { useRouter } from 'next/navigation'
+import { Role, useAuthStore } from '@/lib/authStore'
+import { FormEvent, useState } from 'react'
 
+function Login() {
+
+  const router = useRouter()
+  const setRole = useAuthStore(state => state.setRole)
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+
+  const handleLogin = (e: FormEvent) => {
+    e.preventDefault()
+
+    // Acá simulamos los usuarios y roles
+    const users = {
+      admin: { password: '123', role: 'admin' },
+      cajero: { password: 'caja123', role: 'cajero' },
+      contador: { password: '123', role: 'contable' }
+    }
+
+    const user = users[username as keyof typeof users]
+
+    if (user && user.password === password) {
+      setRole(user.role as Role)  // Guarda el rol en Zustand
+      router.push('/dashboard')   // Redirige al dashboard inicial
+    } else {
+      alert('Credenciales incorrectas')
+    }
+  }
+
+  return (
     <div className="flex flex-col h-screen justify-center items-center gap-10 bg-emerald-600">
-     
       <Image src="/logo.png" alt="Swing Jugos" width={70} height={70} />
 
       <form 
-      className="form-login bg-amber-500 shadow-2xl flex flex-col items-center justify-center w-1/3 p-8 gap-10 rounded-4xl"
-      action="">
-
+        onSubmit={handleLogin}
+        className="form-login bg-amber-500 shadow-2xl flex flex-col items-center justify-center w-1/3 p-8 gap-10 rounded-4xl"
+      >
         <div className="flex flex-col gap-2">
-          <label htmlFor="name" className="text-white">Usuario</label>
-          <input id="name" type="text" />
+          <label htmlFor="username" className="text-white">Usuario</label>
+          <input 
+            id="username" 
+            type="text" 
+            value={username} 
+            onChange={(e) => setUsername(e.target.value)} 
+          />
         </div>
 
         <div className="flex flex-col gap-2">
-          <label htmlFor="name" className="text-white">Contraseña</label>
-          <input id="name" type="password" />
+          <label htmlFor="password" className="text-white">Contraseña</label>
+          <input 
+            id="password" 
+            type="password" 
+            value={password}
+            onChange={(e) => setPassword(e.target.value)} 
+          />
         </div>
 
         <div className="w-full flex flex-col items-center gap-2 ">
-          <Link href="/dashboard"
-          className="flex justify-center items-center p-2 w-1/2 text-white border-2 border-white rounded-xl cursor-pointer transition hover:bg-amber-700"
-          type="submit">Ingresar</Link>
+          <button 
+            type="submit" 
+            className="flex justify-center items-center p-2 w-1/2 text-white border-2 border-white bg-amber-700 rounded-xl cursor-pointer transition hover:bg-amber-900"
+          >
+            Ingresar
+          </button>
         </div>
 
-        <a href="" className="text-black">¿Olvidaste tu contraseña?</a>
-
+        <a href="" className="text-white font-semibold hover:text-amber-950 transition">¿Olvidaste tu contraseña?</a>
       </form>
-
     </div>
-
   );
 }
 
