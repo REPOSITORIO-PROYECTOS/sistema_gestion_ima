@@ -125,7 +125,7 @@ function FormVentas({
     };
 
     try {
-      const response = await fetch("http://localhost:8000/caja/ventas/registrar", {
+      const response = await fetch("https://swingjugos.netlify.app/caja/ventas/registrar", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -326,8 +326,6 @@ function FormVentas({
           />
         </div>
 
-
-        {/* FALTA DESCUENTO - NOMINAL O PORCENTUAL */}
 
         {/* Total Venta */}
         <div className="flex flex-row gap-4 justify-between items-center mt-4 px-2">
