@@ -72,7 +72,12 @@ function DashboardVenta() {
 
 
         {/* Formulario de Ventas */}
-        <FormVentas onAgregarProducto={handleAgregarProducto} totalVenta={totalVenta} />
+        <FormVentas
+          onAgregarProducto={handleAgregarProducto}
+          totalVenta={totalVenta}
+          productosVendidos={productos}
+        />
+
           
       </div>
 

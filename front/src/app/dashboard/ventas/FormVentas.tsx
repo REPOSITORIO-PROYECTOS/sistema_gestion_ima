@@ -29,11 +29,13 @@ const tipoCliente = [
 
 
 function FormVentas({
-  onAgregarProducto,  /* Agrega productos al resumen */
-  totalVenta          /* Valor total de todos los productos */
+  onAgregarProducto,    /* Agrega productos al resumen - no es el submit */
+  totalVenta,           /* Valor total de todos los productos - costo total del pedido */
+  productosVendidos     /* Lista con todos los productos vendidos y su cantidad */
 }: {
-  onAgregarProducto: (prod: { tipo: string; cantidad: number; precioTotal: number }) => void,   // f()
-  totalVenta: number                                                                            
+  onAgregarProducto: (prod: { tipo: string; cantidad: number; precioTotal: number }) => void,
+  totalVenta: number,
+  productosVendidos: { tipo: string; cantidad: number; precioTotal: number }[]
 }) {
 
   // Listado de productos - para nuevos prod, agregar en el array de arriba
@@ -72,7 +74,6 @@ function FormVentas({
     setCantidad(1);
   }
 
-
   // Hook para mostrar la calculadora de vuelto si se selecciona efectivo
   useEffect(() => {
     if (metodoPago === 'efectivo' && typeof montoPagado === 'number') {
@@ -93,21 +94,60 @@ function FormVentas({
   }
 }, [montoPagado, metodoPago, totalVenta]);
 
+
+
   // Registrar la venta completa - falta terminar
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+
     e.preventDefault();
+  
+    // Objeto resumen de toda la venta generada
+    const ventaPayload = {
+      id_sesion_caja: 1,
+      id_cliente: tipoClienteSeleccionado.id, // Este es el ID real
+      usuario: "admin",
+      metodo_pago: metodoPago.toUpperCase(),
+      total_venta: totalVenta,
+      paga_con: metodoPago === "efectivo" ? montoPagado : undefined,
+      quiere_factura: true,
+      tipo_comprobante_solicitado: "Ticket No Fiscal", // o según la selección de ticket/comprobante
+      articulos_vendidos: productosVendidos.map((p) => {
+        const productoReal = productos.find(prod => prod.nombre === p.tipo);
+        return {
+          id_articulo: productoReal?.id ?? "0",
+          nombre: productoReal?.nombre ?? p.tipo,
+          cantidad: p.cantidad,
+          precio_unitario: productoReal?.precio ?? 0,
+          subtotal: p.precioTotal,
+          tasa_iva: 21.0 // IVA 21%?
+        };
+      })
+    };
 
-    // Acá podrías enviar todo el resumen de venta
-    console.log({
-      tipoCliente: tipoClienteSeleccionado.nombre,
-      metodoPago,
-      montoPagado,
-      vuelto,
-      observaciones,
-    });
+    try {
+      const response = await fetch("http://localhost:8000/caja/ventas/registrar", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(ventaPayload)
+      });
 
-    // Mostrar alerta y limpiar inputs cuando se haga el submit! 
+      if (response.ok) {
+        const data = await response.json();
+        alert("✅ Venta registrada exitosamente: " + data.message);
+        // Opcional: resetear formulario y productos
+      } else {
+        const error = await response.json();
+        alert("❌ Error al registrar venta: " + error.detail);
+      }
+    } catch (error) {
+      console.error("Detalles del error:", error);
+      alert("❌ Error al registrar venta:\n" + JSON.stringify(error, null, 2));
+    }
   };
+
+
 
 
   return (
