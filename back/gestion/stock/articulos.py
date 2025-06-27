@@ -1,46 +1,100 @@
-# gestion/stock/__init__.py
-# (Archivo vacío)
+# back/gestion/stock/articulos.py
 
-# gestion/stock/articulos.py
-from utils.sheets_google_handler import GoogleSheetsHandler
-from config import SHEET_NAME_ARTICULOS # Necesitarás definir esta hoja y su estructura
-
-# g_handler = GoogleSheetsHandler() # Podría instanciarse aquí
-
-# ---- SIMULACIÓN INICIAL ----
-ARTICULOS_SIMULADOS_DB = {
-    "PROD001": {"ID_Articulo": "PROD001", "Descripcion": "Coca Cola 600ml", "StockActual": 50, "CostoUltimo": 0.80, "PrecioVenta": 1.50},
-    "PROD002": {"ID_Articulo": "PROD002", "Descripcion": "Galletas Oreo", "StockActual": 100, "CostoUltimo": 0.40, "PrecioVenta": 0.80},
-    "MATPRIMA01": {"ID_Articulo": "MATPRIMA01", "Descripcion": "Harina 000 1kg", "StockActual": 20, "CostoUltimo": 0.50, "PrecioVenta": None}, # Materia prima
-}
-
-def obtener_articulo_por_id_simulado(id_articulo: str):
-    """Función simulada para obtener datos de un artículo."""
-    print(f"[STOCK_ARTICULOS_SIMULADO] Buscando artículo: {id_articulo}")
-    return ARTICULOS_SIMULADOS_DB.get(id_articulo)
-
-# --- FIN SIMULACIÓN ---
-
+from mysql.connector import Error
+from back.utils.mysql_handler import get_db_connection
 
 def obtener_articulo_por_id(id_articulo: str):
     """
-    Obtiene un artículo específico por su ID desde Google Sheets.
-    (Implementación real cuando desarrollemos este módulo)
+    Obtiene un artículo específico por su ID desde la base de datos MySQL.
+    Devuelve un diccionario con los datos del artículo o None si no se encuentra.
     """
-    # try:
-    #     g_handler = GoogleSheetsHandler()
-    #     ws = g_handler.get_worksheet(SHEET_NAME_ARTICULOS)
-    #     if ws:
-    #         # Asumiendo que ID_Articulo es la primera columna y la hoja tiene encabezados
-    #         # Esto es ineficiente para búsquedas frecuentes. Considerar cargar todo en memoria o mejor indexación.
-    #         records = ws.get_all_records()
-    #         for record in records:
-    #             if record.get('ID_Articulo') == id_articulo:
-    #                 return record # Devuelve el diccionario del artículo
-    #         return None # No encontrado
-    # except Exception as e:
-    #     print(f"Error obteniendo artículo {id_articulo}: {e}")
-    #     return None
-    print(f"ADVERTENCIA: Usando obtener_articulo_por_id_simulado para {id_articulo}")
-    return obtener_articulo_por_id_simulado(id_articulo) # Temporalmente usar la simulación
+    conn = get_db_connection()
+    if not conn:
+        print("Error de conexión al buscar artículo.")
+        return None
 
+    # Usamos un cursor de diccionario para obtener un resultado fácil de usar
+    cursor = conn.cursor(dictionary=True)
+    try:
+        query = "SELECT * FROM articulos WHERE id_articulo = %s"
+        cursor.execute(query, (id_articulo,))
+        articulo = cursor.fetchone()
+        
+        if articulo:
+            print(f"[ARTICULOS_DB] Artículo encontrado: {id_articulo}")
+            return articulo
+        else:
+            print(f"[ARTICULOS_DB] Artículo con ID {id_articulo} no encontrado.")
+            return None
+    except Error as e:
+        print(f"Error de base de datos al obtener artículo {id_articulo}: {e}")
+        return None
+    finally:
+        if conn.is_connected():
+            cursor.close()
+            conn.close()
+
+def obtener_todos_los_articulos(limite: int = 100, pagina: int = 1):
+    """
+    Obtiene una lista paginada de todos los artículos de la base de datos.
+    Ideal para mostrar en una tabla en el frontend.
+    """
+    conn = get_db_connection()
+    if not conn:
+        return []
+
+    cursor = conn.cursor(dictionary=True)
+    try:
+        # Calculamos el offset para la paginación
+        offset = (pagina - 1) * limite
+        
+        query = "SELECT * FROM articulos ORDER BY id_articulo LIMIT %s OFFSET %s"
+        cursor.execute(query, (limite, offset))
+        articulos = cursor.fetchall()
+        
+        # También podríamos querer devolver el total de artículos para la paginación del frontend
+        # cursor.execute("SELECT COUNT(*) as total FROM articulos")
+        # total_articulos = cursor.fetchone()['total']
+        
+        return articulos # , total_articulos
+    except Error as e:
+        print(f"Error de base deatos al obtener todos los artículos: {e}")
+        return []
+    finally:
+        if conn.is_connected():
+            cursor.close()
+            conn.close()
+
+def crear_articulo(id_articulo: str, descripcion: str, precio_venta: float, stock_inicial: int = 0):
+    """
+    Crea un nuevo artículo en la base de datos.
+    """
+    conn = get_db_connection()
+    if not conn:
+        return {"status": "error", "message": "Error de conexión."}
+
+    cursor = conn.cursor()
+    try:
+        query = """
+            INSERT INTO articulos (id_articulo, descripcion, precio_venta, stock)
+            VALUES (%s, %s, %s, %s)
+        """
+        valores = (id_articulo, descripcion, precio_venta, stock_inicial)
+        cursor.execute(query, valores)
+        conn.commit()
+        
+        return {
+            "status": "success",
+            "message": f"Artículo '{descripcion}' creado exitosamente.",
+            "data": {"id_articulo": id_articulo}
+        }
+    except Error as e:
+        conn.rollback()
+        # Manejar error de clave duplicada de forma amigable
+        if e.errno == 1062: # Código de error para 'Duplicate entry'
+            return {"status": "error", "message": f"El ID de artículo '{id_articulo}' ya existe."}
+        return {"status": "error", "message": f"Error de base de datos: {e}"}
+    finally:
+        if conn.is_connected():
+            cursor.close()
+            conn.close()

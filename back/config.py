@@ -13,6 +13,8 @@ else:
     load_dotenv(override=True) # Intentar cargar de todas formas
 # --- Fin Carga .env ---
 
+# --- SEGURIDAD-----
+SECRET_KEY_SEC= os.getenv('SECRET_KEY_SEGURIDAD')
 
 # --- Variables de Conexión ---
 GOOGLE_SHEET_ID = os.getenv('GOOGLE_SHEET_ID')
