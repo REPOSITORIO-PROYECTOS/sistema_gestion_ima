@@ -13,9 +13,20 @@ else:
     load_dotenv(override=True) # Intentar cargar de todas formas
 # --- Fin Carga .env ---
 
+
 # --- SEGURIDAD-----
 SECRET_KEY_SEC= os.getenv('SECRET_KEY_SEGURIDAD')
 
+# --- Variables de Conexión ---
+GOOGLE_SHEET_ID = os.getenv('GOOGLE_SHEET_ID')
+GOOGLE_SERVICE_ACCOUNT_FILE = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', "credencial_IA.json") # Default simple
+
+# ===== AÑADE ESTA SECCIÓN AQUÍ =====
+DB_HOST = os.getenv("DB_HOST")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_NAME = os.getenv("DB_NAME")
+# ===================================
 # --- Variables de Conexión ---
 GOOGLE_SHEET_ID = os.getenv('GOOGLE_SHEET_ID')
 GOOGLE_SERVICE_ACCOUNT_FILE = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', "credencial_IA.json") # Default simple

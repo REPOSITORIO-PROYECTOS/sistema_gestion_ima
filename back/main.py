@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from back.api import caja_router, admin_router, auth_router
 
 # Importamos la configuración para la conexión inicial y CORS
-from back.config import DB_HOST, DB_NAME, GOOGLE_SHEET_ID # (y otros que necesites)
+from back import config # (y otros que necesites)
 from back.utils.mysql_handler import get_db_connection
 
 # --- Inicialización de FastAPI ---
@@ -40,7 +40,7 @@ def startup_event():
     Ideal para verificar conexiones a bases de datos.
     """
     print("--- Evento de Inicio de la API ---")
-    print(f"Verificando conexión a la base de datos '{DB_NAME}' en '{DB_HOST}'...")
+    print(f"Verificando conexión a la base de datos '{config.DB_NAME}' en '{config.DB_HOST}'...")
     conn = get_db_connection()
     if conn:
         print("✅ Conexión a la base de datos MySQL verificada exitosamente.")
@@ -49,8 +49,8 @@ def startup_event():
         print("❌ ERROR CRÍTICO: No se pudo conectar a la base de datos MySQL.")
         # En un entorno real, podrías decidir si la app debe detenerse aquí.
     
-    if GOOGLE_SHEET_ID:
-        print(f"ℹ️  Google Sheets configurado para reportes (ID: {GOOGLE_SHEET_ID[:10]}...).")
+    if config.GOOGLE_SHEET_ID:
+        print(f"ℹ️  Google Sheets configurado para reportes (ID: {config.GOOGLE_SHEET_ID[:10]}...).")
 
 
 # --- Inclusión de Routers ---

@@ -6,11 +6,11 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from config import SECRET_KEY_SEC
+from back import config
 
 # --- Configuración de Seguridad ---
 # Estos valores deberían ir en tu .env y cargarse desde config.py
-SECRET_KEY = SECRET_KEY_SEC # ¡CAMBIAR ESTO Y PONERLO EN .ENV!
+SECRET_KEY = config.SECRET_KEY_SEC # ¡CAMBIAR ESTO Y PONERLO EN .ENV!
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 210 # Un token de acceso durará 210 minutos
 
