@@ -1,0 +1,2 @@
+# Proyecto de Front-End con Next.js
+# Las dependencias están en package.json
