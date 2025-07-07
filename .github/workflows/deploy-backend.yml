@@ -16,19 +16,18 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            # ===== ¡LA MAGIA ESTÁ AQUÍ! =====
-            # Carga NVM para tener acceso a PM2
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-            # ===============================
 
             cd ${{ secrets.PROJECT_PATH }}
-            git pull origin main
+            git fetch --all
+            git reset --hard origin/main
+
             echo "🚀 Deploying Python Backend..."
             cd back
             source venv/bin/activate
             pip install -r requirements.txt
             deactivate
-            # Usamos la ruta completa a PM2 para ser extra seguros
-            $HOME/.nvm/versions/node/$(nvm version)/bin/pm2 reload ecosystem.config.js --only gestion-ima-api
+            # Usamos la ruta absoluta al ecosistema y la ruta absoluta a pm2
+            $HOME/.nvm/versions/node/$(nvm version)/bin/pm2 reload ${{ secrets.PROJECT_PATH }}/ecosystem.config.js --only gestion-ima-api
             echo "✅ Backend Deployed!"
