@@ -53,7 +53,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
                 <a href="/dashboard" className="text-xl font-bold flex items-center gap-2 lg:ml-2.5">
                   <Image src="/logo.png" alt="Swing Jugos" width={50} height={50} />
                   <span className="self-center whitespace-nowrap ml-2 italic text-white">
-                    Sistema{" "}Gestion{" "}Jugo{" "}Swing
+                    Sistema{" "}Gestion{" "}Jugos{" "}Swing
                   </span>
                 </a>
 

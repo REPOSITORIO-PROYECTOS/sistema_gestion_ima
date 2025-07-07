@@ -21,7 +21,9 @@ app = FastAPI(
 origins = [
     "http://localhost",
     "http://localhost:3000",
-    "https://swingjugos.netlify.app", # Quitamos la barra final
+    "https://swingjugos.netlify.app",
+    "https://sistema-ima.sistemataup.online",
+    "https://www.sistema-ima.sistemataup.online",
 ]
 
 app.add_middleware(
