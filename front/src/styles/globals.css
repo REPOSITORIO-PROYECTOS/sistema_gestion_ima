@@ -156,3 +156,7 @@ body {
   border: 2px solid rgb(194, 118, 32);
   outline: none; 
 }
+
+body{
+  background-color: red !important;
+}
