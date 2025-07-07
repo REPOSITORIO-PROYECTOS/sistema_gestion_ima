@@ -5,10 +5,13 @@ from mysql.connector import Error
 
 from back.utils.mysql_handler import get_db_connection
 # Importamos los otros "gestores" que contendrán la lógica específica
-from back.gestion.stock_manager import actualizar_stock_por_venta_y_detalle
 # Suponemos que existen estos módulos que también migraremos
 # from back.gestion.clientes_manager import verificar_cliente_y_cta_cte
 # from back.gestion.facturacion_manager import generar_comprobante
+
+#ACA TENGO QUE REGISTRAR CUANDO ENTRA Y CUANDO SALE PLATA, MODIFICA LA TABLA MOVIMIENTOS
+
+
 
 def registrar_ingreso_egreso(id_sesion_caja: int, concepto: str, monto: float, tipo: str, usuario: str):
     """
@@ -94,7 +97,6 @@ def registrar_venta(
         # --- 3. Actualizar Stock y Registrar Detalles de Venta ---
         # Llamamos al gestor de stock, que trabaja dentro de NUESTRA transacción.
         # Esta función ahora también se encargará de insertar en `venta_detalle`.
-        actualizar_stock_por_venta_y_detalle(id_movimiento_venta, articulos_vendidos, cursor)
         
         # --- 4. Generar Comprobante Fiscal (a implementar en su propio módulo) ---
         # if quiere_factura:

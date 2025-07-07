@@ -4,31 +4,94 @@ import os
 import random
 import time
 from datetime import datetime, timedelta
-
+# Importaciones necesarias para la nueva función
+from .mysql_handler import get_db_connection
+from passlib.context import CryptContext
 from back.utils.sheets_google_handler import GoogleSheetsHandler
-from back.config import (
-    ADMIN_TOKEN_KEYWORDS,
-    ADMIN_TOKEN_DURATION_SECONDS,
-    SHEET_NAME_ADMIN_TOKEN,
-    ADMIN_TOKEN_LOCAL_FILE # Opcional, si prefieres archivo local a Sheet
-)
+from back import config
 
 # ------ GESTIÓN DE TOKEN DE ADMINISTRADOR ------
 # Usaremos un archivo local para el token, pero podría ser una hoja de cálculo también.
 
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def verificar_password(plain_password: str, hashed_password: str) -> bool:
+    """Verifica una contraseña en texto plano contra una hasheada."""
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+
 def _cargar_token_data():
     """Carga los datos del token desde un archivo local."""
-    if os.path.exists(ADMIN_TOKEN_LOCAL_FILE):
+    if os.path.exists(config.ADMIN_TOKEN_LOCAL_FILE):
         try:
-            with open(ADMIN_TOKEN_LOCAL_FILE, 'r') as f:
+            with open(config.ADMIN_TOKEN_LOCAL_FILE, 'r') as f:
                 return json.load(f)
         except json.JSONDecodeError:
             return None # Archivo corrupto
     return None
 
+
+def autenticar_usuario(nombre_usuario: str, password: str):
+    """
+    Busca al usuario en la base de datos y verifica su contraseña.
+
+    Args:
+        nombre_usuario (str): El nombre de usuario a buscar.
+        password (str): La contraseña en texto plano a verificar.
+
+    Returns:
+        dict: Un diccionario con los datos del usuario si la autenticación es exitosa.
+        None: Si el usuario no existe o la contraseña es incorrecta.
+    """
+    conn = get_db_connection()
+    if not conn:
+        # No se pudo conectar a la DB, no se puede autenticar
+        return None
+
+    try:
+        cursor = conn.cursor(dictionary=True)
+        
+        # Consulta para obtener el usuario y su rol
+        query = """
+            SELECT u.id_usuario, u.nombre_usuario, u.password_hash, r.nombre_rol
+            FROM usuarios u
+            JOIN roles r ON u.id_rol = r.id_rol
+            WHERE u.nombre_usuario = %s
+        """
+        
+        cursor.execute(query, (nombre_usuario,))
+        user_data = cursor.fetchone()
+        
+        if not user_data:
+            # Usuario no encontrado
+            return None
+        
+        # Verificar la contraseña
+        if not verificar_password(password, user_data['password_hash']):
+            # Contraseña incorrecta
+            return None
+        
+        # ¡Autenticación exitosa! Devolvemos los datos del usuario
+        # Excluimos la contraseña hasheada por seguridad
+        return {
+            "id_usuario": user_data['id_usuario'],
+            "nombre_usuario": user_data['nombre_usuario'],
+            "nombre_rol": user_data['nombre_rol']
+        }
+
+    except Exception as e:
+        print(f"Error durante la autenticación: {e}")
+        return None
+    finally:
+        if conn.is_connected():
+            cursor.close()
+            conn.close()
+
+
 def _guardar_token_data(token_data):
     """Guarda los datos del token en un archivo local."""
-    with open(ADMIN_TOKEN_LOCAL_FILE, 'w') as f:
+    with open(config.ADMIN_TOKEN_LOCAL_FILE, 'w') as f:
         json.dump(token_data, f)
 
 def generar_y_guardar_admin_token(forzar_nuevo=False):
@@ -43,12 +106,12 @@ def generar_y_guardar_admin_token(forzar_nuevo=False):
 
     if not forzar_nuevo and token_data and 'token' in token_data and 'generated_at' in token_data:
         generated_at_ts = token_data['generated_at']
-        if now_ts < generated_at_ts + ADMIN_TOKEN_DURATION_SECONDS:
-            print(f"Usando token de administrador existente: {token_data['token']} (válido hasta {datetime.fromtimestamp(generated_at_ts + ADMIN_TOKEN_DURATION_SECONDS).strftime('%Y-%m-%d %H:%M:%S')})")
+        if now_ts < generated_at_ts + config.ADMIN_TOKEN_DURATION_SECONDS:
+            print(f"Usando token de administrador existente: {token_data['token']} (válido hasta {datetime.fromtimestamp(generated_at_ts + config.ADMIN_TOKEN_DURATION_SECONDS).strftime('%Y-%m-%d %H:%M:%S')})")
             return token_data['token'] # Token actual sigue siendo válido
 
     # Generar nuevo token
-    palabra = random.choice(ADMIN_TOKEN_KEYWORDS)
+    palabra = random.choice(config.ADMIN_TOKEN_KEYWORDS)
     numeros = str(random.randint(100, 999)).zfill(3)
     nuevo_token = f"{palabra}{numeros}"
     
@@ -74,7 +137,7 @@ def verificar_admin_token(token_ingresado: str):
     generated_at_ts = token_data['generated_at']
     now_ts = time.time()
 
-    if now_ts >= generated_at_ts + ADMIN_TOKEN_DURATION_SECONDS:
+    if now_ts >= generated_at_ts + config.ADMIN_TOKEN_DURATION_SECONDS:
         print("El token de administrador ha expirado. Se necesita generar uno nuevo.")
         # Aquí, el administrador debería tener una forma de "solicitar" uno nuevo.
         # Por ahora, para el flujo, diremos que falló la verificación.

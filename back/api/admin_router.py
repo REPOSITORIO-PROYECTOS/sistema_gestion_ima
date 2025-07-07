@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends, Header, Body
 from typing import Optional
 
 # --- Importaciones de Lógica de Negocio ---
-from back.gestion import auth as mod_auth
+from back.utils import auth as mod_auth
 from back.gestion.caja import apertura_cierre as mod_apertura_cierre
 from back.security import es_admin
 

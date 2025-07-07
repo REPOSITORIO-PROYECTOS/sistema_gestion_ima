@@ -2,6 +2,8 @@
 # Este módulo podría usarse para seleccionar un cliente o usar "Público General".
 # Eventualmente, podría interactuar con el módulo de Contabilidad/Clientes.
 
+#ACA TENGO QUE TOMAR LOS DATOS DE LA TABLA CLIENTE , DEVULEVO EL NOMBRE DEL CLIENTE
+
 def obtener_cliente_para_venta(id_cliente_o_nombre=None):
     """
     Determina el cliente para una venta.

@@ -1,18 +1,17 @@
 import mysql.connector
 from mysql.connector import Error
+from back import config  # ¡Importa el módulo entero!
 
-# ¡Importamos nuestra configuración centralizada!
-from back.config import DB_HOST, DB_USER, DB_PASSWORD, DB_NAME
 
 def get_db_connection():
     """Crea y devuelve una conexión a la base de datos usando la configuración central."""
     try:
         # Ahora los datos de conexión se leen desde config.py
         conn = mysql.connector.connect(
-            host=DB_HOST,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME
+            host=config.DB_HOST,
+            user=config.DB_USER,
+            password=config.DB_PASSWORD,
+            database=config.DB_NAME
         )
         if conn.is_connected():
             return conn

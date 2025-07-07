@@ -1,5 +1,9 @@
 # back/gestion/stock_manager.py (función modificada)
 
+#MODIFICA LA TABLA STOCK, TENGO QUE RESTAR LA CANTIDAD DE PRODUCTOS VENDIDOS O SUMAR
+
+#HACER FUNCION PARA VOLVER PARA ATRAS LA VENTA, SUMAR LOS PRODUCTOS VENDIDOS
+
 def actualizar_stock_por_venta_y_detalle(id_movimiento_venta: int, articulos_vendidos: list, cursor):
     """
     - Verifica el stock de los artículos.

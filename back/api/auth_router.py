@@ -5,8 +5,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 from back.security import crear_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 # Necesitaremos una función para autenticar al usuario contra la DB
-from back.gestion.auth import autenticar_usuario # Esta función la crearemos ahora
-
+from back.utils.auth import autenticar_usuario
 router = APIRouter(
     prefix="/auth",
     tags=["Autenticación"]

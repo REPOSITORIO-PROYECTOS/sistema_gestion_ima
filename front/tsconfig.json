@@ -18,6 +18,8 @@
         "name": "next"
       }
     ],
+    // --- ESTA ES LA SECCIÓN CORREGIDA ---
+    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }

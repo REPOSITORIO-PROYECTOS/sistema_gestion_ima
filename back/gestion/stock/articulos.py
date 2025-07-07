@@ -1,5 +1,8 @@
 # back/gestion/stock/articulos.py
 
+#ACA TENGO QUE USAR LA TABLA STOCK, Y DEVOLVER LOS PRODUCTOS 
+
+
 from mysql.connector import Error
 from back.utils.mysql_handler import get_db_connection
 from typing import Optional
