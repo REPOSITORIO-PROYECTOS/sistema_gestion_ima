@@ -16,12 +16,19 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
+            # ===== ¡LA MAGIA ESTÁ AQUÍ! =====
+            # Carga NVM y, por lo tanto, Node.js y npm
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            # ===============================
+
             cd ${{ secrets.PROJECT_PATH }}
             git pull origin main
             echo "🚀 Deploying Next.js Frontend..."
-            cd front  # <-- ¡CORREGIDO!
-            rm -rf .next/ # Borra la caché vieja
+            cd front
+            rm -rf .next/
             npm install
             npm run build
-            pm2 reload ecosystem.config.js --only gestion-ima-front
+            # Usamos la ruta completa a PM2 para ser extra seguros
+            $HOME/.nvm/versions/node/$(nvm version)/bin/pm2 reload ecosystem.config.js --only gestion-ima-front
             echo "✅ Frontend Deployed!"
