@@ -1,7 +1,7 @@
 name: Deploy Frontend (Next.js)
 on:
   push:
-    branches: [ "main" ] # O tu rama principal
+    branches: [ "main" ]
     paths:
       - 'front/**'
       - '.github/workflows/deploy-frontend.yml'
@@ -19,7 +19,8 @@ jobs:
             cd ${{ secrets.PROJECT_PATH }}
             git pull origin main
             echo "🚀 Deploying Next.js Frontend..."
-            cd front
+            cd front  # <-- ¡CORREGIDO!
+            rm -rf .next/ # Borra la caché vieja
             npm install
             npm run build
             pm2 reload ecosystem.config.js --only gestion-ima-front
