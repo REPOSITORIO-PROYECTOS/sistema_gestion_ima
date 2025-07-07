@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel
 from typing import Optional
-
+from typing import Any 
 class Articulo(BaseModel):
     id_articulo: str
     descripcion: str
@@ -12,7 +12,7 @@ class Articulo(BaseModel):
     categoria: Optional[str] = None
     
     class Config:
-        orm_mode = True # Permite que Pydantic lea datos desde objetos de DB
+        from_attributes = True # Permite que Pydantic lea datos desde objetos de DB
 
 class ArticuloCreate(BaseModel):
     id_articulo: str
@@ -28,3 +28,8 @@ class ArticuloUpdate(BaseModel):
     precio_venta: Optional[float] = None
     costo_ultimo: Optional[float] = None
     categoria: Optional[str] = None
+
+class RespuestaGenerica(BaseModel):
+    success: bool
+    message: str
+    data: Optional[Any] = None
