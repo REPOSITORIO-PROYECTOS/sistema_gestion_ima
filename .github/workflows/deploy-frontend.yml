@@ -1,0 +1,26 @@
+name: Deploy Frontend (Next.js)
+on:
+  push:
+    branches: [ "main" ] # O tu rama principal
+    paths:
+      - 'front/**'
+      - '.github/workflows/deploy-frontend.yml'
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Frontend
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd ${{ secrets.PROJECT_PATH }}
+            git pull origin main
+            echo "🚀 Deploying Next.js Frontend..."
+            cd front
+            npm install
+            npm run build
+            pm2 reload ecosystem.config.js --only gestion-ima-front
+            echo "✅ Frontend Deployed!"

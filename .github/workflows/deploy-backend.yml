@@ -1,0 +1,27 @@
+name: Deploy Backend (Python)
+on:
+  push:
+    branches: [ "main" ] # O tu rama principal (master, develop, etc.)
+    paths:
+      - 'back/**'
+      - '.github/workflows/deploy-backend.yml'
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Backend
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd ${{ secrets.PROJECT_PATH }}
+            git pull origin main
+            echo "🚀 Deploying Python Backend..."
+            cd back
+            source venv/bin/activate
+            pip install -r requirements.txt
+            deactivate
+            pm2 reload ecosystem.config.js --only gestion-ima-api
+            echo "✅ Backend Deployed!"
