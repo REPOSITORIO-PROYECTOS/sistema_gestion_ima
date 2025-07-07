@@ -1,16 +1,17 @@
-# back/config.py
 import os
 from dotenv import load_dotenv, find_dotenv
 
 # --- Carga de .env ---
-print("--- Cargando config.py (Versión Estructura Base Estable) ---")
-dotenv_path = find_dotenv(usecwd=True, raise_error_if_not_found=False)
-if dotenv_path and os.path.exists(dotenv_path):
-    print(f"DEBUG_CFG: Cargando .env desde: '{dotenv_path}'")
-    load_dotenv(dotenv_path=dotenv_path, override=True)
-else:
-    print("DEBUG_CFG: No se encontró .env o la ruta no existe, usando defaults o variables de sistema.")
-    load_dotenv(override=True) # Intentar cargar de todas formas
+print("--- Cargando config.py (Versión Explícita) ---")
+
+# Definimos la ruta absoluta al archivo .env
+# Esto elimina cualquier ambigüedad sobre dónde buscarlo.
+dotenv_path = "/home/sgi_user/proyectos/sistema_gestion_ima/.env"
+
+# Cargamos las variables desde esa ruta específica
+load_dotenv(dotenv_path=dotenv_path)
+
+print(f"DEBUG_CFG: Intentando cargar .env desde: '{dotenv_path}'")
 # --- Fin Carga .env ---
 
 
@@ -85,4 +86,3 @@ if not os.path.exists(GOOGLE_SERVICE_ACCOUNT_FILE):
     )
 print(f"DEBUG_CFG: Configuración cargada. Usando GOOGLE_SERVICE_ACCOUNT_FILE='{GOOGLE_SERVICE_ACCOUNT_FILE}'")
 print(f"DEBUG_CFG: Hoja de Sesiones de Caja se llamará: '{CAJA_SESIONES_SHEET}'") # Ejemplo de verificación
-
