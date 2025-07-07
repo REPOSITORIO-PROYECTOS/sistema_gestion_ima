@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Importamos los routers que acabamos de crear
-from back.api import caja_router, admin_router, auth_router
+from back.api import caja_router, admin_router, auth_router, articulos_router
 
 # Importamos la configuración para la conexión inicial y CORS
 from back.config import DB_HOST, DB_NAME, GOOGLE_SHEET_ID # (y otros que necesites)
@@ -58,6 +58,7 @@ def startup_event():
 app.include_router(caja_router.router)
 app.include_router(admin_router.router)
 app.include_router(auth_router.router)
+app.include_router(articulos_router.router)
 
 
 # --- Endpoint Raíz ---

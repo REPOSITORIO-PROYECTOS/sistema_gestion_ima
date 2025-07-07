@@ -74,3 +74,4 @@ if not os.path.exists(GOOGLE_SERVICE_ACCOUNT_FILE):
     )
 print(f"DEBUG_CFG: Configuración cargada. Usando GOOGLE_SERVICE_ACCOUNT_FILE='{GOOGLE_SERVICE_ACCOUNT_FILE}'")
 print(f"DEBUG_CFG: Hoja de Sesiones de Caja se llamará: '{CAJA_SESIONES_SHEET}'") # Ejemplo de verificación
+
