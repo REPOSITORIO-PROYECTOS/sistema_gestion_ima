@@ -1,10 +1,11 @@
 # back/main.py
 
+from back.api.blueprints import admin_router, articulos_router, auth_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Importamos los routers que acabamos de crear
-from back.api import caja_router, admin_router, auth_router, articulos_router
+from back.api.blueprints import caja_router
 
 # Importamos la configuración para la conexión inicial y CORS
 from back import config # (y otros que necesites)

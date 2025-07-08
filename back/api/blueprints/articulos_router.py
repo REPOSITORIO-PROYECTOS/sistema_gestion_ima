@@ -5,7 +5,7 @@ from typing import List, Optional
 
 # Importamos la lógica de negocio y los modelos Pydantic
 from back.gestion.stock import articulos as mod_articulos
-from back.api.schemas import Articulo, ArticuloCreate, ArticuloUpdate, RespuestaGenerica
+from back.api.blueprints.schemas import Articulo, ArticuloCreate, ArticuloUpdate, RespuestaGenerica
 # Importamos nuestros guardianes de seguridad
 from back.security import es_cajero, es_admin
 
