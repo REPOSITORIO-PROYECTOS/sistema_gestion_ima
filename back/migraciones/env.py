@@ -17,12 +17,14 @@ sys.path.append(os.getcwd())
 # --- FIN DE LA CONFIGURACIÓN DE RUTA ---
 
 
-# --- INICIO DE LA CARGA DE NUESTROS MÓDULOS ---
-# Importamos la configuración y los modelos de nuestra aplicación.
-from back import config as app_config
-from back import modelos
-# --- FIN DE LA CARGA DE NUESTROS MÓDULOS ---
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
+# Ahora sí, importamos nuestros módulos
+from back import modelos
+from back import config as app_config
+
+# Le decimos a Alembic que el "metadata" de nuestras tablas está en SQLModel
+target_metadata = modelos.SQLModel.metadata 
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

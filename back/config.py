@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv, find_dotenv
+from pathlib import Path  #
 
 # --- Carga de .env ---
 print("--- Cargando config.py (Versión Explícita) ---")
@@ -79,10 +80,23 @@ if not GOOGLE_SHEET_ID:
     raise ValueError("CRÍTICO: GOOGLE_SHEET_ID no está configurado en .env.")
 if not GOOGLE_SERVICE_ACCOUNT_FILE:
      raise ValueError("CRÍTICO: GOOGLE_SERVICE_ACCOUNT_FILE no está configurado en .env.")
-if not os.path.exists(GOOGLE_SERVICE_ACCOUNT_FILE):
+
+
+# ===== INICIO DE LA MODIFICACIÓN =====
+# Creamos una ruta absoluta al archivo de credenciales,
+# basándonos en la ubicación del propio archivo config.py
+
+# Directorio donde se encuentra este archivo config.py
+CONFIG_DIR = Path(__file__).resolve().parent 
+# Ruta completa y absoluta al archivo .json
+CREDENTIALS_FILE_PATH = CONFIG_DIR / GOOGLE_SERVICE_ACCOUNT_FILE
+
+if not CREDENTIALS_FILE_PATH.exists():
     raise FileNotFoundError(
-        f"CRÍTICO: Archivo de credenciales '{GOOGLE_SERVICE_ACCOUNT_FILE}' (definido por GOOGLE_SERVICE_ACCOUNT_FILE) no encontrado. "
-        f"Verifica el valor en tu .env y la existencia del archivo en el servidor."
+        f"CRÍTICO: Archivo de credenciales '{CREDENTIALS_FILE_PATH}' no encontrado. "
+        f"Verifica el valor en tu .env y la existencia del archivo en la misma carpeta que config.py."
     )
+# ===== FIN DE LA MODIFICACIÓN =====
+
 print(f"DEBUG_CFG: Configuración cargada. Usando GOOGLE_SERVICE_ACCOUNT_FILE='{GOOGLE_SERVICE_ACCOUNT_FILE}'")
-print(f"DEBUG_CFG: Hoja de Sesiones de Caja se llamará: '{CAJA_SESIONES_SHEET}'") # Ejemplo de verificación
+# ...
