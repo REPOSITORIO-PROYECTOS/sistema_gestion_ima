@@ -11,7 +11,6 @@ import {
   SelectTrigger, SelectValue
 } from "@/components/ui/select"
 
-
 // Dropdown Productos
 const productos = [
   { id: "1", nombre: "Jugo de Naranja", precio: 500 },
@@ -23,10 +22,9 @@ const productos = [
 
 // Dropdown tipo de cliente
 const tipoCliente = [
-  { id: "1", nombre: "Con CUIT"},
-  { id: "2", nombre: "Cliente Final"},
+  { id: "1", nombre: "Con CUIT"},       // este anda
+  { id: "2", nombre: "Cliente Final"},  // este no
 ]
-
 
 function FormVentas({
   onAgregarProducto,    /* Agrega productos al resumen - no es el submit */
@@ -86,13 +84,13 @@ function FormVentas({
 
   // Estado para el cambio en efectivo en base al valor final
   useEffect(() => {
-  if (metodoPago === "efectivo") {
-    const calculado = montoPagado - totalVenta;
-    setVuelto(calculado > 0 ? calculado : 0);
-  } else {
-    setVuelto(0);
-  }
-}, [montoPagado, metodoPago, totalVenta]);
+    if (metodoPago === "efectivo") {
+      const calculado = montoPagado - totalVenta;
+      setVuelto(calculado > 0 ? calculado : 0);
+    } else {
+      setVuelto(0);
+    }
+  }, [montoPagado, metodoPago, totalVenta]);
 
 
 
@@ -103,12 +101,13 @@ function FormVentas({
   
     // Objeto resumen de toda la venta generada
     const ventaPayload = {
-      id_sesion_caja: 1,
-      id_cliente: tipoClienteSeleccionado.id,     // Este es el ID real
+      id_sesion_caja: 3,
+      id_cliente: tipoClienteSeleccionado.id,     // con "1" funciona, con "2" no
       usuario: "admin",
+      id_usuario: 1,                              // debe ser dinamico con el tipo de usuario / admin=1, cajero=2, etc
       metodo_pago: metodoPago.toUpperCase(),
       total_venta: totalVenta,
-      paga_con: metodoPago === "efectivo" ? montoPagado : undefined,
+      /* paga_con: metodoPago === "efectivo" ? montoPagado : undefined, */  // probar si anda CON esto
       quiere_factura: true,
       tipo_comprobante_solicitado: "Ticket No Fiscal",    // o según la selección de ticket/comprobante
       articulos_vendidos: productosVendidos.map((p) => {
@@ -124,8 +123,8 @@ function FormVentas({
       })
     };
 
-    try {   // MODIFICAR ESTO POR LA NUEVA
-      const response = await fetch(" https://sistema-ima.sistemataup.online/api/caja/ventas/registrar", {
+    try {
+      const response = await fetch("https://sistema-ima.sistemataup.online/api/caja/ventas/registrar", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -150,10 +149,10 @@ function FormVentas({
     }
 
     // Verificamos que estamos mandando
-    console.log(ventaPayload)
+    console.log(JSON.stringify(ventaPayload, null, 2));
   };
 
-
+  
 
   return (
     <form onSubmit={handleSubmit} 
