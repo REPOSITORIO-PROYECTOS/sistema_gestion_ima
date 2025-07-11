@@ -12,11 +12,12 @@ type NavLink = {
   roles: string[]  // Roles permitidos
 }
 
-// Lista de secciones (paths) y sus roles permitidos
+// Lista de secciones (paths) y sus roles permitidos - revisar si no va en ssr
 const links: NavLink[] = [
   { name: "Ventas", href: "/dashboard/ventas", roles: ["admin", "cajero"] },
   { name: "Contabilidad", href: "/dashboard/contabilidad", roles: ["admin", "contable"] },
   { name: "Stock", href: "/dashboard/stock", roles: ["admin", "contable"] },
+  { name: "Carta", href: "/dashboard/carta", roles: ["admin"] }
 ]
 
 
@@ -29,9 +30,9 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
     
     // Al Dashboard inicial pueden acceder todos los roles
     <ProtectedRoute allowedRoles={["admin", "cajero", "contable"]}>
-      <>
+      
         {/* Header */}
-        <nav className="bg-green-700 border-b border-gray-200 fixed z-30 w-full" aria-label='Banner Nav'>
+        <header className="bg-green-700 border-b border-gray-200 fixed z-30 w-full" aria-label='Banner Nav'>
           <div className="px-3 py-3 lg:px-5 lg:pl-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center justify-start">
@@ -66,14 +67,14 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
 
             </div>
           </div>
-        </nav>
+        </header>
 
 
-        {/* NavBar de las secciones / Se pasa el rol para permitir o deshabilitar links y secciones en base al rol */}
+        {/* NavBar de las secciones / Se pasan roles como prop para disablear secciones */}
         <NavBar links={links} role={role} />
 
 
-        {/* Frame principal de la App / Aca se renderizan todas las subsecciones */}
+        {/* Frame principal de la App */}
         <main id="main-content" className="w-full pt-36 pb-12 bg-white relative overflow-y-auto">
           <div className="pt-2 px-1">
             <div className="w-full min-h-[calc(100vh-230px)]">
@@ -87,7 +88,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
 
         {/* Copyright y Fecha */}
         <p className="text-center text-sm text-gray-500 mb-10">&copy; 2019-{new Date().getFullYear()}{" "}Jugos Swing.</p>
-      </>
+    
     </ProtectedRoute>
   );
 }

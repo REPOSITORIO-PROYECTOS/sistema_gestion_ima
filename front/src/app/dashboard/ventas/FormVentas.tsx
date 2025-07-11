@@ -104,13 +104,13 @@ function FormVentas({
     // Objeto resumen de toda la venta generada
     const ventaPayload = {
       id_sesion_caja: 1,
-      id_cliente: tipoClienteSeleccionado.id, // Este es el ID real
+      id_cliente: tipoClienteSeleccionado.id,     // Este es el ID real
       usuario: "admin",
       metodo_pago: metodoPago.toUpperCase(),
       total_venta: totalVenta,
       paga_con: metodoPago === "efectivo" ? montoPagado : undefined,
       quiere_factura: true,
-      tipo_comprobante_solicitado: "Ticket No Fiscal", // o según la selección de ticket/comprobante
+      tipo_comprobante_solicitado: "Ticket No Fiscal",    // o según la selección de ticket/comprobante
       articulos_vendidos: productosVendidos.map((p) => {
         const productoReal = productos.find(prod => prod.nombre === p.tipo);
         return {
@@ -119,13 +119,13 @@ function FormVentas({
           cantidad: p.cantidad,
           precio_unitario: productoReal?.precio ?? 0,
           subtotal: p.precioTotal,
-          tasa_iva: 21.0 // IVA 21%?
+          tasa_iva: 21.0                      // IVA 21%?
         };
       })
     };
 
-    try {
-      const response = await fetch("https://swingjugos.netlify.app/caja/ventas/registrar", {
+    try {   // MODIFICAR ESTO POR LA NUEVA
+      const response = await fetch(" https://sistema-ima.sistemataup.online/api/caja/ventas/registrar", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -134,19 +134,24 @@ function FormVentas({
       });
 
       if (response.ok) {
+
         const data = await response.json();
         alert("✅ Venta registrada exitosamente: " + data.message);
-        // Opcional: resetear formulario y productos
+
       } else {
+
         const error = await response.json();
         alert("❌ Error al registrar venta: " + error.detail);
       }
     } catch (error) {
+
       console.error("Detalles del error:", error);
       alert("❌ Error al registrar venta:\n" + JSON.stringify(error, null, 2));
     }
-  };
 
+    // Verificamos que estamos mandando
+    console.log(ventaPayload)
+  };
 
 
 
