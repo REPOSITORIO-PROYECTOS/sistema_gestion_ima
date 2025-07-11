@@ -5,7 +5,7 @@ from mysql.connector import Error
 from sqlmodel import Session, select
 from datetime import datetime
 # Importa todos tus modelos. Asegúrate de que las rutas sean correctas.
-from modelos import Venta, VentaDetalle, CajaMovimiento, Articulo 
+from back.modelos import Venta, VentaDetalle, CajaMovimiento, Articulo 
 from back.utils.mysql_handler import get_db_connection
 # Importamos los otros "gestores" que contendrán la lógica específica
 # Suponemos que existen estos módulos que también migraremos
@@ -13,7 +13,7 @@ from back.utils.mysql_handler import get_db_connection
 # from back.gestion.facturacion_manager import generar_comprobante
 
 #ACA TENGO QUE REGISTRAR CUANDO ENTRA Y CUANDO SALE PLATA, MODIFICA LA TABLA MOVIMIENTOS
-
+  
 
 
 def registrar_ingreso_egreso(id_sesion_caja: int, concepto: str, monto: float, tipo: str, usuario: str):

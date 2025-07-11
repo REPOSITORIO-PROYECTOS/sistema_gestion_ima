@@ -1,16 +1,19 @@
 # back/api/caja_router.py
 
+# 1. Librerías de terceros
 from fastapi import APIRouter, HTTPException, Depends
+from sqlmodel import Session
 from typing import List, Optional
 
-from sqlmodel import Session
-from database import get_db # Importa tu función para obtener la sesión
-from . import mod_registro_caja # Importa tu módulo de lógica
-from .schemas import RegistrarVentaRequest, RespuestaGenerica 
-# --- Importaciones de Lógica de Negocio ---
+# 2. Módulos de tu propio proyecto (usando siempre 'from back...')
+from back.database import get_db
+
+from back.security import es_cajero
+# Solución para el Escenario A
+from .schemas import RegistrarVentaRequest, RespuestaGenerica
+# Lógica de negocio
 from back.gestion.caja import apertura_cierre as mod_apertura_cierre
-from back.gestion.caja import registro_caja as mod_registro_caja
-from back.security import es_cajero # Importamos nuestro guardián
+from back.gestion.caja import registro_caja as mod_registro_caja # <--- ESTA ES LA ÚNICA Y CORRECTA
 from back.gestion.stock import articulos as mod_articulos
 from back.gestion import configuracion_manager as mod_config
 
@@ -55,14 +58,6 @@ class ArticuloVendido(BaseModel):
     precio_unitario: float = Field(..., ge=0)
     subtotal: float
 
-class RegistrarVentaRequest(BaseModel):
-    id_sesion_caja: int
-    articulos_vendidos: List[ArticuloVendido]
-    metodo_pago: str
-    usuario: str
-    total_venta: float
-    quiere_factura: bool
-    tipo_comprobante_solicitado: str
 class MovimientoCajaRequest(BaseModel):
     id_sesion_caja: int
     concepto: str # Renombrado de 'descripcion' para coincidir con el backend
