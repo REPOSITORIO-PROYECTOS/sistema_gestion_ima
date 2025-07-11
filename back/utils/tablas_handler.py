@@ -109,3 +109,75 @@ class TablasHandler:
         except Exception as e:
             print(f"Error al registrar venta: {e}")
             return False
+        
+
+
+def restar_stock(self, lista_items: List[Dict[str, Any]]) -> bool:
+
+        if not self.client:
+            print("❌ ERROR [STOCK]: Cliente de Google Sheets no disponible.")
+            return False
+
+        print("🔄 [STOCK] Iniciando proceso de actualización de stock en Google Sheets...")
+        try:
+
+            sheet = self.client.open_by_key(GOOGLE_SHEET_ID)
+            worksheet = sheet.worksheet("stock") 
+            datos_stock = worksheet.get_all_records()
+
+            columna_id = "id producto"
+            columna_stock = "cantidad"
+
+            if not datos_stock or columna_id not in datos_stock[0] or columna_stock not in datos_stock[0]:
+                print(f"❌ ERROR [STOCK]: La hoja 'stock' está vacía o no tiene las columnas '{columna_id}' y '{columna_stock}'.")
+                return False
+
+
+            for item_a_restar in lista_items:
+                id_producto = item_a_restar.get("id_articulo")
+                cantidad_a_restar = item_a_restar.get("cantidad")
+
+                if not id_producto or cantidad_a_restar is None:
+                    print(f"⚠️ ADVERTENCIA [STOCK]: Item inválido en la lista, saltando: {item_a_restar}")
+                    continue
+
+                print(f"  -> Procesando ID: {id_producto}, Cantidad a restar: {cantidad_a_restar}")
+                
+                encontrado = False
+                for i, fila in enumerate(datos_stock):
+                    if str(fila.get(columna_id)) == str(id_producto):
+                        encontrado = True
+                        numero_fila_gspread = i + 2
+                        stock_actual = float(fila.get(columna_stock, 0))
+
+                        if stock_actual < cantidad_a_restar:
+                            print(f"❌ ERROR [STOCK]: Stock insuficiente para ID {id_producto}. Stock actual: {stock_actual}, se necesita: {cantidad_a_restar}. Abortando operación completa.")
+                    
+                            return False
+ 
+                        nuevo_stock = stock_actual - cantidad_a_restar
+
+                        encabezados = worksheet.row_values(1)
+                        letra_columna_stock = gspread.utils.rowcol_to_a1(1, encabezados.index(columna_stock) + 1)[0]
+                        
+                        celda_a_actualizar = f"{letra_columna_stock}{numero_fila_gspread}"
+                        print(f"     Stock actual: {stock_actual}. Actualizando celda {celda_a_actualizar} a {nuevo_stock}")
+                        worksheet.update_acell(celda_a_actualizar, nuevo_stock)
+
+                        fila[columna_stock] = nuevo_stock
+                        
+                        break # Salimos del bucle de filas, ya encontramos el producto
+                
+                if not encontrado:
+                    print(f"❌ ERROR [STOCK]: Producto con ID {id_producto} no encontrado en la hoja 'stock'. Abortando operación completa.")
+                    return False
+
+            print("✅ [STOCK] Proceso de actualización de stock en Google Sheets completado exitosamente.")
+            return True
+
+        except gspread.exceptions.WorksheetNotFound:
+            print("❌ ERROR [STOCK]: Hoja 'stock' no encontrada en el documento.")
+            return False
+        except Exception as e:
+            print(f"❌ ERROR [STOCK]: Ocurrió un error inesperado al actualizar el stock: {e}")
+            return False

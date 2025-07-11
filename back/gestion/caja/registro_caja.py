@@ -62,30 +62,25 @@ def registrar_ingreso_egreso(id_sesion_caja: int, concepto: str, monto: float, t
 def registrar_venta(
     db: Session,
     id_sesion_caja: int,
-    articulos_vendidos: list,  # Espera una lista de dicts: [{"id_articulo": 1, "cantidad": 2}, ...]
+    articulos_vendidos: list,  
     id_cliente: int,
     id_usuario: int,
     metodo_pago: str,
     total_venta: float
 ):
-    """
-    Orquesta el registro de una venta completa usando SQLModel
-    dentro de una única transacción de base de datos.
-    Actualiza Venta, VentaDetalle, Articulo (stock) y CajaMovimiento.
-    """
+  
     try:
-        # --- PASO 1: Crear el registro principal de la VENTA ---
+
         nueva_venta = Venta(
             total=total_venta,
             id_cliente=id_cliente,
             id_usuario=id_usuario,
             id_caja_sesion=id_sesion_caja,
             timestamp=datetime.utcnow()
-            # estado se establece por defecto a "COMPLETADA"
+ 
         )
         db.add(nueva_venta)
 
-        # --- PASO 2: Iterar artículos, actualizar stock y crear detalles ---
         for item_data in articulos_vendidos:
             id_articulo = item_data.get("id_articulo")
             cantidad_vendida = item_data.get("cantidad")
@@ -93,7 +88,6 @@ def registrar_venta(
             if not id_articulo or not cantidad_vendida:
                 raise ValueError("Cada artículo vendido debe tener 'id_articulo' y 'cantidad'.")
 
-            # Busca el artículo en la BDD y lo bloquea para la actualización.
             articulo_db = db.exec(
                 select(Articulo).where(Articulo.id == id_articulo).with_for_update()
             ).first()
@@ -101,34 +95,30 @@ def registrar_venta(
             if not articulo_db:
                 raise ValueError(f"El artículo con ID {id_articulo} no existe.")
 
-            # VALIDACIÓN ADICIONAL: Comprobar si el artículo está activo
+      
             if not articulo_db.activo:
                 raise ValueError(f"El artículo '{articulo_db.descripcion}' (ID: {id_articulo}) no está activo y no se puede vender.")
 
-            # VALIDACIÓN DE STOCK: Usando el campo correcto 'stock_actual'
+
             if articulo_db.stock_actual < cantidad_vendida:
                 raise ValueError(f"Stock insuficiente para '{articulo_db.descripcion}'. Disponible: {articulo_db.stock_actual}, Solicitado: {cantidad_vendida}")
 
-            # ACTUALIZACIÓN DE STOCK: Usando el campo correcto 'stock_actual'
+    
             articulo_db.stock_actual -= cantidad_vendida
             
-            # NOTA: Si `maneja_lotes` es True, aquí iría una lógica más compleja
-            # para seleccionar y descontar de un lote específico. Por ahora, se omite.
-            
-            # Crear el registro de VentaDetalle
+     
             detalle_venta = VentaDetalle(
                 cantidad=cantidad_vendida,
-                precio_unitario=articulo_db.precio_venta, # Guarda el precio al momento de la venta
+                precio_unitario=articulo_db.precio_venta, 
                 id_articulo=id_articulo,
-                venta=nueva_venta # El ORM asocia este detalle con la venta padre
+                venta=nueva_venta 
             )
             db.add(detalle_venta)
 
-        # Hacemos un "flush" para que nueva_venta obtenga su ID de la BDD.
-        # Esto es necesario para poder usarlo en el concepto del movimiento de caja.
+
         db.flush()
 
-        # --- PASO 3: Crear el movimiento de caja asociado ---
+      
         concepto_venta = f"Venta #{nueva_venta.id} (Cliente ID: {id_cliente})"
         
         movimiento_caja = CajaMovimiento(
@@ -138,22 +128,20 @@ def registrar_venta(
             concepto=concepto_venta,
             monto=total_venta,
             metodo_pago=metodo_pago,
-            id_venta=nueva_venta.id # Asociamos el movimiento con la venta
+            id_venta=nueva_venta.id 
         )
         db.add(movimiento_caja)
         
-        # --- PASO 4: Confirmar la transacción ---
-        # Si llegamos aquí sin errores, guardamos todos los cambios a la vez.
         db.commit()
 
-        # Refrescamos los objetos para obtener sus datos finales (como IDs generados)
+        
         db.refresh(nueva_venta)
         db.refresh(movimiento_caja)
 
         print(f"[REGISTRO_CAJA] Transacción completada. Venta ID: {nueva_venta.id}, Movimiento ID: {movimiento_caja.id}")
 
 
-        #--- AHORA INICIA LA PARTE DE GUARDAR EL MOVIMIENTO EN EL DRIVE ------
+      
         print(f"[REGISTRO_CAJA] Transacción completada. Venta ID: {nueva_venta.id}, Movimiento ID: {movimiento_caja.id}")
 
 # --- INICIA LA PARTE DE GUARDAR EN DRIVE (BLOQUE SEGURO) ---
@@ -161,7 +149,7 @@ def registrar_venta(
             print("[DRIVE] Intentando registrar movimiento en Google Sheets...")
             cliente = obtener_cliente_por_id(id_cliente)
 
-            # ¡AÑADIR ESTA VALIDACIÓN!
+   
             if cliente:
                 datos_para_sheets = {
                     "id_cliente": id_cliente,
@@ -171,15 +159,17 @@ def registrar_venta(
                     "Tipo_movimiento": "venta",
                     "descripcion": f"Venta de {len(articulos_vendidos)} artículos",
                     "monto": total_venta,
-                    # ... puedes añadir más campos si los necesitas ...
+              
                 }
                 if not caller.registrar_movimiento(datos_para_sheets):
                     print("⚠️ [DRIVE] La función registrar_movimiento devolvió False.")
+
+                if not caller.restar_stock(articulos_vendidos):
+                    print("⚠️ [DRIVE] Ocurrió un error al intentar actualizar el stock en Google Sheets.")
             else:
                 print(f"⚠️ [DRIVE] No se pudo encontrar el cliente con ID {id_cliente} en Google Sheets. No se registrará el movimiento en Drive.")
 
         except Exception as e_sheets:
-            # Si algo falla aquí, solo lo imprimimos, no afectamos la respuesta al frontend.
             print(f"❌ [DRIVE] Ocurrió un error al intentar registrar en Google Sheets: {e_sheets}")
 
 # --- FIN DE LA PARTE DE DRIVE --
