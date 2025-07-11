@@ -18,7 +18,7 @@ from back.config import (
 )
 
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.file']
-
+gspread_client: Optional[gspread.Client] = None
 
 datos_clientes: List[Dict] = []
 
