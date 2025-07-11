@@ -42,9 +42,12 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
 
 
   return (
-    <header style={{ top: '72px' }} className={`fixed z-10 w-full transition-transform duration-300 ${show ? 'translate-y-0' : '-translate-y-full'}`}>
+
+    <nav style={{ top: '72px' }} className={`fixed z-10 w-full transition-transform duration-300 ${show ? 'translate-y-0' : '-translate-y-full'}`}>
+      
       <div className="bg-white shadow px-4 py-4 flex justify-between items-center">
 
+        {/* Barra de Navegacion de Secciones */}
         <NavigationMenu>
           <NavigationMenuList className="flex space-x-4">
 
@@ -78,17 +81,19 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
           </NavigationMenuList>
         </NavigationMenu>
 
+        {/* Cerrar Sesión y volver al login */}
         <Button
           variant="destructive"
           onClick={() => {
-            useAuthStore.getState().logout();
+            useAuthStore.getState().logout();   
             router.push('/');
           }}
         >
           Cerrar Sesión
         </Button>
       </div>
-    </header>
+      
+    </nav>
   );
 }
 
