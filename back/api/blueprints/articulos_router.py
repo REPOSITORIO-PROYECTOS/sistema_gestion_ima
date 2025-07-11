@@ -41,6 +41,7 @@ async def api_crear_articulo(articulo_data: ArticuloCreate):
         raise HTTPException(status_code=400, detail=resultado["message"])
     return resultado
 
+
 @router.patch("/{id_articulo}", response_model=RespuestaGenerica, dependencies=[Depends(es_admin)])
 async def api_actualizar_articulo(id_articulo: str, articulo_data: ArticuloUpdate):
     """Actualiza un artículo existente. Requiere permisos de administrador."""
@@ -56,6 +57,8 @@ async def api_actualizar_articulo(id_articulo: str, articulo_data: ArticuloUpdat
             raise HTTPException(status_code=404, detail=resultado["message"])
         raise HTTPException(status_code=400, detail=resultado["message"])
     return resultado
+
+
 
 @router.delete("/{id_articulo}", response_model=RespuestaGenerica, dependencies=[Depends(es_admin)])
 async def api_eliminar_articulo(id_articulo: str):

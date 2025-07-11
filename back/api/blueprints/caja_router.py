@@ -3,6 +3,10 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional
 
+from sqlmodel import Session
+from database import get_db # Importa tu función para obtener la sesión
+from . import mod_registro_caja # Importa tu módulo de lógica
+from .schemas import RegistrarVentaRequest, RespuestaGenerica 
 # --- Importaciones de Lógica de Negocio ---
 from back.gestion.caja import apertura_cierre as mod_apertura_cierre
 from back.gestion.caja import registro_caja as mod_registro_caja
@@ -57,7 +61,8 @@ class RegistrarVentaRequest(BaseModel):
     metodo_pago: str
     usuario: str
     total_venta: float
-
+    quiere_factura: bool
+    tipo_comprobante_solicitado: str
 class MovimientoCajaRequest(BaseModel):
     id_sesion_caja: int
     concepto: str # Renombrado de 'descripcion' para coincidir con el backend
@@ -103,22 +108,38 @@ async def api_abrir_caja(request_data: AbrirCajaRequest, current_user: dict = De
     else:
         raise HTTPException(status_code=400, detail=resultado.get("message", "Error al abrir caja."))
 
+
 @router.post("/ventas/registrar", response_model=RespuestaGenerica)
-async def api_registrar_venta(request_data: RegistrarVentaRequest):
+def api_registrar_venta(
+    request_data: RegistrarVentaRequest, 
+    db: Session = Depends(get_db)   
+):
     """Registra una nueva venta en la sesión de caja activa."""
-    articulos_dict_list = [dict(art) for art in request_data.articulos_vendidos]
+    
+    articulos_list = [art.model_dump() for art in request_data.articulos_vendidos]
     
     resultado = mod_registro_caja.registrar_venta(
+        db=db,
         id_sesion_caja=request_data.id_sesion_caja,
-        articulos_vendidos=articulos_dict_list,
+        articulos_vendidos=articulos_list,
+        id_cliente=request_data.id_cliente,
+        id_usuario=request_data.id_usuario,
         metodo_pago=request_data.metodo_pago.upper(),
-        usuario=request_data.usuario,
         total_venta=request_data.total_venta
     )
+
     if resultado.get("status") == "success":
-        return RespuestaGenerica(status="success", message=resultado.get("message"), data={"id_movimiento": resultado.get("id_movimiento")})
+        return RespuestaGenerica(
+            status="success",
+            message=resultado.get("message"), 
+            data={
+                "id_venta": resultado.get("id_venta"),
+                "id_movimiento": resultado.get("id_movimiento")
+            }
+        )
     else:
-        raise HTTPException(status_code=400, detail=resultado.get("message", "Error al registrar venta."))
+        raise HTTPException(status_code=400, detail=resultado.get("message"))
+
 
 @router.post("/ingresos/registrar", response_model=RespuestaGenerica)
 async def api_registrar_ingreso(request_data: MovimientoCajaRequest):

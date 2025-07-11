@@ -2,7 +2,10 @@
 
 from datetime import datetime
 from mysql.connector import Error
-
+from sqlmodel import Session, select
+from datetime import datetime
+# Importa todos tus modelos. Asegúrate de que las rutas sean correctas.
+from modelos import Venta, VentaDetalle, CajaMovimiento, Articulo 
 from back.utils.mysql_handler import get_db_connection
 # Importamos los otros "gestores" que contendrán la lógica específica
 # Suponemos que existen estos módulos que también migraremos
@@ -51,91 +54,118 @@ def registrar_ingreso_egreso(id_sesion_caja: int, concepto: str, monto: float, t
             cursor.close()
             conn.close()
 
+
+
 def registrar_venta(
+    db: Session,
     id_sesion_caja: int,
-    articulos_vendidos: list,
+    articulos_vendidos: list,  # Espera una lista de dicts: [{"id_articulo": 1, "cantidad": 2}, ...]
     id_cliente: int,
+    id_usuario: int,
     metodo_pago: str,
-    usuario: str,
-    total_venta: float,
-    quiere_factura: bool = True,
-    tipo_comprobante_solicitado: str = None
+    total_venta: float
 ):
     """
-    Orquesta el registro de una venta completa dentro de una única transacción de base de datos.
-    Esto incluye: movimiento de caja, actualización de stock, (futuro) cuenta corriente y facturación.
+    Orquesta el registro de una venta completa usando SQLModel
+    dentro de una única transacción de base de datos.
+    Actualiza Venta, VentaDetalle, Articulo (stock) y CajaMovimiento.
     """
-    conn = get_db_connection()
-    if not conn:
-        return {"status": "error", "message": "Error de conexión a la base de datos."}
-
-    cursor = conn.cursor()
-
     try:
-        # --- INICIO DE LA TRANSACCIÓN MAESTRA ---
-        # Si algo falla en cualquier punto, todo se revierte.
-        conn.start_transaction()
+        # --- PASO 1: Crear el registro principal de la VENTA ---
+        nueva_venta = Venta(
+            total=total_venta,
+            id_cliente=id_cliente,
+            id_usuario=id_usuario,
+            id_caja_sesion=id_sesion_caja,
+            timestamp=datetime.utcnow()
+            # estado se establece por defecto a "COMPLETADA"
+        )
+        db.add(nueva_venta)
 
-        # --- 1. Lógica de Cliente y Cuenta Corriente (a implementar en su propio módulo) ---
-        # cliente_data = verificar_cliente_y_cta_cte(id_cliente, total_venta, metodo_pago, cursor)
-        # monto_para_caja = cliente_data['monto_para_caja']
-        # monto_a_cta_cte = cliente_data['monto_a_cta_cte']
-        # Por ahora, simplificamos y asumimos que todo va a caja:
-        monto_para_caja = total_venta
+        # --- PASO 2: Iterar artículos, actualizar stock y crear detalles ---
+        for item_data in articulos_vendidos:
+            id_articulo = item_data.get("id_articulo")
+            cantidad_vendida = item_data.get("cantidad")
+
+            if not id_articulo or not cantidad_vendida:
+                raise ValueError("Cada artículo vendido debe tener 'id_articulo' y 'cantidad'.")
+
+            # Busca el artículo en la BDD y lo bloquea para la actualización.
+            articulo_db = db.exec(
+                select(Articulo).where(Articulo.id == id_articulo).with_for_update()
+            ).first()
+
+            if not articulo_db:
+                raise ValueError(f"El artículo con ID {id_articulo} no existe.")
+
+            # VALIDACIÓN ADICIONAL: Comprobar si el artículo está activo
+            if not articulo_db.activo:
+                raise ValueError(f"El artículo '{articulo_db.descripcion}' (ID: {id_articulo}) no está activo y no se puede vender.")
+
+            # VALIDACIÓN DE STOCK: Usando el campo correcto 'stock_actual'
+            if articulo_db.stock_actual < cantidad_vendida:
+                raise ValueError(f"Stock insuficiente para '{articulo_db.descripcion}'. Disponible: {articulo_db.stock_actual}, Solicitado: {cantidad_vendida}")
+
+            # ACTUALIZACIÓN DE STOCK: Usando el campo correcto 'stock_actual'
+            articulo_db.stock_actual -= cantidad_vendida
+            
+            # NOTA: Si `maneja_lotes` es True, aquí iría una lógica más compleja
+            # para seleccionar y descontar de un lote específico. Por ahora, se omite.
+            
+            # Crear el registro de VentaDetalle
+            detalle_venta = VentaDetalle(
+                cantidad=cantidad_vendida,
+                precio_unitario=articulo_db.precio_venta, # Guarda el precio al momento de la venta
+                id_articulo=id_articulo,
+                venta=nueva_venta # El ORM asocia este detalle con la venta padre
+            )
+            db.add(detalle_venta)
+
+        # Hacemos un "flush" para que nueva_venta obtenga su ID de la BDD.
+        # Esto es necesario para poder usarlo en el concepto del movimiento de caja.
+        db.flush()
+
+        # --- PASO 3: Crear el movimiento de caja asociado ---
+        concepto_venta = f"Venta #{nueva_venta.id} (Cliente ID: {id_cliente})"
         
-        # --- 2. Crear el Movimiento de Caja ---
-        concepto_venta = f"Venta (Cliente ID: {id_cliente}, Items: {len(articulos_vendidos)})"
-        query_movimiento = """
-            INSERT INTO caja_movimientos (id_sesion, fecha, usuario, tipo_movimiento, concepto, monto, metodo_pago)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """
-        valores_movimiento = (id_sesion_caja, datetime.now(), usuario, 'VENTA', concepto_venta, monto_para_caja, metodo_pago)
-        cursor.execute(query_movimiento, valores_movimiento)
-        id_movimiento_venta = cursor.lastrowid
-        print(f"[REGISTRO_CAJA] Movimiento de Venta ID {id_movimiento_venta} creado.")
-
-        # --- 3. Actualizar Stock y Registrar Detalles de Venta ---
-        # Llamamos al gestor de stock, que trabaja dentro de NUESTRA transacción.
-        # Esta función ahora también se encargará de insertar en `venta_detalle`.
+        movimiento_caja = CajaMovimiento(
+            id_caja_sesion=id_sesion_caja,
+            id_usuario=id_usuario,
+            tipo='VENTA',
+            concepto=concepto_venta,
+            monto=total_venta,
+            metodo_pago=metodo_pago,
+            id_venta=nueva_venta.id # Asociamos el movimiento con la venta
+        )
+        db.add(movimiento_caja)
         
-        # --- 4. Generar Comprobante Fiscal (a implementar en su propio módulo) ---
-        # if quiere_factura:
-        #     res_factura = generar_comprobante(
-        #         id_movimiento_origen=id_movimiento_venta,
-        #         cliente_data=cliente_data,
-        #         items=articulos_vendidos,
-        #         total=total_venta,
-        #         tipo_solicitado=tipo_comprobante_solicitado,
-        #         cursor=cursor
-        #     )
-        #     id_comprobante_emitido = res_factura['id_comprobante']
-        #     numero_comprobante = res_factura['numero']
-        # else:
-        id_comprobante_emitido = None
-        numero_comprobante = "N/A"
+        # --- PASO 4: Confirmar la transacción ---
+        # Si llegamos aquí sin errores, guardamos todos los cambios a la vez.
+        db.commit()
 
-        # --- FIN DE LA TRANSACCIÓN ---
-        # Si llegamos aquí, todas las partes (caja, stock, cta cte, factura) funcionaron.
-        conn.commit()
-        print(f"[REGISTRO_CAJA] Transacción completada y guardada exitosamente.")
+        # Refrescamos los objetos para obtener sus datos finales (como IDs generados)
+        db.refresh(nueva_venta)
+        db.refresh(movimiento_caja)
+
+        print(f"[REGISTRO_CAJA] Transacción completada. Venta ID: {nueva_venta.id}, Movimiento ID: {movimiento_caja.id}")
 
         return {
             "status": "success",
-            "message": f"Venta registrada. Comprobante: {numero_comprobante}.",
-            "id_movimiento_venta": id_movimiento_venta,
-            "id_comprobante_emitido": id_comprobante_emitido
+            "message": f"Venta ID {nueva_venta.id} registrada exitosamente.",
+            "id_venta": nueva_venta.id,
+            "id_movimiento": movimiento_caja.id
         }
 
-    except (Error, ValueError) as e:
-        # Si CUALQUIER error ocurre en CUALQUIER paso, se revierte todo.
-        print(f"[REGISTRO_CAJA] ERROR en la transacción, revirtiendo todo. Detalle: {e}")
-        conn.rollback()
-        # Devolvemos un mensaje de error claro al frontend.
+    except ValueError as e: # Errores de negocio (ej. stock)
+        print(f"[REGISTRO_CAJA] ERROR de lógica, revirtiendo transacción. Detalle: {e}")
+        db.rollback()
         return {"status": "error", "message": str(e)}
-    finally:
-        if conn.is_connected():
-            cursor.close()
-            conn.close()
+    except Exception as e: # Cualquier otro error inesperado
+        print(f"[REGISTRO_CAJA] ERROR inesperado, revirtiendo transacción. Detalle: {e}")
+        db.rollback()
+        return {"status": "error", "message": "Ocurrió un error interno al procesar la venta."}
+
+
 
 def calcular_vuelto(total_a_pagar: float, monto_recibido: float):
     """
