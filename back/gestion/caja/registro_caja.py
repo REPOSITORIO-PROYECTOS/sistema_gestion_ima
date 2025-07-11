@@ -4,6 +4,7 @@ from datetime import datetime
 from mysql.connector import Error
 from sqlmodel import Session, select
 from datetime import datetime
+from back.gestion.caja.cliente_publico import obtener_cliente_por_id
 # Importa todos tus modelos. Asegúrate de que las rutas sean correctas.
 from back.modelos import Venta, VentaDetalle, CajaMovimiento, Articulo 
 from back.utils.mysql_handler import get_db_connection
@@ -11,7 +12,9 @@ from back.utils.mysql_handler import get_db_connection
 # Suponemos que existen estos módulos que también migraremos
 # from back.gestion.clientes_manager import verificar_cliente_y_cta_cte
 # from back.gestion.facturacion_manager import generar_comprobante
+from back.utils.tablas_handler import TablasHandler
 
+caller = TablasHandler()
 #ACA TENGO QUE REGISTRAR CUANDO ENTRA Y CUANDO SALE PLATA, MODIFICA LA TABLA MOVIMIENTOS
   
 
@@ -148,6 +151,30 @@ def registrar_venta(
         db.refresh(movimiento_caja)
 
         print(f"[REGISTRO_CAJA] Transacción completada. Venta ID: {nueva_venta.id}, Movimiento ID: {movimiento_caja.id}")
+
+
+        #--- AHORA INICIA LA PARTE DE GUARDAR EL MOVIMIENTO EN EL DRIVE ------
+        cliente = obtener_cliente_por_id(id_cliente)
+
+        datos_venta = {
+            "id_cliente": id_cliente,
+            "id_ingresos": "",
+            "id_repartidor": "",
+            "repartidor": "",
+            "cliente": cliente.get("nombre-usuario"),
+            "cuit": cliente.get("CUIT-CUIL"),
+            "razon_social": cliente.get("Nombre de Contacto"),
+            "Tipo_movimiento": "venta",
+            "nro_comprobante": "",
+            "descripcion": "Venta de productos",
+            "monto": total_venta,
+            "foto_comprobante": "",
+            "observaciones": ""
+        }
+
+        caller.registrar_movimiento(datos_venta)
+
+        #----ACA TERMINA ESTA PARTE -----------------------------------
 
         return {
             "status": "success",

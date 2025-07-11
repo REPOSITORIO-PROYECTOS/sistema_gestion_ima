@@ -1,7 +1,8 @@
 import gspread
 from google.oauth2.service_account import Credentials
 from typing import List, Dict, Any, Optional, Tuple
-
+import uuid
+from datetime import datetime
 # Importar las VARIABLES PYTHON definidas en config.py
 from back.config import (
     GOOGLE_SHEET_ID, GOOGLE_SERVICE_ACCOUNT_FILE,
@@ -56,3 +57,45 @@ class TablasHandler:
         else:
             print("Cliente no disponible.")
         return []
+    
+
+
+    def registrar_movimiento(self, datos_venta: Dict[str, Any]) -> bool:
+        
+        if not self.client:
+            print("ERROR: Cliente de Google Sheets no disponible.")
+            return False
+
+        try:
+            hoja = self.client.open_by_key(GOOGLE_SHEET_ID).worksheet("MOVIMIENTOS")
+
+            id_movimiento = str(uuid.uuid4())[:8]
+            fecha_actual = datetime.now().strftime("%d-%m-%Y")
+            fecha_hora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+
+            fila = [
+                id_movimiento,
+                datos_venta.get("id_cliente", ""),
+                datos_venta.get("id_ingresos", ""),
+                datos_venta.get("id_repartidor", ""),
+                datos_venta.get("repartidor", ""),
+                fecha_hora,
+                fecha_actual,
+                datos_venta.get("cliente", ""),
+                datos_venta.get("cuit", ""),
+                datos_venta.get("razon_social", ""),
+                datos_venta.get("Tipo_movimiento", ""),  # Tipo de Movimiento
+                datos_venta.get("nro_comprobante", ""),
+                datos_venta.get("descripcion", ""),
+                f"${datos_venta.get('monto', 0):,.2f}".replace(",", "@").replace(".", ",").replace("@", "."),
+                datos_venta.get("foto_comprobante", ""),
+                datos_venta.get("observaciones", "")
+            ]
+
+            hoja.append_row(fila, value_input_option="USER_ENTERED")
+            print(f"Venta registrada correctamente en caja con ID: {id_movimiento}")
+            return True
+
+        except Exception as e:
+            print(f"Error al registrar venta: {e}")
+            return False
