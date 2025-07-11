@@ -1,3 +1,4 @@
+import os
 import gspread
 from google.oauth2.service_account import Credentials
 from typing import List, Dict, Any, Optional, Tuple
@@ -31,7 +32,15 @@ class TablasHandler:
         if gspread_client is None:
             print("Inicializando cliente gspread...")
             try:
-                gspread_client = gspread.service_account(filename=GOOGLE_SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+                back_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                
+                # 2. Construir la ruta absoluta al archivo de credenciales
+                credential_path = os.path.join(back_dir, GOOGLE_SERVICE_ACCOUNT_FILE)
+                
+                print(f"Buscando credenciales en la ruta absoluta: {credential_path}")
+
+                # 3. Usar la ruta absoluta para inicializar el cliente
+                gspread_client = gspread.service_account(filename=credential_path, scopes=SCOPES)
                 print("Cliente gspread inicializado.")
             except FileNotFoundError:
                 print(f"ERROR FATAL: Archivo de credenciales no encontrado en '{GOOGLE_SERVICE_ACCOUNT_FILE}'")
@@ -47,16 +56,17 @@ class TablasHandler:
         if self.client:
             try:
                 sheet = self.client.open_by_key(GOOGLE_SHEET_ID)
-                worksheet = sheet.worksheet("clientes")
+                worksheet = sheet.worksheet("clientes") # <-- ¿Existe una hoja llamada "clientes"?
                 datos_clientes = worksheet.get_all_records()
                 return datos_clientes
             except gspread.exceptions.WorksheetNotFound:
-                print("ERROR: Hoja 'clientes' no encontrada.")
+                print("❌ ERROR: La hoja de cálculo no tiene una pestaña llamada 'clientes'.")
             except Exception as e:
-                print(f"Error al cargar datos de Clientes: {e}")
+                # ¡IMPRIME EL ERROR REAL!
+                print(f"❌ Error detallado al cargar datos de Clientes: {type(e).__name__} - {e}")
         else:
-            print("Cliente no disponible.")
-        return []
+            print("Cliente de Google Sheets no disponible.")
+        return [] # Devuelve lista vacía en caso de cualquier error
     
 
 

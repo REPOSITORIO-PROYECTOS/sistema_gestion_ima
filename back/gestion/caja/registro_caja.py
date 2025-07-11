@@ -154,25 +154,35 @@ def registrar_venta(
 
 
         #--- AHORA INICIA LA PARTE DE GUARDAR EL MOVIMIENTO EN EL DRIVE ------
-        cliente = obtener_cliente_por_id(id_cliente)
+        print(f"[REGISTRO_CAJA] Transacción completada. Venta ID: {nueva_venta.id}, Movimiento ID: {movimiento_caja.id}")
 
-        datos_venta = {
-            "id_cliente": id_cliente,
-            "id_ingresos": "",
-            "id_repartidor": "",
-            "repartidor": "",
-            "cliente": cliente.get("nombre-usuario"),
-            "cuit": cliente.get("CUIT-CUIL"),
-            "razon_social": cliente.get("Nombre de Contacto"),
-            "Tipo_movimiento": "venta",
-            "nro_comprobante": "",
-            "descripcion": "Venta de productos",
-            "monto": total_venta,
-            "foto_comprobante": "",
-            "observaciones": ""
-        }
+# --- INICIA LA PARTE DE GUARDAR EN DRIVE (BLOQUE SEGURO) ---
+        try:
+            print("[DRIVE] Intentando registrar movimiento en Google Sheets...")
+            cliente = obtener_cliente_por_id(id_cliente)
 
-        caller.registrar_movimiento(datos_venta)
+            # ¡AÑADIR ESTA VALIDACIÓN!
+            if cliente:
+                datos_para_sheets = {
+                    "id_cliente": id_cliente,
+                    "cliente": cliente.get("nombre-usuario", "No encontrado"),
+                    "cuit": cliente.get("CUIT-CUIL", "N/A"),
+                    "razon_social": cliente.get("Nombre de Contacto", "N/A"),
+                    "Tipo_movimiento": "venta",
+                    "descripcion": f"Venta de {len(articulos_vendidos)} artículos",
+                    "monto": total_venta,
+                    # ... puedes añadir más campos si los necesitas ...
+                }
+                if not caller.registrar_movimiento(datos_para_sheets):
+                    print("⚠️ [DRIVE] La función registrar_movimiento devolvió False.")
+            else:
+                print(f"⚠️ [DRIVE] No se pudo encontrar el cliente con ID {id_cliente} en Google Sheets. No se registrará el movimiento en Drive.")
+
+        except Exception as e_sheets:
+            # Si algo falla aquí, solo lo imprimimos, no afectamos la respuesta al frontend.
+            print(f"❌ [DRIVE] Ocurrió un error al intentar registrar en Google Sheets: {e_sheets}")
+
+# --- FIN DE LA PARTE DE DRIVE --
 
         #----ACA TERMINA ESTA PARTE -----------------------------------
 
