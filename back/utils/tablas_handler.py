@@ -112,7 +112,7 @@ class TablasHandler:
         
 
 
-def restar_stock(self, lista_items: List[Dict[str, Any]]) -> bool:
+    def restar_stock(self, lista_items: List[Dict[str, Any]]) -> bool:
 
         if not self.client:
             print("❌ ERROR [STOCK]: Cliente de Google Sheets no disponible.")
