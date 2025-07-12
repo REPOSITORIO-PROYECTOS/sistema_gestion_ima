@@ -1,6 +1,6 @@
 "use client"
 
-/* -------------------------------------------- LOGIN INICIAL -------------------------------------------- */
+/* -------------------------------------------- LOGIN -------------------------------------------- */
 
 import Image from 'next/image'
 import "../styles/globals.css"
@@ -37,23 +37,29 @@ function Login() {
   }
 
   return (
-    <div className="flex flex-col h-screen justify-center items-center gap-10 bg-emerald-600">
-      <Image src="/logo.png" alt="Swing Jugos" width={70} height={70} />
 
-      <form 
-        onSubmit={handleLogin}
-        className="form-login bg-amber-500 shadow-2xl flex flex-col items-center justify-center w-1/3 p-8 gap-10 rounded-4xl"
+    <div className="flex flex-col justify-center items-center gap-10 bg-emerald-600 px-6 py-8 md:h-screen">
+      
+      <Image src="/logo.png" alt="Swing Jugos" width={80} height={80} />
+
+      {/* Form Login */}
+      <form onSubmit={handleLogin}
+      className="form-login bg-amber-500 shadow-2xl flex flex-col items-center justify-center p-8 gap-10 rounded-4xl md:w-1/3"
       >
+        {/* Usuario */}
         <div className="flex flex-col gap-2">
           <label htmlFor="username" className="text-white">Usuario</label>
           <input 
             id="username" 
             type="text" 
             value={username} 
-            onChange={(e) => setUsername(e.target.value)} 
+            onChange={(e) => setUsername(e.target.value)}
+              className="border !border-white text-white bg-transparent px-3 py-2 rounded focus:!outline-none focus:!ring-0 focus:!border-white hover:!border-white"
+
           />
         </div>
 
+        {/* Contraseña */}
         <div className="flex flex-col gap-2">
           <label htmlFor="password" className="text-white">Contraseña</label>
           <input 
@@ -61,9 +67,12 @@ function Login() {
             type="password" 
             value={password}
             onChange={(e) => setPassword(e.target.value)} 
+              className="border !border-white text-white bg-transparent px-3 py-2 rounded focus:!outline-none focus:!ring-0 focus:!border-white hover:!border-white"
+
           />
         </div>
 
+        {/* Submit */}
         <div className="w-full flex flex-col items-center gap-2 ">
           <button 
             type="submit" 
@@ -73,8 +82,10 @@ function Login() {
           </button>
         </div>
 
+        {/* Recuperar contraseña */}
         <a href="" className="text-white font-semibold hover:text-amber-950 transition">¿Olvidaste tu contraseña?</a>
       </form>
+
     </div>
   );
 }
