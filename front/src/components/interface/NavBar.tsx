@@ -7,12 +7,21 @@ import {
   NavigationMenuList,
 } from "@/components/ui/navigation-menu"
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react';
 
 import { useAuthStore } from '@/lib/authStore'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image';
 
 type NavLink = {
   href: string
@@ -40,20 +49,20 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [lastScrollY]);
 
-
   return (
 
-    <nav style={{ top: '72px' }} className={`fixed z-10 w-full transition-transform duration-300 ${show ? 'translate-y-0' : '-translate-y-full'}`}>
-      
-      <div className="bg-white shadow px-4 py-4 flex justify-between items-center">
+    <nav className={`fixed top-0 z-10 w-full transition-transform duration-300 ${show ? 'translate-y-0' : '-translate-y-full'}`}>
+      <div className="bg-green-800 shadow px-4 py-4 flex justify-between items-center">
 
-        {/* Barra de Navegacion de Secciones */}
-        <NavigationMenu>
+        {/* Logo */}
+        <a href="/dashboard" className="text-xl font-bold flex items-center gap-2">
+          <Image src="/logo.png" alt="Swing Jugos" width={60} height={60} />
+        </a>
+
+        {/* Menú de secciones - responsivo */}
+        <NavigationMenu className="hidden md:block">
           <NavigationMenuList className="flex space-x-4">
-
             {links.map(({ href, name, roles }) => {
-
-              // Mapeamos por si existe subseccion y si el rol lo permite
               const isActive = pathname.startsWith(href);
               const isAllowed = roles.includes(role);
 
@@ -67,8 +76,8 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                     className={`text-md font-medium px-4 py-2 rounded-lg transition-colors
                       ${isAllowed
                         ? isActive
-                          ? 'bg-green-800 text-white'
-                          : 'text-gray-900 hover:bg-slate-200'
+                          ? 'bg-green-700 text-white'
+                          : 'text-white hover:bg-green-300 hover:text-green-900'
                         : 'text-gray-400 cursor-not-allowed'}
                     `}
                     aria-disabled={!isAllowed}
@@ -81,18 +90,78 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
           </NavigationMenuList>
         </NavigationMenu>
 
-        {/* Cerrar Sesión y volver al login */}
-        <Button
-          variant="destructive"
-          onClick={() => {
-            useAuthStore.getState().logout();   
-            router.push('/');
-          }}
-        >
-          Cerrar Sesión
-        </Button>
+        {/* Desplegables */}
+        <div className="flex items-center">
+
+          {/* Avatar con desplegable cerrar sesion */}
+          <div className="hidden md:flex">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="cursor-pointer bg-green-300 text-gray-800 font-semibold p-2 rounded-full w-12 h-12 flex items-center justify-center">
+                  IM
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-white">
+                <DropdownMenuItem 
+                  className="cursor-pointer text-red-600"
+                  onClick={() => {
+                    useAuthStore.getState().logout();
+                    router.push('/');
+                  }}
+                >
+                  Cerrar Sesión
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Menu hamburguesa mobile */}
+          <div className="md:hidden ml-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="text-orange-500 border-white font-bold">
+                  ☰
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-white">
+                {links.map(({ href, name, roles }) => {
+                  const isAllowed = roles.includes(role);
+                  return (
+                    <DropdownMenuItem key={href} asChild>
+                      <a
+                        href={isAllowed ? href : "#"}
+                        onClick={(e) => {
+                          if (!isAllowed) e.preventDefault();
+                        }}
+                        className={`block px-4 py-2 text-sm ${
+                          isAllowed
+                            ? 'text-green-900 hover:bg-green-100'
+                            : 'text-gray-400 cursor-not-allowed'
+                        }`}
+                      >
+                        {name}
+                      </a>
+                    </DropdownMenuItem>
+                  );
+                })}
+
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  className="text-red-600"
+                  onClick={() => {
+                    useAuthStore.getState().logout();
+                    router.push('/');
+                    
+                  }}
+                >
+                  Cerrar Sesión
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
       </div>
-      
     </nav>
   );
 }

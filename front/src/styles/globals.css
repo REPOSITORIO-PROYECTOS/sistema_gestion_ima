@@ -138,9 +138,14 @@
   }
 }
 
+/* Corrije movimiento que oculta el scroll */
+html {
+  overflow-y: scroll;
+}
 
 body {
   font-family: var(--font-inter);
+  overflow-y: scroll !important;
 }
 
 .form-login input  { 
