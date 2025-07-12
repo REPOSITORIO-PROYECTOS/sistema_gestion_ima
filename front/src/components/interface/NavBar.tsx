@@ -77,7 +77,7 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                       ${isAllowed
                         ? isActive
                           ? 'bg-green-700 text-white'
-                          : 'text-white hover:bg-green-300 hover:text-green-900'
+                          : 'text-white hover:bg-green-500 hover:text-green-900'
                         : 'text-gray-400 cursor-not-allowed'}
                     `}
                     aria-disabled={!isAllowed}

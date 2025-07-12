@@ -10,6 +10,7 @@ import {
   Select, SelectContent, SelectItem,
   SelectTrigger, SelectValue
 } from "@/components/ui/select"
+import { Loader2 } from "lucide-react";
 
 // Dropdown Productos
 const productos = [
@@ -92,11 +93,15 @@ function FormVentas({
     }
   }, [montoPagado, metodoPago, totalVenta]);
 
+  // Estado para spinner de carga submit
+  const [isLoading, setIsLoading] = useState(false);
 
 
   // Registrar la venta completa - falta terminar
   const handleSubmit = async (e: React.FormEvent) => {
 
+    // Animacion de carga
+    setIsLoading(true);
     e.preventDefault();
   
     // Objeto resumen de toda la venta generada
@@ -147,16 +152,19 @@ function FormVentas({
       console.error("Detalles del error:", error);
       alert("❌ Error al registrar venta:\n" + JSON.stringify(error, null, 2));
     }
+      finally {
+      setIsLoading(false);
+    }
 
-    // Verificamos que estamos mandando
+    // Se printea el Payload
     console.log(JSON.stringify(ventaPayload, null, 2));
   };
 
-  
 
   return (
+
     <form onSubmit={handleSubmit} 
-    className="flex flex-col w-1/2 rounded-xl bg-white shadow-md">
+    className="flex flex-col w-full lg:w-1/2 rounded-xl bg-white shadow-md">
 
       {/* Header del Cajero */}
       <div className="w-full flex flex-row justify-between items-center p-6 bg-green-700 rounded-t-xl">
@@ -166,7 +174,7 @@ function FormVentas({
       <div className="flex flex-col justify-between w-full gap-6 p-8">
 
         {/* Listado de Productos */}
-        <div className="flex flex-row gap-4 items-center justify-between">
+        <div className="flex flex-col gap-4 items-center justify-between md:flex-row">
           <Label className="text-2xl font-semibold text-green-900">Producto</Label>
           <Select
             defaultValue={productoSeleccionado.id}
@@ -174,7 +182,7 @@ function FormVentas({
               const prod = productos.find(p => p.id === value)
               if (prod) setProductoSeleccionado(prod)
             }}>
-            <SelectTrigger className="w-1/2 cursor-pointer text-black">
+            <SelectTrigger className="w-full cursor-pointer text-black">
               <SelectValue placeholder="Seleccionar producto" />
             </SelectTrigger>
             <SelectContent>
@@ -186,19 +194,21 @@ function FormVentas({
             </SelectContent>
           </Select>
         </div>
+        <span className="block w-full h-0.5 bg-green-900"></span>
 
 
         {/* Cantidad de un Producto */}
-        <div className="flex flex-row gap-4 items-center justify-between">
+        <div className="flex flex-col gap-4 items-center justify-between md:flex-row">
           <Label className="text-2xl font-semibold text-green-900">Cantidad</Label>
           <Input
             type="number"
             min={1}
             value={cantidad}
             onChange={(e) => setCantidad(Number(e.target.value))}
-            className="w-1/2 text-black"
+            className="w-full text-black"
           />
         </div>
+        <span className="block w-full h-0.5 bg-green-900"></span>
 
 
         {/* Total de prod * cant */}
@@ -217,11 +227,10 @@ function FormVentas({
           Agregar producto
         </Button>
 
-        {/* --------------------------------------- */} <hr className="p-0.25 bg-green-900"/> {/* --------------------------------------- */}
-
+        {/* --------------------------------------- */} <hr className="p-0.75 bg-green-900 my-8"/> {/* --------------------------------------- */}
 
         {/* Tipo Cliente */}
-        <div className="flex flex-row gap-4 items-center justify-between">
+        <div className="flex flex-col gap-4 items-center justify-between md:flex-row">
           <Label className="text-2xl font-semibold text-green-900">Tipo de Cliente</Label>
           <Select
             defaultValue={tipoClienteSeleccionado.id}
@@ -229,7 +238,7 @@ function FormVentas({
               const cliente = tipoCliente.find(p => p.id === value)
               if (cliente) setTipoClienteSeleccionado(cliente)
             }}>
-            <SelectTrigger className="w-1/2 cursor-pointer text-black">
+            <SelectTrigger className="w-full cursor-pointer text-black">
               <SelectValue placeholder="Seleccionar cliente" />
             </SelectTrigger>
             <SelectContent>
@@ -241,60 +250,70 @@ function FormVentas({
             </SelectContent>
           </Select>
         </div>
+        <span className="block w-full h-0.5 bg-green-900"></span>
 
 
         {/* Método de Pago y condicional efectivo */}
         <div className="flex flex-col gap-4">
-          <div className="flex flex-row gap-4 items-center justify-between">
-            <Label className="text-2xl font-semibold text-green-900">Método de Pago</Label>
-            <Select
-              value={metodoPago}
-              onValueChange={(value) => setMetodoPago(value)}
-            >
-              <SelectTrigger className="w-1/2 cursor-pointer text-black">
-                <SelectValue placeholder="Seleccionar método" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="efectivo">Efectivo</SelectItem>
-                <SelectItem value="transferencia">Transferencia</SelectItem>
-                <SelectItem value="credito">Crédito</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
+            <div className="flex flex-col gap-4 items-center justify-between md:flex-row">
+              <Label className="text-2xl font-semibold text-green-900">Método de Pago</Label>
+              <Select
+                value={metodoPago}
+                onValueChange={(value) => setMetodoPago(value)}
+              >
+                <SelectTrigger className="w-full cursor-pointer text-black">
+                  <SelectValue placeholder="Seleccionar método" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="efectivo">Efectivo</SelectItem>
+                  <SelectItem value="transferencia">Transferencia</SelectItem>
+                  <SelectItem value="credito">Crédito</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           {metodoPago === 'efectivo' && (
             <div className="flex flex-col gap-4 p-4 bg-green-800 rounded-lg mt-2">
-              <div className="flex flex-row gap-4 items-center justify-between">
-                <Label className="text-2xl font-semibold text-white">Con cuánto paga</Label>
+              <div className="flex flex-col gap-4 items-center justify-between">
+                <Label className="text-2xl font-semibold text-white">Costo del Pedido:</Label>
+                <Input
+                  type="number"
+                  value={totalVenta}
+                  disabled
+                  className="w-1/2 font-semibold text-white"
+                />
+              </div>
+              <div className="flex flex-col gap-4 items-center justify-between">
+                <Label className="text-2xl font-semibold text-white">Con cuánto abona:</Label>
                 <Input
                   type="number"
                   min={totalVenta}
                   value={montoPagado}
                   onChange={(e) => setMontoPagado(Number(e.target.value))}
-                  className="w-1/2 text-white"
+                  className="w-1/2 font-semibold text-white"
                 />
               </div>
-              <div className="flex flex-row gap-4 items-center justify-between">
-                <Label className="text-2xl font-semibold text-white">Cambio</Label>
+              <div className="flex flex-col gap-4 items-center justify-between">
+                <Label className="text-2xl font-semibold text-white">Vuelto:</Label>
                 <Input
                   type="number"
                   value={vuelto}
                   disabled
-                  className="w-1/2 text-white bg-green-900"
+                  className="w-1/2 font-semibold text-white"
                 />
               </div>
             </div>
           )}
         </div>
+        <span className="block w-full h-0.5 bg-green-900"></span>
 
 
         {/* Checkbox Ticket o Comprobante */}
-        <RadioGroup defaultValue="ticket" className="flex flex-row gap-4">
+        <RadioGroup defaultValue="ticket" className="flex flex-col gap-4 md:flex-row">
           
           {/* Ticket */}
           <Label
             htmlFor="ticket"
-            className="flex flex-row items-center w-1/2 cursor-pointer text-black border-green-900 hover:bg-green-400 dark:hover:bg-green-700 gap-3 rounded-lg border p-3 transition-colors duration-200 data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900"
+            className="flex flex-row items-center w-full md:w-1/2 lg:flex-row cursor-pointer text-black border-green-900 hover:bg-green-400 dark:hover:bg-green-700 gap-3 rounded-lg border p-3 transition-colors duration-200 data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900"
           >
             <RadioGroupItem
               value="ticket"
@@ -307,7 +326,7 @@ function FormVentas({
           {/* Comprobante */}
           <Label
             htmlFor="comprobante"
-            className="flex flex-row items-center w-1/2 cursor-pointer text-black border-green-900 hover:bg-green-400 dark:hover:bg-green-700 gap-3 rounded-lg border p-3 transition-colors duration-200 data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900"
+            className="flex flex-row items-center w-full md:w-1/2 lg:flex-row cursor-pointer text-black border-green-900 hover:bg-green-400 dark:hover:bg-green-700 gap-3 rounded-lg border p-3 transition-colors duration-200 data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900"
           >
             <RadioGroupItem
               value="comprobante"
@@ -317,6 +336,7 @@ function FormVentas({
             <span className="text-sm leading-none font-medium">Comprobante</span>
           </Label>
         </RadioGroup>
+        <span className="block w-full h-0.5 bg-green-900"></span>
 
 
         {/* Observaciones */}
@@ -329,6 +349,7 @@ function FormVentas({
             onChange={(e) => setObservaciones(e.target.value)}
           />
         </div>
+        <span className="block w-full h-0.5 bg-green-900"></span>
 
 
         {/* Total Venta */}
@@ -338,10 +359,20 @@ function FormVentas({
         </div>
 
 
-        {/* Botón Final: Registrar Venta y enviar toda la info al server */}
-        <Button type="submit" className="bg-green-900 hover:bg-green-700">
-          Registrar Venta
-        </Button>
+        {/* Botón Final: Registra venta y envia toda la info al server */}
+        <Button
+            type="submit"
+            disabled={isLoading}
+            className={`bg-green-900 flex items-center justify-center gap-2
+              ${isLoading 
+                ? "cursor-not-allowed opacity-50 hover:cursor-not-allowed"
+                : "hover:bg-green-700 cursor-pointer"
+              }
+            `}
+          >
+            {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+            {isLoading ? "Registrando..." : "Registrar Venta"}
+          </Button>
 
       </div>
 
