@@ -1,196 +1,81 @@
-# back/api/caja_router.py
-
-# 1. Librerías de terceros
-from fastapi import APIRouter, HTTPException, Depends
+# back/api/blueprints/caja_router.py
+from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
-from typing import List, Optional
+from typing import List
 
-# 2. Módulos de tu propio proyecto (usando siempre 'from back...')
 from back.database import get_db
-
-from back.security import es_cajero
-# Solución para el Escenario A
-from .schemas import RegistrarVentaRequest, RespuestaGenerica
-# Lógica de negocio
-from back.gestion.caja import apertura_cierre as mod_apertura_cierre
-from back.gestion.caja import registro_caja as mod_registro_caja # <--- ESTA ES LA ÚNICA Y CORRECTA
-from back.gestion.stock import articulos as mod_articulos
-from back.gestion import configuracion_manager as mod_config
-
-
-# --- Importaciones de Modelos Pydantic (los moveremos a su propio archivo después) ---
-# Por ahora, los definimos aquí para que funcione.
-from pydantic import BaseModel, Field
-from typing import Dict, Any
-
-router = APIRouter(
-    prefix="/caja",
-    tags=["Caja"],
-    dependencies=[Depends(es_cajero)] # ¡TODA la sección de caja está protegida!
+from back.security import obtener_usuario_actual
+from back.modelos import Usuario
+from back.gestion.caja import apertura_cierre, registro_caja, consultas_caja, movimientos_simples
+from back.schemas.caja_schemas import (
+    AbrirCajaRequest, CerrarCajaRequest, EstadoCajaResponse,
+    RegistrarVentaRequest, ArqueoCajaResponse, RespuestaGenerica,
+    MovimientoSimpleRequest
 )
 
-# --- Modelos Pydantic para Request/Response (esto idealmente iría en un archivo 'schemas.py') ---
-class RespuestaGenerica(BaseModel):
-    status: str
-    message: str
-    data: Optional[Dict[str, Any]] = None
-
-class AbrirCajaRequest(BaseModel):
-    saldo_inicial: float = Field(..., gt=-0.00001)
-    usuario: str
-
-class SesionInfo(BaseModel):
-    id_sesion: int
-    usuario_apertura: Optional[str] = None
-    fecha_apertura: Optional[str] = None
-    saldo_inicial: Optional[float] = None
-
-class EstadoCajaResponse(BaseModel):
-    status: str
-    caja_abierta: bool
-    sesion_info: Optional[SesionInfo] = None
-    message: Optional[str] = None
-
-class ArticuloVendido(BaseModel):
-    id_articulo: str
-    nombre: Optional[str] = None
-    cantidad: int = Field(..., gt=0)
-    precio_unitario: float = Field(..., ge=0)
-    subtotal: float
-
-class MovimientoCajaRequest(BaseModel):
-    id_sesion_caja: int
-    concepto: str # Renombrado de 'descripcion' para coincidir con el backend
-    monto: float = Field(..., gt=0)
-    usuario: str
-
-class CerrarCajaRequest(BaseModel):
-    id_sesion: int
-    saldo_final_contado: float = Field(..., ge=0)
-    usuario_cierre: str
-    # token_admin: str # El token se manejará por dependencia, no en el cuerpo
-
-# --- Creación del Router ---
-router = APIRouter(
-    prefix="/caja",
-    tags=["Caja"],
-    responses={404: {"description": "No encontrado"}}
-)
-
-# --- Endpoints de Caja ---
+router = APIRouter(prefix="/caja", tags=["Caja"], dependencies=[Depends(obtener_usuario_actual)])
 
 @router.get("/estado", response_model=EstadoCajaResponse)
-async def api_obtener_estado_caja():
-    """Verifica si hay una caja abierta y devuelve su información."""
+def get_estado_caja_propia(db: Session = Depends(get_db), current_user: Usuario = Depends(obtener_usuario_actual)):
+    sesion_abierta = apertura_cierre.obtener_caja_abierta_por_usuario(db, id_usuario=current_user.id)
+    if sesion_abierta:
+        return EstadoCajaResponse(caja_abierta=True, id_sesion=sesion_abierta.id, fecha_apertura=sesion_abierta.fecha_apertura)
+    return EstadoCajaResponse(caja_abierta=False)
+
+@router.post("/abrir", response_model=RespuestaGenerica)
+def api_abrir_caja(req: AbrirCajaRequest, db: Session = Depends(get_db), current_user: Usuario = Depends(obtener_usuario_actual)):
     try:
-        sesion_data = mod_apertura_cierre.obtener_estado_caja_actual()
-        if sesion_data:
-            return EstadoCajaResponse(status="success", caja_abierta=True, sesion_info=SesionInfo(**sesion_data))
-        else:
-            return EstadoCajaResponse(status="success", caja_abierta=False, message="No hay ninguna caja abierta actualmente.")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
+        nueva_sesion = apertura_cierre.abrir_caja(db=db, saldo_inicial=req.saldo_inicial, id_usuario_apertura=current_user.id)
+        return RespuestaGenerica(status="success", message=f"Caja abierta. ID Sesión: {nueva_sesion.id}", data={"id_sesion": nueva_sesion.id})
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-@router.post("/abrir")
-async def api_abrir_caja(request_data: AbrirCajaRequest, current_user: dict = Depends(es_cajero)):
-    # Ya no necesitamos pasar el usuario en el request_data, lo obtenemos del token
-    resultado = mod_apertura_cierre.abrir_caja(
-        saldo_inicial=request_data.saldo_inicial,
-        usuario=current_user['username'] # Usamos el usuario autenticado
-    )
-    if resultado.get("status") == "success":
-        return RespuestaGenerica(status="success", message=resultado.get("message"), data={"id_sesion": resultado.get("id_sesion")})
-    else:
-        raise HTTPException(status_code=400, detail=resultado.get("message", "Error al abrir caja."))
-
+@router.post("/cerrar", response_model=RespuestaGenerica)
+def api_cerrar_caja(req: CerrarCajaRequest, db: Session = Depends(get_db), current_user: Usuario = Depends(obtener_usuario_actual)):
+    try:
+        resultado = apertura_cierre.cerrar_caja(db=db, id_usuario_cierre=current_user.id, saldo_final_declarado=req.saldo_final_declarado)
+        return RespuestaGenerica(status=resultado["status"], message=resultado["message"])
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/ventas/registrar", response_model=RespuestaGenerica)
-def api_registrar_venta(
-    request_data: RegistrarVentaRequest, 
-    db: Session = Depends(get_db)   
-):
-    """Registra una nueva venta en la sesión de caja activa."""
-    
-    articulos_list = [art.model_dump() for art in request_data.articulos_vendidos]
-    
-    resultado = mod_registro_caja.registrar_venta(
-        db=db,
-        id_sesion_caja=request_data.id_sesion_caja,
-        articulos_vendidos=articulos_list,
-        id_cliente=request_data.id_cliente,
-        id_usuario=request_data.id_usuario,
-        metodo_pago=request_data.metodo_pago.upper(),
-        total_venta=request_data.total_venta
-    )
-
-    if resultado.get("status") == "success":
-        return RespuestaGenerica(
-            status="success",
-            message=resultado.get("message"), 
-            data={
-                "id_venta": resultado.get("id_venta"),
-                "id_movimiento": resultado.get("id_movimiento")
-            }
+def api_registrar_venta(req: RegistrarVentaRequest, db: Session = Depends(get_db), current_user: Usuario = Depends(obtener_usuario_actual)):
+    sesion_activa = apertura_cierre.obtener_caja_abierta_por_usuario(db, id_usuario=current_user.id)
+    if not sesion_activa:
+        raise HTTPException(status_code=400, detail="Operación denegada: El usuario no tiene una caja abierta.")
+    try:
+        resultado = registro_caja.registrar_venta_sql(
+            db=db, id_sesion_caja=sesion_activa.id, articulos_vendidos=[art.model_dump() for art in req.articulos_vendidos],
+            id_cliente=req.id_cliente, id_usuario=current_user.id, metodo_pago=req.metodo_pago.upper(), total_venta=req.total_venta
         )
-    else:
-        raise HTTPException(status_code=400, detail=resultado.get("message"))
+        return RespuestaGenerica(status=resultado["status"], message=resultado["message"], data=resultado)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-
-@router.post("/ingresos/registrar", response_model=RespuestaGenerica)
-async def api_registrar_ingreso(request_data: MovimientoCajaRequest):
-    """Registra un ingreso de efectivo en la caja."""
-    resultado = mod_registro_caja.registrar_ingreso_egreso(
-        id_sesion_caja=request_data.id_sesion_caja,
-        concepto=request_data.concepto,
-        monto=request_data.monto,
-        tipo="INGRESO",
-        usuario=request_data.usuario
-    )
-    if resultado.get("status") == "success":
-        return RespuestaGenerica(status="success", message=resultado.get("message"), data={"id_movimiento": resultado.get("id_movimiento")})
-    else:
-        raise HTTPException(status_code=400, detail=resultado.get("message", "Error al registrar ingreso."))
+@router.post("/ingresos", response_model=RespuestaGenerica)
+def api_registrar_ingreso(req: MovimientoSimpleRequest, db: Session = Depends(get_db), current_user: Usuario = Depends(obtener_usuario_actual)):
+    sesion_activa = apertura_cierre.obtener_caja_abierta_por_usuario(db, id_usuario=current_user.id)
+    if not sesion_activa:
+        raise HTTPException(status_code=400, detail="Operación denegada: El usuario no tiene una caja abierta.")
+    try:
+        mov = movimientos_simples.registrar_movimiento_simple(db, sesion_activa.id, current_user.id, "INGRESO", req.concepto, req.monto)
+        return RespuestaGenerica(status="success", message="Ingreso registrado.", data={"id_movimiento": mov.id})
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/egresos", response_model=RespuestaGenerica)
-async def api_registrar_egreso(
-    request_data: MovimientoCajaRequest,
-    current_user: dict = Depends(es_cajero) # Usamos nuestro guardián
-):
-    """
-    Registra un egreso simple de efectivo de la caja.
-    El usuario que realiza la operación se obtiene del token de autenticación.
-    """
-    # La función de negocio ya existe, solo tenemos que llamarla con los parámetros correctos.
-    resultado = mod_registro_caja.registrar_ingreso_egreso(
-        id_sesion_caja=request_data.id_sesion_caja,
-        concepto=request_data.concepto,
-        monto=request_data.monto,
-        tipo="EGRESO",
-        usuario=current_user['username'] # Usamos el usuario autenticado
-    )
-    
-    if resultado.get("status") == "success":
-        return RespuestaGenerica(
-            status="success", 
-            message=resultado.get("message"), 
-            data={"id_movimiento": resultado.get("id_movimiento")}
-        )
-    else:
-        # Si la función de negocio devuelve un error, lo pasamos como una HTTPException.
-        raise HTTPException(status_code=400, detail=resultado.get("message", "Error desconocido al registrar el egreso."))
+def api_registrar_egreso(req: MovimientoSimpleRequest, db: Session = Depends(get_db), current_user: Usuario = Depends(obtener_usuario_actual)):
+    sesion_activa = apertura_cierre.obtener_caja_abierta_por_usuario(db, id_usuario=current_user.id)
+    if not sesion_activa:
+        raise HTTPException(status_code=400, detail="Operación denegada: El usuario no tiene una caja abierta.")
+    try:
+        monto = -abs(req.monto) # Los egresos son negativos
+        mov = movimientos_simples.registrar_movimiento_simple(db, sesion_activa.id, current_user.id, "EGRESO", req.concepto, monto)
+        return RespuestaGenerica(status="success", message="Egreso registrado.", data={"id_movimiento": mov.id})
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-
-@router.get("/articulos/{id_articulo}")
-async def api_obtener_articulo(id_articulo: str):
-    """
-    Endpoint para obtener la información de un artículo por su ID.
-    """
-    articulo_data = mod_articulos.obtener_articulo_por_id(id_articulo)
-    if not articulo_data:
-        raise HTTPException(status_code=404, detail=f"Artículo con ID {id_articulo} no encontrado.")
-    return articulo_data
-
-@router.get("/egresos/razones", response_model=List[str])
-async def api_obtener_razones_de_egreso():
-    """Devuelve una lista de razones comunes para los egresos."""
-    return mod_config.obtener_razones_de_egreso()
+@router.get("/arqueos", response_model=List[ArqueoCajaResponse], tags=["Caja - Supervisión"])
+def get_lista_de_arqueos(db: Session = Depends(get_db)):
+    # NOTA: Proteger con una dependencia de seguridad más estricta (ej: rol 'admin').
+    return consultas_caja.obtener_arqueos_de_caja(db=db)
