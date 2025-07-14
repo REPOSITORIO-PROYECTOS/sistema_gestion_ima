@@ -12,10 +12,7 @@ async function Clientes() {
     const data = await fetchData();
 
     return (
-
-        <div>
-            <DataTable columns={columns} data={data} />
-        </div>
+        <DataTable columns={columns} data={data} />
     )
 }
 

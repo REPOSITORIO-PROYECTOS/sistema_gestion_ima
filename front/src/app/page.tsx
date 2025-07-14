@@ -17,6 +17,7 @@ function Login() {
   const [password, setPassword] = useState('')
 
   const handleLogin = (e: FormEvent) => {
+    
     e.preventDefault()
 
     // Acá simulamos los usuarios y roles
@@ -38,7 +39,7 @@ function Login() {
 
   return (
 
-    <div className="flex flex-col justify-center items-center gap-10 bg-emerald-600 px-6 py-8 md:h-screen">
+    <div className="flex flex-col h-screen justify-center items-center gap-10 bg-emerald-600 px-6 py-8 md:h-screen">
       
       <Image src="/logo.png" alt="Swing Jugos" width={80} height={80} />
 
@@ -47,7 +48,7 @@ function Login() {
       className="form-login bg-amber-500 shadow-2xl flex flex-col items-center justify-center p-8 gap-10 rounded-4xl md:w-1/3"
       >
         {/* Usuario */}
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1">
           <label htmlFor="username" className="text-white">Usuario</label>
           <input 
             id="username" 
@@ -60,7 +61,7 @@ function Login() {
         </div>
 
         {/* Contraseña */}
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1">
           <label htmlFor="password" className="text-white">Contraseña</label>
           <input 
             id="password" 
@@ -76,14 +77,14 @@ function Login() {
         <div className="w-full flex flex-col items-center gap-2 ">
           <button 
             type="submit" 
-            className="flex justify-center items-center p-2 w-1/2 text-white border-2 border-white bg-amber-700 rounded-xl cursor-pointer transition hover:bg-amber-900"
+            className="flex justify-center items-center p-2 w-1/2 text-white border-2 border-white bg-amber-700 rounded-xl cursor-pointer transition hover:bg-amber-800"
           >
             Ingresar
           </button>
         </div>
 
         {/* Recuperar contraseña */}
-        <a href="" className="text-white font-semibold hover:text-amber-950 transition">¿Olvidaste tu contraseña?</a>
+        <a href="" className="text-white font-semibold hover:text-amber-900 transition">¿Olvidaste tu contraseña?</a>
       </form>
 
     </div>

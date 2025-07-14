@@ -61,6 +61,8 @@ function DashboardVenta() {
     setProductos((prev) => prev.filter((_, i) => i !== index));
   };
 
+  /* SECCION CAJA -> ABRIR/CERRAR CAJA + LLAVE MAESTRA + PLATA PRESENTE + PLATA AL FINALIZAR */
+
   return (
     <ProtectedRoute allowedRoles={["admin", "cajero"]}>
       <div className="flex flex-col gap-4">

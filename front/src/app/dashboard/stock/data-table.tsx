@@ -81,49 +81,46 @@ export function DataTable<TData, TValue>({
 
     <div>
 
-        {/* Selectores Filtrado */}
-        <div className="flex items-center pb-4 justify-between">
+        {/* Inputs de Filtrado + Creación */}
+        <div className="flex flex-col md:flex-row-reverse justify-between gap-2 pb-4">
 
+            {/* Modal para crear items */}
+            <Dialog>
+                <DialogTrigger asChild>
+                    <Button variant="success">+ Agregar Producto</Button>
+                </DialogTrigger>
 
-            {/* Input de Búsqueda por email */}
-            <Input placeholder="Filtrar por producto" value={(table.getColumn("producto")?.getFilterValue() as string) ?? ""}
-            onChange={(event) => table.getColumn("producto")?.setFilterValue(event.target.value)} className="max-w-48" />
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                    <DialogTitle>Agregar un Producto Nuevo</DialogTitle>
+                    <DialogDescription>Todos los campos son obligatorios</DialogDescription>
+                    </DialogHeader>
 
+                    {/* Llamamos al Form con el modo crear */}
+                    <AddStockForm mode="create" />
+                </DialogContent>
+            </Dialog>
 
-            <div className="flex flex-row-reverse items-center gap-2">
+            {/* Inputs de Filtrado */}
+            <div className="flex flex-row justify-between items-center md:justify-start gap-2 w-full">
 
-                {/* Modal para crear items */}
-                <Dialog>
-                    <DialogTrigger asChild>
-                        <Button variant="outline">Agregar Producto +</Button>
-                    </DialogTrigger>
+                {/* Input de Búsqueda por Producto */}
+                <Input placeholder="Filtrar por producto" value={(table.getColumn("producto")?.getFilterValue() as string) ?? ""}
+                onChange={(event) => table.getColumn("producto")?.setFilterValue(event.target.value)} className="w-1/2 md:max-w-1/4" />
 
-                    <DialogContent className="sm:max-w-lg">
-                        <DialogHeader>
-                        <DialogTitle>Agregar un Producto Nuevo</DialogTitle>
-                        <DialogDescription>Todos los campos son obligatorios</DialogDescription>
-                        </DialogHeader>
-
-                        {/* Llamamos al Form con el modo crear */}
-                        <AddStockForm mode="create" />
-                    </DialogContent>
-                </Dialog>
-
-            
-
-                {/* Input de Seleccion por status */}
+                {/* Input de Filtrado por Ubicación */}
                 <Select value={currentStatus} onValueChange={(value) => {
                 setCurrentStatus(value)
                 table.getColumn("ubicacion")?.setFilterValue(value === "all" ? undefined : value)}}>
 
-                    <SelectTrigger className="w-[180px] cursor-pointer">
+                    <SelectTrigger className="w-1/2 md:max-w-1/4 cursor-pointer">
                         <SelectValue placeholder="Ubicación"/>
                     </SelectTrigger>
 
                     <SelectContent>
                         <SelectGroup>
                             <SelectLabel>Ubicación</SelectLabel>
-                            <SelectItem value="all">Todos</SelectItem>
+                            <SelectItem value="all">Todas</SelectItem>
                             <SelectItem value="Depósito A">Depósito A</SelectItem>
                             <SelectItem value="Depósito B">Depósito B</SelectItem>
                             <SelectItem value="Sucursal Centro">Sucursal Centro</SelectItem>
@@ -135,7 +132,6 @@ export function DataTable<TData, TValue>({
 
             </div>
         </div>
-
 
         {/* Tabla */}
         <div className="rounded-md border">
@@ -187,9 +183,26 @@ export function DataTable<TData, TValue>({
                 </TableBody>
             </Table>
 
-
             {/* Footer Tabla */}
-            <div className="flex flex-row-reverse justify-between items-center mx-2 ">
+            <div className="flex flex-col sm:flex-row justify-between items-center m-2">
+
+                {/* Control de Filas por Página */}
+                <Select onValueChange={(value) => {  table.setPageSize(+value) }}>
+                    <SelectTrigger className="w-[100px] m-2 cursor-pointer">
+                        <SelectValue placeholder="10 filas" />
+                    </SelectTrigger>
+
+                    <SelectContent>
+                        <SelectGroup>
+                            <SelectLabel>Filas por Página</SelectLabel>
+                            <SelectItem value="10">10</SelectItem>
+                            <SelectItem value="20">20</SelectItem>
+                            <SelectItem value="30">30</SelectItem>
+                            <SelectItem value="40">40</SelectItem>
+                            <SelectItem value="50">50</SelectItem>
+                        </SelectGroup>
+                    </SelectContent>
+                </Select>
 
                 {/* Controles de Paginación */}
                 <div className="flex items-center justify-end space-x-2 py-4 mx-2">
@@ -211,23 +224,6 @@ export function DataTable<TData, TValue>({
                     </Button>
                 </div>
 
-                {/* Control de Filas por Página */}
-                <Select onValueChange={(value) => {  table.setPageSize(+value) }}>
-                    <SelectTrigger className="w-[100px] m-2 cursor-pointer">
-                        <SelectValue placeholder="10 filas" />
-                    </SelectTrigger>
-
-                    <SelectContent>
-                        <SelectGroup>
-                            <SelectLabel>Filas por Página</SelectLabel>
-                            <SelectItem value="10">10</SelectItem>
-                            <SelectItem value="20">20</SelectItem>
-                            <SelectItem value="30">30</SelectItem>
-                            <SelectItem value="40">40</SelectItem>
-                            <SelectItem value="50">50</SelectItem>
-                        </SelectGroup>
-                    </SelectContent>
-                </Select>
             </div>
 
         </div>

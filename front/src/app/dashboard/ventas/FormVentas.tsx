@@ -169,6 +169,7 @@ function FormVentas({
       {/* Header del Cajero */}
       <div className="w-full flex flex-row justify-between items-center p-6 bg-green-700 rounded-t-xl">
         <h4 className="text-2xl font-semibold text-white">Cajero</h4>
+        <p className="text-2xl font-semibold text-white md:hidden">${totalVenta}</p>
       </div>
 
       <div className="flex flex-col justify-between w-full gap-6 p-8">
@@ -182,7 +183,7 @@ function FormVentas({
               const prod = productos.find(p => p.id === value)
               if (prod) setProductoSeleccionado(prod)
             }}>
-            <SelectTrigger className="w-full cursor-pointer text-black">
+            <SelectTrigger className="w-full md:max-w-1/2 cursor-pointer text-black">
               <SelectValue placeholder="Seleccionar producto" />
             </SelectTrigger>
             <SelectContent>
@@ -205,7 +206,7 @@ function FormVentas({
             min={1}
             value={cantidad}
             onChange={(e) => setCantidad(Number(e.target.value))}
-            className="w-full text-black"
+            className="w-full md:max-w-1/2 text-black"
           />
         </div>
         <span className="block w-full h-0.5 bg-green-900"></span>
@@ -224,7 +225,7 @@ function FormVentas({
           onClick={handleAgregarProducto}
           className="bg-green-900 hover:bg-green-700"
         >
-          Agregar producto
+          + Agregar producto
         </Button>
 
         {/* --------------------------------------- */} <hr className="p-0.75 bg-green-900 my-8"/> {/* --------------------------------------- */}
@@ -238,7 +239,7 @@ function FormVentas({
               const cliente = tipoCliente.find(p => p.id === value)
               if (cliente) setTipoClienteSeleccionado(cliente)
             }}>
-            <SelectTrigger className="w-full cursor-pointer text-black">
+            <SelectTrigger className="w-full md:max-w-1/2 cursor-pointer text-black">
               <SelectValue placeholder="Seleccionar cliente" />
             </SelectTrigger>
             <SelectContent>
@@ -261,7 +262,7 @@ function FormVentas({
                 value={metodoPago}
                 onValueChange={(value) => setMetodoPago(value)}
               >
-                <SelectTrigger className="w-full cursor-pointer text-black">
+                <SelectTrigger className="w-full md:max-w-1/2 cursor-pointer text-black">
                   <SelectValue placeholder="Seleccionar método" />
                 </SelectTrigger>
                 <SelectContent>
@@ -272,33 +273,34 @@ function FormVentas({
               </Select>
             </div>
           {metodoPago === 'efectivo' && (
+            /* Caja de Vuelto en Efectivo: */
             <div className="flex flex-col gap-4 p-4 bg-green-800 rounded-lg mt-2">
-              <div className="flex flex-col gap-4 items-center justify-between">
+              <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
                 <Label className="text-2xl font-semibold text-white">Costo del Pedido:</Label>
                 <Input
                   type="number"
                   value={totalVenta}
                   disabled
-                  className="w-1/2 font-semibold text-white"
+                  className="w-full md:max-w-1/2 font-semibold text-white"
                 />
               </div>
-              <div className="flex flex-col gap-4 items-center justify-between">
+              <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
                 <Label className="text-2xl font-semibold text-white">Con cuánto abona:</Label>
                 <Input
                   type="number"
                   min={totalVenta}
                   value={montoPagado}
                   onChange={(e) => setMontoPagado(Number(e.target.value))}
-                  className="w-1/2 font-semibold text-white"
+                  className="w-full md:max-w-1/2 font-semibold text-white"
                 />
               </div>
-              <div className="flex flex-col gap-4 items-center justify-between">
+              <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
                 <Label className="text-2xl font-semibold text-white">Vuelto:</Label>
                 <Input
                   type="number"
                   value={vuelto}
                   disabled
-                  className="w-1/2 font-semibold text-white"
+                  className="w-full md:max-w-1/2 font-semibold text-white"
                 />
               </div>
             </div>
@@ -349,11 +351,11 @@ function FormVentas({
             onChange={(e) => setObservaciones(e.target.value)}
           />
         </div>
-        <span className="block w-full h-0.5 bg-green-900"></span>
 
+        {/* --------------------------------------- */} <hr className="p-0.75 bg-green-900 my-8"/> {/* --------------------------------------- */}
 
         {/* Total Venta */}
-        <div className="flex flex-row gap-4 justify-between items-center mt-4 px-2">
+        <div className="flex flex-row gap-4 justify-between items-center px-2">
           <Label className="text-2xl font-semibold text-green-900">Total del Pedido</Label>
           <p className="text-3xl font-semibold text-green-900">${totalVenta}</p>
         </div>

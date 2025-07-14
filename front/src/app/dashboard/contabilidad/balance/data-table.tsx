@@ -3,7 +3,6 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -15,7 +14,6 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table"
-
 import {
   Table,
   TableBody,
@@ -24,7 +22,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-
 import {
   Select,
   SelectContent,
@@ -34,7 +31,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
@@ -65,24 +61,23 @@ export function DataTable<TData, TValue>({
         },
     })
 
-
     return (
 
     <div>
 
-        {/* Selectores Filtrado */}
-        <div className="flex items-center pb-4 justify-between">
+        {/* Inputs de Filtrado */}
+        <div className="flex flex-row justify-between gap-2 pb-4">
 
             {/* Input de Búsqueda por cliente */}
             <Input placeholder="Filtrar por Usuario" value={(table.getColumn("usuario")?.getFilterValue() as string) ?? ""}
-            onChange={(event) => table.getColumn("usuario")?.setFilterValue(event.target.value)} className="max-w-xs" />
+            onChange={(event) => table.getColumn("usuario")?.setFilterValue(event.target.value)} className="w-1/2 md:max-w-1/4" />
 
             {/* Input de Seleccion por status */}
             <Select value={currentStatus} onValueChange={(value) => {
             setCurrentStatus(value)
             table.getColumn("tipoUsuario")?.setFilterValue(value === "all" ? undefined : value)}}>
 
-                <SelectTrigger className="w-[180px] cursor-pointer">
+                <SelectTrigger className="w-1/2 md:max-w-1/4 cursor-pointer">
                     <SelectValue placeholder="Usuario"/>
                 </SelectTrigger>
 
@@ -97,7 +92,6 @@ export function DataTable<TData, TValue>({
 
             </Select>
         </div>
-
 
         {/* Tabla */}
         <div className="rounded-md border">
@@ -148,9 +142,8 @@ export function DataTable<TData, TValue>({
                 </TableBody>
             </Table>
 
-
             {/* Footer Tabla */}
-            <div className="flex flex-row justify-between items-center mx-2 ">
+            <div className="flex flex-col sm:flex-row justify-between items-center m-2">
 
                 {/* Control de Filas por Página */}
                 <Select onValueChange={(value) => {  table.setPageSize(+value) }}>
@@ -192,7 +185,7 @@ export function DataTable<TData, TValue>({
             </div>
 
             {/* Balance Total */}
-            <div className="text-right text-lg font-bold p-4">
+            <div className="text-center sm:text-right text-xl font-bold p-4">
             {(() => {
                 const rows = table.getFilteredRowModel().rows;
                 const total = rows.reduce((acc, row) => {
