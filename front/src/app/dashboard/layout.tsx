@@ -30,26 +30,20 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
     
     // Al Dashboard inicial pueden acceder todos los roles
     <ProtectedRoute allowedRoles={["admin", "cajero", "contable"]}>
-      
+
       {/* NavBar - los roles disablean */}
       <NavBar links={links} role={role} />
 
-
       {/* Frame principal de la App */}
-      <main id="main-content" className="w-full pt-24 pb-12 bg-white relative overflow-y-auto">
-        <div className="pt-2 px-1">
-          <div className="w-full min-h-[calc(100vh-230px)]">
-            <div className="bg-white shadow rounded-lg p-4 sm:p-5">
-              {children}
-            </div>
-          </div>
-        </div>
+      <main id="main-content" className="w-full h-screen py-32 px-8 relative">
+        {children}   
       </main>
 
+      {/* Copyright */}
+      <footer className="shrink-0 text-center text-sm text-gray-500 p-4">
+        © 2019-{new Date().getFullYear()} Jugos Swing.
+      </footer>
 
-      {/* Copyright y Fecha */}
-      <p className="text-center text-sm text-gray-500 mb-10">&copy; 2019-{new Date().getFullYear()}{" "}Jugos Swing.</p>
-    
     </ProtectedRoute>
   );
 }

@@ -76,8 +76,8 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                     className={`text-md font-medium px-4 py-2 rounded-lg transition-colors
                       ${isAllowed
                         ? isActive
-                          ? 'bg-green-700 text-white'
-                          : 'text-white hover:bg-green-500 hover:text-green-900'
+                          ? 'bg-green-600 text-white'
+                          : 'text-white hover:bg-green-600 hover:text-white'
                         : 'text-gray-400 cursor-not-allowed'}
                     `}
                     aria-disabled={!isAllowed}
