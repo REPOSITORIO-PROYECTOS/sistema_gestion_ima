@@ -1,7 +1,6 @@
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-
 import { 
     Select, 
     SelectTrigger, 
@@ -10,7 +9,6 @@ import {
     SelectItem 
 } from "@/components/ui/select"
 import { useState } from "react";
-
 
 /* Dependiendo el tipo de modo se crea o modifica un item */
 type StockFormProps = {
@@ -24,37 +22,36 @@ type StockFormProps = {
   };
 };
 
-
 export default function AddStockForm({ mode, initialData }: StockFormProps) {
 
+  const [nombre, setNombre] = useState(initialData?.nombre || "");
+  const [cantidad, setCantidad] = useState(initialData?.cantidad?.toString() || "");
+  const [ubicacion, setUbicacion] = useState(initialData?.ubicacion || "");
+  const [costo, setCosto] = useState(initialData?.costoUnitario?.toString() || "");
 
-    const [nombre, setNombre] = useState(initialData?.nombre || "");
-    const [cantidad, setCantidad] = useState(initialData?.cantidad?.toString() || "");
-    const [ubicacion, setUbicacion] = useState(initialData?.ubicacion || "");
-    const [costo, setCosto] = useState(initialData?.costoUnitario?.toString() || "");
+  const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
+      if (mode === "create") {
+          
+      // POST: Crear producto nuevo
+      console.log("POST", { nombre, cantidad, ubicacion, costo });
 
-        if (mode === "create") {
-            
-        // POST: Crear producto nuevo
-        console.log("POST", { nombre, cantidad, ubicacion, costo });
+      } else {
 
-        } else {
+      // PATCH: Editar producto existente
+      console.log("PATCH", {
+          id: initialData?.id,
+          nombre,
+          cantidad,
+          ubicacion,
+          costo,
+      });
+      }
+  };
 
-        // PATCH: Editar producto existente
-        console.log("PATCH", {
-            id: initialData?.id,
-            nombre,
-            cantidad,
-            ubicacion,
-            costo,
-        });
-        }
-    };
+  return (
 
-    return (
     <form onSubmit={handleSubmit}>
       <div className="grid gap-6 py-4">
         <div className="grid grid-cols-4 items-center gap-4">

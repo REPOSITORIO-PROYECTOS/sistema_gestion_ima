@@ -6,16 +6,22 @@ import { Input } from "@/components/ui/input";
 import FormVentas from "./FormVentas";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuthStore } from "@/lib/authStore";
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import CajaForm from "./CajaForm";
 
 function DashboardVenta() {
 
   const [productos, setProductos] = useState<{ tipo: string; cantidad: number; precioTotal: number }[]>([]);
   const [fechaActual, setFechaActual] = useState("");
   const [horaActual, setHoraActual] = useState("");
-  
-
-  // Traemos el rol desde Zustand
-  const role = useAuthStore((state) => state.role);
+  const role = useAuthStore((state) => state.role);     // estado del rol
 
   // Hook para calcular fecha y hora en vivo
   useEffect(() => {
@@ -63,13 +69,20 @@ function DashboardVenta() {
   };
 
   /* SECCION CAJA -> ABRIR/CERRAR CAJA + LLAVE MAESTRA + PLATA PRESENTE + PLATA AL FINALIZAR */
+  const [cajaAbierta, setCajaAbierta] = useState(false);
+  const handleAbrirCaja = () => {
+    setCajaAbierta(true);
+  };
+  const handleCerrarCaja = () => {
+    setCajaAbierta(false);
+  };
 
   return (
     <ProtectedRoute allowedRoles={["admin", "cajero"]}>
       <div className="flex flex-col gap-4">
 
-        {/* Barra de Información */}
-        <div className="flex flex-wrap justify-between items-center p-4 gap-4 bg-neutral-800/90 rounded-xl">
+        {/* Header de Informacion */}
+        <div className="flex flex-wrap justify-between items-center p-4 gap-4 bg-neutral-800/90 rounded-xl px-6">
           <Input
             value={fechaActual}
             disabled
@@ -85,12 +98,30 @@ function DashboardVenta() {
             disabled
             className="w-full sm:w-[48%] lg:w-[23%] text-white font-semibold border border-white bg-transparent placeholder-white disabled:opacity-100 rounded-lg"
           />
-          <Button
-            className="w-full sm:w-[48%] lg:w-[23%] text-white font-semibold p-2 text-center border rounded-lg border-white hover:bg-white transition hover:text-green-800"
-            onClick={() => console.log("Abrir modal de historial")}
-          >
-            Historial de Pedidos
-          </Button>
+          {/* Boton abrir caja */}
+          <Dialog>
+              <DialogTrigger asChild className="w-full sm:w-[48%] lg:w-[23%]">
+                  <Button type="submit" variant="success">
+                    {cajaAbierta ? "Cerrar Caja" : "Abrir Caja"}
+                  </Button>
+              </DialogTrigger>
+
+              <DialogContent className="sm:max-w-lg">
+
+                <DialogHeader>
+                  <DialogTitle>Apertura / Cierre de Caja</DialogTitle>
+                  <DialogDescription>Ingrese los datos solicitados para abrir la caja</DialogDescription>
+                </DialogHeader>
+
+                {/* Modal de Apertura / Cierre de caja */}
+                <CajaForm
+                  cajaAbierta={cajaAbierta}
+                  onAbrirCaja={handleAbrirCaja}
+                  onCerrarCaja={handleCerrarCaja}
+                />
+
+              </DialogContent>
+          </Dialog>
         </div>
 
         {/* Bloque principal: Resumen + Formulario */}
@@ -119,12 +150,19 @@ function DashboardVenta() {
           </div>
 
           {/* Panel derecho: Formulario */}
-          <FormVentas
-            onAgregarProducto={handleAgregarProducto}
-            totalVenta={totalVenta}
-            productosVendidos={productos}
-          />
+          {cajaAbierta ? (
+            <FormVentas
+              onAgregarProducto={handleAgregarProducto}
+              totalVenta={totalVenta}
+              productosVendidos={productos}
+            />
+          ) : (
+            <div className="flex justify-center items-center w-full p-8 bg-yellow-100 border border-yellow-300 rounded-lg text-yellow-800 font-semibold text-xl">
+              La caja está cerrada. Debes abrirla para comenzar a registrar ventas.
+            </div>
+          )}
         </div>
+
       </div>
     </ProtectedRoute>
   );

@@ -15,11 +15,11 @@ import { toast } from "sonner";
 
 // Dropdown Productos
 const productos = [
-  { id: "1", nombre: "Jugo de Naranja", precio: 500 },
-  { id: "2", nombre: "Jugo de Durazno", precio: 600 },
-  { id: "3", nombre: "Jugo de Manzana", precio: 400 },
-  { id: "4", nombre: "Disecado de Naranja (0.5 Kg)", precio: 400 },
-  { id: "5", nombre: "Disecado de Durazno (0.5 Kg)", precio: 400 },
+  { id: "5", nombre: "Jugo de Naranja", precio: 500 },
+  { id: "6", nombre: "Jugo de Durazno", precio: 600 },
+  { id: "7", nombre: "Jugo de Manzana", precio: 400 },
+  { id: "8", nombre: "Disecado de Naranja (0.5 Kg)", precio: 400 },
+  { id: "9", nombre: "Disecado de Durazno (0.5 Kg)", precio: 400 },
 ]
 
 // Dropdown tipo de cliente
@@ -29,7 +29,7 @@ const tipoCliente = [
 ]
 
 function FormVentas({
-  onAgregarProducto,    /* Agrega productos al resumen - no es el submit */
+  onAgregarProducto,    /* Agrega productos al resumen (componente padre) */
   totalVenta,           /* Valor total de todos los productos - costo total del pedido */
   productosVendidos     /* Lista con todos los productos vendidos y su cantidad */
 }: {
@@ -94,7 +94,7 @@ function FormVentas({
     }
   }, [montoPagado, metodoPago, totalVenta]);
 
-  // Estado para spinner de carga submit
+  // Estado animación para spinner de carga submit
   const [isLoading, setIsLoading] = useState(false);
 
 
@@ -147,23 +147,20 @@ function FormVentas({
 
         const error = await response.json();
         toast.error("❌ Error al registrar venta: " + error.detail);
-        
       }
     } catch (error) {
 
       console.error("Detalles del error:", error);
       alert("❌ Error al registrar venta:\n" + JSON.stringify(error, null, 2));
-    }
-      finally {
-      setIsLoading(false);
-    }
 
-    // Se printea el Payload
+    } finally { setIsLoading(false); }
+
+    // Se printea el Payload para debug
     console.log(JSON.stringify(ventaPayload, null, 2));
   };
 
 
-  return (
+  return (              // TO DO  ->>>>>>>>>>> FORZAR EN LOS INPUTS QUE NO SE PUEDA MANDAR ALGO VACIO 
 
     <form onSubmit={handleSubmit} 
     className="flex flex-col w-full lg:w-1/2 rounded-xl bg-white shadow-md">
@@ -177,7 +174,7 @@ function FormVentas({
       <div className="flex flex-col justify-between w-full gap-6 p-8">
 
         {/* Listado de Productos */}
-        <div className="flex flex-col gap-4 items-center justify-between md:flex-row">
+        <div className="flex flex-col gap-4 items-start justify-between md:flex-row">
           <Label className="text-2xl font-semibold text-green-900">Producto</Label>
           <Select
             defaultValue={productoSeleccionado.id}
@@ -201,7 +198,7 @@ function FormVentas({
 
 
         {/* Cantidad de un Producto */}
-        <div className="flex flex-col gap-4 items-center justify-between md:flex-row">
+        <div className="flex flex-col gap-4 items-start justify-between md:flex-row">
           <Label className="text-2xl font-semibold text-green-900">Cantidad</Label>
           <Input
             type="number"
@@ -215,7 +212,7 @@ function FormVentas({
 
 
         {/* Total de prod * cant */}
-        <div className="flex flex-row gap-4 justify-between items-center mt-4">
+        <div className="flex flex-row gap-4 justify-between items-start mt-4">
           <Label className="text-2xl font-semibold text-green-900">Total</Label>
           <p className="text-2xl font-semibold text-green-900">${totalProducto}</p>
         </div>
@@ -236,7 +233,7 @@ function FormVentas({
         {/* --------------------------------------- */} <hr className="p-0.75 bg-green-900 my-8"/> {/* --------------------------------------- */}
 
         {/* Tipo Cliente */}
-        <div className="flex flex-col gap-4 items-center justify-between md:flex-row">
+        <div className="flex flex-col gap-4 items-start justify-between md:flex-row">
           <Label className="text-2xl font-semibold text-green-900">Tipo de Cliente</Label>
           <Select
             defaultValue={tipoClienteSeleccionado.id}
@@ -261,7 +258,7 @@ function FormVentas({
 
         {/* Método de Pago y condicional efectivo */}
         <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-4 items-center justify-between md:flex-row">
+            <div className="flex flex-col gap-4 items-start justify-between md:flex-row">
               <Label className="text-2xl font-semibold text-green-900">Método de Pago</Label>
               <Select
                 value={metodoPago}
@@ -280,7 +277,7 @@ function FormVentas({
           {metodoPago === 'efectivo' && (
             /* Caja de Vuelto en Efectivo: */
             <div className="flex flex-col gap-4 p-4 bg-green-800 rounded-lg mt-2">
-              <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+              <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
                 <Label className="text-2xl font-semibold text-white">Costo del Pedido:</Label>
                 <Input
                   type="number"
@@ -289,7 +286,7 @@ function FormVentas({
                   className="w-full md:max-w-1/2 font-semibold text-white"
                 />
               </div>
-              <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+              <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
                 <Label className="text-2xl font-semibold text-white">Con cuánto abona:</Label>
                 <Input
                   type="number"
@@ -299,7 +296,7 @@ function FormVentas({
                   className="w-full md:max-w-1/2 font-semibold text-white"
                 />
               </div>
-              <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+              <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
                 <Label className="text-2xl font-semibold text-white">Vuelto:</Label>
                 <Input
                   type="number"
