@@ -5,19 +5,26 @@ from typing import List
 
 from back.database import get_db
 from back.security import get_current_user, es_admin
-from back.modelos import Usuario
+from back.modelos import Articulo, Usuario
 from back.gestion.stock import articulos as mod_articulos
 from back.schemas.articulo_schemas import ArticuloCreate, ArticuloUpdate, ArticuloResponse
 from back.schemas.caja_schemas import RespuestaGenerica
 
 router = APIRouter(prefix="/articulos", tags=["Artículos"])
 
-@router.get("/obtener_todos", response_model=List[ArticuloResponse])
-def api_get_all_articulos(db: Session = Depends(get_db), pagina: int = Query(1, ge=1), limite: int = Query(100, ge=1, le=200)):
+@router.get("/obtener_todos", response_model=List[Articulo])
+def api_get_all_articulos(
+    db: Session = Depends(get_db), 
+    pagina: int = Query(1, ge=1, description="Número de página"), 
+    limite: int = Query(100, ge=1, le=200, description="Tamaño de la página")
+):
+    # Calculamos el 'skip' (offset) a partir de la página y el límite
     skip = (pagina - 1) * limite
-    return mod_articulos.obtener_todos_los_articulos(limite=limite, pagina=pagina)
-
-
+    
+    # Llamamos a nuestra nueva función de lógica ORM
+    lista_articulos = mod_articulos.obtener_todos_los_articulos_orm(db=db, skip=skip, limit=limite)
+    
+    return lista_articulos
 
 @router.get("/{id_articulo}", response_model=ArticuloResponse)
 def api_get_articulo(id_articulo: int, db: Session = Depends(get_db)):

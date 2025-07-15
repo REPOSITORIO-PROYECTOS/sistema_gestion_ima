@@ -4,6 +4,8 @@
 
 
 from mysql.connector import Error
+from sqlmodel import Session, select
+from back.modelos import Articulo
 from back.utils.mysql_handler import get_db_connection
 from typing import Optional
 
@@ -39,36 +41,17 @@ def obtener_articulo_por_id(id_articulo: str):
             cursor.close()
             conn.close()
 
-def obtener_todos_los_articulos(limite: int = 100, pagina: int = 1):
+def obtener_todos_los_articulos_orm(db: Session, skip: int = 0, limit: int = 100):
     """
-    Obtiene una lista paginada de todos los artículos de la base de datos.
-    Ideal para mostrar en una tabla en el frontend.
+    Obtiene una lista paginada de artículos usando el ORM (SQLModel).
     """
-    conn = get_db_connection()
-    if not conn:
-        return []
-
-    cursor = conn.cursor(dictionary=True)
-    try:
-        # Calculamos el offset para la paginación
-        offset = (pagina - 1) * limite
-        
-        query = "SELECT * FROM articulos ORDER BY id_articulo"
-        cursor.execute(query, (limite, offset))
-        articulos = cursor.fetchall()
-        
-        # También podríamos querer devolver el total de artículos para la paginación del frontend
-        # cursor.execute("SELECT COUNT(*) as total FROM articulos")
-        # total_articulos = cursor.fetchone()['total']
-        
-        return articulos # , total_articulos
-    except Error as e:
-        print(f"Error de base deatos al obtener todos los artículos: {e}")
-        return []
-    finally:
-        if conn.is_connected():
-            cursor.close()
-            conn.close()
+    # Creamos la consulta base
+    statement = select(Articulo).order_by(Articulo.id).offset(skip).limit(limit)
+    
+    # Ejecutamos la consulta y obtenemos los resultados
+    articulos = db.exec(statement).all()
+    
+    return articulos
 
 def crear_articulo(id_articulo: str, descripcion: str, precio_venta: float, stock_inicial: int = 0):
     """
