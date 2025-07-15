@@ -42,6 +42,7 @@ def api_cerrar_caja(req: CerrarCajaRequest, db: Session = Depends(get_db), curre
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+
 @router.post("/ventas/registrar", response_model=RespuestaGenerica)
 def api_registrar_venta(req: RegistrarVentaRequest, db: Session = Depends(get_db)):
    # sesion_activa = apertura_cierre.obtener_caja_abierta_por_usuario(db, id_usuario=current_user.id)
@@ -53,12 +54,13 @@ def api_registrar_venta(req: RegistrarVentaRequest, db: Session = Depends(get_db
            # id_cliente=req.id_cliente, id_usuario=current_user.id, metodo_pago=req.metodo_pago.upper(), total_venta=req.total_venta
       #  )
         resultado = registro_caja.registrar_venta(
-            db=db, id_sesion_caja = 1, articulos_vendidos=[art.model_dump() for art in req.articulos_vendidos],
+            db=db, id_sesion_caja = 3, articulos_vendidos=[art.model_dump() for art in req.articulos_vendidos],
             id_cliente=req.id_cliente, id_usuario=1, metodo_pago=req.metodo_pago.upper(), total_venta=req.total_venta
         )
         return RespuestaGenerica(status=resultado["status"], message=resultado["message"], data=resultado)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
 
 @router.post("/ingresos", response_model=RespuestaGenerica)
 def api_registrar_ingreso(req: MovimientoSimpleRequest, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
