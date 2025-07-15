@@ -53,7 +53,7 @@ def obtener_todos_los_articulos(limite: int = 100, pagina: int = 1):
         # Calculamos el offset para la paginación
         offset = (pagina - 1) * limite
         
-        query = "SELECT * FROM articulos ORDER BY id_articulo LIMIT %s OFFSET %s"
+        query = "SELECT * FROM articulos ORDER BY id_articulo"
         cursor.execute(query, (limite, offset))
         articulos = cursor.fetchall()
         

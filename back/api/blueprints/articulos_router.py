@@ -12,10 +12,11 @@ from back.schemas.caja_schemas import RespuestaGenerica
 
 router = APIRouter(prefix="/articulos", tags=["Artículos"])
 
-@router.get("/", response_model=List[ArticuloResponse])
+@router.get("/obtener-todoss", response_model=List[ArticuloResponse])
 def api_get_all_articulos(db: Session = Depends(get_db), pagina: int = Query(1, ge=1), limite: int = Query(100, ge=1, le=200)):
     skip = (pagina - 1) * limite
-    return mod_articulos.get_all_articulos(db, skip=skip, limit=limite)
+    return mod_articulos.obtener_todos_los_articulos(db, skip=skip, limit=limite)
+
 
 @router.get("/{id_articulo}", response_model=ArticuloResponse)
 def api_get_articulo(id_articulo: int, db: Session = Depends(get_db)):
