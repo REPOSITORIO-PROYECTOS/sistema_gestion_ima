@@ -53,7 +53,7 @@ def api_registrar_venta(req: RegistrarVentaRequest, db: Session = Depends(get_db
            # id_cliente=req.id_cliente, id_usuario=current_user.id, metodo_pago=req.metodo_pago.upper(), total_venta=req.total_venta
       #  )
         resultado = registro_caja.registrar_venta(
-            db=db, id_sesion_caga = 1, articulos_vendidos=[art.model_dump() for art in req.articulos_vendidos],
+            db=db, id_sesion_caja = 1, articulos_vendidos=[art.model_dump() for art in req.articulos_vendidos],
             id_cliente=req.id_cliente, id_usuario=1, metodo_pago=req.metodo_pago.upper(), total_venta=req.total_venta
         )
         return RespuestaGenerica(status=resultado["status"], message=resultado["message"], data=resultado)
