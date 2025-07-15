@@ -64,7 +64,7 @@ class Articulo(SQLModel, table=True):
     descripcion: str
     precio_costo: float = Field(default=0.0)
     precio_venta: float
-    precio_venta_negocio: float
+    venta_negocio: float = Field(default=0.0)
     stock_actual: float = Field(default=0.0)
     stock_minimo: Optional[float]
     activo: bool = Field(default=True)
