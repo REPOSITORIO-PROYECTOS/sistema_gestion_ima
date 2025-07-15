@@ -12,6 +12,7 @@ function DashboardVenta() {
   const [productos, setProductos] = useState<{ tipo: string; cantidad: number; precioTotal: number }[]>([]);
   const [fechaActual, setFechaActual] = useState("");
   const [horaActual, setHoraActual] = useState("");
+  
 
   // Traemos el rol desde Zustand
   const role = useAuthStore((state) => state.role);

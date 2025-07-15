@@ -11,6 +11,7 @@ import {
   SelectTrigger, SelectValue
 } from "@/components/ui/select"
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 // Dropdown Productos
 const productos = [
@@ -140,12 +141,13 @@ function FormVentas({
       if (response.ok) {
 
         const data = await response.json();
-        alert("✅ Venta registrada exitosamente: " + data.message);
+        toast.success("✅ Venta registrada: " + data.message);
 
       } else {
 
         const error = await response.json();
-        alert("❌ Error al registrar venta: " + error.detail);
+        toast.error("❌ Error al registrar venta: " + error.detail);
+        
       }
     } catch (error) {
 
@@ -221,9 +223,12 @@ function FormVentas({
 
         {/* Botón Agregar Producto */}
         <Button
+          variant="success"
           type="button"
-          onClick={handleAgregarProducto}
-          className="bg-green-900 hover:bg-green-700"
+          onClick={() => {
+            handleAgregarProducto();
+            toast.success("Producto agregado al resumen.");
+          }}
         >
           + Agregar producto
         </Button>
@@ -367,7 +372,7 @@ function FormVentas({
             disabled={isLoading}
             className={`bg-green-900 flex items-center justify-center gap-2
               ${isLoading 
-                ? "cursor-not-allowed opacity-50 hover:cursor-not-allowed"
+                ? "cursor-not-allowed opacity-50"
                 : "hover:bg-green-700 cursor-pointer"
               }
             `}
