@@ -27,17 +27,17 @@ def get_estado_caja_propia(db: Session = Depends(get_db), current_user: Usuario 
     return EstadoCajaResponse(caja_abierta=False)
 
 @router.post("/abrir", response_model=RespuestaGenerica)
-def api_abrir_caja(req: AbrirCajaRequest, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
+def api_abrir_caja(req: AbrirCajaRequest, db: Session = Depends(get_db)):
     try:
-        nueva_sesion = apertura_cierre.abrir_caja(db=db, saldo_inicial=req.saldo_inicial, id_usuario_apertura=current_user.id)
+        nueva_sesion = apertura_cierre.abrir_caja(db=db, saldo_inicial=req.saldo_inicial, id_usuario_apertura="admin123") #ESTA ESTATICOOO!"!!!"
         return RespuestaGenerica(status="success", message=f"Caja abierta. ID Sesión: {nueva_sesion.id}", data={"id_sesion": nueva_sesion.id})
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/cerrar", response_model=RespuestaGenerica)
-def api_cerrar_caja(req: CerrarCajaRequest, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
-    try:
-        resultado = apertura_cierre.cerrar_caja(db=db, id_usuario_cierre=current_user.id, saldo_final_declarado=req.saldo_final_declarado)
+def api_cerrar_caja(req: CerrarCajaRequest, db: Session = Depends(get_db)):
+    try:                                                   #ESTA ETATICOO!!
+        resultado = apertura_cierre.cerrar_caja(db=db, id_usuario_cierre="admin123", saldo_final_declarado=req.saldo_final_declarado)
         return RespuestaGenerica(status=resultado["status"], message=resultado["message"])
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

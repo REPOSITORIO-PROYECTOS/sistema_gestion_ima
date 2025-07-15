@@ -26,31 +26,31 @@ def api_get_all_articulos(
     
     return lista_articulos
 
-@router.get("/{id_articulo}", response_model=ArticuloResponse)
+@router.get("/obtener/{id_articulo}", response_model=ArticuloResponse)
 def api_get_articulo(id_articulo: int, db: Session = Depends(get_db)):
-    articulo_db = mod_articulos.get_articulo_by_id(db, id_articulo)
+    articulo_db = mod_articulos.obtener_articulo_por_id(db, id_articulo)
     if not articulo_db:
         raise HTTPException(status_code=404, detail=f"Artículo con ID {id_articulo} no encontrado.")
     return articulo_db
 
-@router.post("/", response_model=ArticuloResponse, status_code=201, dependencies=[Depends(es_admin)])
+@router.post("/crear", response_model=ArticuloResponse, status_code=201, dependencies=[Depends(es_admin)])
 def api_create_articulo(req: ArticuloCreate, db: Session = Depends(get_db)):
-    return mod_articulos.create_articulo(db, req.model_dump())
+    return mod_articulos.crear_articulo(db, req.model_dump())
 
-@router.patch("/{id_articulo}", response_model=ArticuloResponse, dependencies=[Depends(es_admin)])
+@router.patch("/actualizar/{id_articulo}", response_model=ArticuloResponse, dependencies=[Depends(es_admin)])
 def api_update_articulo(id_articulo: int, req: ArticuloUpdate, db: Session = Depends(get_db)):
     update_data = req.model_dump(exclude_unset=True)
     if not update_data:
         raise HTTPException(status_code=400, detail="No se enviaron datos para actualizar.")
     try:
-        return mod_articulos.update_articulo(db, id_articulo, update_data)
+        return mod_articulos.actualizar_articulo(db, id_articulo, update_data)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
-@router.delete("/{id_articulo}", response_model=RespuestaGenerica, dependencies=[Depends(es_admin)])
+@router.delete("/eliminar/{id_articulo}", response_model=RespuestaGenerica, dependencies=[Depends(es_admin)])
 def api_delete_articulo(id_articulo: int, db: Session = Depends(get_db)):
     try:
-        mod_articulos.delete_articulo(db, id_articulo)
+        mod_articulos.eliminar_articulo(db, id_articulo)
         return RespuestaGenerica(status="success", message=f"Artículo con ID {id_articulo} eliminado.")
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

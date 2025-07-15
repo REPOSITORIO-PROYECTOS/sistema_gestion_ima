@@ -181,3 +181,18 @@ class TablasHandler:
         except Exception as e:
             print(f"❌ ERROR [STOCK]: Ocurrió un error inesperado al actualizar el stock: {e}")
             return False
+        
+
+  
+    def cargar_articulos(self):
+        print("Intentando cargar/recargar datos de Artículos...")
+        if self.client:
+            try:
+                sheet = self.client.open_by_key(GOOGLE_SHEET_ID)
+                worksheet = sheet.worksheet("stock") # Apunta a la hoja "stock"
+                return worksheet.get_all_records()
+            except gspread.exceptions.WorksheetNotFound:
+                print("ERROR: Hoja 'stock' no encontrada.")
+            except Exception as e:
+                print(f"Error al cargar datos de Artículos: {e}")
+        return []
