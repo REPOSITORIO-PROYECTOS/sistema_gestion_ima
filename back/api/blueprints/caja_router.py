@@ -13,7 +13,11 @@ from back.schemas.caja_schemas import (
     MovimientoSimpleRequest
 )
 
-router = APIRouter(prefix="/caja", tags=["Caja"], dependencies=[Depends(get_current_user)])
+#router = APIRouter(prefix="/caja", tags=["Caja"], dependencies=[Depends(get_current_user)])
+
+
+router = APIRouter(prefix="/caja", tags=["Caja"])
+
 
 @router.get("/estado", response_model=EstadoCajaResponse)
 def get_estado_caja_propia(db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
