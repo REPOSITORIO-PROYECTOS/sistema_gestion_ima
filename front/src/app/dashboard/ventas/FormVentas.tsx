@@ -12,6 +12,19 @@ import {
 } from "@/components/ui/select"
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from "@/components/ui/command";
+import { ChevronsUpDown } from "lucide-react";
 
 interface ProductoAPI {
   id: number;
@@ -38,9 +51,6 @@ function FormVentas({
 
   /* Estados */
 
-  // Estado animación para spinner de carga submit
-  const [isLoading, setIsLoading] = useState(false);
-
   // Listado de productos - GET 
   const [productos, setProductos] = useState<{
     id: string;
@@ -59,7 +69,12 @@ function FormVentas({
 
   // Cantidad de un producto particular - se * por el producto y se saca el valor total
   const [cantidad, setCantidad] = useState(1)
-  
+
+  // Input de Busqueda para Productos
+  /* const [searchProducto, setSearchProducto] = useState(""); */
+  const [open, setOpen] = useState(false);
+
+
   // Sección Facturación 
   const [tipoClienteSeleccionado, setTipoClienteSeleccionado] = useState(tipoCliente[1])
   const [metodoPago, setMetodoPago] = useState("efectivo")
@@ -70,6 +85,9 @@ function FormVentas({
 
   // Estado para las observaciones de la venta
   const [observaciones, setObservaciones] = useState("")
+
+  // Estado animación para spinner de carga submit
+  const [isLoading, setIsLoading] = useState(false);
 
 
   /* Hooks */ /* -------------------------------------------------------------- */
@@ -275,34 +293,62 @@ function FormVentas({
         <span className="block w-full h-0.5 bg-green-900"></span>
 
         {/* Listado de Productos */}
-        <div className="flex flex-col gap-4 items-start justify-between md:flex-row">
+        <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
           <Label className="text-2xl font-semibold text-green-900">Producto</Label>
+
           {!productoSeleccionado ? (
             <p className="text-green-900 font-semibold">Cargando productos...</p>
           ) : (
-            <Select
-              value={productoSeleccionado?.id}
-              onValueChange={(value) => {
-                const prod = productos.find(p => p.id === value)
-                if (prod) setProductoSeleccionado(prod)
-              }}>
-              <SelectTrigger className="w-full md:max-w-1/2 cursor-pointer text-black">
-                <SelectValue placeholder="Seleccionar producto" />
-              </SelectTrigger>
-              <SelectContent>
-                {productos.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.nombre} - $
-                    {tipoClienteSeleccionado.id === "1"           // modificar despues por tipos reales
-                      ? p.venta_negocio
-                      : p.precio_venta}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="w-full md:max-w-2/3 flex flex-col gap-2">
+              <Popover open={open} onOpenChange={setOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    role="combobox"
+                    aria-controls="productos-list"
+                    aria-expanded={open}
+                    className="w-full justify-between text-left cursor-pointer border px-3 py-2 rounded-md shadow-sm bg-white text-black flex items-center"
+                    onClick={() => setOpen(!open)}
+                  >
+                    {productoSeleccionado
+                      ? `${productoSeleccionado.nombre} - $${tipoClienteSeleccionado.id === "1"
+                          ? productoSeleccionado.venta_negocio
+                          : productoSeleccionado.precio_venta}`
+                      : "Seleccionar producto"}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  side="bottom"
+                  align="start"
+                  className="w-full md:max-w-[98%] p-0 max-h-64 overflow-y-auto z-50"
+                  sideOffset={8} 
+                >
+                  <Command>
+                    <CommandInput placeholder="Buscar producto..." />
+                    <CommandEmpty>No se encontró ningún producto.</CommandEmpty>
+                    <CommandGroup>
+                      {productos.map((p) => (
+                        <CommandItem
+                          key={p.id}
+                          value={p.nombre}
+                          className="pl-2 pr-4 py-2 text-sm text-black cursor-pointer"
+                          onSelect={() => {
+                            setProductoSeleccionado(p);
+                            setOpen(false);
+                          }}
+                        >
+                          <span className="truncate">
+                            {p.nombre} - ${tipoClienteSeleccionado.id === "1" ? p.venta_negocio : p.precio_venta}
+                          </span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
           )}
         </div>
-        <span className="block w-full h-0.5 bg-green-900"></span>
 
         {/* Cantidad de un Producto */}
         <div className="flex flex-col gap-4 items-start justify-between md:flex-row">
