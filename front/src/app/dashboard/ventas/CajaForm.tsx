@@ -127,6 +127,11 @@ export default function CajaForm({
         </div>
 
         <div className="flex flex-row items-center justify-between gap-4">
+          <Label className="text-right sm:text-lg">Monto Inicial</Label>
+          <Input placeholder="Valor de la caja al momento de la apertura" className="w-full max-w-2/3" />
+        </div>
+
+        <div className="flex flex-row items-center justify-between gap-4">
           <Label className="text-right sm:text-lg">Contraseña</Label>
           <Input placeholder="Clave Maestra?" className="w-full max-w-2/3" />
         </div>
