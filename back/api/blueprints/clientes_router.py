@@ -25,6 +25,7 @@ def api_crear_cliente(req: ClienteCreate, db: Session = Depends(get_db)):
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
 
+
 @router.get("/obtener-todos", response_model=List[ClienteResponse])
 def api_obtener_clientes(
     db: Session = Depends(get_db),
@@ -34,6 +35,7 @@ def api_obtener_clientes(
     """Obtiene una lista paginada de clientes desde la base de datos SQL."""
     skip = (pagina - 1) * limite
     return clientes_manager.obtener_todos_los_clientes(db, skip=skip, limit=limite)
+
 
 @router.get("/obtener/{id_cliente}", response_model=ClienteResponse)
 def api_obtener_cliente(id_cliente: int, db: Session = Depends(get_db)):
