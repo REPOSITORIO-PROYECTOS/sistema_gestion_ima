@@ -32,6 +32,7 @@ class Tercero(SQLModel, table=True):
     es_proveedor: bool = Field(default=False)
     nombre_razon_social: str = Field(index=True)
     nombre_fantasia: Optional[str]
+    cuit: Optional[int]
     identificacion_fiscal: Optional[str] = Field(index=True)
     condicion_iva: str
     direccion: Optional[str]
