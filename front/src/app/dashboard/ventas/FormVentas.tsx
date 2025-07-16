@@ -13,14 +13,11 @@ import {
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-// Dropdown Productos
-const productos = [
-  { id: "5", nombre: "Jugo de Naranja", precio: 500 },
-  { id: "6", nombre: "Jugo de Durazno", precio: 600 },
-  { id: "7", nombre: "Jugo de Manzana", precio: 400 },
-  { id: "8", nombre: "Disecado de Naranja (0.5 Kg)", precio: 400 },
-  { id: "9", nombre: "Disecado de Durazno (0.5 Kg)", precio: 400 },
-]
+interface ProductoAPI {
+  id: number;
+  descripcion: string;
+  precio_venta: number;
+}
 
 // Dropdown tipo de cliente
 const tipoCliente = [
@@ -38,16 +35,21 @@ function FormVentas({
   productosVendidos: { tipo: string; cantidad: number; precioTotal: number }[]
 }) {
 
-  // Listado de productos - para nuevos prod, agregar en el array de arriba
-  const [productoSeleccionado, setProductoSeleccionado] = useState(productos[0])
-  
+  // Estado animación para spinner de carga submit
+  const [isLoading, setIsLoading] = useState(false);
+
+  /* SECCION CAJA */
+
+  // Listado de productos - GET 
+  const [productos, setProductos] = useState<{ id: string; nombre: string; precio: number }[]>([]);
+
+  const [productoSeleccionado, setProductoSeleccionado] = useState<{ id: string; nombre: string; precio: number } | null>(null);
+
   // Cantidad de un producto particular - se * por el producto y se saca el valor total
   const [cantidad, setCantidad] = useState(1)
   
   // Producto seleccionado * cantidad = total
-  const totalProducto = productoSeleccionado.precio * cantidad
-
-  /* -------------------------------------------------------------- */
+  const totalProducto = productoSeleccionado ? productoSeleccionado.precio * cantidad : 0;
 
   // Sección Facturación 
   const [tipoClienteSeleccionado, setTipoClienteSeleccionado] = useState(tipoCliente[1])
@@ -64,17 +66,19 @@ function FormVentas({
 
   // Hook para agregar producto al panel resumen de productos
   const handleAgregarProducto = () => {
+
+    if (!productoSeleccionado) return; // Protege contra null
+
     onAgregarProducto({
       tipo: productoSeleccionado.nombre,
       cantidad,
       precioTotal: totalProducto,
     });
 
-    // Reseteamos cantidad a 1 por default luego de agregar
     setCantidad(1);
-  }
+  };
 
-  // Hook para mostrar la calculadora de vuelto si se selecciona efectivo
+  // Effect para mostrar la calculadora de vuelto si es pago con efectivo
   useEffect(() => {
     if (metodoPago === 'efectivo' && typeof montoPagado === 'number') {
       const cambio = montoPagado - totalProducto;
@@ -84,7 +88,7 @@ function FormVentas({
     }
   }, [montoPagado, totalProducto, metodoPago]);
 
-  // Estado para el cambio en efectivo en base al valor final
+  // Effect para el calculo del vuelto en pago con efectivo
   useEffect(() => {
     if (metodoPago === "efectivo") {
       const calculado = montoPagado - totalVenta;
@@ -94,12 +98,45 @@ function FormVentas({
     }
   }, [montoPagado, metodoPago, totalVenta]);
 
-  // Estado animación para spinner de carga submit
-  const [isLoading, setIsLoading] = useState(false);
+  // GET Productos - trae los productos reales de la empresa
+  useEffect(() => {
 
+    const fetchProductos = async () => {
 
-  // Registrar la venta completa - falta terminar
+      try {
+        const res = await fetch("https://sistema-ima.sistemataup.online/api/articulos/obtener_todos");
+        const data: ProductoAPI[] = await res.json();
+        console.log(data)
+
+        const productosMapeados = data.map((item) => ({
+          id: String(item.id),
+          nombre: item.descripcion,
+          precio: item.precio_venta,
+        }));
+
+        setProductos(productosMapeados);
+
+        // Setear el primer producto como seleccionado por defecto
+        if (productosMapeados.length > 0) {
+          setProductoSeleccionado(productosMapeados[0]);
+        }
+
+      } catch (error) {
+        console.error("❌ Error al obtener productos:", error);
+      }
+    };
+    
+    fetchProductos();
+  }, []);
+
+  // POST Ventas - Registra la venta completa
   const handleSubmit = async (e: React.FormEvent) => {
+
+    if (productosVendidos.length === 0) {
+      toast.error("❌ No hay productos cargados en la venta.");
+      setIsLoading(false);
+      return;
+    }
 
     // Animacion de carga
     setIsLoading(true);
@@ -159,6 +196,7 @@ function FormVentas({
     console.log(JSON.stringify(ventaPayload, null, 2));
   };
 
+  /* -------------------------------------------------------------- */
 
   return (              // TO DO  ->>>>>>>>>>> FORZAR EN LOS INPUTS QUE NO SE PUEDA MANDAR ALGO VACIO 
 
@@ -176,23 +214,28 @@ function FormVentas({
         {/* Listado de Productos */}
         <div className="flex flex-col gap-4 items-start justify-between md:flex-row">
           <Label className="text-2xl font-semibold text-green-900">Producto</Label>
-          <Select
-            defaultValue={productoSeleccionado.id}
-            onValueChange={(value) => {
-              const prod = productos.find(p => p.id === value)
-              if (prod) setProductoSeleccionado(prod)
-            }}>
-            <SelectTrigger className="w-full md:max-w-1/2 cursor-pointer text-black">
-              <SelectValue placeholder="Seleccionar producto" />
-            </SelectTrigger>
-            <SelectContent>
-              {productos.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.nombre} - ${p.precio}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+
+          {!productoSeleccionado ? (
+            <p className="p-4 text-green-900 font-semibold">Cargando productos...</p>
+          ) : (
+            <Select
+              value={productoSeleccionado?.id}
+              onValueChange={(value) => {
+                const prod = productos.find(p => p.id === value)
+                if (prod) setProductoSeleccionado(prod)
+              }}>
+              <SelectTrigger className="w-full md:max-w-1/2 cursor-pointer text-black">
+                <SelectValue placeholder="Seleccionar producto" />
+              </SelectTrigger>
+              <SelectContent>
+                {productos.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.nombre} - ${p.precio}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
         <span className="block w-full h-0.5 bg-green-900"></span>
 
