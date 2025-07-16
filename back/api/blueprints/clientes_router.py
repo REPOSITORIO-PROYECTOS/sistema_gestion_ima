@@ -17,7 +17,7 @@ router = APIRouter(
     # dependencies=[Depends(es_cajero)] # Seguridad desactivada temporalmente
 )
 
-@router.post("/", response_model=ClienteResponse, status_code=201)
+@router.post("/crear", response_model=ClienteResponse, status_code=201)
 def api_crear_cliente(req: ClienteCreate, db: Session = Depends(get_db)):
     """Crea un nuevo cliente directamente en la base de datos SQL."""
     try:
@@ -25,7 +25,7 @@ def api_crear_cliente(req: ClienteCreate, db: Session = Depends(get_db)):
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
 
-@router.get("/", response_model=List[ClienteResponse])
+@router.get("/obtener-todos", response_model=List[ClienteResponse])
 def api_obtener_clientes(
     db: Session = Depends(get_db),
     pagina: int = Query(1, ge=1),
@@ -35,7 +35,7 @@ def api_obtener_clientes(
     skip = (pagina - 1) * limite
     return clientes_manager.obtener_todos_los_clientes(db, skip=skip, limit=limite)
 
-@router.get("/{id_cliente}", response_model=ClienteResponse)
+@router.get("/obtener/{id_cliente}", response_model=ClienteResponse)
 def api_obtener_cliente(id_cliente: int, db: Session = Depends(get_db)):
     """Obtiene un cliente específico por su ID desde la base de datos SQL."""
     cliente = clientes_manager.obtener_cliente_por_id(db, id_cliente)
@@ -43,7 +43,7 @@ def api_obtener_cliente(id_cliente: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Cliente no encontrado.")
     return cliente
 
-@router.patch("/{id_cliente}", response_model=ClienteResponse)
+@router.patch("/actualizar/{id_cliente}", response_model=ClienteResponse)
 def api_actualizar_cliente(id_cliente: int, req: ClienteUpdate, db: Session = Depends(get_db)):
     """Actualiza los datos de un cliente en la base de datos SQL."""
     update_data = req.model_dump(exclude_unset=True)
@@ -55,7 +55,7 @@ def api_actualizar_cliente(id_cliente: int, req: ClienteUpdate, db: Session = De
         status_code = 404 if "no encontrado" in str(e).lower() else 409
         raise HTTPException(status_code=status_code, detail=str(e))
 
-@router.delete("/{id_cliente}", response_model=RespuestaGenerica)
+@router.delete("/desactivar/{id_cliente}", response_model=RespuestaGenerica)
 def api_desactivar_cliente(id_cliente: int, db: Session = Depends(get_db)):
     """Desactiva un cliente (borrado lógico) en la base de datos SQL."""
     try:

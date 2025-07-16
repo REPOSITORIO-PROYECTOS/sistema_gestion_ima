@@ -45,7 +45,7 @@ def api_cerrar_caja(req: CerrarCajaRequest, db: Session = Depends(get_db)):
 
 @router.post("/ventas/registrar", response_model=RespuestaGenerica)
 def api_registrar_venta(req: RegistrarVentaRequest, db: Session = Depends(get_db)):
-   # sesion_activa = apertura_cierre.obtener_caja_abierta_por_usuario(db, id_usuario=current_user.id)
+  #  sesion_activa = apertura_cierre.obtener_caja_abierta_por_usuario(db, id_usuario=current_user.id)
     #if not sesion_activa:
       #  raise HTTPException(status_code=400, detail="Operación denegada: El usuario no tiene una caja abierta.")
     try:
