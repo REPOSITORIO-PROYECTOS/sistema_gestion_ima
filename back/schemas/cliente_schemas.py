@@ -1,17 +1,30 @@
 # back/schemas/cliente_schemas.py
+from datetime import datetime
 from pydantic import BaseModel, Field, EmailStr, validator
 from typing import Optional
 
 CONDICIONES_IVA_VALIDAS = ["IVA Responsable Inscripto", "IVA Sujeto Exento", "Consumidor Final", "Responsable Monotributo", "IVA no Alcanzado"]
 
 class ClienteBase(BaseModel):
-    nombre_razon_social: str = Field(..., max_length=100)
+    id: int = Field(primary_key=True)
+    codigo_interno: Optional[str] = Field(index=True)
+    es_cliente: bool = Field(default=False)
+    es_proveedor: bool = Field(default=False)
+    nombre_razon_social: str = Field(index=True)
+    nombre_fantasia: Optional[str]
+    cuit: Optional[str]
+    identificacion_fiscal: Optional[str] = Field(index=True)
     condicion_iva: str
-    identificacion_fiscal: Optional[str] = Field(None, max_length=13)
-    nombre_fantasia: Optional[str] = Field(None, max_length=100)
-    direccion: Optional[str] = Field(None, max_length=255)
-    email: Optional[EmailStr] = None
-    telefono: Optional[str] = Field(None, max_length=20)
+    direccion: Optional[str]
+    localidad: Optional[str]
+    provincia: Optional[str]
+    pais: Optional[str]
+    telefono: Optional[str]
+    email: Optional[str]
+    limite_credito: float = Field(default=0.0)
+    activo: bool = Field(default=True)
+    fecha_alta: datetime = Field(default_factory=datetime.utcnow)
+    notas: Optional[str]
     
     @validator('condicion_iva')
     def validar_condicion_iva(cls, v):
