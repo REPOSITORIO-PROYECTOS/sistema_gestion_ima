@@ -26,8 +26,11 @@ def crear_cliente(db: Session, cliente_data: dict) -> Tercero:
 def obtener_cliente_por_id(db: Session, id_cliente: int) -> Tercero | None:
     return db.exec(select(Tercero).where(Tercero.id == id_cliente, Tercero.es_cliente == True)).first()
 
+
 def obtener_todos_los_clientes(db: Session, skip: int = 0, limit: int = 100) -> List[Tercero]:
-    return db.exec(select(Tercero).where(Tercero.es_cliente == True).order_by(Tercero.nombre_razon_social).offset(skip).limit(limit)).all()
+    statement = select(Tercero).where(Tercero.es_cliente == True).order_by(Tercero.nombre_razon_social)
+    return db.exec(statement).scalars().all()
+
 
 def actualizar_cliente(db: Session, id_cliente: int, update_data: dict) -> Tercero:
     cliente_db = obtener_cliente_por_id(db, id_cliente)
