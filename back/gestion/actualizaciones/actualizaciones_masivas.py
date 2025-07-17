@@ -46,7 +46,8 @@ def sincronizar_clientes_desde_sheets(db: Session) -> Dict[str, int]:
 
     # Creamos un diccionario de los clientes de la BD para una búsqueda rápida y eficiente
     # La clave será el 'codigo_interno', que almacena el 'id_cliente' de la hoja de cálculo.
-    clientes_db_dict = {cliente.codigo_interno: cliente for cliente in clientes_db_objetos if cliente.codigo_interno}
+    # LÍNEA CORRECTA
+    clientes_db_dict = {str(cliente.id): cliente for cliente in clientes_db_objetos}
 
     resumen = {"creados": 0, "actualizados": 0, "sin_cambios": 0, "errores": 0}
 
