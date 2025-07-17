@@ -33,6 +33,15 @@ interface ProductoAPI {
   venta_negocio: number;
 }
 
+type Cliente = {
+  id: number;
+  nombre_razon_social: string;
+  condicion_iva: string;
+  identificacion_fiscal: string | null;
+  telefono: string;
+  activo: boolean;
+};
+
 // Dropdown tipo de cliente
 const tipoCliente = [
   { id: "1", nombre: "Con CUIT"},      
@@ -59,7 +68,7 @@ function FormVentas({
     venta_negocio: number;
   }[]>([]);
 
-  // Necesario para clasificar precios segun cliente
+  // Necesario para clasificar precios segun tipo de cliente
   const [productoSeleccionado, setProductoSeleccionado] = useState<{
     id: string;
     nombre: string;
@@ -67,13 +76,17 @@ function FormVentas({
     venta_negocio: number;
   } | null>(null);
 
+  // Listado de Clientes - GET
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null);
+  const [openCliente, setOpenCliente] = useState(false);
+
   // Cantidad de un producto particular - se * por el producto y se saca el valor total
   const [cantidad, setCantidad] = useState(1)
 
   // Input de Busqueda para Productos
   /* const [searchProducto, setSearchProducto] = useState(""); */
   const [open, setOpen] = useState(false);
-
 
   // Sección Facturación 
   const [tipoClienteSeleccionado, setTipoClienteSeleccionado] = useState(tipoCliente[1])
@@ -143,6 +156,24 @@ function FormVentas({
 
 
   /* Endpoints */ /* -------------------------------------------------------------- */
+
+  // GET Clientes - trae todos los clientes inscriptos
+  useEffect(() => {
+    const fetchClientes = async () => {
+      try {
+        const res = await fetch("https://sistema-ima.sistemataup.online/api/clientes/obtener-todos");
+        const data: Cliente[] = await res.json();
+        const clientesActivos = data.filter((cliente: Cliente) => cliente.activo);
+
+        setClientes(clientesActivos);
+        console.log("Clientes obtenidos:", clientesActivos);
+      } catch (error) {
+        console.error("❌ Error al obtener clientes:", error);
+      }
+    };
+
+    fetchClientes();
+  }, []);
 
   // GET Productos - trae los productos reales de la empresa
   useEffect(() => {
@@ -245,7 +276,7 @@ function FormVentas({
 
   /* -------------------------------------------------------------- */
 
-  return (              // TO DO  ->>>>>>>>>>> FORZAR EN LOS INPUTS QUE NO SE PUEDA MANDAR ALGO VACIO 
+  return (            
 
     <form onSubmit={handleSubmit} 
     className="flex flex-col w-full lg:w-1/2 rounded-xl bg-white shadow-md">
@@ -256,6 +287,7 @@ function FormVentas({
         <p className="text-2xl font-semibold text-white md:hidden">${totalVenta}</p>
       </div>
 
+      {/* Cajero */}
       <div className="flex flex-col justify-between w-full gap-6 p-8">
 
         {/* Tipo Cliente */}
@@ -265,9 +297,10 @@ function FormVentas({
             <Select
               defaultValue={tipoClienteSeleccionado.id}
               onValueChange={(value) => {
-                const cliente = tipoCliente.find(p => p.id === value)
-                if (cliente) setTipoClienteSeleccionado(cliente)
-              }}>
+                const cliente = tipoCliente.find(p => p.id === value);
+                if (cliente) setTipoClienteSeleccionado(cliente);
+              }}
+            >
               <SelectTrigger className="w-full cursor-pointer text-black">
                 <SelectValue placeholder="Seleccionar cliente" />
               </SelectTrigger>
@@ -279,16 +312,60 @@ function FormVentas({
                 ))}
               </SelectContent>
             </Select>
-            {/* Input de busqueda si es cliente con CUIT */}
-            {tipoClienteSeleccionado.id === "1" && (
-              <Input
-                type="text"
-                placeholder="Buscar cliente por CUIT o nombre..."
-                className="w-full text-black"
-              />
+
+            {/* Si el tipo de cliente es con CUIT... */}
+            {tipoClienteSeleccionado.id === "1" && (  
+              <div className="w-full md:max-w-2/3 flex flex-col gap-2">
+                {!clientes.length ? (
+                  <p className="text-green-900 font-semibold">Cargando clientes...</p>
+                ) : (
+                  <Popover open={openCliente} onOpenChange={setOpenCliente}>
+                    <PopoverTrigger asChild>
+                      <button
+                        role="combobox"
+                        aria-controls="clientes-list"
+                        aria-expanded={openCliente}
+                        className="w-full justify-between text-left cursor-pointer border px-3 py-2 rounded-md shadow-sm bg-white text-black flex items-center"
+                      >
+                        {clienteSeleccionado
+                          ? `${clienteSeleccionado.nombre_razon_social} (${clienteSeleccionado.identificacion_fiscal || "Sin CUIT"})`
+                          : "Seleccionar cliente"}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      side="bottom"
+                      align="start"
+                      className="w-full md:max-w-[98%] p-0 max-h-64 overflow-y-auto z-50"
+                      sideOffset={8}
+                    >
+                      <Command>
+                        <CommandInput placeholder="Buscar cliente por nombre..." />
+                        <CommandEmpty>No se encontró ningún cliente.</CommandEmpty>
+                        <CommandGroup>
+                          {clientes.map((cliente) => (
+                            <CommandItem
+                              key={cliente.id}
+                              value={cliente.nombre_razon_social}
+                              className="pl-2 pr-4 py-2 text-sm text-black cursor-pointer"
+                              onSelect={() => {
+                                setClienteSeleccionado(cliente);
+                                setOpenCliente(false);
+                              }}
+                            >
+                              <span className="truncate">
+                                {cliente.nombre_razon_social} ({cliente.identificacion_fiscal || "Sin CUIT"})
+                              </span>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                )}
+              </div>
             )}
           </div>
-          
         </div>
         <span className="block w-full h-0.5 bg-green-900"></span>
 
