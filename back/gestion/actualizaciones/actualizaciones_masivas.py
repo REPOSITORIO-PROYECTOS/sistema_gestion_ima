@@ -21,109 +21,91 @@ def limpiar_precio(valor_texto: str) -> float:
 # ----- LÓGICA PARA CLIENTES -----
 def sincronizar_clientes_desde_sheets(db: Session) -> Dict[str, int]:
     """
-    Sincroniza los clientes desde la hoja 'clientes' de Google Sheets a la tabla 'terceros'.
-    
-    1. Lee todos los clientes de Google Sheets.
-    2. Usa el 'id_cliente' de la hoja como clave única de sincronización.
-    3. Almacena este 'id_cliente' en el campo 'codigo_interno' de la tabla 'terceros'.
-    4. Si un cliente con ese 'codigo_interno' existe, lo actualiza si hay campos diferentes o faltantes.
-    5. Si no existe, lo crea.
-    
-    Retorna un diccionario con el resumen de las operaciones.
+    Sincroniza clientes en MODO DEPURACIÓN: guarda cada cliente uno por uno
+    para identificar la fila exacta que causa el error.
     """
     handler = TablasHandler()
-    
-    # 1. Obtener datos de las dos fuentes
     print("Obteniendo datos de clientes desde Google Sheets...")
     clientes_sheets = handler.cargar_clientes()
-    
     print("Obteniendo datos de clientes desde la base de datos...")
     clientes_db_objetos = db.exec(select(Tercero).where(Tercero.es_cliente == True)).all()
-    
+
     if not clientes_sheets:
         print("Advertencia: No se pudieron cargar datos de Google Sheets o la hoja está vacía.")
         return {"creados": 0, "actualizados": 0, "errores": 0, "sin_cambios": len(clientes_db_objetos)}
 
-    # Creamos un diccionario de los clientes de la BD para una búsqueda rápida y eficiente
-    # La clave será el 'codigo_interno', que almacena el 'id_cliente' de la hoja de cálculo.
-    # LÍNEA CORRECTA
     clientes_db_dict = {str(cliente.id): cliente for cliente in clientes_db_objetos}
-
     resumen = {"creados": 0, "actualizados": 0, "sin_cambios": 0, "errores": 0}
 
-    # 2. Iterar sobre los clientes de Google Sheets
+    # Iterar sobre los clientes de Google Sheets
     for cliente_sheet in clientes_sheets:
-        # ASUMIMOS que tu hoja de cálculo tiene una columna llamada 'id_cliente'.
-        # Si se llama diferente, cámbialo aquí.
-        id_cliente_sheet = str(cliente_sheet.get("id-cliente", "")).strip()
-        
-        if not id_cliente_sheet:
-            print(f"Error: Fila en Google Sheets sin 'id_cliente'. Datos: {cliente_sheet}")
-            resumen["errores"] += 1
-            continue  # Saltamos filas que no tienen el ID, son inutilizables.
+        id_cliente_sheet_str = "" # Inicializamos para el bloque except
+        try:
+            # --- LIMPIEZA Y VALIDACIÓN ---
+            id_cliente_sheet_str = str(cliente_sheet.get("id-cliente", "")).strip()
+            if not id_cliente_sheet_str:
+                print(f"Error: Fila en Google Sheets sin 'id-cliente'. Datos: {cliente_sheet}")
+                resumen["errores"] += 1
+                continue
+            id_cliente_sheet_int = int(id_cliente_sheet_str)
 
-        # 3. Buscar si el cliente ya existe en nuestra base de datos usando el ID de la hoja
-        cliente_existente = clientes_db_dict.get(id_cliente_sheet)
+            # --- BÚSQUEDA Y LÓGICA ---
+            cliente_existente = clientes_db_dict.get(id_cliente_sheet_str)
+            cuit_raw = str(cliente_sheet.get("CUIT-CUIL", "")).strip()
+            cuit_limpio = cuit_raw if cuit_raw else None # Convierte cadenas vacías a None
 
-        if cliente_existente:
-            # ACTUALIZAR: El cliente existe, ahora verificamos si algún campo necesita actualización.
-            cambios_detectados = False
-            
-            # Comparamos campo por campo para ver si algo ha cambiado o está incompleto
-            # Usamos 'or' para actualizar solo si el campo en la BD está vacío o es diferente
-            if cliente_sheet.get("nombre-usuario") and cliente_existente.nombre_razon_social != cliente_sheet.get("nombre-usuario"):
-                cliente_existente.nombre_razon_social = cliente_sheet.get("nombre-usuario")
-                cambios_detectados = True
-            
-            if cliente_sheet.get("whatsapp") and str(cliente_existente.telefono) != str(cliente_sheet.get("whatsapp")):
-                cliente_existente.telefono = str(cliente_sheet.get("whatsapp"))
-                cambios_detectados = True
+            datos_limpios = {
+                "nombre_razon_social": cliente_sheet.get("nombre-usuario", f"Cliente #{id_cliente_sheet_str}").strip(),
+                "telefono": str(cliente_sheet.get("whatsapp", "")).strip(),
+                "email": cliente_sheet.get("mail", "").strip() or None,
+                "direccion": cliente_sheet.get("direccion", "").strip(),
+                "notas": cliente_sheet.get("observaciones", "").strip(),
+                "cuit": cuit_limpio, # <-- USAMOS EL CUIT YA VALIDADO
+                "condicion_iva": cliente_sheet.get("Tipo de Cliente", "").strip() or "Consumidor Final"
+            }
 
-            if cliente_sheet.get("mail") and cliente_existente.email != cliente_sheet.get("mail"):
-                cliente_existente.email = cliente_sheet.get("mail")
-                cambios_detectados = True
-
-            if cliente_sheet.get("direccion") and cliente_existente.direccion != cliente_sheet.get("direccion"):
-                cliente_existente.direccion = cliente_sheet.get("direccion")
-                cambios_detectados = True
-            
-            if cliente_sheet.get("observaciones") and cliente_existente.notas != cliente_sheet.get("observaciones"):
-                cliente_existente.notas = cliente_sheet.get("observaciones")
-                cambios_detectados = True
+            if cliente_existente:
+                # --- ACTUALIZAR ---
+                cambios_detectados = False
+                for campo, valor_nuevo in datos_limpios.items():
+                    valor_viejo = getattr(cliente_existente, campo)
+                    if valor_nuevo is not None and str(valor_viejo) != str(valor_nuevo):
+                        setattr(cliente_existente, campo, valor_nuevo)
+                        cambios_detectados = True
                 
-            if cliente_sheet.get("CUIT-CUIL") and cliente_existente.identificacion_fiscal != str(cliente_sheet.get("CUIT-CUIL")).strip():
-                cliente_existente.identificacion_fiscal = str(cliente_sheet.get("CUIT-CUIL")).strip()
-                cambios_detectados = True
-
-            if cambios_detectados:
-                print(f"Actualizando cliente con ID: {id_cliente_sheet}")
-                db.add(cliente_existente) # Se marca para la sesión de SQLAlchemy
-                resumen["actualizados"] += 1
+                if cambios_detectados:
+                    print(f"Actualizando cliente con ID: {id_cliente_sheet_str}")
+                    db.add(cliente_existente)
+                    resumen["actualizados"] += 1
+                else:
+                    resumen["sin_cambios"] += 1
+            
             else:
-                resumen["sin_cambios"] += 1
-        
-        else:
-            # CREAR: No se encontró un cliente con este 'codigo_interno', así que lo creamos.
-            print(f"Creando nuevo cliente con ID de Sheets: {id_cliente_sheet}")
+                # --- CREAR ---
+                print(f"Creando nuevo cliente con ID de Sheets: {id_cliente_sheet_str}")
+                nuevo_cliente = Tercero(
+                    id=id_cliente_sheet_int,
+                    es_cliente=True,
+                    activo=True,
+                    **datos_limpios
+                )
+                db.add(nuevo_cliente)
+                resumen["creados"] += 1
+
+            # <<<<<<< CAMBIO CLAVE: HACEMOS COMMIT DENTRO DEL BUCLE >>>>>>>
+            # Intentamos guardar los cambios para ESTE cliente específico.
+            db.commit()
+
+        except Exception as e:
+            # Si algo falla, será para el cliente actual.
+            print(f"!!!!!!!! ERROR AL PROCESAR/GUARDAR CLIENTE ID {id_cliente_sheet_str} !!!!!!!!")
+            print(f"!!!!!!!! DETALLE DEL ERROR: {e} !!!!!!!!")
+            print(f"!!!!!!!! DATOS DE LA FILA: {cliente_sheet} !!!!!!!!")
+            resumen["errores"] += 1
+            db.rollback() # Revertimos la operación fallida para este cliente.
+            continue # Y continuamos con el siguiente.
             
-            nuevo_cliente = Tercero(
-                id=id_cliente_sheet, # Guardamos el ID de sheets aquí
-                es_cliente=True,
-                cuit=str(cliente_sheet.get("CUIT-CUIL", "")).strip(),
-                nombre_razon_social=cliente_sheet.get("nombre-usuario", f"Cliente #{id_cliente_sheet}"),
-                telefono=str(cliente_sheet.get("whatsapp", "")),
-                email=cliente_sheet.get("mail"),
-                direccion=cliente_sheet.get("direccion"),
-                notas=cliente_sheet.get("observaciones"),
-                condicion_iva=cliente_sheet.get("Tipo de Cliente", "Consumidor Final"),
-                activo=True
-            )
-            db.add(nuevo_cliente)
-            resumen["creados"] += 1
-            
-    # Hacemos commit una sola vez al final para mayor eficiencia
-    db.commit() 
-    print("Sincronización de clientes completada.")
+    print("Sincronización de clientes (modo depuración) completada.")
     return resumen
 
 # ----- LÓGICA PARA ARTÍCULOS -----
