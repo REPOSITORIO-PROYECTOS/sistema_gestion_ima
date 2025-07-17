@@ -27,14 +27,17 @@ def api_crear_cliente(req: ClienteCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/obtener-todos", response_model=List[ClienteResponse])
-def api_obtener_clientes(
-    db: Session = Depends(get_db),
-    pagina: int = Query(1, ge=1),
-    limite: int = Query(100, ge=1, le=200)
-):
-    """Obtiene una lista paginada de clientes desde la base de datos SQL."""
-    skip = (pagina - 1) * limite
-    return clientes_manager.obtener_todos_los_clientes(db, skip=skip, limit=limite)
+def api_obtener_clientes(db: Session = Depends(get_db)):
+    """
+    Obtiene la lista COMPLETA de todos los clientes activos, sin paginación.
+    
+    ADVERTENCIA: Si la base de datos tiene miles de clientes, esta
+    operación puede ser lenta y consumir mucha memoria.
+    """
+    # La llamada a la lógica de negocio ahora es más simple, sin parámetros.
+    lista_clientes_db = clientes_manager.obtener_todos_los_clientes(db)
+    
+    return lista_clientes_db
 
 
 @router.get("/obtener/{id_cliente}", response_model=ClienteResponse)
