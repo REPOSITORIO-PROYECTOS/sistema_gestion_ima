@@ -3,7 +3,6 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-
 import {
   Dialog,
   DialogContent,
@@ -12,7 +11,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -24,7 +22,6 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table"
-
 import {
   Table,
   TableBody,
@@ -33,7 +30,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-
 import {
   Select,
   SelectContent,
@@ -43,9 +39,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-
 import AddStockForm from "./StockForm"
-
+import { toast } from "sonner";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
@@ -77,12 +72,65 @@ export function DataTable<TData, TValue>({
     })
 
 
+    /* Handlers */
+
+    /* Sync tabla de clientes en backend */
+    const handleSyncClientes = async () => {
+
+        toast("Sincronizando clientes... Por favor espera");
+
+        try {
+            const response = await fetch("https://sistema-ima.sistemataup.online/api/sincronizar/clientes", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({}),
+            });
+
+            if (!response.ok) throw new Error("Fallo en la respuesta del servidor");
+
+            toast.success("Clientes sincronizados ✅");
+        } catch (error) {
+            console.error("Error al sincronizar usuarios:", error);
+            toast.error("Error al sincronizar usuarios ❌");
+        }
+    };
+
+    /* Sync tabla de articulos en backend */
+    const handleSyncArticulos = async () => {
+        toast("Sincronizando artículos... Por favor espera");
+
+        try {
+            const response = await fetch("https://sistema-ima.sistemataup.online/api/sincronizar/articulos", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({}),
+            });
+
+            if (!response.ok) throw new Error("Fallo en la respuesta del servidor");
+
+            toast.success("Artículos sincronizados ✅");
+        } catch (error) {
+            console.error("Error al sincronizar artículos:", error);
+            toast.error("Error al sincronizar artículos ❌");
+        }
+    };
+
     return (
 
     <div>
 
         {/* Inputs de Filtrado + Creación */}
         <div className="flex flex-col md:flex-row-reverse justify-between gap-2 pb-4">
+
+            {/* Botones para sincronización */}
+            <div className="flex gap-2 md:flex-row flex-col">
+                <Button variant="outline" onClick={handleSyncClientes}>Sincronizar Clientes</Button>
+                <Button variant="outline" onClick={handleSyncArticulos}>Sincronizar Artículos</Button>
+            </div>
 
             {/* Modal para crear items */}
             <Dialog>
@@ -135,7 +183,6 @@ export function DataTable<TData, TValue>({
 
         {/* Tabla */}
         <div className="rounded-md border">
-
             <Table>
                 <TableHeader>
                 {table.getHeaderGroups().map((headerGroup) => (
@@ -225,7 +272,6 @@ export function DataTable<TData, TValue>({
                 </div>
 
             </div>
-
         </div>
 
     </div>

@@ -315,7 +315,7 @@ function FormVentas({
 
             {/* Si el tipo de cliente es con CUIT... */}
             {tipoClienteSeleccionado.id === "1" && (  
-              <div className="w-full md:max-w-2/3 flex flex-col gap-2">
+              <div className="w-full flex flex-col gap-2">
                 {!clientes.length ? (
                   <p className="text-green-900 font-semibold">Cargando clientes...</p>
                 ) : (
