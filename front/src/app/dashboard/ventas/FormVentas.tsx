@@ -31,6 +31,7 @@ interface ProductoAPI {
   descripcion: string;
   precio_venta: number;
   venta_negocio: number;
+  stock_actual: number;
 }
 
 type Cliente = {
@@ -66,6 +67,7 @@ function FormVentas({
     nombre: string;
     precio_venta: number;
     venta_negocio: number;
+    stock_actual: number;
   }[]>([]);
 
   // Necesario para clasificar precios segun tipo de cliente
@@ -74,6 +76,7 @@ function FormVentas({
     nombre: string;
     precio_venta: number;
     venta_negocio: number;
+    stock_actual: number;
   } | null>(null);
 
   // Listado de Clientes - GET
@@ -101,6 +104,10 @@ function FormVentas({
 
   // Estado animación para spinner de carga submit
   const [isLoading, setIsLoading] = useState(false);
+
+  // Estado para la opción de facturación
+  const [tipoComprobante, setTipoComprobante] = useState("factura");
+
 
 
   /* Hooks */ /* -------------------------------------------------------------- */
@@ -190,6 +197,7 @@ function FormVentas({
           nombre: item.descripcion,
           precio_venta: item.precio_venta,
           venta_negocio: item.venta_negocio,
+          stock_actual: item.stock_actual,
         }));
 
         setProductos(productosMapeados);
@@ -230,7 +238,7 @@ function FormVentas({
       total_venta: totalVenta,
       /* paga_con: metodoPago === "efectivo" ? montoPagado : undefined, */  // probar si anda CON esto
       quiere_factura: true,
-      tipo_comprobante_solicitado: "Ticket No Fiscal",    // o según la selección de ticket/comprobante
+      tipo_comprobante_solicitado: tipoComprobante === "factura" ? "Factura" : "Ticket No Fiscal", 
       articulos_vendidos: productosVendidos.map((p) => {
         const productoReal = productos.find(prod => prod.nombre === p.tipo);
         return {
@@ -369,7 +377,7 @@ function FormVentas({
         </div>
         <span className="block w-full h-0.5 bg-green-900"></span>
 
-        {/* Listado de Productos */}
+        {/* Dropdown de Productos */}
         <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
           <Label className="text-2xl font-semibold text-green-900">Producto</Label>
 
@@ -415,7 +423,7 @@ function FormVentas({
                           }}
                         >
                           <span className="truncate">
-                            {p.nombre} - ${tipoClienteSeleccionado.id === "1" ? p.venta_negocio : p.precio_venta}
+                            {p.nombre} - ${tipoClienteSeleccionado.id === "1" ? p.venta_negocio : p.precio_venta} --- Stock: {p.stock_actual}
                           </span>
                         </CommandItem>
                       ))}
@@ -433,8 +441,13 @@ function FormVentas({
           <Input
             type="number"
             min={1}
+            max={productoSeleccionado?.stock_actual || 9999}
             value={cantidad}
-            onChange={(e) => setCantidad(Number(e.target.value))}
+            onChange={(e) => {
+              const value = Number(e.target.value);
+              const max = productoSeleccionado?.stock_actual ?? Infinity;
+              setCantidad(Math.min(value, max));
+            }}
             className="w-full md:max-w-1/2 text-black"
           />
         </div>
@@ -519,21 +532,24 @@ function FormVentas({
 
 
         {/* Checkbox Ticket o Comprobante */}
-        <RadioGroup defaultValue="ticket" className="flex flex-col gap-4 md:flex-row">
-          
-          {/* Ticket */}
+        <RadioGroup
+          value={tipoComprobante}
+          onValueChange={setTipoComprobante}
+          className="flex flex-col gap-4 md:flex-row"
+        >
+          {/* Factura */}
           <Label
-            htmlFor="ticket"
+            htmlFor="factura"
             className="flex flex-row items-center w-full md:w-1/2 lg:flex-row cursor-pointer text-black border-green-900 hover:bg-green-400 dark:hover:bg-green-700 gap-3 rounded-lg border p-3 transition-colors duration-200 data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900"
           >
             <RadioGroupItem
-              value="ticket"
-              id="ticket"
+              value="factura"
+              id="factura"
               className="data-[state=checked]:border-white data-[state=checked]:bg-white"
             />
-            <span className="text-sm leading-none font-medium">Ticket</span>
+            <span className="text-sm leading-none font-medium">Factura</span>
           </Label>
-          
+
           {/* Comprobante */}
           <Label
             htmlFor="comprobante"
