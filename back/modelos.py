@@ -26,13 +26,13 @@ class Usuario(SQLModel, table=True):
 
 class Tercero(SQLModel, table=True):
     __tablename__ = "terceros"
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int = Field(primary_key=True)
     codigo_interno: Optional[str] = Field(index=True)
     es_cliente: bool = Field(default=False)
     es_proveedor: bool = Field(default=False)
     nombre_razon_social: str = Field(index=True)
     nombre_fantasia: Optional[str]
-    cuit: Optional[int]
+    cuit: Optional[str]
     identificacion_fiscal: Optional[str] = Field(index=True)
     condicion_iva: str
     direccion: Optional[str]

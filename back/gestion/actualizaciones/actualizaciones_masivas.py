@@ -106,9 +106,9 @@ def sincronizar_clientes_desde_sheets(db: Session) -> Dict[str, int]:
             print(f"Creando nuevo cliente con ID de Sheets: {id_cliente_sheet}")
             
             nuevo_cliente = Tercero(
-                codigo_interno=id_cliente_sheet, # Guardamos el ID de sheets aquí
+                id=id_cliente_sheet, # Guardamos el ID de sheets aquí
                 es_cliente=True,
-                identificacion_fiscal=str(cliente_sheet.get("CUIT-CUIL", "")).strip(),
+                cuit=str(cliente_sheet.get("CUIT-CUIL", "")).strip(),
                 nombre_razon_social=cliente_sheet.get("nombre-usuario", f"Cliente #{id_cliente_sheet}"),
                 telefono=str(cliente_sheet.get("whatsapp", "")),
                 email=cliente_sheet.get("mail"),
