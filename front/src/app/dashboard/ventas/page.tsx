@@ -138,10 +138,10 @@ function DashboardVenta() {
               {productos.map((prod, index) => (
                 <li
                   key={index}
-                  className="flex flex-row w-full justify-between items-center px-8 py-6 bg-green-600 rounded-lg text-white text-xl shadow-lg"
+                  className="flex flex-row w-full justify-between items-center px-8 py-6 bg-emerald-100 rounded-lg text-green-950 font-semibold border-3 border-green-800 text-xl shadow-lg"
                 >
                   <div>
-                    {prod.tipo} - x{prod.cantidad} - ${prod.precioTotal}
+                    {prod.tipo} - x{prod.cantidad} U. - ${prod.precioTotal}
                   </div>
                   <Button variant="delete" onClick={() => handleEliminarProducto(index)}>X</Button>
                 </li>

@@ -224,6 +224,12 @@ function FormVentas({
       return;
     }
 
+    if (metodoPago === "efectivo" && montoPagado < totalVenta) {
+      toast.error("❌ El monto pagado no puede ser menor al total del pedido.");
+      setIsLoading(false);
+      return;
+    }
+
     // Animacion de carga
     setIsLoading(true);
     e.preventDefault();
@@ -299,9 +305,9 @@ function FormVentas({
       <div className="flex flex-col justify-between w-full gap-6 p-8">
 
         {/* Tipo Cliente */}
-        <div className="flex flex-col gap-4 items-start md:items-center justify-between md:flex-row">
-          <Label className="text-2xl font-semibold text-green-900">Tipo de Cliente</Label>
-          <div className="flex flex-col gap-2 w-full">
+        <div className="flex flex-col md:flex-row w-full gap-4 justify-between items-center">
+          <Label className="text-2xl font-semibold text-green-900 max-w-1/4">Tipo de Cliente</Label>
+          <div className="flex flex-col gap-2 w-2/3">
             <Select
               defaultValue={tipoClienteSeleccionado.id}
               onValueChange={(value) => {
@@ -435,20 +441,33 @@ function FormVentas({
           )}
         </div>
 
-        {/* Cantidad de un Producto */}
+        {/* Seleccionar cantidad de un Producto - limitada por Stock*/}
         <div className="flex flex-col gap-4 items-start justify-between md:flex-row">
           <Label className="text-2xl font-semibold text-green-900">Cantidad</Label>
           <Input
             type="number"
             min={1}
             max={productoSeleccionado?.stock_actual || 9999}
-            value={cantidad}
+            value={cantidad === 0 ? "" : cantidad}
             onChange={(e) => {
-              const value = Number(e.target.value);
+              const input = e.target.value;
+
+              // Permitir input vacío
+              if (input === "") {
+                setCantidad(0);
+                return;
+              }
+
+              // Convertimos a numero
+              const parsed = parseInt(input, 10);
+              // Ignorar si no es número válido
+              if (isNaN(parsed)) return;
+
+              // Limitar al stock
               const max = productoSeleccionado?.stock_actual ?? Infinity;
-              setCantidad(Math.min(value, max));
+              setCantidad(Math.min(parsed, max));
             }}
-            className="w-full md:max-w-1/2 text-black"
+            className="w-full md:max-w-2/3 text-black"
           />
         </div>
         <span className="block w-full h-0.5 bg-green-900"></span>
@@ -464,6 +483,7 @@ function FormVentas({
         {/* Botón Agregar Producto */}
         <Button
           variant="success"
+          className="!py-6"
           type="button"
           onClick={() => {
             handleAgregarProducto();
@@ -478,22 +498,23 @@ function FormVentas({
 
         {/* Método de Pago y condicional efectivo */}
         <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-4 items-start justify-between md:flex-row">
-              <Label className="text-2xl font-semibold text-green-900">Método de Pago</Label>
-              <Select
-                value={metodoPago}
-                onValueChange={(value) => setMetodoPago(value)}
-              >
-                <SelectTrigger className="w-full md:max-w-1/2 cursor-pointer text-black">
-                  <SelectValue placeholder="Seleccionar método" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="efectivo">Efectivo</SelectItem>
-                  <SelectItem value="transferencia">Transferencia</SelectItem>
-                  <SelectItem value="credito">Crédito</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="flex flex-col gap-4 items-start justify-between md:flex-row">
+            <Label className="text-2xl font-semibold text-green-900">Método de Pago</Label>
+            <Select
+              value={metodoPago}
+              onValueChange={(value) => setMetodoPago(value)}
+            >
+              <SelectTrigger className="w-full md:max-w-1/2 cursor-pointer text-black">
+                <SelectValue placeholder="Seleccionar método" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="efectivo">Efectivo</SelectItem>
+                <SelectItem value="transferencia">Transferencia</SelectItem>
+                <SelectItem value="credito">Crédito</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           {metodoPago === 'efectivo' && (
             /* Caja de Vuelto en Efectivo: */
             <div className="flex flex-col gap-4 p-4 bg-green-800 rounded-lg mt-2">
@@ -504,18 +525,27 @@ function FormVentas({
                   value={totalVenta}
                   disabled
                   className="w-full md:max-w-1/2 font-semibold text-white"
-                />
+                />                
               </div>
               <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
                 <Label className="text-2xl font-semibold text-white">Con cuánto abona:</Label>
                 <Input
                   type="number"
-                  min={totalVenta}
-                  value={montoPagado}
-                  onChange={(e) => setMontoPagado(Number(e.target.value))}
+                  value={montoPagado === 0 ? "" : montoPagado}
+                  onChange={(e) => {
+                    const input = e.target.value;
+                    if (input === "") {
+                      setMontoPagado(0);
+                      return;
+                    }
+                    const parsed = parseInt(input, 10);
+                    if (isNaN(parsed)) return;
+                    setMontoPagado(parsed);
+                  }}
                   className="w-full md:max-w-1/2 font-semibold text-white"
                 />
               </div>
+
               <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
                 <Label className="text-2xl font-semibold text-white">Vuelto:</Label>
                 <Input
@@ -579,27 +609,27 @@ function FormVentas({
 
         {/* --------------------------------------- */} <hr className="p-0.75 bg-green-900 my-8"/> {/* --------------------------------------- */}
 
+        
         {/* Total Venta */}
-        <div className="flex flex-row gap-4 justify-between items-center px-2">
+        <div className="flex flex-col sm:flex-row gap-4 justify-between items-center px-2">
           <Label className="text-2xl font-semibold text-green-900">Total del Pedido</Label>
           <p className="text-3xl font-semibold text-green-900">${totalVenta}</p>
         </div>
 
-
         {/* Botón Final: Registra venta y envia toda la info al server */}
         <Button
-            type="submit"
-            disabled={isLoading}
-            className={`bg-green-900 flex items-center justify-center gap-2
-              ${isLoading 
-                ? "cursor-not-allowed opacity-50"
-                : "hover:bg-green-700 cursor-pointer"
-              }
-            `}
-          >
-            {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-            {isLoading ? "Registrando..." : "Registrar Venta"}
-          </Button>
+          type="submit"
+          disabled={isLoading}
+          className={`!py-6 bg-green-900 flex items-center justify-center gap-2 "
+            ${isLoading 
+              ? "cursor-not-allowed opacity-50"
+              : "hover:bg-green-700 cursor-pointer"
+            }
+          `}
+        >
+          {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+          {isLoading ? "Registrando..." : "Registrar Venta"}
+        </Button>
 
       </div>
 
