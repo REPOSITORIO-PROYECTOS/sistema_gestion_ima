@@ -97,11 +97,12 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
           <div className="hidden md:flex">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="cursor-pointer bg-green-300 text-gray-800 font-semibold p-2 rounded-full w-12 h-12 flex items-center justify-center">
+                <button className="cursor-pointer bg-green-300 text-gray-800 font-semibold p-2 rounded-full w-14 h-14 flex items-center justify-center">
                   IM
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-white">
+                {/* Cerrar Sesión */}
                 <DropdownMenuItem 
                   className="cursor-pointer text-red-600"
                   onClick={() => {
@@ -110,6 +111,13 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                   }}
                 >
                   Cerrar Sesión
+                </DropdownMenuItem>
+                {/* Seccion gestion de usuarios */}
+                <DropdownMenuItem 
+                  className="cursor-pointer"
+                  onClick={() => router.push('/dashboard/gestion_usuarios')}
+                >
+                  Gestión de Usuarios
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
