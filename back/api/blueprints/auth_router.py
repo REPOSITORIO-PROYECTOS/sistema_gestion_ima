@@ -1,9 +1,13 @@
 # back/api/auth_router.py
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Dict
+from fastapi import APIRouter, Depends, HTTPException, status,Body
 from fastapi.security import OAuth2PasswordRequestForm
 
 from back.security import crear_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
+from back.security import es_admin, obtener_usuario_actual
+from back.gestion.seguridad import llave_maestra_manager
+from back.schemas.caja_schemas import RespuestaGenerica # Reutilizamos el schema
 # Necesitaremos una función para autenticar al usuario contra la DB
 from back.utils.auth import autenticar_usuario
 router = APIRouter(
@@ -35,3 +39,29 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     )
     
     return {"access_token": access_token, "token_type": "bearer"}
+
+@router.post("/validar-llave", response_model=RespuestaGenerica)
+def api_validar_llave_maestra(
+    llave: str = Body(..., embed=True, description="La llave maestra a validar"),
+    # Este endpoint requiere que el usuario esté al menos logueado
+    current_user = Depends(obtener_usuario_actual) 
+):
+    """
+    Valida si la llave proporcionada coincide con la llave maestra del día.
+    """
+    es_valida = llave_maestra_manager.validar_llave_maestra(llave)
+    
+    if es_valida:
+        # Si es válida, podrías generar un token JWT de corta duración con un permiso especial
+        # o simplemente devolver éxito para que el frontend habilite una acción.
+        return RespuestaGenerica(status="success", message="Llave maestra correcta. Operación autorizada.")
+    else:
+        raise HTTPException(status_code=403, detail="La llave maestra proporcionada es incorrecta o ha expirado.")
+
+@router.get("/llave-actual", response_model=Dict, dependencies=[Depends(es_admin)])
+def api_obtener_llave_actual():
+    """
+    ENDPOINT SOLO PARA ADMINISTRADORES.
+    Devuelve la llave maestra actual y su fecha de expiración.
+    """
+    return llave_maestra_manager.obtener_llave_actual_para_admin()
