@@ -39,61 +39,78 @@ def crear_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 def obtener_usuario_actual(
     token: str = Depends(oauth2_scheme), 
-    db: Session = Depends(get_db) # <-- Inyectamos la sesión de la base de datos
+    db: Session = Depends(get_db)
 ) -> Usuario:
     """
-    Función central de seguridad.
-    1. Valida el token JWT para obtener el nombre de usuario.
-    2. Busca a ese usuario en la base de datos SQL.
-    3. Devuelve el objeto Usuario COMPLETO con su rol actualizado en tiempo real.
+    Función central de seguridad con puntos de rastreo.
     """
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Credenciales inválidas, token expirado o permisos insuficientes",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+    print("\n--- [RASTREO DE SEGURIDAD] ---")
+    print(f"1. Iniciando 'obtener_usuario_actual' con el token recibido.")
+    
+    credentials_exception = HTTPException(...)
+    
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
+        print(f"2. Token decodificado exitosamente. Username extraído: '{username}'")
         if username is None:
+            print("   -> ERROR: 'sub' (username) no encontrado en el payload del token.")
             raise credentials_exception
-    except JWTError:
+    except JWTError as e:
+        print(f"   -> ERROR: El token JWT es inválido o ha expirado. Error: {e}")
         raise credentials_exception
     
-    # --- CONEXIÓN A LA BASE DE DATOS (LA LÓGICA REAL) ---
-    # Buscamos en la DB en CADA petición para tener los datos más actuales.
+    # --- Consulta a la Base de Datos ---
+    print(f"3. Buscando al usuario '{username}' en la base de datos...")
     usuario = db.exec(select(Usuario).where(Usuario.nombre_usuario == username)).first()
     
-    # Verificamos que el usuario exista en la BD y que esté activo
-    if usuario is None or not usuario.activo:
+    if usuario is None:
+        print(f"   -> ERROR: Usuario '{username}' NO ENCONTRADO en la base de datos.")
         raise credentials_exception
+    else:
+        print(f"4. Usuario encontrado en la DB. ID: {usuario.id}, Nombre: {usuario.nombre_usuario}, Activo: {usuario.activo}")
+
+    if not usuario.activo:
+        print(f"   -> ERROR: El usuario '{username}' (ID: {usuario.id}) no está activo.")
+        raise credentials_exception
+    
+    # Verificación del rol (muy importante para depurar)
+    if hasattr(usuario, 'rol') and usuario.rol:
+        print(f"5. Rol del usuario cargado correctamente: '{usuario.rol.nombre}' (ID: {usuario.rol.id})")
+    else:
+        print(f"   -> ¡ADVERTENCIA CRÍTICA! El usuario '{username}' (ID: {usuario.id}) NO TIENE UN ROL ASIGNADO O LA RELACIÓN FALLÓ.")
+        # Podrías querer lanzar una excepción aquí también si un usuario sin rol no debería existir
         
+    print("6. Autenticación exitosa. Devolviendo objeto Usuario completo.")
+    print("--- [FIN DEL RASTREO] ---\n")
     return usuario
+
 
 def es_rol(roles_requeridos: List[str]):
     """
-    Factoría de dependencias que crea un "guardián" de roles.
-    Verifica que el rol del usuario actual (obtenido de la DB) esté en la
-    lista de roles permitidos.
+    Factoría de dependencias con puntos de rastreo.
     """
     def chequear_rol(current_user: Usuario = Depends(obtener_usuario_actual)) -> Usuario:
-        # Aquí la magia: comparamos con el rol REAL de la base de datos
-        if not hasattr(current_user, 'rol') or current_user.rol.nombre not in roles_requeridos:
+        print("\n--- [RASTREO DE ROL] ---")
+        print(f"A. Verificando si el usuario '{current_user.nombre_usuario}' tiene uno de los roles: {roles_requeridos}")
+        
+        user_rol = current_user.rol.nombre if hasattr(current_user, 'rol') and current_user.rol else "SIN ROL"
+        print(f"B. Rol actual del usuario: '{user_rol}'")
+        
+        if user_rol not in roles_requeridos:
+            print(f"   -> ¡ACCESO DENEGADO! El rol '{user_rol}' no está en la lista de roles permitidos.")
+            print("--- [FIN DEL RASTREO DE ROL] ---\n")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Acceso denegado. Se requiere uno de los siguientes roles: {', '.join(roles_requeridos)}.",
             )
+            
+        print("C. ¡ACCESO PERMITIDO! El rol es correcto.")
+        print("--- [FIN DEL RASTREO DE ROL] ---\n")
         return current_user
     return chequear_rol
 
-# --- Guardianes listos para usar en los routers ---
-# Son legibles y encapsulan la lógica de qué roles son válidos.
-
-# Permite usuarios con rol 'Cajero' o 'Admin'
+# --- Guardianes (sin cambios) ---
 es_cajero = es_rol(["Cajero", "Admin", "Gerente", "Soporte"])
-
-# Permite únicamente usuarios con rol 'Admin'
 es_admin = es_rol(["Admin", "Soporte"])
-
-# Permite usuarios con rol 'Gerente' o 'Admin'
 es_gerente = es_rol(["Gerente", "Admin", "Soporte"])
