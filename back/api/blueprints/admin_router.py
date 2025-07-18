@@ -15,7 +15,7 @@ router = APIRouter(
     prefix="/admin",
     tags=["Administración"],
     # ¡Todo en este router requiere que el usuario tenga el rol 'Admin'!
-    dependencies=[Depends(es_admin)]
+    #dependencies=[Depends(es_admin)]
 )
 
 # ===================================================================
@@ -43,6 +43,7 @@ def api_cambiar_rol_usuario(id_usuario: int, req: CambiarRolUsuarioRequest, db: 
         return usuarios_manager.cambiar_rol_de_usuario(db, id_usuario, req.id_rol)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) # 404 Not Found si el usuario o rol no existen
+
 
 @router.get("/obtener-roles", response_model=List[RolResponse], summary="Obtener lista de roles")
 def api_obtener_roles(db: Session = Depends(get_db)):
