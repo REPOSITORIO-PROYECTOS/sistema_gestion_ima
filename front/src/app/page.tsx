@@ -10,12 +10,12 @@ import { useAuthStore } from '@/lib/authStore'
 const API_URL = "https://sistema-ima.sistemataup.online/api"
 
 function Login() {
-
   const router = useRouter()
 
   // Store
   const setToken = useAuthStore(state => state.setToken)
   const setUsuario = useAuthStore(state => state.setUsuario)
+  const setRole = useAuthStore(state => state.setRole) // <-- IMPORTANTE
 
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -45,7 +45,7 @@ function Login() {
 
       const data = await response.json()
       const { access_token } = data
-      console.log(data)
+      console.log("🔑 Token recibido:", data)
       setToken(access_token)
 
       const meResponse = await fetch(`${API_URL}/users/me`, {
@@ -57,21 +57,24 @@ function Login() {
       if (!meResponse.ok) throw new Error("Error al obtener datos del usuario")
 
       const usuario = await meResponse.json()
-      console.log(usuario)
+      console.log("🙋‍♂️ Usuario recibido:", usuario)
+
+      // Guardar usuario y rol en el store
       setUsuario(usuario)
+      setRole(usuario.rol) // <-- ESTA LÍNEA AGREGA EL ROL AL STORE
+
       router.push("/dashboard")
 
     } catch (error) {
-
       console.error("Error:", error)
-
       if (error instanceof Error) {
         alert(error.message)
       } else {
         alert("Error inesperado")
       }
-
-    } finally { setLoading(false) }
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
