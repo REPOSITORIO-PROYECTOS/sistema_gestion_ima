@@ -11,10 +11,6 @@ interface Props {
   children: React.ReactNode
 }
 
-/* Tipo de Roles:
-export type Role = 'admin' | 'vendedor' | 'contable' | 'stock' | 'cliente'
-*/
-
 export default function ProtectedRoute({ allowedRoles, children }: Props) {
   const role = useAuthStore((state) => state.role)
   const hasHydrated = useAuthStore((state) => state.hasHydrated)

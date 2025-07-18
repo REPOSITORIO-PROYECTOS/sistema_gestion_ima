@@ -12,7 +12,7 @@ interface Usuario {
 
 
 // Tipos de usuario
-export type Role = 'admin' | 'cajero' | 'contable' | 'stock' | 'cliente'
+export type Role = 'Admin' | 'Cajero' | 'Gerente' | 'Soporte'
 
 interface AuthState {
 

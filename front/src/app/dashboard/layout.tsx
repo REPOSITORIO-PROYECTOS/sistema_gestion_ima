@@ -17,7 +17,7 @@ const links: NavLink[] = [
   { name: "Ventas", href: "/dashboard/ventas", roles: ["admin", "cajero"] },
   { name: "Contabilidad", href: "/dashboard/contabilidad", roles: ["admin", "contable"] },
   { name: "Stock", href: "/dashboard/stock", roles: ["admin", "contable"] },
-  { name: "Carta", href: "/dashboard/carta", roles: ["admin"] }
+  { name: "Carta", href: "/dashboard/carta", roles: [""] }
 ]
 
 
