@@ -4,7 +4,7 @@ from sqlmodel import Session
 from typing import List
 
 from back.database import get_db
-from back.security import get_current_user, es_admin
+from back.security import obtener_usuario_actual, es_admin
 from back.modelos import Articulo, Usuario
 from back.gestion.stock import articulos as mod_articulos
 from back.schemas.articulo_schemas import ArticuloCreate, ArticuloUpdate, ArticuloResponse

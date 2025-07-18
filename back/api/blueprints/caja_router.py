@@ -4,7 +4,7 @@ from sqlmodel import Session
 from typing import List
 
 from back.database import get_db
-from back.security import get_current_user
+from back.security import obtener_usuario_actual
 from back.modelos import Usuario
 from back.gestion.caja import apertura_cierre, registro_caja, consultas_caja #, movimientos_simples
 from back.schemas.caja_schemas import (

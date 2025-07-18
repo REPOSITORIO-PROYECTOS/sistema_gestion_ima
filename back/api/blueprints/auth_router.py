@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status,Body
 from fastapi.security import OAuth2PasswordRequestForm
 
 from back.security import crear_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
-from back.security import es_admin, get_current_user
+from back.security import es_admin, obtener_usuario_actual
 from back.gestion.seguridad import llave_maestra_manager
 from back.schemas.caja_schemas import RespuestaGenerica # Reutilizamos el schema
 # Necesitaremos una función para autenticar al usuario contra la DB
