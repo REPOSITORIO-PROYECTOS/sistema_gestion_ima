@@ -58,7 +58,7 @@ async def login_for_access_token(
 def api_validar_llave_maestra(
     llave: str = Body(..., embed=True, description="La llave maestra a validar"),
     # CORRECCIÓN: Usamos `obtener_usuario_actual` y especificamos el tipo de retorno
-    current_user: Usuario = Depends(obtener_usuario_actual) 
+    #current_user: Usuario = Depends(obtener_usuario_actual) 
 ):
     """
     Valida si la llave proporcionada coincide con la llave maestra del día.
