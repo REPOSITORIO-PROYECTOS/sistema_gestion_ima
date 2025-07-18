@@ -19,9 +19,10 @@ export default function ProtectedRoute({ allowedRoles, children }: Props) {
   }, [])
 
   useEffect(() => {
+    
     if (!isClient) return
 
-    console.log("🔐 [ProtectedRoute] Rol actual (cliente):", role)
+    /* console.log("🔐 [ProtectedRoute] Rol actual:", role) */  // solo para debug
 
     if (!role || !allowedRoles.includes(role.nombre)) {
       router.push("/")
