@@ -1,4 +1,5 @@
 # back/security.py
+# VERSIÓN FINAL COMPLETA, CORREGIDA Y CON RASTREO
 
 from datetime import datetime, timedelta
 from typing import Optional, List
@@ -7,34 +8,40 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlmodel import Session, select
+from sqlalchemy.orm import selectinload
 
 # --- Módulos del proyecto ---
 from back import config
 from back.database import get_db
 from back.modelos import Usuario
 
-# --- Configuración (sin cambios) ---
+# --- Configuración de Seguridad ---
 SECRET_KEY = config.SECRET_KEY_SEC
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 210
+# Usamos getattr para tener un valor por defecto si no está en config.py
+ACCESS_TOKEN_EXPIRE_MINUTES = getattr(config, 'ACCESS_TOKEN_EXPIRE_MINUTES', 210)
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
-# --- Funciones de Contraseñas y Tokens (sin cambios) ---
-def verificar_password(plain_password, hashed_password):
+# --- Funciones de Contraseñas y Tokens (Estándar) ---
+def verificar_password(plain_password: str, hashed_password: str) -> bool:
+    """Verifica una contraseña en texto plano contra su hash."""
     return pwd_context.verify(plain_password, hashed_password)
 
-def get_password_hash(password):
+def get_password_hash(password: str) -> str:
+    """Genera el hash de una contraseña."""
     return pwd_context.hash(password)
 
-def crear_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+def crear_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    """Crea un nuevo token JWT."""
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 # ===================================================================
-# === DEPENDENCIAS DE SEGURIDAD (CONEXIÓN A DB ACTIVADA) ===
+# === DEPENDENCIAS DE SEGURIDAD (NÚCLEO DEL SISTEMA) ===
 # ===================================================================
 
 def obtener_usuario_actual(
@@ -42,17 +49,23 @@ def obtener_usuario_actual(
     db: Session = Depends(get_db)
 ) -> Usuario:
     """
-    Función central de seguridad con puntos de rastreo.
+    Función central de seguridad. Valida el token y devuelve el objeto Usuario
+    completo desde la base de datos con su rol actualizado en tiempo real.
     """
     print("\n--- [RASTREO DE SEGURIDAD] ---")
-    print(f"1. Iniciando 'obtener_usuario_actual' con el token recibido.")
+    print(f"1. Iniciando 'obtener_usuario_actual'.")
     
-    credentials_exception = HTTPException(...)
+    # CORRECCIÓN: Definición completa de la excepción
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Credenciales inválidas, token expirado o permisos insuficientes.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
     
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
-        print(f"2. Token decodificado exitosamente. Username extraído: '{username}'")
+        print(f"2. Token decodificado. Username extraído: '{username}'")
         if username is None:
             print("   -> ERROR: 'sub' (username) no encontrado en el payload del token.")
             raise credentials_exception
@@ -60,9 +73,15 @@ def obtener_usuario_actual(
         print(f"   -> ERROR: El token JWT es inválido o ha expirado. Error: {e}")
         raise credentials_exception
     
-    # --- Consulta a la Base de Datos ---
-    print(f"3. Buscando al usuario '{username}' en la base de datos...")
-    usuario = db.exec(select(Usuario).where(Usuario.nombre_usuario == username)).first()
+    print(f"3. Buscando al usuario '{username}' en la base de datos (con carga de rol)...")
+    
+    # Consulta optimizada para cargar el usuario y su rol en una sola vez
+    consulta = (
+        select(Usuario)
+        .where(Usuario.nombre_usuario == username)
+        .options(selectinload(Usuario.rol))
+    )
+    usuario = db.exec(consulta).first()
     
     if usuario is None:
         print(f"   -> ERROR: Usuario '{username}' NO ENCONTRADO en la base de datos.")
@@ -74,21 +93,19 @@ def obtener_usuario_actual(
         print(f"   -> ERROR: El usuario '{username}' (ID: {usuario.id}) no está activo.")
         raise credentials_exception
     
-    # Verificación del rol (muy importante para depurar)
     if hasattr(usuario, 'rol') and usuario.rol:
         print(f"5. Rol del usuario cargado correctamente: '{usuario.rol.nombre}' (ID: {usuario.rol.id})")
     else:
         print(f"   -> ¡ADVERTENCIA CRÍTICA! El usuario '{username}' (ID: {usuario.id}) NO TIENE UN ROL ASIGNADO O LA RELACIÓN FALLÓ.")
-        # Podrías querer lanzar una excepción aquí también si un usuario sin rol no debería existir
+        raise credentials_exception # Un usuario sin rol no debería poder operar
         
     print("6. Autenticación exitosa. Devolviendo objeto Usuario completo.")
     print("--- [FIN DEL RASTREO] ---\n")
     return usuario
 
-
 def es_rol(roles_requeridos: List[str]):
     """
-    Factoría de dependencias con puntos de rastreo.
+    Factoría de dependencias que crea un "guardián" de roles.
     """
     def chequear_rol(current_user: Usuario = Depends(obtener_usuario_actual)) -> Usuario:
         print("\n--- [RASTREO DE ROL] ---")
@@ -108,9 +125,9 @@ def es_rol(roles_requeridos: List[str]):
         print("C. ¡ACCESO PERMITIDO! El rol es correcto.")
         print("--- [FIN DEL RASTREO DE ROL] ---\n")
         return current_user
-    return chequear_rol
+    return es_rol
 
-# --- Guardianes (sin cambios) ---
+# --- Guardianes listos para usar en los routers ---
 es_cajero = es_rol(["Cajero", "Admin", "Gerente", "Soporte"])
 es_admin = es_rol(["Admin", "Soporte"])
 es_gerente = es_rol(["Gerente", "Admin", "Soporte"])
