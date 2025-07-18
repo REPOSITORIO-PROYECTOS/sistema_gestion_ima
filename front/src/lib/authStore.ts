@@ -10,7 +10,10 @@ interface Usuario {
 }
 
 // Tipos de usuario
-export type Role = 'Admin' | 'Cajero' | 'Gerente' | 'Soporte'
+export interface Role {
+  id: number
+  nombre: "Admin" | "Cajero" | "Cliente" | "Gerente"
+}
 
 interface AuthState {
 

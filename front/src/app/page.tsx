@@ -61,7 +61,7 @@ function Login() {
 
       // Guardar usuario y rol en el store
       setUsuario(usuario)
-      setRole(usuario.rol) // <-- ESTA LÍNEA AGREGA EL ROL AL STORE
+      setRole(usuario.rol) 
 
       router.push("/dashboard")
 

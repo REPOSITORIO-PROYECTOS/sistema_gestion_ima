@@ -5,17 +5,14 @@ import { useRouter } from "next/navigation"
 import { Role, useAuthStore } from "@/lib/authStore"
 
 interface Props {
-  allowedRoles: Role[]
+  allowedRoles: Role["nombre"][] 
   children: React.ReactNode
 }
 
 export default function ProtectedRoute({ allowedRoles, children }: Props) {
   const router = useRouter()
-
-  // Accedemos al rol desde Zustand
   const role = useAuthStore((state) => state.role)
 
-  // Truco de hidratación: esperar a estar en el cliente
   const [isClient, setIsClient] = useState(false)
   useEffect(() => {
     setIsClient(true)
@@ -26,12 +23,12 @@ export default function ProtectedRoute({ allowedRoles, children }: Props) {
 
     console.log("🔐 [ProtectedRoute] Rol actual (cliente):", role)
 
-    if (!role || !allowedRoles.includes(role)) {
+    if (!role || !allowedRoles.includes(role.nombre)) {
       router.push("/")
     }
   }, [isClient, role, allowedRoles, router])
 
-  if (!isClient || !role || !allowedRoles.includes(role)) {
+  if (!isClient || !role || !allowedRoles.includes(role.nombre)) {
     return (
       <div className="text-center py-4 text-muted-foreground">
         Verificando permisos...

@@ -23,7 +23,7 @@ const links: NavLink[] = [
 function DashboardLayout({ children }: { children: React.ReactNode }) {
 
   // Global de Rol
-  const role = useAuthStore(state => state.role) as string;
+  const role = useAuthStore(state => state.role)
 
   return (
     
@@ -31,7 +31,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
     <ProtectedRoute allowedRoles={["Admin", "Cajero", "Gerente"]}>
       
       {/* NavBar - los roles disablean */}
-      <NavBar links={links} role={role} />
+      <NavBar links={links} role={role?.nombre ?? ""} />
 
       {/* Frame principal de la App */}
       <main id="main-content" className="w-full min-h-screen py-32 px-8 relative">
