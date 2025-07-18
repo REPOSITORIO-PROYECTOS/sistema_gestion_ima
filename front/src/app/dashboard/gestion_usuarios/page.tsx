@@ -91,6 +91,8 @@ export default function GestionUsuarios() {
         </div>
       </div>
 
+      {/* ACA AGREGAR LOGICA PARA MOSTRAR LOS USUARIOS QUE SE VAN CREANDO!!! */}
+
       {/* Tabla de usuarios */}
       <div className="border rounded-lg overflow-hidden">
         <Table>
