@@ -69,6 +69,7 @@ def api_validar_llave_maestra(
     else:
         raise HTTPException(status_code=403, detail="La llave maestra proporcionada es incorrecta o ha expirado.")
 
+
 @router.get("/llave-actual", response_model=Dict, dependencies=[Depends(es_admin)])
 def api_obtener_llave_actual():
     """
