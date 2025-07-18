@@ -1,5 +1,4 @@
 # back/security.py
-# VERSIÓN REFORMULADA PARA DESBLOQUEAR EL DESARROLLO
 
 from datetime import datetime, timedelta
 from typing import Optional, List
@@ -7,12 +6,12 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from sqlmodel import Session
+from sqlmodel import Session, select
 
+# --- Módulos del proyecto ---
 from back import config
-from back.modelos import Usuario, Rol # Importamos los modelos de la DB
-# Importamos get_db para la futura conexión a la base de datos
 from back.database import get_db
+from back.modelos import Usuario
 
 # --- Configuración (sin cambios) ---
 SECRET_KEY = config.SECRET_KEY_SEC
@@ -35,14 +34,18 @@ def crear_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 # ===================================================================
-# === DEPENDENCIAS DE SEGURIDAD (LA LÓGICA "PUENTE") ===
+# === DEPENDENCIAS DE SEGURIDAD (CONEXIÓN A DB ACTIVADA) ===
 # ===================================================================
 
-# CAMBIO 1: Renombramos la función y ajustamos lo que devuelve
-def obtener_usuario_actual(token: str = Depends(oauth2_scheme)) -> Usuario:
+def obtener_usuario_actual(
+    token: str = Depends(oauth2_scheme), 
+    db: Session = Depends(get_db) # <-- Inyectamos la sesión de la base de datos
+) -> Usuario:
     """
-    Función de seguridad temporal. Valida el token y devuelve un objeto Usuario
-    SIMULADO con los datos del token.
+    Función central de seguridad.
+    1. Valida el token JWT para obtener el nombre de usuario.
+    2. Busca a ese usuario en la base de datos SQL.
+    3. Devuelve el objeto Usuario COMPLETO con su rol actualizado en tiempo real.
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -52,37 +55,30 @@ def obtener_usuario_actual(token: str = Depends(oauth2_scheme)) -> Usuario:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
-        role_name: str = payload.get("role") # Obtenemos el rol del token
-        if username is None or role_name is None:
+        if username is None:
             raise credentials_exception
     except JWTError:
         raise credentials_exception
     
-    # --- LA PARTE SIMULADA ---
-    # En lugar de consultar la DB, creamos un objeto Usuario "falso" en memoria.
-    # Esto es suficiente para que los routers obtengan `current_user.id` y `current_user.rol.nombre`.
-    # Asignamos IDs ficticios.
-    rol_ficticio = Rol(id=1, nombre=role_name)
-    usuario_ficticio = Usuario(
-        id=1, # !!! ID FIJO TEMPORAL !!!
-        nombre_usuario=username,
-        rol=rol_ficticio,
-        id_rol=rol_ficticio.id,
-        activo=True,
-        password_hash="" # No es necesario aquí
-    )
+    # --- CONEXIÓN A LA BASE DE DATOS (LA LÓGICA REAL) ---
+    # Buscamos en la DB en CADA petición para tener los datos más actuales.
+    usuario = db.exec(select(Usuario).where(Usuario.nombre_usuario == username)).first()
     
-    return usuario_ficticio
+    # Verificamos que el usuario exista en la BD y que esté activo
+    if usuario is None or not usuario.activo:
+        raise credentials_exception
+        
+    return usuario
 
 def es_rol(roles_requeridos: List[str]):
     """
-
     Factoría de dependencias que crea un "guardián" de roles.
-    Funciona con el usuario (simulado o real) que devuelve `obtener_usuario_actual`.
+    Verifica que el rol del usuario actual (obtenido de la DB) esté en la
+    lista de roles permitidos.
     """
     def chequear_rol(current_user: Usuario = Depends(obtener_usuario_actual)) -> Usuario:
-        # Ahora comparamos con el nombre del rol del objeto Usuario
-        if current_user.rol.nombre not in roles_requeridos:
+        # Aquí la magia: comparamos con el rol REAL de la base de datos
+        if not hasattr(current_user, 'rol') or current_user.rol.nombre not in roles_requeridos:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Acceso denegado. Se requiere uno de los siguientes roles: {', '.join(roles_requeridos)}.",
@@ -90,6 +86,14 @@ def es_rol(roles_requeridos: List[str]):
         return current_user
     return chequear_rol
 
-# --- Guardianes listos para usar (sin cambios) ---
-es_cajero = es_rol(["Cajero", "Admin"])
-es_admin = es_rol(["Admin"])
+# --- Guardianes listos para usar en los routers ---
+# Son legibles y encapsulan la lógica de qué roles son válidos.
+
+# Permite usuarios con rol 'Cajero' o 'Admin'
+es_cajero = es_rol(["Cajero", "Admin", "Gerente", "Soporte"])
+
+# Permite únicamente usuarios con rol 'Admin'
+es_admin = es_rol(["Admin", "Soporte"])
+
+# Permite usuarios con rol 'Gerente' o 'Admin'
+es_gerente = es_rol(["Gerente", "Admin", "Soporte"])
