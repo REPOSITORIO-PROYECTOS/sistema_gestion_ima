@@ -14,7 +14,7 @@ def generar_nueva_llave() -> str:
     Crea una nueva llave maestra combinando palabras aleatorias y un número.
     Ejemplo: 'rapido-luna-brilla-88'
     """
-    palabra1 = random.choice(ADJETIVOS, SUSTANTIVOS, VERBOS)
+    palabra1 = random.choice(ADJETIVOS + SUSTANTIVOS + VERBOS)
     numero = random.randint(10, 99)
     
     llave = f"{palabra1}{numero}"
