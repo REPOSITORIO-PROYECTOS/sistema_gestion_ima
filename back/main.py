@@ -6,6 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # Importamos los routers que acabamos de crear
 from back.api.blueprints import caja_router
+from back.api.blueprints import usuarios_router
+
 
 # Importamos la configuración para la conexión inicial y CORS
 from back import config # (y otros que necesites)
@@ -65,6 +67,8 @@ app.include_router(articulos_router.router)
 app.include_router(actualizacion_masiva_router.router)
 app.include_router(clientes_router.router)
 app.include_router(ventas_router.router)
+app.include_router(usuarios_router.router)
+
 
 # --- Endpoint Raíz ---
 @app.get("/", tags=["General"])
