@@ -1,7 +1,5 @@
 "use client"
 
-/* Este componente posee la lógica de admision y rutas basado en el rol del usuario */
-
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Role, useAuthStore } from "@/lib/authStore"
@@ -12,32 +10,28 @@ interface Props {
 }
 
 export default function ProtectedRoute({ allowedRoles, children }: Props) {
-
-  const role = useAuthStore((state) => state.role)
-  const hasHydrated = useAuthStore((state) => state.hasHydrated)
   const router = useRouter()
-  const [isAuthorized, setIsAuthorized] = useState(false)
+
+  // Accedemos al rol desde Zustand
+  const role = useAuthStore((state) => state.role)
+
+  // Truco de hidratación: esperar a estar en el cliente
+  const [isClient, setIsClient] = useState(false)
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
 
   useEffect(() => {
+    if (!isClient) return
 
-    if (!hasHydrated) return
+    console.log("🔐 [ProtectedRoute] Rol actual (cliente):", role)
 
-    console.log("🔐 [ProtectedRoute] Rol actual:", role)
-
-    if (role && allowedRoles.includes(role)) {
-      setIsAuthorized(true)
-    } else {
-      setIsAuthorized(false)
+    if (!role || !allowedRoles.includes(role)) {
       router.push("/")
     }
-  }, [hasHydrated, role, allowedRoles, router])
+  }, [isClient, role, allowedRoles, router])
 
-  console.log("🧪 Estado completo:", {
-    hydrated: hasHydrated,
-    role,
-  })
-
-  if (!hasHydrated || !isAuthorized) {
+  if (!isClient || !role || !allowedRoles.includes(role)) {
     return (
       <div className="text-center py-4 text-muted-foreground">
         Verificando permisos...
