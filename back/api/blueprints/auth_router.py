@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status,Body
 from fastapi.security import OAuth2PasswordRequestForm
 
 from back.security import crear_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
-from back.security import es_admin, obtener_usuario_actual
+from back.security import es_admin, get_current_user
 from back.gestion.seguridad import llave_maestra_manager
 from back.schemas.caja_schemas import RespuestaGenerica # Reutilizamos el schema
 # Necesitaremos una función para autenticar al usuario contra la DB
@@ -44,7 +44,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
 def api_validar_llave_maestra(
     llave: str = Body(..., embed=True, description="La llave maestra a validar"),
     # Este endpoint requiere que el usuario esté al menos logueado
-    current_user = Depends(obtener_usuario_actual) 
+    current_user = Depends(get_current_user) 
 ):
     """
     Valida si la llave proporcionada coincide con la llave maestra del día.
