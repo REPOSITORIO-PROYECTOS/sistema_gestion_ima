@@ -10,6 +10,7 @@ import { useAuthStore } from '@/lib/authStore'
 const API_URL = "https://sistema-ima.sistemataup.online/api"
 
 function Login() {
+
   const router = useRouter()
 
   // Store
@@ -44,7 +45,7 @@ function Login() {
 
       const data = await response.json()
       const { access_token } = data
-
+      console.log(data)
       setToken(access_token)
 
       const meResponse = await fetch(`${API_URL}/users/me`, {
@@ -56,8 +57,8 @@ function Login() {
       if (!meResponse.ok) throw new Error("Error al obtener datos del usuario")
 
       const usuario = await meResponse.json()
+      console.log(usuario)
       setUsuario(usuario)
-
       router.push("/dashboard")
 
     } catch (error) {
@@ -71,7 +72,7 @@ function Login() {
       }
 
     } finally { setLoading(false) }
-    }
+  }
 
   return (
     <div className="flex flex-col h-screen justify-center items-center gap-10 bg-emerald-600 px-6 py-8 md:h-screen">

@@ -12,7 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import UserForm from "./UserForm";
 import { Input } from "@/components/ui/input";
-import { useEffect, /* useState  */} from "react";
+import { useEffect, useState, /* useState  */} from "react";
+import { useAuthStore } from "@/lib/authStore";
 
 // Reemplazar esto por los usuarios reales - BDD o Zustand
   const usuarios = [ 
@@ -20,26 +21,32 @@ import { useEffect, /* useState  */} from "react";
     { id: 2, nombre: 'María López', email: 'maria@example.com', rol: 'Empleado' },
   ]
 
-  export default function GestionUsuarios() {
+export default function GestionUsuarios() {
 
-    /* const [llaveMaestra, setLlaveMaestra] = useState("");
- */
-    useEffect(() => {
-      const fetchLlave = async () => {
-        try {
-          const res = await fetch("https://sistema-ima.sistemataup.online/api/caja/llave-maestra"); 
-          if (!res.ok) throw new Error("Error al obtener la llave");
-          const data = await res.json();
-          /* setLlaveMaestra(data.llave || "");  */
-          console.log(data);
-        } catch (error) {
-          console.error("Error al traer la llave:", error);
-          /* setLlaveMaestra("Error"); */
-        }
-      };
+  const [llaveMaestra, setLlaveMaestra] = useState("");
+  const token = useAuthStore((state) => state.token);
 
-      fetchLlave();
-    }, []);
+  useEffect(() => {
+    if (!token) return;
+
+    const fetchLlave = async () => {
+      try {
+        const res = await fetch("https://sistema-ima.sistemataup.online/api/caja/llave-maestra", {
+          headers: {
+            'x-admin-token': token,
+          },
+        });
+        if (!res.ok) throw new Error("Error al obtener la llave");
+        const data = await res.json();
+        setLlaveMaestra(data.llave || "");
+      } catch (error) {
+        console.error("Error al traer la llave:", error);
+        setLlaveMaestra("Error");
+      }
+    };
+
+    fetchLlave();
+  }, [token]);
 
   return (
 
@@ -71,7 +78,12 @@ import { useEffect, /* useState  */} from "react";
         {/* Llave Maestra */}
         <div className="flex flex-col sm:flex-row items-center bg-green-100 rounded-lg p-4 gap-4 w-full sm:max-w-2/3 md:max-w-1/3">
           <h2 className="text-xl font-bold text-green-950 w-2/3">Llave Caja:</h2>
-          <Input type="text" value={"llavemaestra"} name="" id="" disabled className="border-2 border-green-800" />
+          <Input
+            type="text"
+            value={llaveMaestra}
+            disabled
+            className="border-2 border-green-800"
+          />
         </div>
       </div>
 
