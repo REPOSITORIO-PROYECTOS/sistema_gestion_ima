@@ -16,8 +16,7 @@ import { Eye, EyeOff } from "lucide-react";
 type Role = { id: number; nombre: string };
 
 export default function UserForm() {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [nombre_usuario, setNombreUsuario] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -26,6 +25,7 @@ export default function UserForm() {
 
   const passwordsMatch = password === confirm;
 
+  // Funcion que trae los posibles roles reales del back
   useEffect(() => {
     async function fetchRoles() {
       try {
@@ -48,44 +48,60 @@ export default function UserForm() {
     fetchRoles();
   }, []);
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  // POST de usuarios
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!passwordsMatch || !selectedRoleId) return;
 
     const newUser = {
-      name,
-      email,
+      nombre_usuario,
       password,
-      role_id: selectedRoleId,
+      id_rol: selectedRoleId,
     };
 
-    console.log("✅ Usuario a enviar:", newUser);
+    try {
+      const res = await fetch("https://sistema-ima.sistemataup.online/api/admin/crear-usuario", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(newUser),
+      });
 
-    // TODO: Hacer POST al backend aquí
+      console.log(JSON.stringify(newUser))
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error("❌ Error al crear usuario:", errorData);
+        alert("No se pudo crear el usuario. Revisá los datos.");
+        return;
+      }
+
+      const result = await res.json();
+      console.log("✅ Usuario creado:", result);
+      alert("Usuario creado exitosamente ✅");
+
+      // Resetear formulario
+      setNombreUsuario(""); // ← Este también estaba mal antes
+      setPassword("");
+      setConfirm("");
+      setSelectedRoleId(undefined);
+    } catch (error) {
+      console.error("⚠️ Error inesperado:", error);
+      alert("Ocurrió un error inesperado.");
+    }
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 mt-4 max-w-md">
       <div>
-        <Label htmlFor="name">Nombre</Label>
+        <Label htmlFor="nombre_usuario">Nombre</Label>
         <Input
-          id="name"
+          id="nombre_usuario"
           type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+          value={nombre_usuario}
+          onChange={(e) => setNombreUsuario(e.target.value)} // ← ¡acá estaba el error!
           placeholder="Juan Pérez"
-          className="mt-2"
-        />
-      </div>
-
-      <div>
-        <Label htmlFor="email">Email</Label>
-        <Input
-          id="email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="juan@mail.com"
           className="mt-2"
         />
       </div>
