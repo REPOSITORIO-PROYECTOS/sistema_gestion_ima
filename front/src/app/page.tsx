@@ -4,48 +4,59 @@
 
 import Image from 'next/image'
 import "../styles/globals.css"
-
 import { useRouter } from 'next/navigation'
-import { useAuthStore } from '@/lib/authStore'
-import { FormEvent, useState } from 'react'
+/* import { useAuthStore } from '@/lib/authStore'
+ */import { FormEvent, useState } from 'react'
+import { Eye, EyeOff } from "lucide-react" // o cualquier ícono que uses
 
 function Login() {
 
   const router = useRouter()
-  const setRole = useAuthStore(state => state.setRole)
+  /* const setRole = useAuthStore(state => state.setRole) */
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
 
+  // Animacion para mostrar contraseña
+  const [showPassword, setShowPassword] = useState(false)
+
+
   const handleLogin = async (e: FormEvent) => {
+
     e.preventDefault()
+
+    const formData = new URLSearchParams()
+    formData.append("username", username)
+    formData.append("password", password)
 
     try {
       const response = await fetch("https://sistema-ima.sistemataup.online/api/auth/token", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password })
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: formData.toString()
       })
 
       if (!response.ok) throw new Error("Credenciales inválidas")
 
       const data = await response.json()
 
-      // data.token es el JWT que viene del backend
-      const { token, role } = data
+      const { access_token /* , token_type */ } = data
 
-      // Guardar token en localStorage o cookie
-      localStorage.setItem("token", token)
+      // Guardar token
+      localStorage.setItem("token", access_token)
 
-      // Guardar el rol en Zustand (útil para rutas protegidas)
-      setRole(role)
+      // TODO: Decodificar token si querés saber el rol (o incluirlo en la respuesta)
+      // setRole(decoded.role) si lo sacás del JWT
 
       router.push("/dashboard")
-      
+
     } catch (error) {
       console.error(error)
       alert("Usuario o contraseña incorrectos")
     }
   }
+
 
 
   return (
@@ -72,15 +83,22 @@ function Login() {
         </div>
 
         {/* Contraseña */}
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 relative">
           <label htmlFor="password" className="text-white">Contraseña</label>
           <input 
             id="password" 
-            type="password" 
+            type={showPassword ? "text" : "password"}
             value={password}
-            onChange={(e) => setPassword(e.target.value)} 
-            className="border !border-white text-white bg-transparent px-3 py-2 rounded focus:!outline-none focus:!ring-0 focus:!border-white hover:!border-white"
+            onChange={(e) => setPassword(e.target.value)}
+            className="border !border-white text-white bg-transparent px-3 py-2 rounded w-full pr-10"
           />
+          <button 
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 top-[41px] text-white cursor-pointer"
+          >
+            {showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}
+          </button>
         </div>
 
         {/* Submit */}
