@@ -12,12 +12,14 @@ interface Props {
 }
 
 export default function ProtectedRoute({ allowedRoles, children }: Props) {
+
   const role = useAuthStore((state) => state.role)
   const hasHydrated = useAuthStore((state) => state.hasHydrated)
   const router = useRouter()
   const [isAuthorized, setIsAuthorized] = useState(false)
 
   useEffect(() => {
+
     if (!hasHydrated) return
 
     console.log("🔐 [ProtectedRoute] Rol actual:", role)
@@ -29,6 +31,11 @@ export default function ProtectedRoute({ allowedRoles, children }: Props) {
       router.push("/")
     }
   }, [hasHydrated, role, allowedRoles, router])
+
+  console.log("🧪 Estado completo:", {
+    hydrated: hasHydrated,
+    role,
+  })
 
   if (!hasHydrated || !isAuthorized) {
     return (
