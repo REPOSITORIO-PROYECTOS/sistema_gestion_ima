@@ -34,17 +34,20 @@ def _cargar_token_data():
 
 def autenticar_usuario(nombre_usuario: str, password: str):
     """
-    Busca al usuario en la base de datos y verifica su contraseña. (VERSIÓN CORREGIDA)
+    Busca al usuario en la base de datos y verifica su contraseña.
+    (VERSIÓN DE DEPURACIÓN FORENSE)
     """
+    print("\n--- INICIO DE AUTENTICACIÓN ---")
+    print(f"DEBUG: Intentando autenticar usuario: '{nombre_usuario}' con contraseña: '{password}'")
+    
     conn = get_db_connection()
     if not conn:
+        print("DEBUG: FALLO - No se pudo obtener conexión a la base de datos.")
         return None
 
     try:
         cursor = conn.cursor(dictionary=True)
         
-        # Consulta corregida para usar los nombres de columna correctos:
-        # u.id, r.nombre, y el JOIN con r.id
         query = """
             SELECT u.id, u.nombre_usuario, u.password_hash, r.nombre AS nombre_rol
             FROM usuarios u
@@ -55,14 +58,23 @@ def autenticar_usuario(nombre_usuario: str, password: str):
         cursor.execute(query, (nombre_usuario,))
         user_data = cursor.fetchone()
         
+        print(f"DEBUG: Datos del usuario encontrados en la BD: {user_data}")
+        
         if not user_data:
-            print(f"DEBUG: Usuario '{nombre_usuario}' no encontrado en la base de datos.") # Debug
+            print("DEBUG: FALLO - El usuario no fue encontrado (la consulta no devolvió filas).")
             return None
         
-        # Verificar la contraseña
-        if not verificar_password(password, user_data['password_hash']):
-            print(f"DEBUG: Contraseña incorrecta para el usuario '{nombre_usuario}'.") # Debug
+        print(f"DEBUG: Verificando contraseña...")
+        print(f"DEBUG: HASH de la BD: {user_data['password_hash']}")
+        
+        resultado_verificacion = verificar_password(password, user_data['password_hash'])
+        print(f"DEBUG: Resultado de verificar_password(): {resultado_verificacion}")
+        
+        if not resultado_verificacion:
+            print("DEBUG: FALLO - La contraseña no coincide.")
             return None
+        
+        print("DEBUG: ÉXITO - Autenticación completada.")
         
         # ¡Autenticación exitosa!
         return {
@@ -72,9 +84,10 @@ def autenticar_usuario(nombre_usuario: str, password: str):
         }
 
     except Exception as e:
-        print(f"Error durante la autenticación: {e}")
+        print(f"DEBUG: FALLO - Ocurrió una excepción: {e}")
         return None
     finally:
+        print("--- FIN DE AUTENTICACIÓN ---\n")
         if conn.is_connected():
             cursor.close()
             conn.close()

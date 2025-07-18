@@ -24,7 +24,9 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     """
     # Esta función de negocio validará el usuario y contraseña contra la DB
     user = autenticar_usuario(form_data.username, form_data.password)
+    print("DEBUG: ANTES DEL NOT ES USER")
     if not user:
+        print("DEBUG: ENTRAMO A NO ES USER")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Nombre de usuario o contraseña incorrectos",
@@ -32,7 +34,10 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
         )
     
     # Creamos el token
+    print("DEBUG: ANTES DEL ACCES TOKENE XPIRES")
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    print("DEBUG: DESPS TOKENE XPIRES")
+
     access_token = crear_access_token(
         data={"sub": user['nombre_usuario'], "role": user['nombre_rol']},
         expires_delta=access_token_expires
