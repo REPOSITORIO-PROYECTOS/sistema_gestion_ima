@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import UserForm from "./UserForm";
 import { Input } from "@/components/ui/input";
-import { useEffect, useState } from "react";
+import { useEffect, /* useState  */} from "react";
 
 // Reemplazar esto por los usuarios reales - BDD o Zustand
   const usuarios = [ 
@@ -22,18 +22,19 @@ import { useEffect, useState } from "react";
 
   export default function GestionUsuarios() {
 
-    const [llaveMaestra, setLlaveMaestra] = useState("");
-
+    /* const [llaveMaestra, setLlaveMaestra] = useState("");
+ */
     useEffect(() => {
       const fetchLlave = async () => {
         try {
           const res = await fetch("https://sistema-ima.sistemataup.online/api/caja/llave-maestra"); 
           if (!res.ok) throw new Error("Error al obtener la llave");
           const data = await res.json();
-          setLlaveMaestra(data.llave || ""); 
+          /* setLlaveMaestra(data.llave || "");  */
+          console.log(data);
         } catch (error) {
           console.error("Error al traer la llave:", error);
-          setLlaveMaestra("Error");
+          /* setLlaveMaestra("Error"); */
         }
       };
 
