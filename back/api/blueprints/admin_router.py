@@ -22,13 +22,14 @@ router = APIRouter(
 # === SECCIÓN: GESTIÓN DE USUARIOS Y ROLES ===
 # ===================================================================
 
-@router.post("/usuarios", response_model=UsuarioResponse, status_code=201, summary="Crear un nuevo usuario")
+@router.post("/crear-usuario", response_model=UsuarioResponse, status_code=201, summary="Crear un nuevo usuario")
 def api_crear_usuario(req: UsuarioCreate, db: Session = Depends(get_db)):
     """Crea un nuevo usuario en el sistema y le asigna un rol existente."""
     try:
         return usuarios_manager.crear_usuario(db, req.nombre_usuario, req.password, req.id_rol)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e)) # 409 Conflict por duplicado
+
 
 @router.get("/usuarios", response_model=List[UsuarioResponse], summary="Obtener lista de usuarios")
 def api_obtener_usuarios(db: Session = Depends(get_db)):
@@ -43,7 +44,7 @@ def api_cambiar_rol_usuario(id_usuario: int, req: CambiarRolUsuarioRequest, db: 
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) # 404 Not Found si el usuario o rol no existen
 
-@router.get("/roles", response_model=List[RolResponse], summary="Obtener lista de roles")
+@router.get("/obtener-roles", response_model=List[RolResponse], summary="Obtener lista de roles")
 def api_obtener_roles(db: Session = Depends(get_db)):
     """
     Devuelve la lista de todos los roles disponibles en el sistema.
