@@ -6,7 +6,7 @@ import Image from 'next/image'
 import "../styles/globals.css"
 
 import { useRouter } from 'next/navigation'
-import { Role, useAuthStore } from '@/lib/authStore'
+import { useAuthStore } from '@/lib/authStore'
 import { FormEvent, useState } from 'react'
 
 function Login() {
@@ -16,26 +16,37 @@ function Login() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
 
-  const handleLogin = (e: FormEvent) => {
-    
+  const handleLogin = async (e: FormEvent) => {
     e.preventDefault()
 
-    // Acá simulamos los usuarios y roles
-    const users = {
-      admin: { password: '123', role: 'admin' },
-      cajero: { password: 'caja123', role: 'cajero' },
-      contador: { password: '123', role: 'contable' }
-    }
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      })
 
-    const user = users[username as keyof typeof users]
+      if (!response.ok) throw new Error("Credenciales inválidas")
 
-    if (user && user.password === password) {
-      setRole(user.role as Role)  // Guarda el rol en Zustand
-      router.push('/dashboard')   // Redirige al dashboard inicial
-    } else {
-      alert('Credenciales incorrectas')
+      const data = await response.json()
+
+      // data.token es el JWT que viene del backend
+      const { token, role } = data
+
+      // Guardar token en localStorage o cookie
+      localStorage.setItem("token", token)
+
+      // Guardar el rol en Zustand (útil para rutas protegidas)
+      setRole(role)
+
+      router.push("/dashboard")
+      
+    } catch (error) {
+      console.error(error)
+      alert("Usuario o contraseña incorrectos")
     }
   }
+
 
   return (
 

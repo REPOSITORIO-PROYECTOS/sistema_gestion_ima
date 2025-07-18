@@ -7,29 +7,41 @@ export type Role = 'admin' | 'cajero' | 'contable' | 'stock' | 'cliente'
 
 // Declaración de tipos de la Store
 interface AuthState {
-  
-  role: Role | null                 // Tupla para Rol 
-  setRole: (role: Role) => void     // Funcion que toma un rol como arg y devuelve void
-  logout: () => void                // Funcion que toma un rol como arg y devuelve void
 
-  // Funciones para hidratación - con token se van ?
+  token: string | null
+  role: Role | null                 
+  nombre_usuario: string | null
+
+  setToken: (token: string) => void
+  setRole: (role: Role) => void
+  setNombreUsuario: (name: string) => void
+
+  logout: () => void
+
   hasHydrated: boolean
   setHasHydrated: (val: boolean) => void
 }
 
 
 // Exportamos Estado para la App
-export const useAuthStore = create<AuthState>()( 
+export const useAuthStore = create<AuthState>()(
+
   persist(
+    
     (set) => ({
+      token: null,
       role: null,
+      nombre_usuario: null,
+
+      setToken: (token) => set({ token }),
       setRole: (role) => set({ role }),
-      logout: () => set({ role: null }),
+      setNombreUsuario: (name) => set({ nombre_usuario: name }),
+
+      logout: () => set({ token: null, role: null, nombre_usuario: null }),
+
       hasHydrated: false,
       setHasHydrated: (val) => set({ hasHydrated: val })
     }),
-
-    // Logica hidratacion y persistencia
     {
       name: 'auth-storage',
       onRehydrateStorage: () => (state) => {

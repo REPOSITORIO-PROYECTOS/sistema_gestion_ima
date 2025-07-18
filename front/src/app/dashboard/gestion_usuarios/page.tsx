@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import UserForm from "./UserForm";
 import { Input } from "@/components/ui/input";
+import { useEffect, useState } from "react";
 
 // Reemplazar esto por los usuarios reales - BDD o Zustand
   const usuarios = [ 
@@ -19,7 +20,25 @@ import { Input } from "@/components/ui/input";
     { id: 2, nombre: 'María López', email: 'maria@example.com', rol: 'Empleado' },
   ]
 
-export default function GestionUsuarios() {
+  export default function GestionUsuarios() {
+
+    const [llaveMaestra, setLlaveMaestra] = useState("");
+
+    useEffect(() => {
+      const fetchLlave = async () => {
+        try {
+          const res = await fetch("/api/caja/llave-maestra"); // 🔁 Ajustar si el endpoint es distinto
+          if (!res.ok) throw new Error("Error al obtener la llave");
+          const data = await res.json();
+          setLlaveMaestra(data.llave || ""); // Si viene como { llave: "abc123" }
+        } catch (error) {
+          console.error("Error al traer la llave:", error);
+          setLlaveMaestra("Error");
+        }
+      };
+
+      fetchLlave();
+    }, []);
 
   return (
 
