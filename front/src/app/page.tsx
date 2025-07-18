@@ -20,7 +20,7 @@ function Login() {
     e.preventDefault()
 
     try {
-      const response = await fetch("https://sistema-ima.sistemataup.online/api/auth/login", {
+      const response = await fetch("https://sistema-ima.sistemataup.online/api/auth/token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password })
@@ -79,8 +79,7 @@ function Login() {
             type="password" 
             value={password}
             onChange={(e) => setPassword(e.target.value)} 
-              className="border !border-white text-white bg-transparent px-3 py-2 rounded focus:!outline-none focus:!ring-0 focus:!border-white hover:!border-white"
-
+            className="border !border-white text-white bg-transparent px-3 py-2 rounded focus:!outline-none focus:!ring-0 focus:!border-white hover:!border-white"
           />
         </div>
 
