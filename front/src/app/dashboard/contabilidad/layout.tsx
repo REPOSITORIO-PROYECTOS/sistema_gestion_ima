@@ -12,7 +12,7 @@ function ContabilidadLayout({ children } : { children: React.ReactNode }) {
 
   return (
 
-    <ProtectedRoute allowedRoles={["admin", "contable"]}>
+    <ProtectedRoute allowedRoles={["Admin", "Cajero"]}>
 
       {/* Nav de Contabilidad */}
       <NavContabilidad links={links}/>

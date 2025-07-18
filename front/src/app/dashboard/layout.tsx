@@ -14,9 +14,9 @@ type NavLink = {
 
 // Lista de secciones (paths) y sus roles permitidos - revisar si no va en ssr
 const links: NavLink[] = [
-  { name: "Ventas", href: "/dashboard/ventas", roles: ["admin", "cajero"] },
-  { name: "Contabilidad", href: "/dashboard/contabilidad", roles: ["admin", "contable"] },
-  { name: "Stock", href: "/dashboard/stock", roles: ["admin", "contable"] },
+  { name: "Ventas", href: "/dashboard/ventas", roles: ["Admin", "Cajero"] },
+  { name: "Contabilidad", href: "/dashboard/contabilidad", roles: ["Admin", "Cajero"] },
+  { name: "Stock", href: "/dashboard/stock", roles: ["Admin", "Cajero", "Gerente"] },
   { name: "Carta", href: "/dashboard/carta", roles: [""] }
 ]
 
@@ -29,7 +29,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     
     // Al Dashboard inicial pueden acceder todos los roles
-    <ProtectedRoute allowedRoles={["admin", "cajero", "contable"]}>
+    <ProtectedRoute allowedRoles={["Admin", "Cajero", "Gerente"]}>
       
         {/* NavBar - los roles disablean */}
         <NavBar links={links} role={role} />
