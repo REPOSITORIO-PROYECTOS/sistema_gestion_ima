@@ -45,7 +45,7 @@ function Login() {
 
       const data = await response.json()
       const { access_token } = data
-      console.log("🔑 Token recibido:", data)
+      /* console.log("🔑 Token recibido:", data) */ // solo para debug
       setToken(access_token)
 
       const meResponse = await fetch(`${API_URL}/users/me`, {
@@ -57,7 +57,7 @@ function Login() {
       if (!meResponse.ok) throw new Error("Error al obtener datos del usuario")
 
       const usuario = await meResponse.json()
-      console.log("🙋‍♂️ Usuario recibido:", usuario)
+      /* console.log("🙋‍♂️ Usuario recibido:", usuario) */  // solo para debug
 
       // Guardar usuario y rol en el store
       setUsuario(usuario)

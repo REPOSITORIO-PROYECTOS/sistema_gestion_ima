@@ -39,15 +39,17 @@ type Cliente = {
   nombre_razon_social: string;
   condicion_iva: string;
   identificacion_fiscal: string | null;
+  cuit: string | null;
   telefono: string;
   activo: boolean;
 };
 
 // Dropdown tipo de cliente
 const tipoCliente = [
-  { id: "1", nombre: "Con CUIT"},      
-  { id: "2", nombre: "Cliente Final"}, 
-]
+  { id: "0", nombre: "Cliente Final" },
+  { id: "1", nombre: "Cliente con CUIT" },
+  { id: "2", nombre: "Cliente sin CUIT" },
+];
 
 function FormVentas({
   onAgregarProducto,    /* Agrega productos al resumen (componente padre) */
@@ -120,9 +122,12 @@ function FormVentas({
     venta_negocio: number;
   } | null): number => {
     if (!producto) return 0;
-    return tipoClienteSeleccionado.id === "1"
-      ? producto.venta_negocio
-      : producto.precio_venta;
+
+    // Cliente Final usa precio_venta siempre
+    if (tipoClienteSeleccionado.id === "0") return producto.precio_venta;
+
+    // Cliente con CUIT o sin CUIT
+    return producto.venta_negocio;
   };
 
   const totalProducto = productoSeleccionado ? getPrecioProducto(productoSeleccionado) * cantidad : 0;
@@ -237,7 +242,10 @@ function FormVentas({
     // Objeto resumen de toda la venta generada
     const ventaPayload = {
       id_sesion_caja: 3,
-      id_cliente: 8,            // reemplazar por cliente posta
+      id_cliente:
+        tipoClienteSeleccionado.id === "0"
+          ? 8 // Cliente Final: ID fijo
+          : clienteSeleccionado?.id ?? 8, // Cliente con/sin CUIT            
       usuario: "admin",
       id_usuario: 1,                              // debe ser dinamico con el tipo de usuario / admin=1, cajero=2, etc
       metodo_pago: metodoPago.toUpperCase(),
@@ -328,36 +336,43 @@ function FormVentas({
             </Select>
 
             {/* Si el tipo de cliente es con CUIT... */}
-            {tipoClienteSeleccionado.id === "1" && (  
-              <div className="w-full flex flex-col gap-2">
-                {!clientes.length ? (
-                  <p className="text-green-900 font-semibold">Cargando clientes...</p>
-                ) : (
-                  <Popover open={openCliente} onOpenChange={setOpenCliente}>
-                    <PopoverTrigger asChild>
-                      <button
-                        role="combobox"
-                        aria-controls="clientes-list"
-                        aria-expanded={openCliente}
-                        className="w-full justify-between text-left cursor-pointer border px-3 py-2 rounded-md shadow-sm bg-white text-black flex items-center"
-                      >
-                        {clienteSeleccionado
-                          ? `${clienteSeleccionado.nombre_razon_social} (${clienteSeleccionado.identificacion_fiscal || "Sin CUIT"})`
-                          : "Seleccionar cliente"}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      side="bottom"
-                      align="start"
-                      className="w-full md:max-w-[98%] p-0 max-h-64 overflow-y-auto z-50"
-                      sideOffset={8}
+            {tipoClienteSeleccionado.id === "1" || tipoClienteSeleccionado.id === "2" ? (
+            <div className="w-full flex flex-col gap-2">
+              {!clientes.length ? (
+                <p className="text-green-900 font-semibold">Cargando clientes...</p>
+              ) : (
+                <Popover open={openCliente} onOpenChange={setOpenCliente}>
+                  <PopoverTrigger asChild>
+                    <button
+                      role="combobox"
+                      aria-controls="clientes-list"
+                      aria-expanded={openCliente}
+                      className="w-full justify-between text-left cursor-pointer border px-3 py-2 rounded-md shadow-sm bg-white text-black flex items-center"
                     >
-                      <Command>
-                        <CommandInput placeholder="Buscar cliente por nombre..." />
-                        <CommandEmpty>No se encontró ningún cliente.</CommandEmpty>
-                        <CommandGroup>
-                          {clientes.map((cliente) => (
+                      {clienteSeleccionado
+                        ? `${clienteSeleccionado.nombre_razon_social} (${clienteSeleccionado.cuit || "Sin CUIT"})`
+                        : "Seleccionar cliente"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    side="bottom"
+                    align="start"
+                    className="w-full md:max-w-[98%] p-0 max-h-64 overflow-y-auto z-50"
+                    sideOffset={8}
+                  >
+                    <Command>
+                      <CommandInput placeholder="Buscar cliente por nombre..." />
+                      <CommandEmpty>No se encontró ningún cliente.</CommandEmpty>
+                      <CommandGroup>
+                        {clientes
+                          .filter((cliente) => {
+                            // Filtrado según tipo de cliente seleccionado
+                            if (tipoClienteSeleccionado.id === "1") return !!cliente.cuit;
+                            if (tipoClienteSeleccionado.id === "2") return !cliente.cuit;
+                            return false;
+                          })
+                          .map((cliente) => (
                             <CommandItem
                               key={cliente.id}
                               value={cliente.nombre_razon_social}
@@ -368,17 +383,17 @@ function FormVentas({
                               }}
                             >
                               <span className="truncate">
-                                {cliente.nombre_razon_social} ({cliente.identificacion_fiscal || "Sin CUIT"})
+                                {cliente.nombre_razon_social} ({cliente.cuit || "Sin CUIT"})
                               </span>
                             </CommandItem>
                           ))}
-                        </CommandGroup>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                )}
-              </div>
-            )}
+                      </CommandGroup>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
+          ) : null}
           </div>
         </div>
         <span className="block w-full h-0.5 bg-green-900"></span>

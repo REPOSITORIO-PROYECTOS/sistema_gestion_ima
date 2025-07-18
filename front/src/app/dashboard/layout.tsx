@@ -17,7 +17,7 @@ const links: NavLink[] = [
   { name: "Ventas", href: "/dashboard/ventas", roles: ["Admin", "Cajero"] },
   { name: "Contabilidad", href: "/dashboard/contabilidad", roles: ["Admin", "Cajero"] },
   { name: "Stock", href: "/dashboard/stock", roles: ["Admin", "Cajero", "Gerente"] },
-  { name: "Carta", href: "/dashboard/carta", roles: [""] }
+  /* { name: "Carta", href: "/dashboard/carta", roles: [""] } */  // agregar en otra app
 ]
 
 function DashboardLayout({ children }: { children: React.ReactNode }) {
