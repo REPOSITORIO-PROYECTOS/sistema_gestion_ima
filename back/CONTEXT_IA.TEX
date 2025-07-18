@@ -1,0 +1,52 @@
+Documento de Traspaso y Contexto del Proyecto: Sistema de Gestión IMA
+Fecha de Estado: 18 de Julio de 2025
+1. Objetivo General y Arquitectura Acordada
+El objetivo es desarrollar el backend para un sistema de gestión multiusuario con una API RESTful. La arquitectura fundamental sobre la que hemos trabajado es la siguiente:
+Fuente Única de Verdad (Single Source of Truth): Una base de datos SQL (MySQL) es la única autoridad final sobre los datos. Todas las operaciones críticas (ventas, stock, usuarios) se validan y confirman primero en SQL.
+Backend: Construido con FastAPI y SQLModel (que es una capa sobre SQLAlchemy y Pydantic).
+API Modular: La API está organizada en "Blueprints" o Routers (caja_router, articulos_router, admin_router, etc.), cada uno manejando un dominio de negocio específico.
+Capas de Lógica Claras: Hemos establecido una estricta separación de responsabilidades:
+back/api/blueprints/ (Capa de Presentación): Routers que definen los endpoints. Su única tarea es recibir peticiones HTTP, validarlas con schemas, llamar a la lógica de negocio y formatear las respuestas.
+back/gestion/ (Capa de Lógica de Negocio): Módulos de Python (managers) que contienen la lógica de negocio real. Estas funciones interactúan con la base de datos a través de SQLModel y no saben nada sobre HTTP.
+back/schemas/ (Capa de Contratos de Datos): Modelos Pydantic que definen la estructura de los datos que viajan a través de la API (peticiones y respuestas JSON).
+back/modelos.py (Capa de Acceso a Datos): Modelos SQLModel que definen la estructura de las tablas en la base de datos SQL.
+Reportes Desacoplados (En Pausa): Se acordó que la lógica de reportes a Google Sheets sería una capa separada (back/reportes/). Sin embargo, su desarrollo e integración están en pausa para priorizar la funcionalidad del núcleo del backend.
+2. Estado del Sistema de Seguridad (El Foco Principal de Nuestro Trabajo)
+Hemos implementado un sistema de seguridad robusto y basado en roles.
+Modelos de Datos: Se utilizan los modelos Usuario y Rol de modelos.py, que tienen una relación de muchos a uno.
+Autenticación (back/security.py y back/gestion/auth_manager.py):
+Se utiliza un flujo estándar de OAuth2 con Tokens Bearer JWT.
+Existe un endpoint POST /auth/token que recibe username y password, los valida contra la base de datos (usando contraseñas hasheadas con bcrypt), y devuelve un access_token.
+El token contiene el username como sub (subject).
+Autorización (back/security.py):
+La función principal es obtener_usuario_actual. Esta dependencia, en cada petición a un endpoint protegido, valida el token JWT y, crucialmente, consulta la base de datos SQL para obtener el objeto Usuario completo y su Rol en tiempo real. Esto elimina la vulnerabilidad de usar roles obsoletos almacenados en el token.
+Hemos creado una "factoría de dependencias" es_rol(roles_requeridos) que genera "guardianes" de seguridad. Estos guardianes se usan para proteger routers o endpoints específicos (ej: Depends(es_admin)).
+Los roles básicos ("Admin", "Cajero", "Gerente", "Soporte") se han creado manualmente en la base de datos.
+Estado Actual: La seguridad del núcleo está completa y funcional. El sistema puede autenticar usuarios y autorizar el acceso a endpoints basado en el rol actual del usuario en la base de datos.
+3. Estado de los Módulos de la Aplicación
+Gestión de Caja (caja_router.py, gestion/caja/):
+Lógica Refactorizada: La lógica de negocio para apertura_cierre y registro_venta está completamente migrada a SQLModel y sigue un patrón de transacciones atómicas.
+Funcionalidad Avanzada: Soporta múltiples cajas abiertas simultáneamente (una por usuario) y un proceso de cierre de caja "a ciegas".
+Endpoints Seguros: El caja_router.py ha sido refactorizado para usar la seguridad por roles. Obtiene el usuario del token y lo usa para realizar operaciones dinámicas (ej: cerrar la caja del usuario actual).
+Lógica Heredada: La función registrar_ingreso_egreso todavía utiliza una conexión manual a MySQL (mysql-connector), pero el router ha sido adaptado para poder llamarla de forma segura. Su refactorización completa es una tarea técnica pendiente.
+Gestión de Clientes (clientes_router.py, gestion/contabilidad/clientes_contabilidad/):
+CRUD Funcional: Se ha creado un conjunto completo de endpoints CRUD (POST, GET, PATCH, DELETE) para la gestión de clientes (modelo Tercero).
+Validaciones Fiscales (AFIP): Los schemas (cliente_schemas.py) y la lógica de negocio (manager.py) incluyen validaciones para cumplir con los requisitos de facturación de AFIP (ej: CUIT condicionalmente obligatorio, validación de unicidad de CUIT).
+Seguridad Pendiente: Los endpoints de clientes están funcionales pero actualmente no tienen aplicada ninguna dependencia de seguridad (es una tarea pendiente fácil de añadir).
+Panel de Administración (admin_router.py, gestion/admin/):
+Gestión de Usuarios y Roles: Se ha creado un conjunto de endpoints (/admin/usuarios, /admin/roles) que permite a un usuario con rol "Admin" crear nuevos usuarios, listar todos los usuarios y cambiarles el rol. También puede listar los roles disponibles en el sistema.
+Seguridad Implementada: Todo el admin_router.py está protegido por la dependencia Depends(es_admin).
+Boletas y Facturación (ventas_router.py, etc.):
+Enfoque Definido: Se ha diseñado la lógica para un endpoint GET /ventas/{id_venta}/boleta. La estrategia es que el backend devuelva un JSON completo y estructurado con todos los datos de la venta, y que el frontend sea responsable de renderizarlo (ya sea en un PDF o en formato de ticket para impresora térmica).
+Estado: La lógica de negocio (ventas_manager.py) y el router (ventas_router.py) para esta funcionalidad han sido creados y están listos, funcionando con la estructura actual de la base de datos (sin soporte para facturación fiscal oficial).
+4. Problemas Recientes y Estado de Depuración
+El último gran obstáculo fue una serie de errores de arranque (502 Bad Gateway) causados por:
+Errores de Importación y Nombres: Inconsistencias en los nombres de las funciones de seguridad (get_current_user vs. obtener_usuario_actual) y rutas de importación incorrectas. Esto ha sido solucionado estandarizando todos los routers.
+Incompatibilidad de Librerías: Se detectó un error AttributeError: module 'bcrypt' has no attribute '__about__', causado por una incompatibilidad entre passlib y bcrypt. La solución recomendada (y pendiente de confirmación de implementación) es reinstalar passlib con pip install "passlib[bcrypt]==1.7.4".
+Problema de Frontend (Race Condition): Se diagnosticó que el frontend redirigía al usuario antes de que el store de estado (Zustand) se actualizara con los datos del usuario después del login, causando que el ProtectedRoute fallara. La solución se propuso del lado del frontend, haciendo que el componente de ruta protegida espere la "hidratación" del store.
+5. Siguientes Pasos Pendientes / Hoja de Ruta
+Confirmar la solución del problema de bcrypt: Ejecutar la reinstalación de la librería en el servidor.
+Confirmar la solución del "race condition" en el frontend.
+Añadir seguridad a los endpoints que faltan: clientes_router.py es el principal candidato.
+Refactorizar la lógica heredada: Específicamente, la función registrar_ingreso_egreso en registro_caja.py para que use SQLModel.
+Implementar la migración de la base de datos (usando Alembic) para añadir los campos de facturación fiscal a la tabla Venta y la lógica para la facturación diferida.
