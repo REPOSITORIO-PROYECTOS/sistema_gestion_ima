@@ -68,7 +68,7 @@ export default function Page() {
 
   return (
 
-    <ProtectedRoute allowedRoles={['admin']}>
+    <ProtectedRoute allowedRoles={['Admin']}>
 
       <div className="flex h-screen gap-6">
 

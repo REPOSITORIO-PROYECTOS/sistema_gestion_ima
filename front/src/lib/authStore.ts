@@ -9,7 +9,6 @@ interface Usuario {
   rol: Role
 }
 
-
 // Tipos de usuario
 export type Role = 'Admin' | 'Cajero' | 'Gerente' | 'Soporte'
 
@@ -19,8 +18,6 @@ interface AuthState {
   role: Role | null
   nombre_usuario: string | null
   usuario: Usuario | null
-
-
 
   setToken: (token: string) => void
   setRole: (role: Role) => void

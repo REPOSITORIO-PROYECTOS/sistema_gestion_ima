@@ -18,21 +18,25 @@ export default function ProtectedRoute({ allowedRoles, children }: Props) {
   const [isAuthorized, setIsAuthorized] = useState(false)
 
   useEffect(() => {
-    
     if (!hasHydrated) return
 
-    // Testeo de roles
     console.log("🔐 [ProtectedRoute] Rol actual:", role)
 
     if (role && allowedRoles.includes(role)) {
       setIsAuthorized(true)
     } else {
+      setIsAuthorized(false)
       router.push("/")
     }
   }, [hasHydrated, role, allowedRoles, router])
 
-  if (!hasHydrated) return null
-  if (!isAuthorized) return null
+  if (!hasHydrated || !isAuthorized) {
+    return (
+      <div className="text-center py-4 text-muted-foreground">
+        Verificando permisos...
+      </div>
+    )
+  }
 
   return <>{children}</>
 }
