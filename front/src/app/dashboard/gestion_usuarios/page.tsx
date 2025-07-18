@@ -27,10 +27,10 @@ import { useEffect, useState } from "react";
     useEffect(() => {
       const fetchLlave = async () => {
         try {
-          const res = await fetch("/api/caja/llave-maestra"); // 🔁 Ajustar si el endpoint es distinto
+          const res = await fetch("https://sistema-ima.sistemataup.online/api/caja/llave-maestra"); 
           if (!res.ok) throw new Error("Error al obtener la llave");
           const data = await res.json();
-          setLlaveMaestra(data.llave || ""); // Si viene como { llave: "abc123" }
+          setLlaveMaestra(data.llave || ""); 
         } catch (error) {
           console.error("Error al traer la llave:", error);
           setLlaveMaestra("Error");
