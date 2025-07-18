@@ -7,7 +7,6 @@ interface Usuario {
   apellido: string
   email: string
   rol: Role
-  // agregá otros campos que tengas en /users/me
 }
 
 

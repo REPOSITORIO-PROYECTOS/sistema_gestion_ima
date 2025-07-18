@@ -4,10 +4,10 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { useAuthStore } from "@/lib/authStore"
+import { Role, useAuthStore } from "@/lib/authStore"
 
 interface Props {
-  allowedRoles: string[]      // permitimos uno o mas roles
+  allowedRoles: Role[]
   children: React.ReactNode
 }
 
