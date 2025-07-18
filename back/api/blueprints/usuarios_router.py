@@ -24,4 +24,5 @@ def read_users_me(current_user: Usuario = Depends(obtener_usuario_actual)):
     # 3. Nos devuelve el objeto `Usuario` completo.
     # Simplemente lo retornamos. FastAPI y Pydantic se encargarán de convertirlo
     # al formato JSON definido en `UsuarioResponse`.
+    print (f"Usuario actual: {current_user.nombre_usuario} (ID: {current_user.id})")
     return current_user
