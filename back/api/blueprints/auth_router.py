@@ -14,7 +14,7 @@ from back.security import (
     es_admin, obtener_usuario_actual # <--- Usamos el nombre correcto
 )
 from back.gestion.seguridad import llave_maestra_manager
-from back.gestion import auth_manager # <--- Importamos nuestra nueva lógica de negocio
+from back.gestion.admin import auth_manager # <--- Importamos nuestra nueva lógica de negocio
 from back.schemas.caja_schemas import RespuestaGenerica
 from back.modelos import Usuario # Importamos el modelo para usarlo en las dependencias
 
