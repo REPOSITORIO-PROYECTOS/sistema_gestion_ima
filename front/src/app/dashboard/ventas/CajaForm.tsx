@@ -1,7 +1,10 @@
+"use client";
+
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
+import { useAuthStore } from "@/lib/authStore";
 
 interface CajaFormProps {
   cajaAbierta: boolean;
@@ -14,126 +17,121 @@ export default function CajaForm({
   onAbrirCaja,
   /* onCerrarCaja, */
 }: CajaFormProps) {
+  const token = useAuthStore((state) => state.token);
 
-  // Funcion de Fecha y Hora
+  const [nombre, setNombre] = useState("");
+  const [montoInicial, setMontoInicial] = useState("");
+  const [llave, setLlave] = useState("");
+
   const [fechaActual, setFechaActual] = useState("");
   const [horaActual, setHoraActual] = useState("");
-  useEffect(() => {
-      const updateDateTime = () => {
-      const now = new Date();
 
+  useEffect(() => {
+    const updateDateTime = () => {
+      const now = new Date();
       setFechaActual(
-          now.toLocaleDateString("es-AR", {
+        now.toLocaleDateString("es-AR", {
           day: "2-digit",
           month: "2-digit",
           year: "numeric",
-          })
+        })
       );
-
       setHoraActual(
-          now.toLocaleTimeString("es-AR", {
+        now.toLocaleTimeString("es-AR", {
           hour: "2-digit",
           minute: "2-digit",
-          })
+        })
       );
-      };
+    };
 
-      updateDateTime();
-
-      const interval = setInterval(updateDateTime, 60 * 1000);
-      return () => clearInterval(interval);
+    updateDateTime();
+    const interval = setInterval(updateDateTime, 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
-
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onAbrirCaja();
 
-  }
+    if (!token) {
+      alert("No se encontró el token.");
+      return;
+    }
 
-  /* const handleSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
+    if (!nombre || !montoInicial || !llave) {
+      alert("Por favor completá todos los campos.");
+      return;
+    }
 
-      const token = localStorage.getItem("admin_token");
-      if (!token) {
-          alert("No se encontró el token de administrador.");
-          return;
+    try {
+      const res = await fetch("https://sistema-ima.sistemataup.online/api/auth/validar-llave", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Admin-Token": token,
+        },
+        body: JSON.stringify({ llave }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(`⛔ Error: ${data.detail || "Llave incorrecta."}`);
+        return;
       }
 
-      if (cajaAbierta) {
-          // Cerrar caja
-          const payload = {
-          id_sesion: 123,
-          saldo_final_contado: 5500,
-          usuario_cierre: "Pepe",
-          };
+      console.log("🔓 Respuesta del backend:", data);
 
-          const res = await fetch("http://localhost:8000/admin/caja/cerrar", {
-          method: "POST",
-          headers: {
-              "Content-Type": "application/json",
-              "X-Admin-Token": token,
-          },
-          body: JSON.stringify(payload),
-          });
+      alert("✅ Caja abierta correctamente.");
+      onAbrirCaja();
 
-          if (!res.ok) {
-          const error = await res.json();
-          alert(`Error: ${error.detail}`);
-          return;
-          }
+      // (Opcional) Podés loguear esto en tu backend también:
+      console.table({
+        nombre,
+        montoInicial,
+        llave,
+        fechaActual,
+        horaActual,
+      });
 
-          const data = await res.json();
-          console.log(data);
-          alert("Caja cerrada correctamente.");
-          onCerrarCaja();
-
-      } else {
-          // Abrir caja
-          const payload = {
-          usuario_apertura: "Pepe",
-          monto_inicial: 5000,
-          };
-
-          const res = await fetch("http://localhost:8000/admin/caja/abrir", {
-          method: "POST",
-          headers: {
-              "Content-Type": "application/json",
-              "X-Admin-Token": token,
-          },
-          body: JSON.stringify(payload),
-          });
-
-          if (!res.ok) {
-          const error = await res.json();
-          alert(`Error: ${error.detail}`);
-          return;
-          }
-
-          const data = await res.json();
-          console.log(data);
-          alert("Caja abierta correctamente.");
-          onAbrirCaja();
-      }
-  }; */
-
+    } catch (err) {
+      console.error("Error validando llave:", err);
+      alert("Ocurrió un error al validar la llave.");
+    }
+  };
 
   return (
-    <form /* onSubmit={handleSubmit} */>
+    <form onSubmit={handleSubmit}>
       <div className="grid gap-6 py-4">
         <div className="flex flex-row items-center justify-between gap-4">
           <Label className="text-right sm:text-lg">Nombre</Label>
-          <Input placeholder="Pepe Prueba" className="w-full max-w-2/3" />
+          <Input
+            placeholder="Pepe Prueba"
+            className="w-full max-w-2/3"
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+          />
         </div>
 
         <div className="flex flex-row items-center justify-between gap-4">
           <Label className="text-right sm:text-lg">Monto Inicial</Label>
-          <Input placeholder="Valor de la caja al momento de la apertura" className="w-full max-w-2/3" />
+          <Input
+            type="number"
+            placeholder="Valor de la caja"
+            className="w-full max-w-2/3"
+            value={montoInicial}
+            onChange={(e) => setMontoInicial(e.target.value)}
+          />
         </div>
 
         <div className="flex flex-row items-center justify-between gap-4">
-          <Label className="text-right sm:text-lg">Contraseña</Label>
-          <Input placeholder="Clave Maestra?" className="w-full max-w-2/3" />
+          <Label className="text-right sm:text-lg">Llave Maestra</Label>
+          <Input
+            type="password"
+            placeholder="Clave del día"
+            className="w-full max-w-2/3"
+            value={llave}
+            onChange={(e) => setLlave(e.target.value)}
+          />
         </div>
 
         <div className="flex flex-row items-center justify-between gap-4">
@@ -156,8 +154,8 @@ export default function CajaForm({
       </div>
 
       <div className="flex justify-end mt-4">
-        <Button type="submit" variant="success" className="w-full" onClick={handleSubmit} >
-          {cajaAbierta ? "Cerrar Caja" : "Abrir Caja"} 
+        <Button type="submit" variant="success" className="w-full">
+          {cajaAbierta ? "Cerrar Caja" : "Abrir Caja"}
         </Button>
       </div>
     </form>

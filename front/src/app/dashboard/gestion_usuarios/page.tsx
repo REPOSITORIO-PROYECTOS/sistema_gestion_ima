@@ -27,18 +27,22 @@ export default function GestionUsuarios() {
   const token = useAuthStore((state) => state.token);
 
   useEffect(() => {
+    
     if (!token) return;
 
     const fetchLlave = async () => {
       try {
-        const res = await fetch("https://sistema-ima.sistemataup.online/api/caja/llave-maestra", {
+        const res = await fetch("https://sistema-ima.sistemataup.online/api/auth/llave-actual", {
           headers: {
             'x-admin-token': token,
           },
         });
+
         if (!res.ok) throw new Error("Error al obtener la llave");
         const data = await res.json();
-        setLlaveMaestra(data.llave || "");
+        setLlaveMaestra(data.llave_maestra || "No Disponible");
+        console.log(data.llave_maestra)
+
       } catch (error) {
         console.error("Error al traer la llave:", error);
         setLlaveMaestra("Error");

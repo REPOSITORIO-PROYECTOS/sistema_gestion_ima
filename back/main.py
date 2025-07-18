@@ -27,6 +27,7 @@ origins = [
     "https://swingjugos.netlify.app",
     "https://sistema-ima.sistemataup.online",
     "https://www.sistema-ima.sistemataup.online",
+    "https://imaconsultora.netlify.app",
 ]
 
 app.add_middleware(
