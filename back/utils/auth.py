@@ -34,29 +34,21 @@ def _cargar_token_data():
 
 def autenticar_usuario(nombre_usuario: str, password: str):
     """
-    Busca al usuario en la base de datos y verifica su contraseña.
-
-    Args:
-        nombre_usuario (str): El nombre de usuario a buscar.
-        password (str): La contraseña en texto plano a verificar.
-
-    Returns:
-        dict: Un diccionario con los datos del usuario si la autenticación es exitosa.
-        None: Si el usuario no existe o la contraseña es incorrecta.
+    Busca al usuario en la base de datos y verifica su contraseña. (VERSIÓN CORREGIDA)
     """
     conn = get_db_connection()
     if not conn:
-        # No se pudo conectar a la DB, no se puede autenticar
         return None
 
     try:
         cursor = conn.cursor(dictionary=True)
         
-        # Consulta para obtener el usuario y su rol
+        # Consulta corregida para usar los nombres de columna correctos:
+        # u.id, r.nombre, y el JOIN con r.id
         query = """
-            SELECT u.id_usuario, u.nombre_usuario, u.password_hash, r.nombre_rol
+            SELECT u.id, u.nombre_usuario, u.password_hash, r.nombre AS nombre_rol
             FROM usuarios u
-            JOIN roles r ON u.id_rol = r.id_rol
+            JOIN roles r ON u.id_rol = r.id
             WHERE u.nombre_usuario = %s
         """
         
@@ -64,18 +56,17 @@ def autenticar_usuario(nombre_usuario: str, password: str):
         user_data = cursor.fetchone()
         
         if not user_data:
-            # Usuario no encontrado
+            print(f"DEBUG: Usuario '{nombre_usuario}' no encontrado en la base de datos.") # Debug
             return None
         
         # Verificar la contraseña
         if not verificar_password(password, user_data['password_hash']):
-            # Contraseña incorrecta
+            print(f"DEBUG: Contraseña incorrecta para el usuario '{nombre_usuario}'.") # Debug
             return None
         
-        # ¡Autenticación exitosa! Devolvemos los datos del usuario
-        # Excluimos la contraseña hasheada por seguridad
+        # ¡Autenticación exitosa!
         return {
-            "id_usuario": user_data['id_usuario'],
+            "id_usuario": user_data['id'],
             "nombre_usuario": user_data['nombre_usuario'],
             "nombre_rol": user_data['nombre_rol']
         }
