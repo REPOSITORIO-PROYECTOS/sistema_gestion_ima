@@ -22,6 +22,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     Recibe 'username' y 'password' en un formulario, valida al usuario
     y devuelve un token JWT si es correcto.
     """
+    print("DEBUG: ANTES De llamar a la func")
     # Esta función de negocio validará el usuario y contraseña contra la DB
     user = autenticar_usuario(form_data.username, form_data.password)
     print("DEBUG: ANTES DEL NOT ES USER")
