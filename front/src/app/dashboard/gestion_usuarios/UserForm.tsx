@@ -12,10 +12,11 @@ import {
   SelectItem
 } from "@/components/ui/select";
 import { Eye, EyeOff } from "lucide-react";
+import { Role } from "@/lib/authStore";
 
-type Role = { id: number; nombre: string };
 
 export default function UserForm() {
+  
   const [nombre_usuario, setNombreUsuario] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -68,7 +69,6 @@ export default function UserForm() {
         body: JSON.stringify(newUser),
       });
 
-      console.log(JSON.stringify(newUser))
 
       if (!res.ok) {
         const errorData = await res.json();
@@ -82,10 +82,11 @@ export default function UserForm() {
       alert("Usuario creado exitosamente ✅");
 
       // Resetear formulario
-      setNombreUsuario(""); // ← Este también estaba mal antes
+      setNombreUsuario("");
       setPassword("");
       setConfirm("");
       setSelectedRoleId(undefined);
+
     } catch (error) {
       console.error("⚠️ Error inesperado:", error);
       alert("Ocurrió un error inesperado.");

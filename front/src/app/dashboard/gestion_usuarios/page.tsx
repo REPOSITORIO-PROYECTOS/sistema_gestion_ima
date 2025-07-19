@@ -12,22 +12,18 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import UserForm from "./UserForm";
 import { Input } from "@/components/ui/input";
-import { useEffect, useState, /* useState  */} from "react";
+import { useEffect, useState } from "react";
 import { useAuthStore } from "@/lib/authStore";
-
-// Reemplazar esto por los usuarios reales - BDD o Zustand
-  const usuarios = [ 
-    { id: 1, nombre: 'Juan Pérez', email: 'juan@example.com', rol: 'Admin' },
-    { id: 2, nombre: 'María López', email: 'maria@example.com', rol: 'Empleado' },
-  ]
+import { Usuario } from "@/lib/authStore";
 
 export default function GestionUsuarios() {
 
   const [llaveMaestra, setLlaveMaestra] = useState("");
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const token = useAuthStore((state) => state.token);
 
+  // Fetch de llave maestra
   useEffect(() => {
-    
     if (!token) return;
 
     const fetchLlave = async () => {
@@ -41,8 +37,6 @@ export default function GestionUsuarios() {
         if (!res.ok) throw new Error("Error al obtener la llave");
         const data = await res.json();
         setLlaveMaestra(data.llave_maestra || "No Disponible");
-        console.log(data.llave_maestra)
-
       } catch (error) {
         console.error("Error al traer la llave:", error);
         setLlaveMaestra("Error");
@@ -52,10 +46,33 @@ export default function GestionUsuarios() {
     fetchLlave();
   }, [token]);
 
+  // GET - Usuarios de la app
+  useEffect(() => {
+    if (!token) return;
+
+    const fetchUsuarios = async () => {
+      try {
+        const res = await fetch("https://sistema-ima.sistemataup.online/api/admin/usuarios", {
+          headers: {
+            'x-admin-token': token,
+          },
+        });
+
+        if (!res.ok) throw new Error("Error al obtener usuarios");
+        const data = await res.json();
+        setUsuarios(data); 
+        console.log(data)
+      } catch (error) {
+        console.error("Error al traer usuarios:", error);
+        setUsuarios([]);
+      }
+    };
+
+    fetchUsuarios();
+  }, [token]);
+
   return (
-
     <div className="flex flex-col gap-6 p-2">
-
       {/* Header */}
       <div className="space-y-2">
         <h2 className="text-3xl font-bold text-green-950">Gestión de Usuarios</h2>
@@ -68,9 +85,9 @@ export default function GestionUsuarios() {
         {/* Botón + Modal */}
         <Dialog>
           <DialogTrigger asChild>
-            <Button variant="success" className="w-full !py-6 sm:!max-w-1/3">+ Crear nuevo usuario</Button>
+            <Button variant="success" className="w-full !py-6 sm:!max-w-1/4">+ Crear nuevo usuario</Button>
           </DialogTrigger>
-          <DialogContent >
+          <DialogContent>
             <DialogHeader>
               <DialogTitle>Crear Usuario</DialogTitle>
               <DialogDescription>Completá los datos para agregar un nuevo usuario al sistema.</DialogDescription>
@@ -80,41 +97,44 @@ export default function GestionUsuarios() {
         </Dialog>
 
         {/* Llave Maestra */}
-        <div className="flex flex-col sm:flex-row items-center bg-green-100 rounded-lg p-4 gap-4 w-full sm:max-w-2/3 md:max-w-1/3">
+        <div className="flex flex-col sm:flex-row items-center bg-green-100 rounded-lg px-4 py-3 gap-4 w-full sm:max-w-2/3 md:max-w-1/4">
           <h2 className="text-xl font-bold text-green-950 w-2/3">Llave Caja:</h2>
           <Input
             type="text"
             value={llaveMaestra}
             disabled
-            className="border-2 border-green-800"
+            className="border-2 border-green-800 text-center w-1/2"
           />
         </div>
       </div>
 
-      {/* ACA AGREGAR LOGICA PARA MOSTRAR LOS USUARIOS QUE SE VAN CREANDO!!! */}
-
       {/* Tabla de usuarios */}
       <div className="border rounded-lg overflow-hidden">
         <Table>
+
           <TableHeader>
             <TableRow>
               <TableHead>Nombre</TableHead>
-              <TableHead>Email</TableHead>
               <TableHead>Rol</TableHead>
             </TableRow>
           </TableHeader>
+
           <TableBody>
-            {usuarios.map((user) => (
-              <TableRow key={user.id}>
-                <TableCell>{user.nombre}</TableCell>
-                <TableCell>{user.email}</TableCell>
-                <TableCell>{user.rol}</TableCell>
+            {usuarios.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={2} className="text-center">No hay usuarios disponibles.</TableCell>
               </TableRow>
-            ))}
+            ) : (
+              usuarios.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell>{user.nombre_usuario}</TableCell>
+                  <TableCell>{user.rol.nombre}</TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
-
     </div>
   );
 }
