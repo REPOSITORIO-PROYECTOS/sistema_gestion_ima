@@ -54,8 +54,8 @@ async def login_for_access_token(
     
     return {"access_token": access_token, "token_type": "bearer"}
 
-@router.post("/validar-llave", response_model=RespuestaGenerica)
-def api_validar_llave_maestra(
+@router.post("/validar-llave", response_model=RespuestaGenerica,)
+def api_validar_llave_maestra(db: Session = Depends(get_db),
     llave: str = Body(..., embed=True, description="La llave maestra a validar"),
     # CORRECCIÓN: Usamos `obtener_usuario_actual` y especificamos el tipo de retorno
     #current_user: Usuario = Depends(obtener_usuario_actual) 
@@ -63,7 +63,7 @@ def api_validar_llave_maestra(
     """
     Valida si la llave proporcionada coincide con la llave maestra del día.
     """
-    es_valida = llave_maestra_manager.validar_llave_maestra(llave)
+    es_valida = llave_maestra_manager.validar_llave_maestra(llave,db)
     if es_valida:
         return RespuestaGenerica(status="success", message="Llave maestra correcta. Operación autorizada.")
     else:
