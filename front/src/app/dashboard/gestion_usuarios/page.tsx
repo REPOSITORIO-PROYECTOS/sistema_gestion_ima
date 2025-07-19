@@ -8,6 +8,12 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import UserForm from "./UserForm";
@@ -76,7 +82,7 @@ export default function GestionUsuarios() {
       {/* Header */}
       <div className="space-y-2">
         <h2 className="text-3xl font-bold text-green-950">Gestión de Usuarios</h2>
-        <p className="text-muted-foreground">Administrá los usuarios de la aplicación.</p>
+        <p className="text-muted-foreground">Administrá los usuarios de tu aplicación.</p>
       </div>
 
       {/* Header de la Tabla */}
@@ -85,7 +91,7 @@ export default function GestionUsuarios() {
         {/* Botón + Modal */}
         <Dialog>
           <DialogTrigger asChild>
-            <Button variant="success" className="w-full !py-6 sm:!max-w-1/4">+ Crear nuevo usuario</Button>
+            <Button variant="success" className="w-full !py-6 sm:!max-w-1/4 text-lg font-semibold">+ Crear nuevo usuario</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -97,15 +103,24 @@ export default function GestionUsuarios() {
         </Dialog>
 
         {/* Llave Maestra */}
-        <div className="flex flex-col sm:flex-row items-center bg-green-100 rounded-lg px-4 py-3 gap-4 w-full sm:max-w-2/3 md:max-w-1/4">
-          <h2 className="text-xl font-bold text-green-950 w-2/3">Llave Caja:</h2>
-          <Input
-            type="text"
-            value={llaveMaestra}
-            disabled
-            className="border-2 border-green-800 text-center w-1/2"
-          />
-        </div>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex flex-col sm:flex-row items-center bg-green-100 rounded-lg px-4 py-3 gap-4 w-full sm:max-w-2/3 md:max-w-1/4 cursor-help">
+                <h2 className="text-xl font-bold text-green-950 w-2/3">Llave Caja:</h2>
+                <Input
+                  type="text"
+                  value={llaveMaestra}
+                  disabled
+                  className="border-2 border-green-800 text-center w-1/2"
+                />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="bg-green-200 text-green-900">
+              Con esta llave podés abrir la caja en la sección Ventas.
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
 
       {/* Tabla de usuarios */}
@@ -114,8 +129,8 @@ export default function GestionUsuarios() {
 
           <TableHeader>
             <TableRow>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Rol</TableHead>
+              <TableHead className="px-4">Nombre</TableHead>
+              <TableHead className="px-4">Rol</TableHead>
             </TableRow>
           </TableHeader>
 
@@ -127,8 +142,8 @@ export default function GestionUsuarios() {
             ) : (
               usuarios.map((user) => (
                 <TableRow key={user.id}>
-                  <TableCell>{user.nombre_usuario}</TableCell>
-                  <TableCell>{user.rol.nombre}</TableCell>
+                  <TableCell className="px-4">{user.nombre_usuario}</TableCell>
+                  <TableCell className="px-4">{user.rol.nombre}</TableCell>
                 </TableRow>
               ))
             )}
