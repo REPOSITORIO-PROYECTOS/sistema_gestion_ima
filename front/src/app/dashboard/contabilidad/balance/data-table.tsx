@@ -65,19 +65,24 @@ export function DataTable<TData, TValue>({
 
     <div>
 
+        <h2 className="text-2xl font-semibold text-green-950 text-center md:hidden my-4">Tabla de Balance</h2>
+
         {/* Inputs de Filtrado */}
-        <div className="flex flex-row justify-between gap-2 pb-4">
+        <div className="flex flex-col sm:flex-row justify-between gap-2 pb-4">
 
             {/* Input de Búsqueda por cliente */}
-            <Input placeholder="Filtrar por Usuario" value={(table.getColumn("usuario")?.getFilterValue() as string) ?? ""}
-            onChange={(event) => table.getColumn("usuario")?.setFilterValue(event.target.value)} className="w-1/2 md:max-w-1/4" />
+            <Input placeholder="Filtrar por Usuario" 
+                value={(table.getColumn("usuario")?.getFilterValue() as string) ?? ""}
+                onChange={(event) => table.getColumn("usuario")?.setFilterValue(event.target.value)} 
+                className="w-full sm:w-1/2 md:max-w-1/4" 
+            />
 
             {/* Input de Seleccion por status */}
             <Select value={currentStatus} onValueChange={(value) => {
             setCurrentStatus(value)
             table.getColumn("tipoUsuario")?.setFilterValue(value === "all" ? undefined : value)}}>
 
-                <SelectTrigger className="w-1/2 md:max-w-1/4 cursor-pointer">
+                <SelectTrigger className="w-full sm:w-1/2 md:max-w-1/4 cursor-pointer">
                     <SelectValue placeholder="Usuario"/>
                 </SelectTrigger>
 

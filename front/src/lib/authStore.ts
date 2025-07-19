@@ -1,9 +1,9 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-interface Usuario {
+export interface Usuario {
   id: number
-  nombre: string
+  nombre_usuario: string        // atento a que no rompa nada esto..
   apellido: string
   email: string
   rol: Role

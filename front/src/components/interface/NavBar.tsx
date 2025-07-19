@@ -159,10 +159,14 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                   onClick={() => {
                     useAuthStore.getState().logout();
                     router.push('/');
-                    
                   }}
                 >
                   Cerrar Sesión
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => { router.push('/dashboard/gestion_usuarios'); }}
+                >
+                  Gestión de Usuarios
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

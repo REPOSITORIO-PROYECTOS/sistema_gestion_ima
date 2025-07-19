@@ -61,41 +61,49 @@ export function DataTable<TData, TValue>({
         },
     })
 
-
     return (
 
     <div>
 
-        {/* Inputs de Filtrado */}
-        <div className="flex flex-row justify-between gap-2 pb-4">
+        <h2 className="text-2xl font-semibold text-green-950 text-center md:hidden my-4">Tabla de Clientes</h2>
 
-            {/* Input de Búsqueda por cliente */}
-            <Input placeholder="Filtrar por Cliente" value={(table.getColumn("cliente")?.getFilterValue() as string) ?? ""}
-            onChange={(event) => table.getColumn("cliente")?.setFilterValue(event.target.value)} className="w-1/2 md:max-w-1/4" />
+        {/* Inputs de Filtrado */}
+        <div className="flex flex-col sm:flex-row justify-between gap-2 pb-4">
+
+            {/* Input de Búsqueda por cliente / razon social */}
+            <Input
+                value={(table.getColumn("nombre_razon_social")?.getFilterValue() as string) ?? ""}
+                placeholder="Filtrar por Razón Social"
+                onChange={(event) =>
+                    table.getColumn("nombre_razon_social")?.setFilterValue(event.target.value)
+                }
+                className="w-full sm:w-1/2 md:max-w-1/4"
+            />
 
             {/* Input de Seleccion por status */}
-            <Select value={currentStatus} onValueChange={(value) => {
-            setCurrentStatus(value)
-            table.getColumn("producto")?.setFilterValue(value === "all" ? undefined : value)}}>
-
-                <SelectTrigger className="w-1/2 md:max-w-1/4 cursor-pointer">
-                    <SelectValue placeholder="Producto"/>
+            <Select
+                value={currentStatus}
+                onValueChange={(value) => {
+                    setCurrentStatus(value);
+                    table.getColumn("cuit")?.setFilterValue(
+                    value === "all" ? undefined : value === "con" ? "con" : "sin"
+                    );
+                }}
+                >
+                <SelectTrigger className="w-full sm:w-1/2 md:max-w-1/6 cursor-pointer">
+                    <SelectValue placeholder="Filtrar por CUIT" />
                 </SelectTrigger>
 
                 <SelectContent>
                     <SelectGroup>
-                        <SelectLabel>Producto</SelectLabel>
-                        <SelectItem value="all">Todos</SelectItem>
-                        <SelectItem value="Jugo Naranja">Jugo Naranja</SelectItem>
-                        <SelectItem value="Jugo Manzana">Jugo Manzana</SelectItem>
-                        <SelectItem value="Jugo Durazno">Jugo Durazno</SelectItem>
-                        <SelectItem value="Jugo Multifruta">Jugo Multifruta</SelectItem>
+                    <SelectLabel>CUIT</SelectLabel>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="con">Con CUIT</SelectItem>
+                    <SelectItem value="sin">Sin CUIT</SelectItem>
                     </SelectGroup>
                 </SelectContent>
-
             </Select>
         </div>
-
 
         {/* Tabla */}
         <div className="rounded-md border">
@@ -107,7 +115,7 @@ export function DataTable<TData, TValue>({
                     <TableRow key={headerGroup.id}>
                     {headerGroup.headers.map((header) => {
                         return (
-                        <TableHead key={header.id}>
+                        <TableHead key={header.id} className="px-4">
                             {header.isPlaceholder
                             ? null
                             : flexRender(
@@ -145,7 +153,6 @@ export function DataTable<TData, TValue>({
                 )}
                 </TableBody>
             </Table>
-
 
             {/* Footer Tabla */}
             <div className="flex flex-col sm:flex-row justify-between items-center m-2">
@@ -191,7 +198,7 @@ export function DataTable<TData, TValue>({
             </div>
 
         </div>
-
+        
     </div>
     )
 }

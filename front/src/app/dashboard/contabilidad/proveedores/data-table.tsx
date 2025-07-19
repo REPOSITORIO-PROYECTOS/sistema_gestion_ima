@@ -75,6 +75,8 @@ export function DataTable<TData, TValue>({
 
     <div>
 
+        <h2 className="text-2xl font-semibold text-green-950 text-center md:hidden my-4">Tabla de Proveedores</h2>
+
         {/* Selectores Filtrado */}
         <div className="flex flex-col md:flex-row-reverse justify-between gap-2 pb-4">
 
@@ -120,19 +122,21 @@ export function DataTable<TData, TValue>({
                 </DialogContent>
             </Dialog>
 
-            <div className="flex flex-row justify-between items-center md:justify-start gap-2 w-full">
+            <div className="flex flex-col sm:flex-row justify-between items-center md:justify-start gap-2 w-full">
 
                 {/* Input de Búsqueda por proveedor */}
-                <Input placeholder="Filtrar por Proveedor" value={(table.getColumn("proveedor")?.getFilterValue() as string) ?? ""}
-                onChange={(event) => table.getColumn("proveedor")?.setFilterValue(event.target.value)} className="w-1/2 md:max-w-1/4" />
-
+                <Input placeholder="Filtrar por Proveedor" 
+                    value={(table.getColumn("proveedor")?.getFilterValue() as string) ?? ""}
+                    onChange={(event) => table.getColumn("proveedor")?.setFilterValue(event.target.value)} 
+                    className="w-full sm:w-1/2 md:max-w-1/4" 
+                />
 
                 {/* Input de Seleccion por status */}
                 <Select value={currentStatus} onValueChange={(value) => {
                 setCurrentStatus(value)
                 table.getColumn("producto")?.setFilterValue(value === "all" ? undefined : value)}}>
 
-                    <SelectTrigger className="w-1/2 md:max-w-1/4 cursor-pointer">
+                    <SelectTrigger className="w-full sm:w-1/2 md:max-w-1/4 cursor-pointer">
                         <SelectValue placeholder="Materia Prima"/>
                     </SelectTrigger>
 
@@ -150,7 +154,6 @@ export function DataTable<TData, TValue>({
 
             </div>
         </div>
-
 
         {/* Tabla */}
         <div className="rounded-md border">
