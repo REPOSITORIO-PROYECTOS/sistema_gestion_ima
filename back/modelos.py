@@ -166,3 +166,11 @@ class VentaDetalle(SQLModel, table=True):
     id_articulo: int = Field(foreign_key="articulos.id")
     
     venta: Venta = Relationship(back_populates="items")
+    
+    
+class LlaveMaestra(SQLModel, table=True):
+    __tablename__ = "llave_maestra" # Nombre de tabla explícito
+    id: Optional[int] = Field(default=None, primary_key=True)
+    llave: str = Field(index=True, unique=True)
+    fecha_creacion: datetime = Field(default_factory=datetime.utcnow)
+    fecha_expiracion: datetime
