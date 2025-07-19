@@ -5,9 +5,11 @@
 
 from mysql.connector import Error
 from sqlmodel import Session, select
-from back.modelos import Articulo
+from back.modelos import Articulo, ArticuloCodigo
 from back.utils.mysql_handler import get_db_connection
 from typing import Optional
+from sqlalchemy.orm import selectinload
+
 
 
 def obtener_articulo_por_id(id_articulo: str):
@@ -165,3 +167,105 @@ def eliminar_articulo(id_articulo: str):
         if conn.is_connected():
             cursor.close()
             conn.close()
+            
+def obtener_articulo_por_codigo_barras(db: Session, codigo_barras: str) -> Optional[Articulo]:
+    """
+    Busca un único artículo por su código de barras.
+    La búsqueda distingue mayúsculas/minúsculas y espacios, debe ser exacta.
+    Devuelve el objeto Articulo o None si no se encuentra.
+    """
+    statement = (
+        select(Articulo)
+        .where(Articulo.codigo_barras == codigo_barras)
+        .where(Articulo.activo == True) # Importante: solo buscar artículos activos
+        .options(selectinload('*')) # Opcional: Cargar relaciones si es necesario para la venta
+    )
+    
+    articulo = db.exec(statement).first()
+    return articulo
+
+def anadir_codigo_a_articulo(db: Session, articulo_id: int, nuevo_codigo: str) -> ArticuloCodigo:
+    """Añade un nuevo código de barras a un artículo existente."""
+    
+    # 1. Verificar si el artículo existe
+    articulo = db.get(Articulo, articulo_id)
+    if not articulo:
+        raise ValueError("El artículo no existe.")
+        
+    # 2. Verificar si el código ya está en uso por OTRO artículo
+    codigo_existente = db.get(ArticuloCodigo, nuevo_codigo)
+    if codigo_existente:
+        raise ValueError(f"El código '{nuevo_codigo}' ya está asignado a otro artículo.")
+
+    # 3. Crear y guardar el nuevo código
+    nuevo_codigo_obj = ArticuloCodigo(codigo=nuevo_codigo, id_articulo=articulo_id)
+    db.add(nuevo_codigo_obj)
+    db.commit()
+    db.refresh(nuevo_codigo_obj)
+    
+    return nuevo_codigo_obj
+
+def eliminar_codigo_de_articulo(db: Session, codigo_a_borrar: str) -> bool:
+    """Elimina un código de barras."""
+    codigo_obj = db.get(ArticuloCodigo, codigo_a_borrar)
+    if not codigo_obj:
+        return False # No se encontró el código
+
+    db.delete(codigo_obj)
+    db.commit()
+    return True
+
+def _recalcular_precio_venta(articulo: Articulo):
+    """
+    Función interna para recalcular el precio de venta de un artículo.
+    No guarda en la BD, solo modifica el objeto.
+    """
+    if not articulo.auto_actualizar_precio:
+        return # Si está en modo manual, no hacemos nada
+
+    if articulo.factor_conversion <= 0:
+        # Evitar división por cero
+        costo_unitario_venta = articulo.precio_costo
+    else:
+        # El costo por unidad de venta (la "división")
+        costo_unitario_venta = articulo.precio_costo / articulo.factor_conversion
+
+    # Aplicamos el margen de ganancia
+    precio_con_margen = costo_unitario_venta * (1 + articulo.margen_ganancia)
+    
+    # Aplicamos el impuesto (el IVA de AFIP)
+    precio_final = precio_con_margen * (1 + articulo.tasa_iva)
+    
+    # Actualizamos el precio de venta del artículo, redondeando a 2 decimales
+    articulo.precio_venta = round(precio_final, 2)
+
+# Ahora, en tu función de crear o actualizar, llamas a esta ayuda:
+def crear_articulosa(db: Session, articulo_data: ArticuloCreate) -> Articulo:
+    # ... (validaciones de código duplicado)
+    
+    db_articulo = Articulo.from_orm(articulo_data)
+    
+    # ¡Llamamos al calculador antes de guardar!
+    _recalcular_precio_venta(db_articulo)
+    
+    db.add(db_articulo)
+    db.commit()
+    db.refresh(db_articulo)
+    return db_articulo
+
+def actualizar_articulo(db: Session, articulo_id: int, articulo_data: ArticuloUpdate) -> Optional[Articulo]:
+    db_articulo = db.get(Articulo, articulo_id)
+    if not db_articulo:
+        return None
+
+    update_data = articulo_data.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_articulo, key, value)
+        
+    # ¡Llamamos al calculador antes de guardar!
+    _recalcular_precio_venta(db_articulo)
+
+    db.add(db_articulo)
+    db.commit()
+    db.refresh(db_articulo)
+    return db_articulo

@@ -1,11 +1,13 @@
 # /home/sgi_user/proyectos/sistema_gestion_ima/back/modelos.py
-# VERSIÓN COMPLETA CON RELACIONES BIDIRECCIONALES Y LLAVE MAESTRA
+# VERSIÓN FINAL UNIFICADA CON MÓDULO DE INVENTARIO AVANZADO
 
 from datetime import datetime, date
 from typing import List, Optional
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Field, Relationship, SQLModel, JSON, Column
 
-# --- MODELOS DE ENTIDADES PRINCIPALES ---
+# ===================================================================
+# === MODELOS DE ENTIDADES PRINCIPALES
+# ===================================================================
 
 class Rol(SQLModel, table=True):
     __tablename__ = "roles"
@@ -25,15 +27,8 @@ class Usuario(SQLModel, table=True):
     id_rol: int = Field(foreign_key="roles.id")
     rol: Rol = Relationship(back_populates="usuarios")
 
-    # --- Relaciones Inversas ---
-    sesiones_abiertas: List["CajaSesion"] = Relationship(
-        back_populates="usuario_apertura",
-        sa_relationship_kwargs={'foreign_keys': '[CajaSesion.id_usuario_apertura]'}
-    )
-    sesiones_cerradas: List["CajaSesion"] = Relationship(
-        back_populates="usuario_cierre",
-        sa_relationship_kwargs={'foreign_keys': '[CajaSesion.id_usuario_cierre]'}
-    )
+    sesiones_abiertas: List["CajaSesion"] = Relationship(back_populates="usuario_apertura", sa_relationship_kwargs={'foreign_keys': '[CajaSesion.id_usuario_apertura]'})
+    sesiones_cerradas: List["CajaSesion"] = Relationship(back_populates="usuario_cierre", sa_relationship_kwargs={'foreign_keys': '[CajaSesion.id_usuario_cierre]'})
     movimientos_de_caja: List["CajaMovimiento"] = Relationship(back_populates="usuario")
     movimientos_de_stock: List["StockMovimiento"] = Relationship(back_populates="usuario")
     compras_registradas: List["Compra"] = Relationship(back_populates="usuario")
@@ -63,44 +58,119 @@ class Tercero(SQLModel, table=True):
 
     compras_realizadas: List["Compra"] = Relationship(back_populates="proveedor")
     ventas_recibidas: List["Venta"] = Relationship(back_populates="cliente")
+    articulos_proveidos: List["Articulo"] = Relationship(back_populates="proveedor_principal")
 
 class Categoria(SQLModel, table=True):
     __tablename__ = "categorias"
     id: Optional[int] = Field(default=None, primary_key=True)
     nombre: str = Field(unique=True)
-    
     articulos: List["Articulo"] = Relationship(back_populates="categoria")
 
 class Marca(SQLModel, table=True):
     __tablename__ = "marcas"
     id: Optional[int] = Field(default=None, primary_key=True)
     nombre: str = Field(unique=True)
-
     articulos: List["Articulo"] = Relationship(back_populates="marca")
+
+# ===================================================================
+# === MODELO DE ARTÍCULO Y GESTIÓN DE INVENTARIO
+# ===================================================================
 
 class Articulo(SQLModel, table=True):
     __tablename__ = "articulos"
     id: Optional[int] = Field(default=None, primary_key=True)
-    codigo_barras: Optional[str] = Field(index=True, unique=True)
+    
+    # --- Identificadores Múltiples ---
+    codigo_interno: Optional[str] = Field(index=True, unique=True, nullable=True)
+    codigo_proveedor: Optional[str] = Field(index=True, nullable=True)
+
     descripcion: str
-    precio_costo: float = Field(default=0.0)
-    precio_venta: float
-    venta_negocio: float = Field(default=0.0)
+    
+    # --- Unidades de Compra y Venta (La "División") ---
+    unidad_compra: str = Field(default="Unidad")
+    unidad_venta: str = Field(default="Unidad")
+    factor_conversion: float = Field(default=1.0, description="Cuántas unidades de venta hay en una unidad de compra.")
+    
+    # --- Componentes para el Cálculo de Precio (Los "Multiplicadores") ---
+    precio_costo: float = Field(default=0.0, description="Costo por UNIDAD DE COMPRA, sin IVA.")
+    tasa_iva: float = Field(default=0.21, description="La tasa de IVA aplicable, ej: 0.21 para 21%")
+    margen_ganancia: float = Field(default=0.0, description="El margen de ganancia deseado, ej: 0.30 para 30%")
+    
+    # --- Precio Final y Control ---
+    precio_venta: float = Field(description="Precio final por UNIDAD DE VENTA, con IVA incluido.")
+    auto_actualizar_precio: bool = Field(default=True, description="Si es True, el precio de venta se recalcula al cambiar costo o márgenes.")
+    
+    venta_negocio: float = Field(default=0.0) # Este campo podría ser para otros usos o descuentos
+    
+    # --- Stock (medido en UNIDAD DE VENTA) ---
     stock_actual: float = Field(default=0.0)
-    stock_minimo: Optional[float]
+    stock_minimo: Optional[float] = Field(description="Stock de alerta para reposición")
+    
+    # --- Reposición Automática ---
+    cantidad_minima_pedido: Optional[float]
+    cantidad_deseada_pedido: Optional[float]
+
+    # --- Atributos de Control ---
     activo: bool = Field(default=True)
+    es_combo: bool = Field(default=False)
     maneja_lotes: bool = Field(default=False)
     
+    # --- Relaciones ---
+    id_proveedor_principal: Optional[int] = Field(default=None, foreign_key="terceros.id")
     id_categoria: Optional[int] = Field(default=None, foreign_key="categorias.id")
     id_marca: Optional[int] = Field(default=None, foreign_key="marcas.id")
 
-    categoria: Optional[Categoria] = Relationship(back_populates="articulos")
-    marca: Optional[Marca] = Relationship(back_populates="articulos")
+    proveedor_principal: Optional["Tercero"] = Relationship(back_populates="articulos_proveidos")
+    categoria: Optional["Categoria"] = Relationship(back_populates="articulos")
+    marca: Optional["Marca"] = Relationship(back_populates="articulos")
+    
+    # Relación a la nueva tabla de códigos
+    codigos: List["ArticuloCodigo"] = Relationship(back_populates="articulo")
+    
     movimientos_stock: List["StockMovimiento"] = Relationship(back_populates="articulo")
-    items_compra: List["CompraDetalle"] = Relationship(back_populates="articulo")
-    items_venta: List["VentaDetalle"] = Relationship(back_populates="articulo")
+    items_compra: List["CompraDetalle"] = Relationship(back_populates="items_compra")
+    items_venta: List["VentaDetalle"] = Relationship(back_populates="items_venta")
+    componentes_combo: List["ArticuloCombo"] = Relationship(back_populates="combo_padre", sa_relationship_kwargs={'primaryjoin': 'Articulo.id == ArticuloCombo.id_articulo_padre'})
+    parte_de_combos: List["ArticuloCombo"] = Relationship(back_populates="componente_hijo", sa_relationship_kwargs={'primaryjoin': 'Articulo.id == ArticuloCombo.id_articulo_hijo'})
+    
+class DescuentoProveedor(SQLModel, table=True):
+    __tablename__ = "descuento_proveedor"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    id_proveedor: int = Field(foreign_key="terceros.id")
+    porcentaje_descuento: float
+    activo: bool = Field(default=True)
 
-# --- MODELOS DE OPERACIONES ---
+class PlantillaProveedor(SQLModel, table=True):
+    __tablename__ = "plantilla_proveedor"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    id_proveedor: int = Field(foreign_key="terceros.id")
+    nombre_plantilla: str
+    mapeo_columnas: dict = Field(sa_column=Column(JSON))
+
+class ArticuloCombo(SQLModel, table=True):
+    __tablename__ = "articulo_combo"
+    id_articulo_padre: int = Field(foreign_key="articulos.id", primary_key=True)
+    id_articulo_hijo: int = Field(foreign_key="articulos.id", primary_key=True)
+    cantidad: float = Field(description="Cantidad del hijo necesaria para 1 unidad del padre")
+
+    combo_padre: Articulo = Relationship(back_populates="componentes_combo", sa_relationship_kwargs={'primaryjoin': 'ArticuloCombo.id_articulo_padre == Articulo.id'})
+    componente_hijo: Articulo = Relationship(back_populates="parte_de_combos", sa_relationship_kwargs={'primaryjoin': 'ArticuloCombo.id_articulo_hijo == Articulo.id'})
+
+class ArticuloCodigo(SQLModel, table=True):
+    __tablename__ = "articulo_codigos"
+    
+    # El código de barras es la clave primaria. Debe ser único en toda la tabla.
+    codigo: str = Field(primary_key=True, index=True)
+    
+    id_articulo: int = Field(foreign_key="articulos.id")
+    
+    # La relación inversa para saber a qué artículo pertenece este código
+    articulo: "Articulo" = Relationship(back_populates="codigos")
+
+
+# ===================================================================
+# === MODELOS DE OPERACIONES Y MOVIMIENTOS
+# ===================================================================
 
 class CajaSesion(SQLModel, table=True):
     __tablename__ = "caja_sesiones"
@@ -116,14 +186,8 @@ class CajaSesion(SQLModel, table=True):
     id_usuario_apertura: int = Field(foreign_key="usuarios.id")
     id_usuario_cierre: Optional[int] = Field(default=None, foreign_key="usuarios.id")
     
-    usuario_apertura: Usuario = Relationship(
-        back_populates="sesiones_abiertas",
-        sa_relationship_kwargs={'foreign_keys': '[CajaSesion.id_usuario_apertura]'}
-    )
-    usuario_cierre: Optional[Usuario] = Relationship(
-        back_populates="sesiones_cerradas",
-        sa_relationship_kwargs={'foreign_keys': '[CajaSesion.id_usuario_cierre]'}
-    )
+    usuario_apertura: Usuario = Relationship(back_populates="sesiones_abiertas", sa_relationship_kwargs={'foreign_keys': '[CajaSesion.id_usuario_apertura]'})
+    usuario_cierre: Optional[Usuario] = Relationship(back_populates="sesiones_cerradas", sa_relationship_kwargs={'foreign_keys': '[CajaSesion.id_usuario_cierre]'})
     movimientos: List["CajaMovimiento"] = Relationship(back_populates="caja_sesion")
     ventas: List["Venta"] = Relationship(back_populates="caja_sesion")
 
@@ -163,7 +227,9 @@ class StockMovimiento(SQLModel, table=True):
     compra_detalle: Optional["CompraDetalle"] = Relationship(back_populates="movimiento_stock")
     venta_detalle: Optional["VentaDetalle"] = Relationship(back_populates="movimiento_stock")
     
-# --- MODELOS DE DOCUMENTOS (COMPRAS Y VENTAS) ---
+# ===================================================================
+# === MODELOS DE DOCUMENTOS (COMPRAS Y VENTAS)
+# ===================================================================
 
 class Compra(SQLModel, table=True):
     __tablename__ = "compras"
@@ -185,6 +251,7 @@ class CompraDetalle(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     cantidad: float
     costo_unitario: float
+    descuento_aplicado: float = Field(default=0.0)
     
     id_compra: int = Field(foreign_key="compras.id")
     id_articulo: int = Field(foreign_key="articulos.id")
@@ -215,6 +282,7 @@ class VentaDetalle(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     cantidad: float
     precio_unitario: float
+    descuento_aplicado: float = Field(default=0.0)
     
     id_venta: int = Field(foreign_key="ventas.id")
     id_articulo: int = Field(foreign_key="articulos.id")
@@ -223,7 +291,10 @@ class VentaDetalle(SQLModel, table=True):
     articulo: Articulo = Relationship(back_populates="items_venta")
     movimiento_stock: Optional[StockMovimiento] = Relationship(back_populates="venta_detalle")
 
-# --- Modelo de seguridad que discutimos ---
+# ===================================================================
+# === MODELOS DE SEGURIDAD Y OTROS
+# ===================================================================
+
 class LlaveMaestra(SQLModel, table=True):
     __tablename__ = "llave_maestra"
     id: Optional[int] = Field(default=None, primary_key=True)
