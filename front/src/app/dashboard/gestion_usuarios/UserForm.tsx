@@ -14,7 +14,6 @@ import {
 import { Eye, EyeOff } from "lucide-react";
 import { Role } from "@/lib/authStore";
 
-
 export default function UserForm() {
   
   const [nombre_usuario, setNombreUsuario] = useState("");

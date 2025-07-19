@@ -127,12 +127,6 @@ export function DataTable<TData, TValue>({
             {/* Inputs de Filtrado + Creación */}
             <div className="flex flex-col md:flex-row-reverse justify-between gap-2 pb-4">
 
-                {/* Botones para sincronización */}
-                <div className="flex gap-2 md:flex-row flex-col">
-                    <Button variant="outline" onClick={handleSyncClientes}>Sincronizar Clientes</Button>
-                    <Button variant="outline" onClick={handleSyncArticulos}>Sincronizar Artículos</Button>
-                </div>
-
                 {/* Modal para crear items */}
                 <Dialog>
                     <DialogTrigger asChild>
@@ -149,6 +143,12 @@ export function DataTable<TData, TValue>({
                         <AddStockForm mode="create" />
                     </DialogContent>
                 </Dialog>
+
+                {/* Botones para sincronización */}
+                <div className="flex gap-2 md:flex-row flex-col">
+                    <Button variant="outline" onClick={handleSyncClientes}>Sincronizar Clientes</Button>
+                    <Button variant="outline" onClick={handleSyncArticulos}>Sincronizar Artículos</Button>
+                </div>
 
                 {/* Inputs de Filtrado */}
                 <div className="flex flex-row justify-between items-center md:justify-start gap-2 w-full">

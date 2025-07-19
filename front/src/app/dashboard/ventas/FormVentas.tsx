@@ -178,7 +178,7 @@ function FormVentas({
         const clientesActivos = data.filter((cliente: Cliente) => cliente.activo);
 
         setClientes(clientesActivos);
-        console.log("Clientes obtenidos:", clientesActivos);
+        console.log("Clientes obtenidos:", clientesActivos);    // sacar en produ
       } catch (error) {
         console.error("❌ Error al obtener clientes:", error);
       }
