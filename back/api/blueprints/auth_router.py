@@ -77,4 +77,4 @@ def api_obtener_llave_actual():
     Devuelve la llave maestra actual.
     """
 
-    return llave_maestra_manager.obtener_llave_actual_para_admin()
+    return llave_maestra_manager.obtener_llave_actual_para_admin(get_db)
