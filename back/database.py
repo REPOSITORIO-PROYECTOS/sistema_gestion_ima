@@ -27,7 +27,7 @@ DATABASE_URL = f"mysql+mysqlconnector://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PO
 engine = create_engine(DATABASE_URL, echo=True)
 
 # --- 4. FUNCIÓN GENERADORA DE SESIONES (get_db) ---
-def get_db():
+def obtener_sesion():
     with Session(engine) as session:
         try:
             yield session

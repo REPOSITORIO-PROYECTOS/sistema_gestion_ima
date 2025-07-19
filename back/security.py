@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 
 # --- Módulos del proyecto ---
 from back import config
-from back.db.session import obtener_sesion # Asegúrate que la ruta de importación de tu sesión sea correcta
+from database import obtener_sesion # Asegúrate que la ruta de importación de tu sesión sea correcta
 from back.modelos import Usuario, Rol # Importamos Rol también para type hints
 
 # --- Configuración de Seguridad ---
