@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 
 # --- Módulos del proyecto ---
 from back import config
-from database import obtener_sesion # Asegúrate que la ruta de importación de tu sesión sea correcta
+from database import get_db # Asegúrate que la ruta de importación de tu sesión sea correcta
 from back.modelos import Usuario, Rol # Importamos Rol también para type hints
 
 # --- Configuración de Seguridad ---
@@ -52,7 +52,7 @@ CREDENTIALS_EXCEPTION = HTTPException(
 
 def obtener_usuario_actual(
     token: str = Depends(oauth2_scheme), 
-    db: Session = Depends(obtener_sesion) # <-- Cambié get_db por obtener_sesion, ajústalo si es necesario
+    db: Session = Depends(get_db) # <-- Cambié get_db por obtener_sesion, ajústalo si es necesario
 ) -> Usuario:
     """
     Función central de seguridad. Valida el token y devuelve el objeto Usuario
