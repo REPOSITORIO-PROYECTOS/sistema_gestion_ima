@@ -13,18 +13,9 @@ TESTING_GOOGLE_SHEET_ID = "1jDd784ApjPGyI7jsFF_bwPhupsBid-yGSJ9K4hOUaqo"
 # Genera una clave secreta larga y aleatoria. Puedes usar un generador de contraseñas online.
 SECRET_KEY_SEGURIDAD="una_clave_muy_larga_y_secreta_para_los_tokens"
 
-
-# ===================================================================
-# === 2. IMPORTACIONES Y CONFIGURACIÓN INICIAL
-# ===================================================================
-# Todas las librerías necesarias para que el script funcione por sí solo.
-# ===================================================================
-# === 2. IMPORTACIONES Y CONFIGURACIÓN INICIAL
-# ===================================================================
 import os
-import sys
 from datetime import datetime
-from typing import List
+from typing import List, Dict, Any
 
 # --- Librerías de Terceros ---
 import gspread
@@ -33,17 +24,11 @@ from fastapi import FastAPI, Depends, HTTPException, Security
 from fastapi.security.api_key import APIKeyHeader
 from pydantic import BaseModel, Field
 
-# Añadimos la ruta raíz del proyecto para que el script se pueda ejecutar desde allí
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-
-
-# ===================================================================
-# === 3. SEGURIDAD (Autenticación por API Key)
-# ===================================================================
-
+# --- Seguridad por API Key ---
 api_key_header = APIKeyHeader(name="x-api-key", auto_error=False)
 
 def get_api_key(api_key: str = Security(api_key_header)):
+    """Verifica que la API Key en la cabecera sea la correcta."""
     if api_key == API_KEY:
         return api_key
     else:
@@ -51,129 +36,139 @@ def get_api_key(api_key: str = Security(api_key_header)):
             status_code=403, detail="Acceso no autorizado: API Key inválida o no proporcionada."
         )
 
-# ===================================================================
-# === 4. LÓGICA Y CONEXIÓN CON GOOGLE SHEETS
-# ===================================================================
-
-HOJA_DE_CALCULO_SIMULACION = None
+# --- Conexión con Google Sheets ---
+HOJA_DE_CALCULO = None
 try:
     SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
     CREDENCIALES = Credentials.from_service_account_file(GOOGLE_SERVICE_ACCOUNT_FILE, scopes=SCOPES)
     CLIENTE_GSPREAD = gspread.authorize(CREDENCIALES)
-    HOJA_DE_CALCULO_SIMULACION = CLIENTE_GSPREAD.open_by_key(TESTING_GOOGLE_SHEET_ID)
-    print("✅ Conexión con Google Sheets para simulación establecida.")
+    HOJA_DE_CALCULO = CLIENTE_GSPREAD.open_by_key(TESTING_GOOGLE_SHEET_ID)
+    print("✅ Conexión con Google Sheets establecida.")
 except Exception as e:
-    print(f"❌ ERROR CRÍTICO: No se pudo conectar a Google Sheets. Error: {e}")
+    print(f"❌ ERROR CRÍTICO AL INICIAR: No se pudo conectar a Google Sheets. Verifique las credenciales y el SHEET_ID. Error: {e}")
 
 def _obtener_hoja(nombre_hoja: str):
-    if not HOJA_DE_CALCULO_SIMULACION:
+    """Función de ayuda para obtener una pestaña de la hoja de cálculo."""
+    if not HOJA_DE_CALCULO:
         raise ConnectionError("La conexión con Google Sheets no fue establecida.")
     try:
-        return HOJA_DE_CALCULO_SIMULACION.worksheet(nombre_hoja)
+        return HOJA_DE_CALCULO.worksheet(nombre_hoja)
     except gspread.WorksheetNotFound:
         raise ValueError(f"La pestaña '{nombre_hoja}' no se encontró en la Hoja de Cálculo.")
 
-# ===================================================================
-# === 5. SCHEMAS (Modelos de Datos para la API)
-# ===================================================================
-
+# --- Schemas (Modelos de Datos para la API) ---
 class ProductoSheet(BaseModel):
-    ID: int
-    Codigo_Interno: str = Field(alias="Codigo Interno") # Permite mapear nombres con espacios
+    id_producto: int = Field(alias="id producto")
+    Codigo: str
+    nombre: str
+    precio: str
+    precio_negocio: str = Field(alias="precio negocio")
     Descripcion: str
-    Precio_Venta: float = Field(alias="Precio Venta")
-    Stock_Actual: float = Field(alias="Stock Actual")
+    cantidad: float
+    unidad: str
+    tipo_de_envase: str = Field(alias="tipo de envase")
+    Activo: bool
+    Etiqueta_Visual: str = Field(alias="Etiqueta Visual")
+    Destino_Final: str = Field(alias="Destino Final")
+    Observaciones: str
 
-class ItemVentaSimulada(BaseModel):
+class ItemVenta(BaseModel):
     id_producto: int
     cantidad: float
 
-class VentaSimuladaCreate(BaseModel):
-    items: List[ItemVentaSimulada]
+class VentaCreate(BaseModel):
+    items: List[ItemVenta]
 
-# ===================================================================
-# === 6. APLICACIÓN Y ENDPOINTS DE LA API
-# ===================================================================
-
+# --- Inicialización de la Aplicación FastAPI ---
 app = FastAPI(
-    title="API de Simulación de Stock y Ventas",
-    description="Endpoints que usan Google Sheets como base de datos.",
-    version="1.0.0"
+    title="API de Simulación con Google Sheets",
+    description="Endpoints que usan una Hoja de Cálculo como base de datos de lectura y escritura.",
+    version="2.0.0"
 )
 
-# --- Endpoint para MOSTRAR los productos ---
-@app.get("/productos", response_model=List[ProductoSheet], dependencies=[Depends(get_api_key)], tags=["Simulación"])
-def api_mostrar_productos_desde_sheet():
+# ===================================================================
+# === 3. ENDPOINTS DE LA API
+# ===================================================================
+
+@app.get("/productos", response_model=List[Dict[str, Any]], dependencies=[Depends(get_api_key)], tags=["Simulación"])
+def mostrar_productos_de_sheet():
     """
-    Lee todos los datos de la pestaña 'Productos' y los devuelve.
+    Lee todos los datos de la pestaña 'STOCK' y los devuelve.
+    La estructura de la respuesta coincide con las columnas de la hoja.
     """
     try:
-        hoja_productos = _obtener_hoja("Productos")
-        # get_all_records() convierte la hoja en una lista de diccionarios, ideal para APIs
-        productos = hoja_productos.get_all_records()
-        return productos
+        hoja_stock = _obtener_hoja("STOCK")
+        return hoja_stock.get_all_records()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ocurrió un error al leer la hoja: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Ocurrió un error al leer la hoja 'STOCK': {str(e)}")
 
 
-# --- Endpoint para REGISTRAR una venta y MOVER stock ---
-@app.post("/registrar-venta", dependencies=[Depends(get_api_key)], tags=["Simulación"])
-def api_registrar_venta_simulada(venta_data: VentaSimuladaCreate):
+@app.post("/registrar-movimiento", dependencies=[Depends(get_api_key)], tags=["Simulación"])
+def registrar_movimiento_y_actualizar_stock(venta_data: VentaCreate):
     """
-    Recibe una lista de productos y cantidades, los registra en la pestaña 'Ventas'
-    y actualiza (resta) el stock en la pestaña 'Productos'.
+    Recibe una venta, la registra en la pestaña 'MOVIMIENTOS' y
+    actualiza (resta) el stock en la pestaña 'STOCK' de la misma hoja.
     """
     try:
-        hoja_ventas = _obtener_hoja("Ventas")
-        hoja_productos = _obtener_hoja("Productos")
+        hoja_movimientos = _obtener_hoja("MOVIMIENTOS")
+        hoja_stock = _obtener_hoja("STOCK")
         
-        # Leemos todos los productos en memoria para una simulación rápida
-        productos_en_sheet = hoja_productos.get_all_records()
-        # Creamos un diccionario para buscar productos por ID fácilmente
-        productos_dict = {prod["ID"]: prod for prod in productos_en_sheet}
+        productos_en_stock = hoja_stock.get_all_records()
+        stock_dict = {prod["id producto"]: prod for prod in productos_en_stock}
 
-        filas_para_ventas = []
+        filas_para_movimientos = []
         actualizaciones_stock = []
         
         for item in venta_data.items:
-            producto = productos_dict.get(item.id_producto)
+            producto = stock_dict.get(item.id_producto)
             if not producto:
-                raise HTTPException(status_code=404, detail=f"Producto con ID {item.id_producto} no encontrado en la hoja.")
+                raise HTTPException(status_code=404, detail=f"Producto con ID {item.id_producto} no encontrado en la hoja 'STOCK'.")
             
-            stock_actual = float(producto["Stock Actual"])
+            stock_actual = float(producto["cantidad"])
             if stock_actual < item.cantidad:
-                raise HTTPException(status_code=400, detail=f"Stock insuficiente para '{producto['Descripcion']}'. Stock actual: {stock_actual}, se solicitó: {item.cantidad}.")
+                raise HTTPException(status_code=400, detail=f"Stock insuficiente para '{producto['nombre']}'. Stock actual: {stock_actual}, se solicitó: {item.cantidad}.")
             
-            # Preparamos la fila para la hoja de Ventas
-            subtotal = item.cantidad * float(producto["Precio Venta"])
-            filas_para_ventas.append([
-                datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                producto["ID"], producto["Descripcion"], item.cantidad,
-                producto["Precio Venta"], subtotal
+            # --- Preparamos la fila para la hoja de MOVIMIENTOS ---
+            # (Se omiten campos no relevantes para la simulación)
+            monto = item.cantidad * float(str(producto["precio"]).replace("$",""))
+            filas_para_movimientos.append([
+                "", # ID Movimiento
+                "", # ID Cliente
+                "", # ID Ingresos
+                "", # ID Repartidor
+                "", # Repartidor
+                "", # Fecha y Hora Entrega
+                datetime.now().strftime('%Y-%m-%d'), # Fecha
+                "Cliente Simulado", # Cliente
+                "", # CUIT
+                "", # Razon Social
+                "VENTA", # Tipo de Movimiento
+                "", # Nro Comprobante
+                producto["Descripción"], # Descripción
+                monto, # Monto
+                "", # Foto Comprobante
+                "Registrado por API de simulación" # Observaciones
             ])
             
-            # Preparamos la actualización de stock para la hoja de Productos
+            # --- Preparamos la actualización para la hoja de STOCK ---
             nuevo_stock = stock_actual - item.cantidad
             # Buscamos la fila del producto (índice + 2 porque la fila 1 es cabecera y es 1-based)
-            fila_a_actualizar = productos_en_sheet.index(producto) + 2
-            # Gspread permite actualizar un rango de celdas, en este caso, una sola celda 'E{fila}'
+            fila_a_actualizar = productos_en_stock.index(producto) + 2
+            # Gspread permite actualizar un rango de celdas, en este caso, la columna 'cantidad' (G)
             actualizaciones_stock.append({
-                'range': f'E{fila_a_actualizar}',
+                'range': f'G{fila_a_actualizar}',
                 'values': [[nuevo_stock]],
             })
 
-        # Si todas las validaciones pasaron, ejecutamos las escrituras
-        if filas_para_ventas:
-            hoja_ventas.append_rows(filas_para_ventas)
+        # --- Ejecutamos las escrituras en Google Sheets ---
+        if filas_para_movimientos:
+            hoja_movimientos.append_rows(filas_para_movimientos, value_input_option='USER_ENTERED')
         if actualizaciones_stock:
-            # batch_update es la forma más eficiente de actualizar múltiples celdas
-            hoja_productos.batch_update(actualizaciones_stock)
+            hoja_stock.batch_update(actualizaciones_stock)
 
-        return {"status": "success", "message": "Venta simulada registrada y stock actualizado."}
+        return {"status": "success", "message": "Movimiento registrado y stock actualizado en Google Sheets."}
 
     except Exception as e:
-        # Si es una excepción que ya hemos lanzado nosotros, la relanzamos
         if isinstance(e, HTTPException):
             raise e
-        # Para cualquier otro error (conexión, etc.)
-        raise HTTPException(status_code=500, detail=f"Ocurrió un error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Ocurrió un error en la simulación: {str(e)}")
