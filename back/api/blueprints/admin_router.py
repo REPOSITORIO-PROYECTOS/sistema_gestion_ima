@@ -1,12 +1,13 @@
 # back/api/blueprints/admin_router.py
 
 from fastapi import APIRouter, Depends, HTTPException
+from back.modelos import Usuario
 from sqlmodel import Session
 from typing import List
 
 from back.database import get_db
-from back.security import es_admin # ¡Usamos nuestro guardián de seguridad estándar!
-from back.gestion.admin import usuarios_manager
+from back.security import es_admin, obtener_usuario_actual # ¡Usamos nuestro guardián de seguridad estándar!
+from back.gestion.admin import usuarios_manager, admin_manager
 from back.gestion.caja import apertura_cierre # Para la función de cerrar caja
 from back.schemas.admin_schemas import *
 from back.schemas.caja_schemas import CerrarCajaRequest, RespuestaGenerica
@@ -101,6 +102,28 @@ def api_admin_cerrar_caja(req: CerrarCajaRequest, db: Session = Depends(get_db))
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error interno al cerrar la caja.")
 
-# El endpoint para generar un token ficticio se ha eliminado, ya que será reemplazado
-# por el nuevo sistema de login en `/auth/token`. Si lo necesitas temporalmente,
-# se puede añadir de nuevo, pero se recomienda no hacerlo.
+@router.delete("/usuarios/{usuario_id}", response_model=RespuestaGenerica)
+def api_eliminar_usuario(
+    usuario_id: int,
+    db: Session = Depends(get_db),
+    admin_actual: Usuario = Depends(obtener_usuario_actual) # Inyectamos al admin que realiza la acción
+):
+    """
+    Desactiva a un usuario en el sistema (eliminación lógica).
+    Un administrador no puede eliminarse a sí mismo.
+    """
+    try:
+        usuario_desactivado = admin_manager.desactivar_usuario(
+            db=db,
+            usuario_id_a_desactivar=usuario_id,
+            admin_actual=admin_actual
+        )
+        
+        if not usuario_desactivado:
+            raise HTTPException(status_code=404, detail=f"Usuario con ID {usuario_id} no encontrado.")
+        
+        return RespuestaGenerica(status="success", message=f"Usuario '{usuario_desactivado.nombre_usuario}' ha sido desactivado.")
+
+    except ValueError as e:
+        # Esto captura el error si un admin intenta auto-eliminarse
+        raise HTTPException(status_code=400, detail=str(e))
