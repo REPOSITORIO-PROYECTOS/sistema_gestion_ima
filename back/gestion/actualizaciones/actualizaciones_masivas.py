@@ -111,63 +111,88 @@ def sincronizar_clientes_desde_sheets(db: Session) -> Dict[str, int]:
 # ----- LÓGICA PARA ARTÍCULOS -----
 def sincronizar_articulos_desde_sheets(db: Session) -> Dict[str, int]:
     """
-    Sincroniza los artículos desde la hoja 'stock' de Google Sheets a la tabla 'articulos'.
+    Sincroniza los artículos desde la hoja 'stock' de Google Sheets a la tabla 'articulos',
+    adaptado al nuevo modelo de datos.
     """
     handler = TablasHandler()
     
-    # Asumimos que tienes una función para cargar artículos en tu handler
     print("Obteniendo datos de Google Sheets...")
-    articulos_sheets = handler.cargar_articulos() # NECESITARÁS CREAR ESTA FUNCIÓN
+    articulos_sheets = handler.cargar_articulos() # Asumo que esta función existe y funciona
     
     print("Obteniendo datos de la base de datos...")
     articulos_db_objetos = db.exec(select(Articulo)).all()
 
     if not articulos_sheets:
-        return {"error": "No se pudieron cargar los datos de Google Sheets."}
+        print("Advertencia: No se pudieron cargar datos de Google Sheets o la hoja está vacía.")
+        return {"creados": 0, "actualizados": 0, "errores": 0, "sin_cambios": len(articulos_db_objetos)}
 
-    # Usamos el código de barras como clave única
-    articulos_db_dict = {articulo.codigo_barras: articulo for articulo in articulos_db_objetos if articulo.codigo_barras}
+    # CAMBIO IMPORTANTE: Usamos 'codigo_interno' como la clave única para la sincronización.
+    # Asumimos que la columna "Código" en tu sheet ahora corresponde a "codigo_interno".
+    articulos_db_dict = {articulo.codigo_interno: articulo for articulo in articulos_db_objetos if articulo.codigo_interno}
 
-    resumen = {"creados": 0, "actualizados": 0, "errores": 0}
+    resumen = {"creados": 0, "actualizados": 0, "sin_cambios": 0, "errores": 0}
 
     for articulo_sheet in articulos_sheets:
-        codigo = str(articulo_sheet.get("Código", "")).strip()
-        if not codigo:
-            resumen["errores"] += 1
-            continue
+        try:
+            # Usamos "Código" como el 'codigo_interno' para sincronizar
+            codigo_interno = str(articulo_sheet.get("Código", "")).strip()
+            if not codigo_interno:
+                resumen["errores"] += 1
+                continue
 
-        articulo_existente = articulos_db_dict.get(codigo)
-        
-        # Extraer y limpiar datos del sheet
-        descripcion = articulo_sheet.get("nombre", "Sin Descripción")
-        precio_venta = limpiar_precio(articulo_sheet.get("precio", 0))
-        venta_negocio = limpiar_precio(articulo_sheet.get("precio negocio", 0))
-        stock_actual = limpiar_precio(articulo_sheet.get("cantidad", 0))
-        activo = str(articulo_sheet.get("Activo", "TRUE")).upper() == "TRUE"
-
-        if articulo_existente:
-            # ACTUALIZAR
-            print(f"Actualizando artículo: {codigo}")
-            articulo_existente.descripcion = descripcion
-            articulo_existente.precio_venta = precio_venta
-            articulo_existente.venta_negocio = venta_negocio
-            articulo_existente.stock_actual = stock_actual
-            articulo_existente.activo = activo
-            resumen["actualizados"] += 1
-        else:
-            # CREAR
-            print(f"Creando nuevo artículo: {codigo}")
-            nuevo_articulo = Articulo(
-                codigo_barras=codigo,
-                descripcion=descripcion,
-                precio_venta=precio_venta,
-                venta_negocio=venta_negocio,
-                stock_actual=stock_actual,
-                activo=activo
-            )
-            db.add(nuevo_articulo)
-            resumen["creados"] += 1
+            articulo_existente = articulos_db_dict.get(codigo_interno)
             
-    db.commit()
-    print("Sincronización de artículos completada.")
+            # Preparamos un diccionario con los datos limpios y mapeados al nuevo modelo
+            datos_limpios = {
+                "descripcion": articulo_sheet.get("nombre", "Sin Descripción").strip(),
+                "precio_venta": limpiar_precio(articulo_sheet.get("precio", 0)),
+                "venta_negocio": limpiar_precio(articulo_sheet.get("precio negocio", 0)),
+                "stock_actual": limpiar_precio(articulo_sheet.get("cantidad", 0)),
+                "activo": str(articulo_sheet.get("Activo", "TRUE")).upper() == "TRUE",
+                # Puedes añadir más campos del sheet aquí si los tienes
+                # Ejemplo: "precio_costo": limpiar_precio(articulo_sheet.get("Costo", 0)),
+            }
+
+            if articulo_existente:
+                # --- ACTUALIZAR ---
+                cambios_detectados = False
+                print(f"Verificando artículo existente: {codigo_interno}")
+                for campo, valor_nuevo in datos_limpios.items():
+                    valor_viejo = getattr(articulo_existente, campo)
+                    if str(valor_viejo) != str(valor_nuevo):
+                        setattr(articulo_existente, campo, valor_nuevo)
+                        cambios_detectados = True
+                
+                if cambios_detectados:
+                    print(f"-> Actualizando artículo: {codigo_interno}")
+                    db.add(articulo_existente)
+                    resumen["actualizados"] += 1
+                else:
+                    resumen["sin_cambios"] += 1
+            else:
+                # --- CREAR ---
+                print(f"Creando nuevo artículo: {codigo_interno}")
+
+                # Creamos el nuevo artículo usando los datos limpios.
+                # SQLModel usará los valores 'default' para los campos que no proporcionemos.
+                nuevo_articulo = Articulo(
+                    codigo_interno=codigo_interno,
+                    **datos_limpios
+                )
+                db.add(nuevo_articulo)
+                resumen["creados"] += 1
+
+        except Exception as e:
+            print(f"Error procesando la fila del sheet: {articulo_sheet}. Detalle: {e}")
+            resumen["errores"] += 1
+            db.rollback() # Revertimos si una fila da error para no dejar la sesión sucia
+            continue
+            
+    try:
+        db.commit()
+        print("Sincronización de artículos completada.")
+    except Exception as e:
+        print(f"ERROR FATAL DURANTE EL COMMIT: Se revirtió la transacción. Detalle: {e}")
+        db.rollback()
+        
     return resumen
