@@ -38,7 +38,8 @@ origins = [
     "https://imaconsultora.netlify.app",  # El dominio de tu frontend en producción
     "http://localhost",                  # Para desarrollo local
     "http://localhost:3000",             # Puerto común para React/Vue en desarrollo
-    "http://localhost:5173",             # Puerto común para Vite en desarrollo
+    "http://localhost:5173",
+    "https://sistema-ima.sistemataup.online" # Puerto común para Vite en desarrollo
 ]
 
 app.add_middleware(
