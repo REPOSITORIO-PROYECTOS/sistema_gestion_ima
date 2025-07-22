@@ -19,7 +19,7 @@ from typing import List, Dict, Any
 
 import gspread
 from google.oauth2.service_account import Credentials
-from fastapi import FastAPI, Depends, HTTPException, Security
+from fastapi import FastAPI, Depends, HTTPException, Security, APIRouter
 from fastapi.security.api_key import APIKeyHeader
 # ¡IMPORTACIÓN CLAVE PARA SOLUCIONAR EL PROBLEMA DE CORS!
 from fastapi.middleware.cors import CORSMiddleware
@@ -109,6 +109,12 @@ class VentaCreate(BaseModel):
 # ===================================================================
 # === 3. ENDPOINTS DE LA API (Sin cambios en la lógica)
 # ===================================================================
+
+router = APIRouter(
+    prefix="/prototipo",
+    dependencies=[Depends(get_api_key)],
+    tags=["Prototipo"]
+)
 
 @app.get("/productos", response_model=List[Dict[str, Any]], dependencies=[Depends(get_api_key)], tags=["Simulación"])
 def mostrar_productos_de_sheet():
