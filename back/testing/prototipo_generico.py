@@ -1,17 +1,17 @@
 # /home/sgi_user/proyectos/sistema_gestion_ima/back/testing/reporte_sheets_especial.py
-# ARCHIVO AUTO-CONTENIDO PARA REPORTES ESPECIALES A GOOGLE SHEETS
+# VERSIÓN FINAL CON CORS CONFIGURADO
 
-# Esta es la "llave secreta" para acceder a esta API. El frontend de Netlify
-# deberá enviar esta llave en la cabecera 'x-api-key'.
+# ===================================================================
+# === 1. CONFIGURACIÓN
+# ===================================================================
+
 API_KEY = "12123ed2121312wdawd123ecd"
-
-# === Configuración de Google Sheets ===
-GOOGLE_SERVICE_ACCOUNT_FILE="credencial_IA.json"
+GOOGLE_SERVICE_ACCOUNT_FILE="back/credencial_IA.json" # Asegúrate de que esta ruta sea correcta desde la raíz del proyecto
 TESTING_GOOGLE_SHEET_ID = "1jDd784ApjPGyI7jsFF_bwPhupsBid-yGSJ9K4hOUaqo"
 
-# === Seguridad (JWT) ===
-# Genera una clave secreta larga y aleatoria. Puedes usar un generador de contraseñas online.
-SECRET_KEY_SEGURIDAD="una_clave_muy_larga_y_secreta_para_los_tokens"
+# ===================================================================
+# === 2. IMPORTACIONES Y CÓDIGO DEL SERVIDOR
+# ===================================================================
 
 import os
 from datetime import datetime
@@ -22,7 +22,35 @@ import gspread
 from google.oauth2.service_account import Credentials
 from fastapi import FastAPI, Depends, HTTPException, Security
 from fastapi.security.api_key import APIKeyHeader
+# ¡IMPORTACIÓN CLAVE PARA SOLUCIONAR EL PROBLEMA!
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+
+# --- Inicialización de la Aplicación FastAPI ---
+app = FastAPI(
+    title="API de Simulación con Google Sheets",
+    description="Endpoints que usan una Hoja de Cálculo como base de datos de lectura y escritura.",
+    version="2.1.0" # Versión actualizada con CORS
+)
+
+# --- INICIO DE LA CONFIGURACIÓN DE CORS ---
+# Lista de orígenes (dominios) que tienen permiso para hablar con esta API.
+origins = [
+    "https://imaconsultora.netlify.app",  # El dominio de tu frontend
+    "http://localhost",
+    "http://localhost:3000",
+    "http://localhost:5173", # Puerto común para Vite
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"], # Permite GET, POST, etc.
+    allow_headers=["*"], # Permite cabeceras como 'x-api-key'
+)
+# --- FIN DE LA CONFIGURACIÓN DE CORS ---
+
 
 # --- Seguridad por API Key ---
 api_key_header = APIKeyHeader(name="x-api-key", auto_error=False)
@@ -79,13 +107,6 @@ class ItemVenta(BaseModel):
 class VentaCreate(BaseModel):
     items: List[ItemVenta]
 
-# --- Inicialización de la Aplicación FastAPI ---
-app = FastAPI(
-    title="API de Simulación con Google Sheets",
-    description="Endpoints que usan una Hoja de Cálculo como base de datos de lectura y escritura.",
-    version="2.0.0"
-)
-
 # ===================================================================
 # === 3. ENDPOINTS DE LA API
 # ===================================================================
@@ -94,7 +115,6 @@ app = FastAPI(
 def mostrar_productos_de_sheet():
     """
     Lee todos los datos de la pestaña 'STOCK' y los devuelve.
-    La estructura de la respuesta coincide con las columnas de la hoja.
     """
     try:
         hoja_stock = _obtener_hoja("STOCK")
@@ -128,39 +148,19 @@ def registrar_movimiento_y_actualizar_stock(venta_data: VentaCreate):
             if stock_actual < item.cantidad:
                 raise HTTPException(status_code=400, detail=f"Stock insuficiente para '{producto['nombre']}'. Stock actual: {stock_actual}, se solicitó: {item.cantidad}.")
             
-            # --- Preparamos la fila para la hoja de MOVIMIENTOS ---
-            # (Se omiten campos no relevantes para la simulación)
-            monto = item.cantidad * float(str(producto["precio"]).replace("$",""))
+            monto = item.cantidad * float(str(producto["precio"]).replace("$","").replace(".","").replace(",","."))
             filas_para_movimientos.append([
-                "", # ID Movimiento
-                "", # ID Cliente
-                "", # ID Ingresos
-                "", # ID Repartidor
-                "", # Repartidor
-                "", # Fecha y Hora Entrega
-                datetime.now().strftime('%Y-%m-%d'), # Fecha
-                "Cliente Simulado", # Cliente
-                "", # CUIT
-                "", # Razon Social
-                "VENTA", # Tipo de Movimiento
-                "", # Nro Comprobante
-                producto["Descripción"], # Descripción
-                monto, # Monto
-                "", # Foto Comprobante
-                "Registrado por API de simulación" # Observaciones
+                "", "", "", "", "", "", datetime.now().strftime('%Y-%m-%d'), "Cliente Simulado", "", "",
+                "VENTA", "", producto["Descripción"], monto, "", "Registrado por API de simulación"
             ])
             
-            # --- Preparamos la actualización para la hoja de STOCK ---
             nuevo_stock = stock_actual - item.cantidad
-            # Buscamos la fila del producto (índice + 2 porque la fila 1 es cabecera y es 1-based)
             fila_a_actualizar = productos_en_stock.index(producto) + 2
-            # Gspread permite actualizar un rango de celdas, en este caso, la columna 'cantidad' (G)
             actualizaciones_stock.append({
                 'range': f'G{fila_a_actualizar}',
                 'values': [[nuevo_stock]],
             })
 
-        # --- Ejecutamos las escrituras en Google Sheets ---
         if filas_para_movimientos:
             hoja_movimientos.append_rows(filas_para_movimientos, value_input_option='USER_ENTERED')
         if actualizaciones_stock:
