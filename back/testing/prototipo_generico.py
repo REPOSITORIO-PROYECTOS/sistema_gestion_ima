@@ -1,28 +1,27 @@
 # /home/sgi_user/proyectos/sistema_gestion_ima/back/testing/reporte_sheets_especial.py
-# VERSIÓN FINAL CON CORS CONFIGURADO
+# VERSIÓN FINAL CON LA CONFIGURACIÓN DE CORS AÑADIDA
 
 # ===================================================================
 # === 1. CONFIGURACIÓN
 # ===================================================================
 
 API_KEY = "12123ed2121312wdawd123ecd"
-GOOGLE_SERVICE_ACCOUNT_FILE="back/credencial_IA.json" # Asegúrate de que esta ruta sea correcta desde la raíz del proyecto
+# Ruta al archivo de credenciales, relativa a la raíz del proyecto
+GOOGLE_SERVICE_ACCOUNT_FILE = "back/credencial_IA.json" 
 TESTING_GOOGLE_SHEET_ID = "1jDd784ApjPGyI7jsFF_bwPhupsBid-yGSJ9K4hOUaqo"
 
 # ===================================================================
 # === 2. IMPORTACIONES Y CÓDIGO DEL SERVIDOR
 # ===================================================================
 
-import os
 from datetime import datetime
 from typing import List, Dict, Any
 
-# --- Librerías de Terceros ---
 import gspread
 from google.oauth2.service_account import Credentials
 from fastapi import FastAPI, Depends, HTTPException, Security
 from fastapi.security.api_key import APIKeyHeader
-# ¡IMPORTACIÓN CLAVE PARA SOLUCIONAR EL PROBLEMA!
+# ¡IMPORTACIÓN CLAVE PARA SOLUCIONAR EL PROBLEMA DE CORS!
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -36,10 +35,10 @@ app = FastAPI(
 # --- INICIO DE LA CONFIGURACIÓN DE CORS ---
 # Lista de orígenes (dominios) que tienen permiso para hablar con esta API.
 origins = [
-    "https://imaconsultora.netlify.app",  # El dominio de tu frontend
-    "http://localhost",
-    "http://localhost:3000",
-    "http://localhost:5173", # Puerto común para Vite
+    "https://imaconsultora.netlify.app",  # El dominio de tu frontend en producción
+    "http://localhost",                  # Para desarrollo local
+    "http://localhost:3000",             # Puerto común para React/Vue en desarrollo
+    "http://localhost:5173",             # Puerto común para Vite en desarrollo
 ]
 
 app.add_middleware(
@@ -108,14 +107,12 @@ class VentaCreate(BaseModel):
     items: List[ItemVenta]
 
 # ===================================================================
-# === 3. ENDPOINTS DE LA API
+# === 3. ENDPOINTS DE LA API (Sin cambios en la lógica)
 # ===================================================================
 
 @app.get("/productos", response_model=List[Dict[str, Any]], dependencies=[Depends(get_api_key)], tags=["Simulación"])
 def mostrar_productos_de_sheet():
-    """
-    Lee todos los datos de la pestaña 'STOCK' y los devuelve.
-    """
+    """Lee todos los datos de la pestaña 'STOCK' y los devuelve."""
     try:
         hoja_stock = _obtener_hoja("STOCK")
         return hoja_stock.get_all_records()
@@ -125,10 +122,7 @@ def mostrar_productos_de_sheet():
 
 @app.post("/registrar-movimiento", dependencies=[Depends(get_api_key)], tags=["Simulación"])
 def registrar_movimiento_y_actualizar_stock(venta_data: VentaCreate):
-    """
-    Recibe una venta, la registra en la pestaña 'MOVIMIENTOS' y
-    actualiza (resta) el stock en la pestaña 'STOCK' de la misma hoja.
-    """
+    """Recibe una venta, la registra y actualiza el stock en Google Sheets."""
     try:
         hoja_movimientos = _obtener_hoja("MOVIMIENTOS")
         hoja_stock = _obtener_hoja("STOCK")
@@ -156,10 +150,7 @@ def registrar_movimiento_y_actualizar_stock(venta_data: VentaCreate):
             
             nuevo_stock = stock_actual - item.cantidad
             fila_a_actualizar = productos_en_stock.index(producto) + 2
-            actualizaciones_stock.append({
-                'range': f'G{fila_a_actualizar}',
-                'values': [[nuevo_stock]],
-            })
+            actualizaciones_stock.append({ 'range': f'G{fila_a_actualizar}', 'values': [[nuevo_stock]] })
 
         if filas_para_movimientos:
             hoja_movimientos.append_rows(filas_para_movimientos, value_input_option='USER_ENTERED')
