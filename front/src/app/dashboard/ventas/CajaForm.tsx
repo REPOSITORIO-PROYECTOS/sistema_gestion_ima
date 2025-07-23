@@ -18,24 +18,22 @@ interface CajaFormProps {
 export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
   
   const token = useAuthStore((state) => state.token);
-  const { cajaAbierta, setCajaAbierta, clearCaja } = useCajaStore();
 
+  const { cajaAbierta, setCajaAbierta, clearCaja } = useCajaStore();
   const [nombre, setNombre] = useState("");
-  const [montoInicial, setMontoInicial] = useState("");
   const [llave, setLlave] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [fechaActual, setFechaActual] = useState("");
   const [horaActual, setHoraActual] = useState("");
+  
 
-  // Fecha y hora en vivo
-  useState(() => {
-    const now = new Date();
-    setFechaActual(now.toLocaleDateString("es-AR"));
-    setHoraActual(now.toLocaleTimeString("es-AR", {
-      hour: "2-digit",
-      minute: "2-digit",
-    }));
-  });
+  /* Estados de la caja */
+
+  // Monto inicial con el que se abre la caja
+  const [saldoInicial, setSaldoInicial] = useState("");
+
+  // Monto final al cerrar la caja
+  const [saldoFinalDeclarado, setSaldoFinalDeclarado] = useState("");
 
 
   // Abrir caja
@@ -44,7 +42,7 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
     e.preventDefault();
 
     if (!token) return toast.error("No se encontró el token.");
-    if (!nombre || !montoInicial || !llave)
+    if (!nombre || !saldoInicial || !llave)
       return toast.error("Por favor completá todos los campos.");
 
     setIsLoading(true);
@@ -56,7 +54,10 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
           "Content-Type": "application/json",
           "X-Admin-Token": token,
         },
-        body: JSON.stringify({ llave }),
+        body: JSON.stringify({ 
+          llave,
+          saldo_inicial: parseFloat(saldoInicial),
+        }),
       });
 
       const data = await res.json();
@@ -80,13 +81,29 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
 
   // Cerrar caja
   const handleCerrarCaja = async () => {
-
     if (!token) return toast.error("No se encontró el token.");
-    if (!nombre || !montoInicial) return toast.error("Por favor completá todos los campos.");
+    if (!nombre || !saldoInicial || !llave)
+      return toast.error("Por favor completá todos los campos.");
 
     setIsLoading(true);
 
     try {
+      // Primero validamos la llave
+      const validarRes = await fetch("https://sistema-ima.sistemataup.online/api/auth/validar-llave", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Admin-Token": token,
+        },
+        body: JSON.stringify({ llave }),
+      });
+
+      const validarData = await validarRes.json();
+      if (!validarRes.ok) {
+        return toast.error(`⛔ ${validarData.detail || "Llave incorrecta."}`);
+      }
+
+      // Si la llave es válida, cerramos la caja
       const cerrarRes = await fetch("https://sistema-ima.sistemataup.online/api/caja/cerrar", {
         method: "POST",
         headers: {
@@ -94,36 +111,46 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          saldo_final_declarado: parseFloat(montoInicial),
+          saldo_final_declarado: parseFloat(saldoFinalDeclarado),
         }),
       });
 
       const cerrarData = await cerrarRes.json();
-      if (!cerrarRes.ok)
+      if (!cerrarRes.ok) {
         return toast.error(`⛔ ${cerrarData.detail || "Error al cerrar la caja"}`);
+      }
 
       toast.success(cerrarData.message || "✅ Caja cerrada correctamente.");
       clearCaja();
       onCerrarCaja();
       setNombre("");
-      setMontoInicial("");
+      setSaldoFinalDeclarado("");
+      setLlave("");
+
 
     } catch (error) {
-
       console.error("Error al cerrar caja:", error);
       toast.error("Ocurrió un error inesperado.");
-      
     } finally {
-
       setIsLoading(false);
       document.getElementById("close-caja-modal")?.click();
     }
   };
 
+  // Fecha y hora en vivo
+  useState(() => {
+    const now = new Date();
+    setFechaActual(now.toLocaleDateString("es-AR"));
+    setHoraActual(now.toLocaleTimeString("es-AR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }));
+  });
 
   return (
     <>
       <form onSubmit={handleSubmit}>
+
         <div className="grid gap-6 py-4">
           <div className="flex items-center justify-between gap-4">
             <Label className="text-right text-md md:text-lg">Nombre</Label>
@@ -131,8 +158,20 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
           </div>
 
           <div className="flex items-center justify-between gap-4">
-            <Label className="text-right text-md md:text-lg">{cajaAbierta ? "Monto de Cierre" : "Monto Inicial"}</Label>
-            <Input type="number" value={montoInicial} onChange={(e) => setMontoInicial(e.target.value)} placeholder="Monto" className="w-full max-w-3/5" />
+            <Label className="text-right text-md md:text-lg">
+              {cajaAbierta ? "Monto de Cierre" : "Monto Inicial"}
+            </Label>
+            <Input
+              type="number"
+              value={cajaAbierta ? saldoFinalDeclarado : saldoInicial}
+              onChange={(e) =>
+                cajaAbierta
+                  ? setSaldoFinalDeclarado(e.target.value)
+                  : setSaldoInicial(e.target.value)
+              }
+              placeholder="Monto"
+              className="w-full max-w-3/5"
+            />
           </div>
 
           <div className="flex items-center justify-between gap-4">
@@ -151,6 +190,7 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
           </div>
         </div>
 
+        {/* Botones de Abrir o Cerrar Caja */}
         <div className="flex justify-end mt-4 gap-2">
           {cajaAbierta ? (
             <Button type="button" variant="destructive" className="w-full" onClick={handleCerrarCaja} disabled={isLoading}>
