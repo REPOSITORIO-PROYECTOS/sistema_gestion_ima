@@ -24,7 +24,16 @@ import {
   CommandInput,
   CommandItem,
 } from "@/components/ui/command";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
 import { ChevronsUpDown } from "lucide-react";
+import { useFacturacionStore } from "@/lib/facturacionStore";
+
 
 interface ProductoAPI {
   id: number;
@@ -116,7 +125,8 @@ function FormVentas({
   const [isLoading, setIsLoading] = useState(false);
 
   // Estado para la opción de facturación
-  const [tipoComprobante, setTipoComprobante] = useState("factura");
+  const [tipoFacturacion, setTipoFacturacion] = useState("factura");
+  const { habilitarExtras } = useFacturacionStore();  
 
 
 
@@ -259,9 +269,23 @@ function FormVentas({
       id_usuario: 1,                              // debe ser dinamico con el tipo de usuario / admin=1, cajero=2, etc
       metodo_pago: metodoPago.toUpperCase(),
       total_venta: totalVenta,
+      /* FALTA AGREGAR CUIT */
       /* paga_con: metodoPago === "efectivo" ? montoPagado : undefined, */  // probar si anda CON esto
       quiere_factura: true,
-      tipo_comprobante_solicitado: tipoComprobante === "factura" ? "Factura" : "Ticket No Fiscal", 
+      tipo_comprobante_solicitado: (() => {
+        switch (tipoFacturacion) {
+          case "factura":
+            return "Factura";
+          case "comprobante":
+            return "Comprobante";
+          case "remito":
+            return "Remito";
+          case "presupuesto":
+            return "Presupuesto";
+          default:
+            return "Desconocido";
+        }
+      })(),
       articulos_vendidos: productosVendidos.map((p) => {
         const productoReal = productos.find(prod => prod.nombre === p.tipo);
         return {
@@ -272,6 +296,7 @@ function FormVentas({
           subtotal: p.precioTotal,
           tasa_iva: 21.0                     
         };
+
       })
     };
 
@@ -596,16 +621,16 @@ function FormVentas({
         <span className="block w-full h-0.5 bg-green-900"></span>
 
 
-        {/* Checkbox Ticket o Comprobante */}
+        {/* Opciones de Tipo de Facturación */}
         <RadioGroup
-          value={tipoComprobante}
-          onValueChange={setTipoComprobante}
-          className="flex flex-col gap-4 md:flex-row"
+          value={tipoFacturacion}
+          onValueChange={setTipoFacturacion}
+          className="flex flex-col gap-4 md:flex-row flex-wrap"
         >
           {/* Factura */}
           <Label
             htmlFor="factura"
-            className="flex flex-row items-center w-full md:w-1/2 lg:flex-row cursor-pointer text-black border-green-900 hover:bg-green-400 dark:hover:bg-green-700 gap-3 rounded-lg border p-3 transition-colors duration-200 data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900"
+            className="flex flex-row items-center w-full md:w-[48%] lg:flex-row cursor-pointer text-black border-green-900 hover:bg-green-400 dark:hover:bg-green-700 gap-3 rounded-lg border p-3 transition-colors duration-200 data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900"
           >
             <RadioGroupItem
               value="factura"
@@ -618,7 +643,7 @@ function FormVentas({
           {/* Comprobante */}
           <Label
             htmlFor="comprobante"
-            className="flex flex-row items-center w-full md:w-1/2 lg:flex-row cursor-pointer text-black border-green-900 hover:bg-green-400 dark:hover:bg-green-700 gap-3 rounded-lg border p-3 transition-colors duration-200 data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900"
+            className="flex flex-row items-center w-full md:w-[48%] lg:flex-row cursor-pointer text-black border-green-900 hover:bg-green-400 dark:hover:bg-green-700 gap-3 rounded-lg border p-3 transition-colors duration-200 data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900"
           >
             <RadioGroupItem
               value="comprobante"
@@ -627,6 +652,66 @@ function FormVentas({
             />
             <span className="text-sm leading-none font-medium">Comprobante</span>
           </Label>
+
+          {/* Remito y Presupuesto */}
+          <TooltipProvider>
+            <div className="flex flex-wrap gap-4 w-full">
+              {/* Remito - con mensaje informativo */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Label
+                    htmlFor="remito"
+                    className={`flex flex-row items-center w-full md:w-[48%] lg:flex-row text-black border-green-900 gap-3 rounded-lg border p-3 transition-colors duration-200
+                      ${!habilitarExtras
+                        ? "opacity-50 cursor-not-allowed"
+                        : "cursor-pointer hover:bg-green-400 dark:hover:bg-green-700"}
+                      data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900`}
+                  >
+                    <RadioGroupItem
+                      value="remito"
+                      id="remito"
+                      disabled={!habilitarExtras}
+                      className="data-[state=checked]:border-white data-[state=checked]:bg-white"
+                    />
+                    <span className="text-sm leading-none font-medium">Remito</span>
+                  </Label>
+                </TooltipTrigger>
+                {!habilitarExtras && (
+                  <TooltipContent>
+                    <p>Contactá al administrador para habilitar esta opción</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+
+              {/* Presupuesto - - con mensaje informativo */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Label
+                    htmlFor="presupuesto"
+                    className={`flex flex-row items-center w-full md:w-[48%] lg:flex-row text-black border-green-900 gap-3 rounded-lg border p-3 transition-colors duration-200
+                      ${!habilitarExtras
+                        ? "opacity-50 cursor-not-allowed"
+                        : "cursor-pointer hover:bg-green-400 dark:hover:bg-green-700"}
+                      data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900`}
+                  >
+                    <RadioGroupItem
+                      value="presupuesto"
+                      id="presupuesto"
+                      disabled={!habilitarExtras}
+                      className="data-[state=checked]:border-white data-[state=checked]:bg-white"
+                    />
+                    <span className="text-sm leading-none font-medium">Presupuesto</span>
+                  </Label>
+                </TooltipTrigger>
+                {!habilitarExtras && (
+                  <TooltipContent>
+                    <p>Contactá al administrador para habilitar esta opción</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </div>
+          </TooltipProvider>
+
         </RadioGroup>
         <span className="block w-full h-0.5 bg-green-900"></span>
 
