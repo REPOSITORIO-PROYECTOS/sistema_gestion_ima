@@ -58,7 +58,8 @@ function Login() {
       if (!meResponse.ok) throw new Error("Error al obtener datos del usuario")
 
       const usuario = await meResponse.json()
-      /* console.log("🙋‍♂️ Usuario recibido:", usuario) */  // solo para debug
+      /* console.log("🙋‍♂️ Usuario recibido:", usuario) */    // solo para debug
+      /* console.log("🙋‍♂️ Rol de Usuario:", usuario.rol) */ 
 
       // Guardar usuario y rol en el store
       setUsuario(usuario)

@@ -29,11 +29,14 @@ export default function UserForm() {
   useEffect(() => {
     async function fetchRoles() {
       try {
+
         const res = await fetch(
-          "https://sistema-ima.sistemataup.online/api/admin/obtener-roles"
+          "https://sistema-ima.sistemataup.online/api/admin/roles"
         );
+
         const data = await res.json();
         console.log("Los roles se ven asi:", data);
+
         if (Array.isArray(data)) {
           setRoles(data);
         } else if (Array.isArray(data.roles)) {
@@ -60,7 +63,7 @@ export default function UserForm() {
     };
 
     try {
-      const res = await fetch("https://sistema-ima.sistemataup.online/api/admin/crear-usuario", {
+      const res = await fetch("https://sistema-ima.sistemataup.online/api/admin/usuarios/crear", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
