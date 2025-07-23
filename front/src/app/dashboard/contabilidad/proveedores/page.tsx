@@ -1,22 +1,42 @@
-import { productosProveedor } from "@/data/prodproveedor.data";
+"use client";
+
+import { useState } from "react";
 import { DataTable } from "./data-table";
 import { columns } from "./columns";
+import { ProductosProveedor } from "./columns";
 
-async function fetchData() {
+function Proveedores() {
+  const [data, setData] = useState<ProductosProveedor[]>([]);
 
-    return productosProveedor;
-}
+  const handleFileUpload = async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
 
-async function Proveedores() {
+    try {
+      const res = await fetch("https://tuservidor/api/endpoint", {
+        method: "POST",
+        body: formData,
+      });
 
-    const data = await fetchData();
+      if (!res.ok) throw new Error("Error en el backend");
 
-    return (
+      const parsedData = await res.json();
+      setData(parsedData); 
+    } catch (err) {
+      console.error(err);
+      alert("Hubo un error al subir el archivo.");
+    }
+  };
 
-        <div>
-            <DataTable columns={columns} data={data} />
-        </div>
-    )
+  return (
+    <div>
+      <DataTable
+        columns={columns}
+        data={data}
+        onFileUpload={handleFileUpload} 
+      />
+    </div>
+  );
 }
 
 export default Proveedores;

@@ -13,7 +13,6 @@ export type ProductosProveedor = {
   fecha: Date;
 };
 
-
 export const columns: ColumnDef<ProductosProveedor>[] = [
 
 {

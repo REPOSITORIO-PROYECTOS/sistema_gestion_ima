@@ -258,13 +258,13 @@ function FormVentas({
     setIsLoading(true);
     e.preventDefault();
   
-    // Objeto resumen de toda la venta generada
+    
     const ventaPayload = {
       id_sesion_caja: 3,
       id_cliente:
         tipoClienteSeleccionado.id === "0"
-          ? 8 // Cliente Final: ID fijo
-          : clienteSeleccionado?.id ?? 8, // Cliente con/sin CUIT            
+          ? 8                                     // Cliente Final: ID fijo
+          : clienteSeleccionado?.id ?? 8,         // Cliente con/sin CUIT            
       usuario: "admin",
       id_usuario: 1,                              // debe ser dinamico con el tipo de usuario / admin=1, cajero=2, etc
       metodo_pago: metodoPago.toUpperCase(),
