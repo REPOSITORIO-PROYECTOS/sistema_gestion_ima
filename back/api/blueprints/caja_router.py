@@ -7,7 +7,7 @@ from typing import List
 
 # --- Módulos del proyecto ---
 from back.database import get_db
-from back.security import obtener_usuario_actual, es_cajero
+from back.security import es_cajero, obtener_usuario_actual, verificar_llave_maestra_apertura
 from back.modelos import Usuario
 # Importamos toda la lógica de negocio de la caja
 from back.gestion.caja import apertura_cierre, registro_caja, consultas_caja
@@ -37,14 +37,25 @@ def get_estado_caja_propia(db: Session = Depends(get_db), current_user: Usuario 
         return EstadoCajaResponse(caja_abierta=True, id_sesion=sesion_abierta.id, fecha_apertura=sesion_abierta.fecha_apertura)
     return EstadoCajaResponse(caja_abierta=False)
 
-@router.post("/abrir", response_model=CajaSesionResponse)
-def api_abrir_caja(req: AbrirCajaRequest, db: Session = Depends(get_db), current_user: Usuario = Depends(obtener_usuario_actual)):
-    """Abre una nueva sesión de caja para el usuario autenticado."""
+@router.post(
+    "/abrir",
+    response_model=CajaSesionResponse,
+    dependencies=[Depends(es_cajero), Depends(verificar_llave_maestra_apertura)]
+)
+def api_abrir_caja(
+    req: AbrirCajaRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(obtener_usuario_actual)
+):
+    """
+    Abre una nueva sesión de caja para el usuario autenticado.
+    Esta operación está protegida por rol Y por una llave maestra.
+    """
     try:
-        # CORRECCIÓN: Pasamos el 'current_user' y usamos el response_model correcto.
         return apertura_cierre.abrir_caja(db=db, usuario_apertura=current_user, saldo_inicial=req.saldo_inicial)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e)) # 409 Conflict
+
 
 @router.post("/cerrar", response_model=CajaSesionResponse)
 def api_cerrar_caja(req: CerrarCajaRequest, db: Session = Depends(get_db), current_user: Usuario = Depends(obtener_usuario_actual)):

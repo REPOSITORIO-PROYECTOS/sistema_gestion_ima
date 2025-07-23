@@ -9,6 +9,8 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlmodel import Session, select
 from sqlalchemy.orm import selectinload
+from back.schemas.caja_schemas import AbrirCajaRequest # Necesitamos importar el schema
+from back.modelos import LlaveMaestra # Asumimos que este modelo existe
 
 # --- Módulos del proyecto ---
 from back import config
@@ -100,6 +102,32 @@ def obtener_usuario_actual(
     print("6. Autenticación exitosa. Devolviendo objeto Usuario completo.")
     print("--- [FIN DEL RASTREO] ---\n")
     return usuario
+
+def verificar_llave_maestra_apertura(
+    req: AbrirCajaRequest, # Recibe el cuerpo de la petición
+    db: Session = Depends(get_db)
+):
+    """
+    Dependencia de seguridad que valida la llave maestra para operaciones críticas.
+    """
+    print("\n--- [TRACE: VERIFICACIÓN LLAVE MAESTRA] ---")
+    print(f"1. Llave recibida en la petición: '{req.llave_maestra}'")
+
+    # Obtenemos la llave válida de la base de datos (asumimos que solo hay una)
+    llave_valida = db.exec(select(LlaveMaestra)).first()
+
+    if not llave_valida:
+        print("   -> ERROR: No hay ninguna llave maestra configurada en la base de datos.")
+        raise HTTPException(status_code=500, detail="Error de configuración del sistema: Llave Maestra no encontrada.")
+
+    print(f"2. Llave válida encontrada en la DB: '{llave_valida.llave}'")
+
+    if req.llave_maestra != llave_valida.llave:
+        print("   -> ¡ACCESO DENEGADO! La llave maestra no coincide.")
+        raise HTTPException(status_code=403, detail="La llave maestra proporcionada es incorrecta.")
+    
+    print("3. ¡ACCESO PERMITIDO! La llave maestra es correcta.")
+    print("--- [FIN TRACE] ---\n")
 
 def es_rol(roles_requeridos: List[str]):
     """
