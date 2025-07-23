@@ -49,7 +49,7 @@ def api_cambiar_rol_usuario(id_usuario: int, req: CambiarRolUsuarioRequest, db: 
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) # 404 Not Found
 
-@router.delete("/usuarios/{usuario_id}", response_model=RespuestaGenerica, summary="Desactivar un usuario")
+@router.delete("/usuarios/{usuario_id}/desactivar", response_model=RespuestaGenerica, summary="Desactivar un usuario")
 def api_desactivar_usuario(
     usuario_id: int,
     db: Session = Depends(get_db),
