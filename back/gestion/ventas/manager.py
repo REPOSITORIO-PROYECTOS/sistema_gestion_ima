@@ -32,7 +32,7 @@ def obtener_datos_boleta(db: Session, id_venta: int) -> dict:
             "cantidad": detalle.cantidad, "descripcion": articulo.descripcion if articulo else "N/A",
             "precio_unitario": detalle.precio_unitario, "subtotal": detalle.cantidad * detalle.precio_unitario
         })
-    
+
     boleta_completa = {
         "id_venta": venta.id, "fecha_emision": venta.timestamp,
         "vendedor_razon_social": "IMA Swing Jugos S.A.", "vendedor_cuit": "30-12345678-9",

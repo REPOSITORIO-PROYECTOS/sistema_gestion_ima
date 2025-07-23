@@ -50,3 +50,59 @@ Confirmar la solución del "race condition" en el frontend.
 Añadir seguridad a los endpoints que faltan: clientes_router.py es el principal candidato.
 Refactorizar la lógica heredada: Específicamente, la función registrar_ingreso_egreso en registro_caja.py para que use SQLModel.
 Implementar la migración de la base de datos (usando Alembic) para añadir los campos de facturación fiscal a la tabla Venta y la lógica para la facturación diferida.
+
+
+
+Documento de Contexto y Estado Actual del Proyecto: Sistema de Gestión IMA
+Fecha de Estado: 23 de Julio de 2025 (Actualización sobre el traspaso del 18 de Julio)
+1. Resumen Ejecutivo
+El proyecto consiste en el desarrollo del backend para un sistema de gestión multi-usuario. Partimos de una base de código con una arquitectura definida pero con áreas de lógica heredada. Nuestro trabajo se ha centrado en refactorizar, modernizar y estabilizar el núcleo de la aplicación, migrando la lógica a SQLModel (ORM), robusteciendo la seguridad y depurando problemas críticos de despliegue. Adicionalmente, se ha desarrollado un prototipo de testing aislado para reportes, lo que ha implicado una depuración intensiva de la configuración del servidor (Nginx) y de las políticas de CORS.
+2. Arquitectura Fundamental (Confirmada y Estable)
+La arquitectura base del traspaso se ha mantenido y reforzado. Es la "ley" sobre la que opera todo el sistema:
+Fuente Única de Verdad: Base de datos MySQL. Todas las operaciones críticas se validan y persisten aquí.
+Backend: FastAPI con SQLModel (SQLAlchemy + Pydantic).
+Capas de Lógica Estrictas:
+back/api/blueprints/ (Routers): Capa de presentación. Maneja peticiones y respuestas HTTP. No contiene lógica de negocio.
+back/gestion/ (Managers): Capa de lógica de negocio. Interactúa con la base de datos a través del ORM. No sabe nada de HTTP.
+back/schemas/ (Schemas): Contratos de datos (Pydantic) para validación.
+back/modelos.py (Modelos): Definición de las tablas de la base de datos (SQLModel).
+3. Evolución y Mejoras Clave Implementadas
+Desde el traspaso inicial, hemos realizado las siguientes mejoras estructurales:
+Refactorización Completa del Modelo de Datos (modelos.py):
+Se implementaron relaciones bidireccionales (back_populates) en todos los modelos. Esto hace que el código en los managers sea mucho más limpio y potente, permitiendo una navegación natural entre objetos (ej. usuario.ventas_realizadas).
+Se enriqueció el modelo Articulo para soportar futuras funcionalidades: múltiples códigos, unidades de compra/venta, cálculo automático de precios, etc.
+Modernización de la Lógica de Negocio (Managers):
+Se ha migrado lógica crítica que usaba conexiones manuales (mysql-connector) a una implementación 100% ORM con SQLModel. El ejemplo más claro es el módulo de apertura_cierre.py, que fue completamente refactorizado para trabajar con la Session de la base de datos y objetos Usuario, soportando ahora una caja abierta por usuario.
+La lógica de negocio ahora maneja errores lanzando excepciones (ej. ValueError), en lugar de devolver diccionarios de estado ({"status": "error"}), dejando el manejo de respuestas HTTP exclusivamente al router.
+4. Estado Actual de los Módulos
+Seguridad (security.py, auth_manager.py):
+Estado: Estable y robusto.
+Lógica: Usa JWT con OAuth2. La función clave obtener_usuario_actual valida el token y siempre consulta la base de datos en tiempo real para obtener el usuario y su rol, lo que es muy seguro.
+Problemas Resueltos: Se solucionó un error crítico AttributeError al validar usuarios inexistentes y se confirmó la solución al problema de incompatibilidad de passlib[bcrypt]. El endpoint /token ahora valida que un usuario esté activo y tenga rol antes de emitir un token.
+Gestión de Caja (caja_router.py, apertura_cierre.py):
+Estado: Funcional y refactorizado.
+Lógica: La apertura, cierre y consulta de estado ya no usan mysql-connector. La lógica ahora soporta una caja abierta por cada usuario simultáneamente.
+Problemas Resueltos: Se solucionó un error 422 Unprocessable Entity al sincronizar los schemas de Pydantic con las respuestas del router, asegurando que el response_model coincida con lo que la lógica de negocio devuelve (objetos CajaSesion completos).
+Gestión de Usuarios (admin_router.py, admin_manager.py):
+Estado: Funcional y organizado.
+Lógica: Se unificó toda la lógica de gestión de usuarios en un único admin_manager.py. Se implementaron endpoints seguros para crear usuarios y para la eliminación lógica (desactivación), previniendo la corrupción de datos.
+Problemas Resueltos: Se solucionó un ImportError que impedía el arranque del servidor debido a una estructura de archivos desorganizada en la capa de gestion.
+Gestión de Artículos:
+Estado: Estructuralmente listo, lógica de negocio pendiente.
+Lógica: El modelo Articulo está preparado para soportar hasta 3 códigos de barras (a través de una tabla ArticuloCodigo) y para el cálculo automático de precios. Se ha diseñado la lógica en el manager para estas funcionalidades.
+Problemas Resueltos: Se depuró un error 404 Not Found causado por una discrepancia entre la URL llamada por el frontend (/api/productos) y la URL real del endpoint (/api/articulos/obtener_todos).
+5. El Prototipo de Testing (Foco Principal de Depuración Reciente)
+Se ha creado un servidor de prototipo aislado y autocontenido para reportes especiales.
+Propósito: Servir datos a un frontend en Netlify sin afectar la API principal.
+Fuente de Datos: Inicialmente se pensó en Google Sheets, luego en archivos CSV, y la versión final implementada es un lector de la base de datos SQL que escribe en una hoja de Google Sheets de testing con un formato específico.
+Seguridad: Utiliza un sistema simple y efectivo de API Key en la cabecera (x-api-key), no JWT.
+El Gran Problema de Despliegue (Resuelto): La mayor parte de la depuración reciente se centró en un error de CORS persistente. El diagnóstico final fue:
+El dominio sistema-ima.sistemataup.online estaba apuntando al frontend en Netlify, no al backend, causando un 404 inicial.
+Una vez corregido el DNS, el problema se trasladó a la configuración del proxy inverso (Nginx).
+Se determinó que la mejor solución era que la API del prototipo manejara su propia ruta (/prototipo) y que Nginx simplemente redirigiera el tráfico a esa sub-ruta sin modificarla.
+El script final del prototipo ahora incluye el CORSMiddleware para permitir explícitamente el origen de Netlify y un APIRouter con el prefijo /prototipo.
+6. Tareas Pendientes y Próximos Pasos
+Validación del Frontend: La tarea más inmediata es que el equipo de frontend actualice las URLs que consume de la API principal para que coincidan con las rutas correctas (ej. /api/articulos/obtener_todos).
+Completar Lógica de Artículos: Implementar en el frontend los endpoints ya creados en el backend para gestionar los múltiples códigos de barras.
+Refactorizar Lógica Heredada: Módulos como registro_caja.py todavía usan mysql-connector para algunas operaciones y deben ser migrados a SQLModel para una consistencia total.
+Implementar Nuevas Funcionalidades: Desarrollar la lógica de negocio y los endpoints para las funcionalidades avanzadas ya diseñadas, como la actualización masiva de precios y la creación de combos de productos.
