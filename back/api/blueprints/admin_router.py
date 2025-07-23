@@ -24,7 +24,7 @@ router = APIRouter(
 # === GESTIÓN DE USUARIOS Y ROLES
 # ===================================================================
 
-@router.post("/usuarios", response_model=UsuarioResponse, status_code=201, summary="Crear un nuevo usuario")
+@router.post("/usuarios/crear", response_model=UsuarioResponse, status_code=201, summary="Crear un nuevo usuario")
 def api_crear_usuario(req: UsuarioCreate, db: Session = Depends(get_db)):
     """Crea un nuevo usuario y le asigna un rol."""
     try:
@@ -33,7 +33,7 @@ def api_crear_usuario(req: UsuarioCreate, db: Session = Depends(get_db)):
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e)) # 409 Conflict
 
-@router.get("/usuarios", response_model=List[UsuarioResponse], summary="Obtener lista de usuarios")
+@router.get("/usuarios/listar", response_model=List[UsuarioResponse], summary="Obtener lista de usuarios")
 def api_obtener_usuarios(db: Session = Depends(get_db)):
     """Obtiene una lista de todos los usuarios con su información de rol."""
     return admin_manager.obtener_todos_los_usuarios(db)
