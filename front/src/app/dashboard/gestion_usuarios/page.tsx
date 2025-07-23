@@ -23,13 +23,14 @@ import { useAuthStore } from "@/lib/authStore";
 import { Usuario } from "@/lib/authStore";
 import { useFacturacionStore } from "@/lib/facturacionStore";
 import * as Switch from '@radix-ui/react-switch';
+import EditUserForm from "./EditUserForm";
 
 export default function GestionUsuarios() {
 
   const [llaveMaestra, setLlaveMaestra] = useState("");
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
-  const token = useAuthStore((state) => state.token);
   const { habilitarExtras, toggleExtras } = useFacturacionStore();
+  const token = useAuthStore((state) => state.token);
 
   // Fetch de llave maestra
   useEffect(() => {
@@ -137,23 +138,43 @@ export default function GestionUsuarios() {
             <TableRow>
               <TableHead className="px-4">Nombre</TableHead>
               <TableHead className="px-4">Rol</TableHead>
+              <TableHead className="px-4">Acciones</TableHead>
             </TableRow>
           </TableHeader>
 
           <TableBody>
             {usuarios.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={2} className="text-center">No hay usuarios disponibles.</TableCell>
+                <TableCell colSpan={3} className="text-center">No hay usuarios disponibles.</TableCell>
               </TableRow>
             ) : (
               usuarios.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell className="px-4">{user.nombre_usuario}</TableCell>
                   <TableCell className="px-4">{user.rol.nombre}</TableCell>
+                  <TableCell className="px-4">
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          Editar
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Editar Usuario</DialogTitle>
+                          <DialogDescription>Modificá los datos del usuario.</DialogDescription>
+                        </DialogHeader>
+
+                        {/* Modal de Edicion de User */}
+                        <EditUserForm user={user} />
+                      </DialogContent>
+                    </Dialog>
+                  </TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
+
         </Table>
       </div>
 

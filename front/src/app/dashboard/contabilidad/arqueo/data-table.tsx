@@ -71,10 +71,11 @@ export function DataTable<TData, TValue>({
         <div className="flex flex-col sm:flex-row justify-between gap-2 pb-4">
 
             {/* Input de Búsqueda por cliente */}
-            <Input placeholder="Filtrar por Usuario" 
-                value={(table.getColumn("usuario")?.getFilterValue() as string) ?? ""}
-                onChange={(event) => table.getColumn("usuario")?.setFilterValue(event.target.value)} 
-                className="w-full sm:w-1/2 md:max-w-1/4" 
+            <Input
+                placeholder="Filtrar por Usuario"
+                value={(table.getColumn("usuario_apertura")?.getFilterValue() as string) ?? ""}
+                onChange={(event) => table.getColumn("usuario_apertura")?.setFilterValue(event.target.value)}
+                className="w-full sm:w-1/2 md:max-w-1/4"
             />
 
             {/* Input de Seleccion por status */}
