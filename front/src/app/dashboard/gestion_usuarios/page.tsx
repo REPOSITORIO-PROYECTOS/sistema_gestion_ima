@@ -61,7 +61,7 @@ export default function GestionUsuarios() {
 
     const fetchUsuarios = async () => {
       try {
-        const res = await fetch("https://sistema-ima.sistemataup.online/api/admin/usuarios", {
+        const res = await fetch("https://sistema-ima.sistemataup.online/api/admin/usuarios/listar", {
           headers: {
             'x-admin-token': token,
           },
@@ -71,7 +71,9 @@ export default function GestionUsuarios() {
         const data = await res.json();
         setUsuarios(data); 
         console.log(data)
+
       } catch (error) {
+
         console.error("Error al traer usuarios:", error);
         setUsuarios([]);
       }

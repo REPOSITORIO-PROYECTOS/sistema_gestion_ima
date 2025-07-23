@@ -21,9 +21,9 @@ export default function ArqueoCajaPage() {
             
             try {
                 const res = await fetch("https://sistema-ima.sistemataup.online/api/caja/arqueos", {
-                headers: {
-                    "x-admin-token": token,
-                },
+                    headers: {
+                        "x-admin-token": token,
+                    },
                 });
 
                 if (!res.ok) throw new Error("Error al obtener los arqueos");
