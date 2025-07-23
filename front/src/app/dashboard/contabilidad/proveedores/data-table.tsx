@@ -3,16 +3,6 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -41,15 +31,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import ExcelUploader from "./ExcelUploader"
 
 interface DataTableProps<TData, TValue> {
-  columns: ColumnDef<TData, TValue>[]
-  data: TData[]
+  columns: ColumnDef<TData, TValue>[];
+  data: TData[];
+  onFileUpload?: (file: File) => void; 
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
+  onFileUpload, 
 }: DataTableProps<TData, TValue>) {
 
     const [sorting, setSorting] = useState<SortingState>([])
@@ -80,47 +73,10 @@ export function DataTable<TData, TValue>({
         {/* Selectores Filtrado */}
         <div className="flex flex-col md:flex-row-reverse justify-between gap-2 pb-4">
 
-            {/* Modal para crear items */}
-            <Dialog>
-                <DialogTrigger asChild>
-                    <Button variant="success">+ Agregar Compra</Button>
-                </DialogTrigger>
-
-                <DialogContent className="sm:max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle>Agregar un Producto Nuevo</DialogTitle>
-                        <DialogDescription>Todos los campos son obligatorios</DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label className="text-right">Nombre</Label>
-                            <Input value="Jugo de Manzana" className="col-span-3" />
-                        </div>
-
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label className="text-right">Cantidad</Label>
-                            <Input value="Ej: 10" className="col-span-3" />
-                        </div>
-
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label className="text-right">Ubicación</Label>
-                            <Input value="Agregar dropdown" className="col-span-3" />
-                        </div>
-
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label className="text-right">Costo Unitario</Label>
-                            <Input value="Ej: $1000" className="col-span-3" />
-                        </div>
-
-                    </div>
-
-                    <DialogFooter>
-                        <Button type="submit">Agregar</Button>
-                    </DialogFooter>
-
-                </DialogContent>
-            </Dialog>
+            {/* Area para Excel */}
+            {onFileUpload && 
+            <ExcelUploader onFileSelect={onFileUpload} 
+            />}
 
             <div className="flex flex-col sm:flex-row justify-between items-center md:justify-start gap-2 w-full">
 
