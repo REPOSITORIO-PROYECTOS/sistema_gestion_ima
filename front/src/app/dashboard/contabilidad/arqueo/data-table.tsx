@@ -65,7 +65,7 @@ export function DataTable<TData, TValue>({
 
     <div>
 
-        <h2 className="text-2xl font-semibold text-green-950 text-center md:hidden my-4">Tabla de Balance</h2>
+        <h2 className="text-2xl font-semibold text-green-950 text-center md:hidden my-4">Arqueo de Caja</h2>
 
         {/* Inputs de Filtrado */}
         <div className="flex flex-col sm:flex-row justify-between gap-2 pb-4">

@@ -24,7 +24,6 @@ import { Usuario } from "@/lib/authStore";
 import { useFacturacionStore } from "@/lib/facturacionStore";
 import * as Switch from '@radix-ui/react-switch';
 
-
 export default function GestionUsuarios() {
 
   const [llaveMaestra, setLlaveMaestra] = useState("");

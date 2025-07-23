@@ -5,7 +5,7 @@ const links = [
   
   { name: "Proveedores", href: "/dashboard/contabilidad/proveedores" },
   { name: "Clientes", href: "/dashboard/contabilidad/clientes" },
-  { name: "Balance", href: "/dashboard/contabilidad/balance" },
+  { name: "Arqueo de Caja", href: "/dashboard/contabilidad/arqueo" },
 ];
 
 function ContabilidadLayout({ children } : { children: React.ReactNode }) {

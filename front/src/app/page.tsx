@@ -10,6 +10,7 @@ import { useAuthStore } from '@/lib/authStore'
 const API_URL = "https://sistema-ima.sistemataup.online/api"
 
 function Login() {
+  
   const router = useRouter()
 
   // Store
