@@ -21,7 +21,7 @@ from back.schemas.caja_schemas import (
 router = APIRouter(
     prefix="/caja",
     tags=["Caja"],
-    dependencies=[Depends(es_cajero)]
+    #dependencies=[Depends(es_cajero)]
 )
 
 # =================================================================
