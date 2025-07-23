@@ -1,7 +1,7 @@
 # back/gestion/facturacion_afip.py
 import requests
 from typing import Dict, Any
-from back.config import settings
+from back.config import AFIP_CERT,AFIP_KEY,FACTURACION_API_URL,AFIP_CUIT
 from back.modelos import Venta, Tercero # Importa los modelos que necesites
 
 def generar_factura_para_venta(venta: Venta, cliente: Tercero) -> Dict[str, Any]:
@@ -12,9 +12,9 @@ def generar_factura_para_venta(venta: Venta, cliente: Tercero) -> Dict[str, Any]
 
     # 1. Preparar las credenciales
     credenciales = {
-        "cuit": settings.AFIP_CUIT,
-        "certificado": settings.AFIP_CERT.replace('\\n', '\n') if settings.AFIP_CERT else None,
-        "clave_privada": settings.AFIP_KEY.replace('\\n', '\n') if settings.AFIP_KEY else None
+        "cuit": AFIP_CUIT,
+        "certificado": AFIP_CERT.replace('\\n', '\n') if AFIP_CERT else None,
+        "clave_privada": AFIP_KEY.replace('\\n', '\n') if AFIP_KEY else None
     }
     
     if not all(credenciales.values()):
@@ -51,9 +51,9 @@ def generar_factura_para_venta(venta: Venta, cliente: Tercero) -> Dict[str, Any]
 
     # 4. Llamar al microservicio
     try:
-        print(f"Enviando petición a: {settings.FACTURACION_API_URL}")
+        print(f"Enviando petición a: {FACTURACION_API_URL}")
         response = requests.post(
-            settings.FACTURACION_API_URL,
+            FACTURACION_API_URL,
             json=payload,
             timeout=20  # Timeout de 20 segundos
         )
