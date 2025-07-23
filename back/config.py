@@ -82,6 +82,18 @@ if not GOOGLE_SERVICE_ACCOUNT_FILE:
      raise ValueError("CRÍTICO: GOOGLE_SERVICE_ACCOUNT_FILE no está configurado en .env.")
 
 
+#===========================FACTURADOR=========================================
+AFIP_CUIT: str = os.getenv("AFIP_CUIT")
+AFIP_CERT: str = os.getenv("AFIP_CERT")
+AFIP_KEY: str = os.getenv("AFIP_KEY")
+AFIP_PRODUCTION: bool = os.getenv("AFIP_PRODUCTION", "false").lower() == "true"
+    
+    # URL del microservicio de facturación
+FACTURACION_API_URL: str = os.getenv("FACTURACION_API_URL", "http://localhost:8002/afipws/facturador")
+
+#===========================FIN FACTURADOR=========================================
+
+
 # ===== INICIO DE LA MODIFICACIÓN =====
 # Creamos una ruta absoluta al archivo de credenciales,
 # basándonos en la ubicación del propio archivo config.py

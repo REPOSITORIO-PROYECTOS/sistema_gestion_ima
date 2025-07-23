@@ -4,7 +4,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 from typing import List
-
+from fastapi import BackgroundTasks 
 # --- Módulos del proyecto ---
 from back.database import get_db
 from back.security import es_cajero, obtener_usuario_actual, verificar_llave_maestra_apertura
@@ -72,20 +72,36 @@ def api_cerrar_caja(req: CerrarCajaRequest, db: Session = Depends(get_db), curre
 # =================================================================
 # NOTA: Estos endpoints todavía usan lógica heredada. Se mantienen para no romper la funcionalidad.
 
-@router.post("/ventas/registrar", response_model=RespuestaGenerica)
-def api_registrar_venta(req: RegistrarVentaRequest, db: Session = Depends(get_db), current_user: Usuario = Depends(obtener_usuario_actual)):
-    """Registra una nueva venta en la sesión de caja activa del usuario."""
+@router.post("/ventas/registrar") # Ya no usamos response_model=RespuestaGenerica
+def api_registrar_venta(
+    req: RegistrarVentaRequest, 
+    # background_tasks: BackgroundTasks, # <-- Descomenta para hacerlo asíncrono
+    db: Session = Depends(get_db), 
+    current_user: Usuario = Depends(obtener_usuario_actual)
+):
+    """Registra una nueva venta Y la envía a facturar al microservicio."""
     sesion_activa = apertura_cierre.obtener_caja_abierta_por_usuario(db, current_user)
     if not sesion_activa:
         raise HTTPException(status_code=400, detail="Operación denegada: El usuario no tiene una caja abierta.")
+    
     try:
-        resultado = registro_caja.registrar_venta_sql(
+        resultado_completo = registro_caja.registrar_venta(
             db=db, id_sesion_caja=sesion_activa.id, articulos_vendidos=[art.model_dump() for art in req.articulos_vendidos],
             id_cliente=req.id_cliente, id_usuario=current_user.id, metodo_pago=req.metodo_pago.upper(), total_venta=req.total_venta
         )
-        return RespuestaGenerica(status="success", message="Venta registrada con éxito", data=resultado)
+        
+        # La facturación se puede hacer en segundo plano para una respuesta más rápida
+        # background_tasks.add_task(llamar_a_facturacion, venta_creada, cliente)
+        
+        return {"status": "success", "message": "Venta registrada y facturada con éxito", "data": resultado_completo}
+    
     except ValueError as e:
+        # Este error ahora puede venir de la lógica de venta o de la de facturación
         raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        # Este error viene del microservicio (ej. no disponible)
+        raise HTTPException(status_code=503, detail=str(e)) # 503 Service Unavailable
+    
 
 @router.post("/ingresos", response_model=RespuestaGenerica)
 def api_registrar_ingreso(req: MovimientoSimpleRequest, db: Session = Depends(get_db), current_user: Usuario = Depends(obtener_usuario_actual)):
