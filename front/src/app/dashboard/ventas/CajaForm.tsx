@@ -40,45 +40,60 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
     
     e.preventDefault();
 
+    // --- VALIDACIÓN CORREGIDA ---
+    // Ya no validamos 'nombre'. El usuario se identifica por el token.
+    if (!saldoInicial || !llave) {
+      return toast.error("El monto inicial y la llave maestra son obligatorios.");
+    }
+    
     if (parseFloat(saldoInicial) < 0) {
-      toast.error("El monto inicial no puede ser negativo");
+      toast.error("El monto inicial no puede ser negativo.");
       return;
     }
 
-    if (!token) return toast.error("No se encontró el token.");
-    if (!nombre || !saldoInicial || !llave)
-      return toast.error("Por favor completá todos los campos.");
+    if (!token) {
+      return toast.error("Error de autenticación: No se encontró el token.");
+    }
 
     setIsLoading(true);
 
     try {
-      const res = await fetch("https://sistema-ima.sistemataup.online/api/auth/validar-llave", {
+      // --- PETICIÓN CORREGIDA ---
+      // 1. Llamamos al endpoint CORRECTO: /api/caja/abrir
+      const res = await fetch("https://sistema-ima.sistemataup.online/api/caja/abrir", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Admin-Token": token,
+          // 2. Usamos la cabecera de autorización CORRECTA
+          "Authorization": `Bearer ${token}`,
         },
+        // 3. Enviamos el cuerpo que el backend (schema corregido) espera
         body: JSON.stringify({ 
-          llave,
-          saldo_inicial: parseFloat(saldoInicial),
+          monto_inicial: parseFloat(saldoInicial), // Usamos 'monto_inicial' como acordamos
+          llave_maestra: llave,
         }),
       });
 
       const data = await res.json();
-      if (!res.ok) return toast.error(`⛔ ${data.detail || "Llave incorrecta."}`);
 
-      setCajaAbierta(true);
-      toast.success(data.message || "✅ Caja abierta correctamente.");
+      if (!res.ok) {
+        // El backend nos dará un error detallado que podemos mostrar
+        return toast.error(`Error al abrir la caja: ${data.detail}`);
+      }
+
+      // Si todo sale bien, la respuesta del backend será el objeto de la sesión de caja
+      toast.success("¡Caja abierta correctamente!");
+      
+      // Actualizamos el estado global
+      setCajaAbierta(true); 
       onAbrirCaja();
 
     } catch (err) {
-
-      console.error("Error validando llave:", err);
-      toast.error("Ocurrió un error al validar la llave.");
-
+      console.error("Error al abrir caja:", err);
+      toast.error("Ocurrió un error de red al intentar abrir la caja.");
     } finally {
-
       setIsLoading(false);
+      // Cerramos el modal solo si la operación fue exitosa o falló controladamente
       document.getElementById("close-caja-modal")?.click();
     }
   };
