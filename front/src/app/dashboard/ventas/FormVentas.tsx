@@ -86,6 +86,14 @@ function FormVentas({
   const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null);
   const [openCliente, setOpenCliente] = useState(false);
 
+  // Ingresar el CUIT de un Cliente Final - POST
+  const [cuitManual, setCuitManual] = useState("");
+
+  /* 
+    AGREGAR LOGICA DE REGISTRO? 
+  */
+
+
   // Cantidad de un producto particular - se * por el producto y se saca el valor total
   const [cantidad, setCantidad] = useState(1)
 
@@ -178,7 +186,7 @@ function FormVentas({
         const clientesActivos = data.filter((cliente: Cliente) => cliente.activo);
 
         setClientes(clientesActivos);
-        console.log("Clientes obtenidos:", clientesActivos);    // sacar en produ
+        /* console.log("Clientes obtenidos:", clientesActivos); */    // solo debug
       } catch (error) {
         console.error("❌ Error al obtener clientes:", error);
       }
@@ -195,7 +203,8 @@ function FormVentas({
       try {
         const res = await fetch("https://sistema-ima.sistemataup.online/api/articulos/obtener_todos");
         const data: ProductoAPI[] = await res.json();
-        console.log(data)
+        
+        /* console.log(data) */   // Solo debug
 
         const productosMapeados = data.map((item) => ({
           id: String(item.id),
@@ -335,6 +344,17 @@ function FormVentas({
               </SelectContent>
             </Select>
 
+            {/* Si es Cliente Final, input para registrar su CUIT */}
+            {tipoClienteSeleccionado.id === "0" && (         
+              <Input
+                type="text"
+                placeholder="Ingresar CUIT del cliente - sin espacios ni puntos"
+                value={cuitManual}
+                onChange={(e) => setCuitManual(e.target.value)}
+                className="mt-1 text-black w-full"
+              />
+            )}
+
             {/* Si el tipo de cliente es con CUIT... */}
             {tipoClienteSeleccionado.id === "1" || tipoClienteSeleccionado.id === "2" ? (
             <div className="w-full flex flex-col gap-2">
@@ -444,7 +464,7 @@ function FormVentas({
                           }}
                         >
                           <span className="truncate">
-                            {p.nombre} - ${tipoClienteSeleccionado.id === "1" ? p.venta_negocio : p.precio_venta} --- Stock: {p.stock_actual}
+                            {p.nombre} | ${tipoClienteSeleccionado.id === "1" ? p.venta_negocio : p.precio_venta} | Stock: {p.stock_actual}
                           </span>
                         </CommandItem>
                       ))}
@@ -623,7 +643,6 @@ function FormVentas({
         </div>
 
         {/* --------------------------------------- */} <hr className="p-0.75 bg-green-900 my-8"/> {/* --------------------------------------- */}
-
         
         {/* Total Venta */}
         <div className="flex flex-col sm:flex-row gap-4 justify-between items-center px-2">

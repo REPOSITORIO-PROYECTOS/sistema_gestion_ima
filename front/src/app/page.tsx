@@ -15,7 +15,7 @@ function Login() {
   // Store
   const setToken = useAuthStore(state => state.setToken)
   const setUsuario = useAuthStore(state => state.setUsuario)
-  const setRole = useAuthStore(state => state.setRole) // <-- IMPORTANTE
+  const setRole = useAuthStore(state => state.setRole)
 
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')

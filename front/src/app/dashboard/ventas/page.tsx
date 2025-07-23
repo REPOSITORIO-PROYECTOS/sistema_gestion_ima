@@ -15,13 +15,17 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import CajaForm from "./CajaForm";
+import { useCajaStore } from "@/lib/cajaStore";
 
 function DashboardVenta() {
 
   const [productos, setProductos] = useState<{ tipo: string; cantidad: number; precioTotal: number }[]>([]);
   const [fechaActual, setFechaActual] = useState("");
   const [horaActual, setHoraActual] = useState("");
-  const role = useAuthStore((state) => state.role);     // estado del rol
+
+  // Estados
+  const role = useAuthStore((state) => state.role);     
+  const { cajaAbierta } = useCajaStore();
 
   // Hook para calcular fecha y hora en vivo
   useEffect(() => {
@@ -70,14 +74,6 @@ function DashboardVenta() {
     setProductos((prev) => prev.filter((_, i) => i !== index));
   };
 
-  /* SECCION CAJA -> ABRIR/CERRAR CAJA + LLAVE MAESTRA + PLATA PRESENTE + PLATA AL FINALIZAR */
-  const [cajaAbierta, setCajaAbierta] = useState(false);
-  const handleAbrirCaja = () => {
-    setCajaAbierta(true);
-  };
-  const handleCerrarCaja = () => {
-    setCajaAbierta(false);
-  };
 
   return (
     <ProtectedRoute allowedRoles={["Admin", "Cajero"]}>
@@ -117,11 +113,9 @@ function DashboardVenta() {
 
                 {/* Modal de Apertura / Cierre de caja */}
                 <CajaForm
-                  cajaAbierta={cajaAbierta}
-                  onAbrirCaja={handleAbrirCaja}
-                  onCerrarCaja={handleCerrarCaja}
+                  onAbrirCaja={() => {}}
+                  onCerrarCaja={() => {}}
                 />
-
               </DialogContent>
           </Dialog>
         </div>
