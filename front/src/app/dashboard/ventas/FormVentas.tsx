@@ -269,8 +269,23 @@ function FormVentas({
       id_usuario: 1,                              // debe ser dinamico con el tipo de usuario / admin=1, cajero=2, etc
       metodo_pago: metodoPago.toUpperCase(),
       total_venta: totalVenta,
-      /* FALTA AGREGAR CUIT */
-      /* paga_con: metodoPago === "efectivo" ? montoPagado : undefined, */  // probar si anda CON esto
+      cuit: (() => {
+        if (tipoClienteSeleccionado.id === "0") return cuitManual || null;
+        if (tipoClienteSeleccionado.id === "1") return clienteSeleccionado?.cuit || null;
+        return null;
+      })(),
+      paga_con: (() => {
+        switch (metodoPago) {
+          case "efectivo":
+            return montoPagado;
+          case "billeteras":
+            return "Billeteras";
+          case "banco":
+            return "Banco";
+          default:
+            return "Otro";
+        }
+      })(),
       quiere_factura: true,
       tipo_comprobante_solicitado: (() => {
         switch (tipoFacturacion) {
@@ -532,13 +547,42 @@ function FormVentas({
         </div>
         <span className="block w-full h-0.5 bg-green-900"></span>
 
+        {/* Descuento a Aplicar */}
+        <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
+          <Label className="text-2xl font-semibold text-green-900">Descuento a Aplicar (%)</Label>
+          <Input
+            type="number"
+            /* min={1}
+            max={1} */
+            value={cantidad === 0 ? "" : cantidad}
+            onChange={(e) => {
+              const input = e.target.value;
+
+              // Permitir input vacío
+              if (input === "") {
+                setCantidad(0);
+                return;
+              }
+
+              // Convertimos a numero
+              const parsed = parseInt(input, 10);
+              // Ignorar si no es número válido
+              if (isNaN(parsed)) return;
+
+              // Limitar al stock
+              const max = productoSeleccionado?.stock_actual ?? Infinity;
+              setCantidad(Math.min(parsed, max));
+            }}
+            className="w-full md:max-w-2/3 text-black"
+          />
+        </div>
+        <span className="block w-full h-0.5 bg-green-900"></span>
 
         {/* Total de prod * cant */}
         <div className="flex flex-row gap-4 justify-between items-start mt-4">
           <Label className="text-2xl font-semibold text-green-900">Total</Label>
           <p className="text-2xl font-semibold text-green-900">${totalProducto}</p>
         </div>
-
 
         {/* Botón Agregar Producto */}
         <Button
@@ -569,8 +613,8 @@ function FormVentas({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="efectivo">Efectivo</SelectItem>
-                <SelectItem value="transferencia">Transferencia</SelectItem>
-                <SelectItem value="credito">Crédito</SelectItem>
+                <SelectItem value="billeteras">Billeteras</SelectItem>
+                <SelectItem value="banco">Banco</SelectItem>
               </SelectContent>
             </Select>
           </div>
