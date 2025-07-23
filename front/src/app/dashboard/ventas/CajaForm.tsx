@@ -18,20 +18,19 @@ interface CajaFormProps {
 export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
   
   const token = useAuthStore((state) => state.token);
+  const usuario = useAuthStore((state) => state.usuario);
 
   const { cajaAbierta, setCajaAbierta, clearCaja } = useCajaStore();
+  const [nombreUsuario, /* setNombreUsuario */] = useState(usuario?.nombre_usuario || "");
   const [nombre, setNombre] = useState("");
   const [llave, setLlave] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [fechaActual, setFechaActual] = useState("");
   const [horaActual, setHoraActual] = useState("");
   
-
   /* Estados de la caja */
-
   // Monto inicial con el que se abre la caja
   const [saldoInicial, setSaldoInicial] = useState("");
-
   // Monto final al cerrar la caja
   const [saldoFinalDeclarado, setSaldoFinalDeclarado] = useState("");
 
@@ -40,6 +39,11 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     
     e.preventDefault();
+
+    if (parseFloat(saldoInicial) < 0) {
+      toast.error("El monto inicial no puede ser negativo");
+      return;
+    }
 
     if (!token) return toast.error("No se encontró el token.");
     if (!nombre || !saldoInicial || !llave)
@@ -81,6 +85,11 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
 
   // Cerrar caja
   const handleCerrarCaja = async () => {
+
+    if (parseFloat(saldoFinalDeclarado) < 0) {
+      toast.error("El monto final no puede ser negativo");
+      return;
+    }
     if (!token) return toast.error("No se encontró el token.");
     if (!nombre || !saldoInicial || !llave)
       return toast.error("Por favor completá todos los campos.");
@@ -152,17 +161,21 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
       <form onSubmit={handleSubmit}>
 
         <div className="grid gap-6 py-4">
+
+          {/* Input Nombre */}
           <div className="flex items-center justify-between gap-4">
             <Label className="text-right text-md md:text-lg">Nombre</Label>
-            <Input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre de Usuario" className="w-full max-w-3/5" />
+            <Input value={nombreUsuario} disabled onChange={(e) => setNombre(e.target.value)} placeholder="Nombre de Usuario" className="w-full max-w-3/5" />
           </div>
 
+          {/* Input Montos Iniciales y Finales */}
           <div className="flex items-center justify-between gap-4">
             <Label className="text-right text-md md:text-lg">
               {cajaAbierta ? "Monto de Cierre" : "Monto Inicial"}
             </Label>
             <Input
               type="number"
+              min="0"
               value={cajaAbierta ? saldoFinalDeclarado : saldoInicial}
               onChange={(e) =>
                 cajaAbierta
@@ -174,16 +187,19 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
             />
           </div>
 
+          {/* Input Llave Maestra */}
           <div className="flex items-center justify-between gap-4">
             <Label className="text-right text-md md:text-lg">Llave Maestra</Label>
             <Input type="password" value={llave} onChange={(e) => setLlave(e.target.value)} placeholder="Llave del día" className="w-full max-w-3/5" />
           </div>
 
+          {/* Fecha */}
           <div className="flex items-center justify-between gap-4">
             <Label className="text-right sm:text-lg">Fecha</Label>
             <Input value={fechaActual} disabled className="w-full max-w-3/5 text-green-950 font-semibold border border-white placeholder-white disabled:opacity-100 rounded-lg" />
           </div>
 
+          {/* Hora */}
           <div className="flex items-center justify-between gap-4">
             <Label className="text-right sm:text-lg">Hora</Label>
             <Input value={horaActual} disabled className="w-full max-w-3/5 text-green-950 font-semibold border border-white placeholder-white disabled:opacity-100 rounded-lg" />
