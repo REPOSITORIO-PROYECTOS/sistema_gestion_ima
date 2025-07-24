@@ -21,8 +21,7 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
   const usuario = useAuthStore((state) => state.usuario);
 
   const { cajaAbierta, setCajaAbierta, clearCaja } = useCajaStore();
-  const [nombreUsuario, /* setNombreUsuario */] = useState(usuario?.nombre_usuario || "");
-  const [nombre, setNombre] = useState("");
+  const [nombreUsuario, setNombreUsuario] = useState(usuario?.nombre_usuario || "");
   const [llave, setLlave] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [fechaActual, setFechaActual] = useState("");
@@ -34,8 +33,7 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
   // Monto final al cerrar la caja
   const [saldoFinalDeclarado, setSaldoFinalDeclarado] = useState("");
 
-
-  // Abrir caja
+  /* Abrir Caja */
   const handleSubmit = async (e: React.FormEvent) => {
     
     e.preventDefault();
@@ -46,17 +44,16 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
     }
 
     if (!token) return toast.error("No se encontró el token.");
-    if (!nombre || !saldoInicial || !llave)
-      return toast.error("Por favor completá todos los campos.");
 
     setIsLoading(true);
 
     try {
+      // Paso 1: Validar la llave
       const res = await fetch("https://sistema-ima.sistemataup.online/api/auth/validar-llave", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Admin-Token": token,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ 
           llave,
@@ -65,23 +62,40 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
       });
 
       const data = await res.json();
-      if (!res.ok) return toast.error(`⛔ ${data.detail || "Llave incorrecta."}`);
+      if (!res.ok) {
+        return toast.error(`⛔ ${data.detail || "Llave incorrecta."}`);
+      }
+
+      // Paso 2: Abrir la caja una vez validados
+      const abrirRes = await fetch("https://sistema-ima.sistemataup.online/api/caja/abrir", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          saldo_inicial: parseFloat(saldoInicial),
+        }),
+      });
+
+      const abrirData = await abrirRes.json();
+      if (!abrirRes.ok) {
+        return toast.error(`⛔ ${abrirData.detail || "No se pudo abrir la caja."}`);
+      }
 
       setCajaAbierta(true);
-      toast.success(data.message || "✅ Caja abierta correctamente.");
+      toast.success(abrirData.message || "✅ Caja abierta correctamente.");
       onAbrirCaja();
 
     } catch (err) {
-
-      console.error("Error validando llave:", err);
-      toast.error("Ocurrió un error al validar la llave.");
-
+      console.error("Error abriendo caja:", err);
+      toast.error("Ocurrió un error al abrir la caja.");
     } finally {
-
       setIsLoading(false);
       document.getElementById("close-caja-modal")?.click();
     }
   };
+
 
   // Cerrar caja
   const handleCerrarCaja = async () => {
@@ -91,9 +105,6 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
       return;
     }
     if (!token) return toast.error("No se encontró el token.");
-    if (!nombre || !saldoInicial || !llave)
-      return toast.error("Por favor completá todos los campos.");
-
     setIsLoading(true);
 
     try {
@@ -132,7 +143,7 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
       toast.success(cerrarData.message || "✅ Caja cerrada correctamente.");
       clearCaja();
       onCerrarCaja();
-      setNombre("");
+      setNombreUsuario("");
       setSaldoFinalDeclarado("");
       setLlave("");
 
@@ -165,7 +176,7 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
           {/* Input Nombre */}
           <div className="flex items-center justify-between gap-4">
             <Label className="text-right text-md md:text-lg">Nombre</Label>
-            <Input value={nombreUsuario} disabled onChange={(e) => setNombre(e.target.value)} placeholder="Nombre de Usuario" className="w-full max-w-3/5" />
+            <Input value={nombreUsuario} onChange={(e) => setNombreUsuario(e.target.value)} placeholder="Nombre de Usuario" className="w-full max-w-3/5" />
           </div>
 
           {/* Input Montos Iniciales y Finales */}
