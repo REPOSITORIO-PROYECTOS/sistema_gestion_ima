@@ -15,7 +15,7 @@ from back.gestion.caja import apertura_cierre, registro_caja, consultas_caja
 from back.schemas.caja_schemas import (
     AbrirCajaRequest, CerrarCajaRequest, EstadoCajaResponse,
     RegistrarVentaRequest, ArqueoCajaResponse, RespuestaGenerica,
-    MovimientoSimpleRequest, CajaSesionResponse # <-- ¡Importamos el nuevo schema!
+    MovimientoSimpleRequest, CajaSesionResponse, InformeCajasResponse # <-- ¡Importamos el nuevo schema!
 )
 
 router = APIRouter(
@@ -139,7 +139,11 @@ def api_registrar_egreso(req: MovimientoSimpleRequest, db: Session = Depends(get
 # === ENDPOINT DE SUPERVISIÓN ===
 # =================================================================
 
-@router.get("/arqueos", response_model=List[ArqueoCajaResponse], tags=["Caja - Supervisión"])
+@router.get("/arqueos", response_model=InformeCajasResponse, tags=["Caja - Supervisión"])
 def get_lista_de_arqueos(db: Session = Depends(get_db)):
-    """Obtiene una lista de todos los cierres de caja (arqueos)."""
+    """
+    Obtiene un informe completo con una lista de cajas actualmente abiertas
+    y una lista de todos los arqueos de cajas cerradas.
+    """
+    # La llamada a la función no cambia de nombre, pero ahora devuelve la nueva estructura.
     return consultas_caja.obtener_arqueos_de_caja(db=db)

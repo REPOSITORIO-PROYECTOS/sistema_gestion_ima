@@ -1,34 +1,70 @@
 # back/gestion/caja/consultas_caja.py
+# VERSIÓN CORREGIDA Y UNIFICADA
+
 import logging
 from sqlmodel import Session, select
-from typing import List
-from back.modelos import CajaSesion, Usuario
+from typing import List, Dict, Any
 
-def obtener_arqueos_de_caja(db: Session) -> List[dict]:
+# Importamos los modelos necesarios, creando alias para evitar conflictos en el JOIN
+from back.modelos import CajaSesion
+from back.modelos import Usuario as UsuarioApertura
+from back.modelos import Usuario as UsuarioCierre
+
+def obtener_arqueos_de_caja(db: Session) -> Dict[str, List[Dict[str, Any]]]:
     """
-    Obtiene un listado de todas las cajas cerradas con sus resultados de arqueo.
+    Obtiene un informe completo con dos listas: una de cajas cerradas (arqueos)
+    y otra de cajas actualmente abiertas. Mantiene el nombre original de la función.
     """
-    logging.info("Solicitando listado de arqueos de caja desde SQL.")
+    logging.info("Solicitando informe unificado de cajas (abiertas y cerradas).")
+    
+    informe_final = {
+        "cajas_abiertas": [],
+        "arqueos_cerrados": []
+    }
+
     try:
-        consulta = (
-            select(CajaSesion, Usuario.nombre_usuario)
-            .join(Usuario, CajaSesion.id_usuario_apertura == Usuario.id)
+        # --- CONSULTA 1: OBTENER ARQUEOS DE CAJAS CERRADAS ---
+        consulta_cerradas = (
+            select(CajaSesion, UsuarioApertura.nombre_usuario, UsuarioCierre.nombre_usuario)
+            .join(UsuarioApertura, CajaSesion.id_usuario_apertura == UsuarioApertura.id)
+            .join(UsuarioCierre, CajaSesion.id_usuario_cierre == UsuarioCierre.id, isouter=True)
             .where(CajaSesion.estado == "CERRADA")
             .order_by(CajaSesion.fecha_cierre.desc())
         )
-        resultados = db.exec(consulta).all()
+        resultados_cerradas = db.exec(consulta_cerradas).all()
         
-        arqueos = []
-        for sesion, nombre_usuario in resultados:
-            arqueos.append({
-                "id_sesion": sesion.id, "fecha_apertura": sesion.fecha_apertura,
-                "fecha_cierre": sesion.fecha_cierre, "usuario_apertura": nombre_usuario,
+        for sesion, nombre_usuario_apertura, nombre_usuario_cierre in resultados_cerradas:
+            informe_final["arqueos_cerrados"].append({
+                "id_sesion": sesion.id,
+                "fecha_apertura": sesion.fecha_apertura,
+                "fecha_cierre": sesion.fecha_cierre,
+                "usuario_apertura": nombre_usuario_apertura,
+                "usuario_cierre": nombre_usuario_cierre,
                 "saldo_inicial": sesion.saldo_inicial,
                 "saldo_final_declarado": sesion.saldo_final_declarado,
                 "saldo_final_calculado": sesion.saldo_final_calculado,
                 "diferencia": sesion.diferencia
             })
-        return arqueos
+
+        # --- CONSULTA 2: OBTENER CAJAS ACTUALMENTE ABIERTAS ---
+        consulta_abiertas = (
+            select(CajaSesion, UsuarioApertura.nombre_usuario)
+            .join(UsuarioApertura, CajaSesion.id_usuario_apertura == UsuarioApertura.id)
+            .where(CajaSesion.estado == "ABIERTA")
+            .order_by(CajaSesion.fecha_apertura.asc())
+        )
+        resultados_abiertas = db.exec(consulta_abiertas).all()
+
+        for sesion, nombre_usuario_apertura in resultados_abiertas:
+            informe_final["cajas_abiertas"].append({
+                "id_sesion": sesion.id,
+                "fecha_apertura": sesion.fecha_apertura,
+                "usuario_apertura": nombre_usuario_apertura,
+                "saldo_inicial": sesion.saldo_inicial
+            })
+            
+        return informe_final
+
     except Exception as e:
-        logging.error(f"Error al obtener los arqueos de caja desde SQL: {e}")
-        return []
+        logging.error(f"Error al generar el informe de cajas: {e}")
+        return informe_final

@@ -66,3 +66,25 @@ class ArqueoCajaResponse(BaseModel):
     saldo_final_declarado: float | None
     saldo_final_calculado: float | None
     diferencia: float | None
+    
+    
+class CajaAbiertaResponse(BaseModel):
+    id_sesion: int
+    fecha_apertura: datetime
+    usuario_apertura: str
+    saldo_inicial: float
+
+class ArqueoCerradoResponse(BaseModel):
+    id_sesion: int
+    fecha_apertura: datetime
+    fecha_cierre: datetime | None
+    usuario_apertura: str
+    usuario_cierre: str | None
+    saldo_inicial: float
+    saldo_final_declarado: float | None
+    saldo_final_calculado: float | None
+    diferencia: float | None
+
+class InformeCajasResponse(BaseModel):
+    cajas_abiertas: List[CajaAbiertaResponse]
+    arqueos_cerrados: List[ArqueoCerradoResponse]
