@@ -1,6 +1,6 @@
 # back/main.py
 
-from back.api.blueprints import admin_router, articulos_router, auth_router,actualizacion_masiva_router,clientes_router,ventas_router
+from back.api.blueprints import admin_router, articulos_router, auth_router,actualizacion_masiva_router,clientes_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
