@@ -23,7 +23,6 @@ export default function UserForm() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [selectedRoleId, setSelectedRoleId] = useState<number | undefined>();
   const token = useAuthStore((state) => state.token);
-
   const passwordsMatch = password === confirm;
 
   // Funcion que trae los roles del backend
@@ -70,6 +69,8 @@ export default function UserForm() {
       password,
       id_rol: selectedRoleId,
     };
+
+    console.log(newUser)
 
     try {
       const res = await fetch("https://sistema-ima.sistemataup.online/api/admin/usuarios/crear", {
@@ -126,8 +127,14 @@ export default function UserForm() {
           type={showPassword ? "text" : "password"}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          placeholder="Mínimo 8 caracteres"
           className="mt-2 pr-10"
         />
+        {password.length > 0 && password.length < 8 && (
+          <p className="text-sm text-red-500 mt-1">
+            La contraseña debe tener al menos 8 caracteres.
+          </p>
+        )}
         <button
           type="button"
           className="absolute inset-y-0 right-3 flex items-center mt-6 cursor-pointer"
@@ -176,7 +183,7 @@ export default function UserForm() {
       <Button
         variant="success"
         className="w-full"
-        disabled={!passwordsMatch || !selectedRoleId}
+        disabled={!passwordsMatch || !selectedRoleId || password.length < 8} 
       >
         Crear Usuario
       </Button>
