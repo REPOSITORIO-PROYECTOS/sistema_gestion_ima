@@ -25,7 +25,7 @@ export default function UserForm() {
 
   const passwordsMatch = password === confirm;
 
-  // Funcion que trae los posibles roles reales del back
+  // Funcion que trae los roles del backend
   useEffect(() => {
     async function fetchRoles() {
       try {
@@ -35,7 +35,6 @@ export default function UserForm() {
         );
 
         const data = await res.json();
-        console.log("Los roles se ven asi:", data);
 
         if (Array.isArray(data)) {
           setRoles(data);
@@ -53,9 +52,11 @@ export default function UserForm() {
 
   // POST de usuarios
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+
     e.preventDefault();
     if (!passwordsMatch || !selectedRoleId) return;
 
+    // Payload de User
     const newUser = {
       nombre_usuario,
       password,

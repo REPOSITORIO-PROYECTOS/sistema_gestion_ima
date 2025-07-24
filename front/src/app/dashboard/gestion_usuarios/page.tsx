@@ -18,12 +18,13 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import UserForm from "./UserForm";
 import { Input } from "@/components/ui/input";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuthStore } from "@/lib/authStore";
 import { Usuario } from "@/lib/authStore";
 import { useFacturacionStore } from "@/lib/facturacionStore";
 import * as Switch from '@radix-ui/react-switch';
 import EditUserForm from "./EditUserForm";
+import { Badge } from "@/components/ui/badge";
 
 export default function GestionUsuarios() {
 
@@ -56,7 +57,6 @@ export default function GestionUsuarios() {
     fetchLlave();
   }, [token]);
 
-  // GET - Usuarios de la app
   useEffect(() => {
     if (!token) return;
 
@@ -64,24 +64,27 @@ export default function GestionUsuarios() {
       try {
         const res = await fetch("https://sistema-ima.sistemataup.online/api/admin/usuarios/listar", {
           headers: {
-            'x-admin-token': token,
+            Authorization: `Bearer ${token}`,
           },
         });
 
         if (!res.ok) throw new Error("Error al obtener usuarios");
         const data = await res.json();
         setUsuarios(data); 
-        console.log(data)
-
       } catch (error) {
-
         console.error("Error al traer usuarios:", error);
         setUsuarios([]);
       }
     };
 
     fetchUsuarios();
+    // para usar después, lo asignamos a una ref
+    fetchUsuariosRef.current = fetchUsuarios;
+
   }, [token]);
+
+  // creamos una ref para exponerla afuera del useEffect
+  const fetchUsuariosRef = useRef<() => void>(() => {});
 
   return (
     <div className="flex flex-col gap-6 p-2">
@@ -139,6 +142,7 @@ export default function GestionUsuarios() {
               <TableHead className="px-4">Nombre</TableHead>
               <TableHead className="px-4">Rol</TableHead>
               <TableHead className="px-4">Acciones</TableHead>
+              <TableHead className="px-4">Estado Usuario</TableHead>
             </TableRow>
           </TableHeader>
 
@@ -166,9 +170,15 @@ export default function GestionUsuarios() {
                         </DialogHeader>
 
                         {/* Modal de Edicion de User */}
-                        <EditUserForm user={user} />
+                        <EditUserForm user={user} onUpdated={fetchUsuariosRef.current} />
+
                       </DialogContent>
                     </Dialog>
+                  </TableCell>
+                  <TableCell className="px-4">
+                    <Badge variant={user.activo ? "success" : "destructive"}>
+                      {user.activo ? "Activo" : "Inactivo"}
+                    </Badge>
                   </TableCell>
                 </TableRow>
               ))
