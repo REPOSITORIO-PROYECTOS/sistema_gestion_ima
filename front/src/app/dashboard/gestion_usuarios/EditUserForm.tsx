@@ -100,6 +100,34 @@ export default function EditUserForm({
     }
   };
 
+  /* PATCH Para activar usuario */
+  const activarUsuario = async () => {
+    if (!token || !confirm("¿Seguro que querés activar este usuario?")) return;
+    setLoading(true);
+
+    try {
+      const res = await fetch(
+        `https://sistema-ima.sistemataup.online/api/admin/usuarios/${user.id}/activar`,
+        {
+          method: "PATCH",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!res.ok) throw new Error("Error al activar");
+      alert("✅ Usuario activado.");
+      onUpdated?.();
+
+    } catch (e) {
+      alert("❌ No se pudo activar el usuario.");
+      console.log(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -121,6 +149,7 @@ export default function EditUserForm({
         </Select>
       </div>
 
+      {/* Modificar Rol */}
       <Button
         variant="success"
         onClick={cambiarRol}
@@ -130,6 +159,7 @@ export default function EditUserForm({
         Guardar cambios
       </Button>
 
+      {/* Desactivar Usuario */}
       <Button
         variant="destructive"
         onClick={desactivarUsuario}
@@ -137,6 +167,16 @@ export default function EditUserForm({
         className="w-full"
       >
         Desactivar usuario
+      </Button>
+
+      {/* Activar Usuario */}
+      <Button
+        variant="default"
+        onClick={activarUsuario}
+        disabled={loading}
+        className="w-full"
+      >
+        Activar usuario
       </Button>
     </div>
   );
