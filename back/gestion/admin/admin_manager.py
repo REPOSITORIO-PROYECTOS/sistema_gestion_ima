@@ -15,25 +15,33 @@ from back.schemas.admin_schemas import UsuarioCreate
 # ===================================================================
 
 def crear_usuario(db: Session, usuario_data: UsuarioCreate) -> Usuario:
-    """Crea un nuevo usuario, hasheando su contraseña y validando el rol por nombre."""
+    """
+    Crea un nuevo usuario, hasheando su contraseña y validando el rol por ID.
+    """
+    # 1. Verificar si el nombre de usuario ya existe
     if db.exec(select(Usuario).where(Usuario.nombre_usuario == usuario_data.nombre_usuario)).first():
         raise ValueError(f"El nombre de usuario '{usuario_data.nombre_usuario}' ya está en uso.")
 
-    rol_db = db.exec(select(Rol).where(Rol.nombre == usuario_data.nombre_rol)).first()
+    # 2. Verificar si el rol con el ID proporcionado existe
+    rol_db = db.get(Rol, usuario_data.id_rol)
     if not rol_db:
-        raise ValueError(f"El rol '{usuario_data.nombre_rol}' no es válido.")
+        raise ValueError(f"El rol con ID {usuario_data.id_rol} no es válido o no existe.")
 
+    # 3. Hashear la contraseña
     password_hasheada = get_password_hash(usuario_data.password)
     
+    # 4. Crear la nueva instancia de Usuario
     nuevo_usuario = Usuario(
         nombre_usuario=usuario_data.nombre_usuario,
         password_hash=password_hasheada,
-        id_rol=rol_db.id
+        id_rol=usuario_data.id_rol # Usamos directamente el ID recibido
     )
     
+    # 5. Guardar en la base de datos
     db.add(nuevo_usuario)
     db.commit()
     db.refresh(nuevo_usuario)
+    
     return nuevo_usuario
 
 def obtener_usuario_por_id(db: Session, usuario_id: int) -> Optional[Usuario]:
