@@ -4,10 +4,13 @@ import { useEffect, useState } from "react";
 import { DataTable } from "./data-table";
 import { columns, Cliente } from "./columns";
 
+// GET Clientes para Tabla Clientes
 async function getClientes(): Promise<Cliente[]> {
+
   const res = await fetch("https://sistema-ima.sistemataup.online/api/clientes/obtener-todos");
   const data = await res.json();
   return data.filter((cliente: Cliente) => cliente);
+
 }
 
 function ClientesPage() {
@@ -17,7 +20,7 @@ function ClientesPage() {
     getClientes()
       .then((data) => {
         setClientes(data);
-        console.log("Clientes obtenidos:", data);
+        /* console.log("Clientes obtenidos:", data); */
       })
       .catch((err) => console.error("❌ Error al obtener clientes:", err));
   }, []);

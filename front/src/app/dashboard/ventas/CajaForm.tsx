@@ -3,7 +3,7 @@
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuthStore } from "@/lib/authStore";
 import { toast } from "sonner";
 import { DialogClose } from "@/components/ui/dialog";
@@ -33,10 +33,23 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
   // Monto final al cerrar la caja
   const [saldoFinalDeclarado, setSaldoFinalDeclarado] = useState("");
 
+  /* Soluciona problema de input de nombre de usuario vacio */
+  useEffect(() => {
+    if (usuario?.nombre_usuario) {
+      setNombreUsuario(usuario.nombre_usuario);
+    }
+  }, [usuario]);
+
   /* Abrir Caja */
   const handleSubmit = async (e: React.FormEvent) => {
     
     e.preventDefault();
+
+    // Validamos que no se manden datos vacíos
+    if (!nombreUsuario.trim() || !saldoInicial.trim() || !llave.trim()) {
+      toast.error("Por favor, completá todos los campos.");
+      return;
+    }
 
     if (parseFloat(saldoInicial) < 0) {
       toast.error("El monto inicial no puede ser negativo");
@@ -100,10 +113,16 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
   // Cerrar caja
   const handleCerrarCaja = async () => {
 
+    if (!nombreUsuario.trim() || !saldoFinalDeclarado.trim() || !llave.trim()) {
+      toast.error("Por favor, completá todos los campos.");
+      return;
+    }
+
     if (parseFloat(saldoFinalDeclarado) < 0) {
       toast.error("El monto final no puede ser negativo");
       return;
     }
+
     if (!token) return toast.error("No se encontró el token.");
     setIsLoading(true);
 
