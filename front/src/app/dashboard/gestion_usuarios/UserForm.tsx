@@ -12,7 +12,7 @@ import {
   SelectItem
 } from "@/components/ui/select";
 import { Eye, EyeOff } from "lucide-react";
-import { Role } from "@/lib/authStore";
+import { Role, useAuthStore } from "@/lib/authStore";
 
 export default function UserForm() {
   
@@ -22,16 +22,24 @@ export default function UserForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [roles, setRoles] = useState<Role[]>([]);
   const [selectedRoleId, setSelectedRoleId] = useState<number | undefined>();
+  const token = useAuthStore((state) => state.token);
 
   const passwordsMatch = password === confirm;
 
   // Funcion que trae los roles del backend
   useEffect(() => {
+
     async function fetchRoles() {
+
       try {
 
         const res = await fetch(
-          "https://sistema-ima.sistemataup.online/api/admin/roles"
+          "https://sistema-ima.sistemataup.online/api/admin/roles",
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
         );
 
         const data = await res.json();
@@ -48,7 +56,7 @@ export default function UserForm() {
       }
     }
     fetchRoles();
-  }, []);
+  }, [token]);
 
   // POST de usuarios
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -68,6 +76,7 @@ export default function UserForm() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(newUser),
       });

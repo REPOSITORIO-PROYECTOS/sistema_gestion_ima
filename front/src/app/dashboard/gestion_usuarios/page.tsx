@@ -57,7 +57,9 @@ export default function GestionUsuarios() {
     fetchLlave();
   }, [token]);
 
+  // GET Usuarios
   useEffect(() => {
+
     if (!token) return;
 
     const fetchUsuarios = async () => {
@@ -78,12 +80,11 @@ export default function GestionUsuarios() {
     };
 
     fetchUsuarios();
-    // para usar después, lo asignamos a una ref
     fetchUsuariosRef.current = fetchUsuarios;
 
   }, [token]);
 
-  // creamos una ref para exponerla afuera del useEffect
+  // Creamos una ref para exponerla afuera del useEffect
   const fetchUsuariosRef = useRef<() => void>(() => {});
 
   return (
@@ -141,8 +142,8 @@ export default function GestionUsuarios() {
             <TableRow>
               <TableHead className="px-4">Nombre</TableHead>
               <TableHead className="px-4">Rol</TableHead>
-              <TableHead className="px-4">Acciones</TableHead>
               <TableHead className="px-4">Estado Usuario</TableHead>
+              <TableHead className="px-4">Acciones</TableHead>
             </TableRow>
           </TableHeader>
 
@@ -156,6 +157,11 @@ export default function GestionUsuarios() {
                 <TableRow key={user.id}>
                   <TableCell className="px-4">{user.nombre_usuario}</TableCell>
                   <TableCell className="px-4">{user.rol.nombre}</TableCell>
+                  <TableCell className="px-4">
+                    <Badge variant={user.activo ? "success" : "destructive"}>
+                      {user.activo ? "Activo" : "Inactivo"}
+                    </Badge>
+                  </TableCell>
                   <TableCell className="px-4">
                     <Dialog>
                       <DialogTrigger asChild>
@@ -175,11 +181,6 @@ export default function GestionUsuarios() {
                       </DialogContent>
                     </Dialog>
                   </TableCell>
-                  <TableCell className="px-4">
-                    <Badge variant={user.activo ? "success" : "destructive"}>
-                      {user.activo ? "Activo" : "Inactivo"}
-                    </Badge>
-                  </TableCell>
                 </TableRow>
               ))
             )}
@@ -188,7 +189,7 @@ export default function GestionUsuarios() {
         </Table>
       </div>
 
-       {/* Toggle de Facturación en Caja */}
+      {/* Toggle de Facturación en Caja */}
       <div className="flex items-center gap-4">
         <h3 className="text-lg font-semibold text-green-950">
           Habilitar Remito / Presupuesto
