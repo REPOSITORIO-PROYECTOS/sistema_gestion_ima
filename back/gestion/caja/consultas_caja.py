@@ -51,7 +51,8 @@ def obtener_arqueos_de_caja(db: Session) -> Dict[str, List[Dict[str, Any]]]:
                 "saldo_inicial": sesion.saldo_inicial,
                 "saldo_final_declarado": sesion.saldo_final_declarado,
                 "saldo_final_calculado": sesion.saldo_final_calculado,
-                "diferencia": sesion.diferencia
+                "diferencia": sesion.diferencia,
+                "estado": sesion.estado
             })
 
         # --- CONSULTA 2: OBTENER CAJAS ACTUALMENTE ABIERTAS ---
@@ -71,7 +72,8 @@ def obtener_arqueos_de_caja(db: Session) -> Dict[str, List[Dict[str, Any]]]:
                 "id_sesion": sesion.id,
                 "fecha_apertura": sesion.fecha_apertura,
                 "usuario_apertura": nombre_usuario_apertura,
-                "saldo_inicial": sesion.saldo_inicial
+                "saldo_inicial": sesion.saldo_inicial,
+                "estado": sesion.estado
             })
             
         return informe_final
