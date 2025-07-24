@@ -7,6 +7,7 @@ export interface Usuario {
   apellido: string
   email: string
   rol: Role
+  activo: boolean;
 }
 
 // Tipos de usuario

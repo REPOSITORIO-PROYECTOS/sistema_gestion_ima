@@ -28,7 +28,7 @@ export default function EditUserForm({
           "https://sistema-ima.sistemataup.online/api/admin/roles",
           {
             headers: {
-              "x-admin-token": token,
+              Authorization: `Bearer ${token}`,
             },
           }
         );
@@ -52,7 +52,7 @@ export default function EditUserForm({
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
-            "x-admin-token": token,
+            "Authorization": `Bearer ${token}`,
           },
           body: JSON.stringify({ id_rol: selectedRoleId }),
         }
@@ -70,25 +70,32 @@ export default function EditUserForm({
 
   /* DELETE Para desactivar usuario */
   const desactivarUsuario = async () => {
+
     if (!token || !confirm("¿Seguro que querés desactivar este usuario?")) return;
     setLoading(true);
+
     try {
       const res = await fetch(
         `https://sistema-ima.sistemataup.online/api/admin/usuarios/${user.id}/desactivar`,
         {
           method: "DELETE",
           headers: {
-            "x-admin-token": token,
+            "Authorization": `Bearer ${token}`,
           },
         }
       );
+
       if (!res.ok) throw new Error("Error al desactivar");
       alert("✅ Usuario desactivado.");
       onUpdated?.();
+
     } catch (e) {
+
       alert("❌ No se pudo desactivar el usuario.");
       console.log(e);
+
     } finally {
+      
       setLoading(false);
     }
   };

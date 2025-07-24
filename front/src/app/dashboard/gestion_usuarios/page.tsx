@@ -18,12 +18,13 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import UserForm from "./UserForm";
 import { Input } from "@/components/ui/input";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuthStore } from "@/lib/authStore";
 import { Usuario } from "@/lib/authStore";
 import { useFacturacionStore } from "@/lib/facturacionStore";
 import * as Switch from '@radix-ui/react-switch';
 import EditUserForm from "./EditUserForm";
+import { Badge } from "@/components/ui/badge";
 
 export default function GestionUsuarios() {
 
@@ -56,32 +57,35 @@ export default function GestionUsuarios() {
     fetchLlave();
   }, [token]);
 
-  // GET - Usuarios de la app
+  // GET Usuarios
   useEffect(() => {
+
     if (!token) return;
 
     const fetchUsuarios = async () => {
       try {
         const res = await fetch("https://sistema-ima.sistemataup.online/api/admin/usuarios/listar", {
           headers: {
-            'x-admin-token': token,
+            Authorization: `Bearer ${token}`,
           },
         });
 
         if (!res.ok) throw new Error("Error al obtener usuarios");
         const data = await res.json();
         setUsuarios(data); 
-        console.log(data)
-
       } catch (error) {
-
         console.error("Error al traer usuarios:", error);
         setUsuarios([]);
       }
     };
 
     fetchUsuarios();
+    fetchUsuariosRef.current = fetchUsuarios;
+
   }, [token]);
+
+  // Creamos una ref para exponerla afuera del useEffect
+  const fetchUsuariosRef = useRef<() => void>(() => {});
 
   return (
     <div className="flex flex-col gap-6 p-2">
@@ -138,6 +142,7 @@ export default function GestionUsuarios() {
             <TableRow>
               <TableHead className="px-4">Nombre</TableHead>
               <TableHead className="px-4">Rol</TableHead>
+              <TableHead className="px-4">Estado Usuario</TableHead>
               <TableHead className="px-4">Acciones</TableHead>
             </TableRow>
           </TableHeader>
@@ -153,6 +158,11 @@ export default function GestionUsuarios() {
                   <TableCell className="px-4">{user.nombre_usuario}</TableCell>
                   <TableCell className="px-4">{user.rol.nombre}</TableCell>
                   <TableCell className="px-4">
+                    <Badge variant={user.activo ? "success" : "destructive"}>
+                      {user.activo ? "Activo" : "Inactivo"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="px-4">
                     <Dialog>
                       <DialogTrigger asChild>
                         <Button variant="outline" size="sm">
@@ -166,7 +176,8 @@ export default function GestionUsuarios() {
                         </DialogHeader>
 
                         {/* Modal de Edicion de User */}
-                        <EditUserForm user={user} />
+                        <EditUserForm user={user} onUpdated={fetchUsuariosRef.current} />
+
                       </DialogContent>
                     </Dialog>
                   </TableCell>
@@ -178,7 +189,7 @@ export default function GestionUsuarios() {
         </Table>
       </div>
 
-       {/* Toggle de Facturación en Caja */}
+      {/* Toggle de Facturación en Caja */}
       <div className="flex items-center gap-4">
         <h3 className="text-lg font-semibold text-green-950">
           Habilitar Remito / Presupuesto

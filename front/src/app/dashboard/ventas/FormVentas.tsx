@@ -105,6 +105,8 @@ function FormVentas({
 
   // Cantidad de un producto particular - se * por el producto y se saca el valor total
   const [cantidad, setCantidad] = useState(1)
+  // Porcentaje de Descuento sobre total
+  const [descuento, setDescuento] = useState(0);
 
   // Input de Busqueda para Productos
   /* const [searchProducto, setSearchProducto] = useState(""); */
@@ -128,6 +130,7 @@ function FormVentas({
   const [tipoFacturacion, setTipoFacturacion] = useState("factura");
   const { habilitarExtras } = useFacturacionStore();  
 
+  
 
 
   /* Hooks */ /* -------------------------------------------------------------- */
@@ -148,7 +151,11 @@ function FormVentas({
     return producto.venta_negocio;
   };
 
-  const totalProducto = productoSeleccionado ? getPrecioProducto(productoSeleccionado) * cantidad : 0;
+  const totalProducto = productoSeleccionado
+  ? getPrecioProducto(productoSeleccionado) * cantidad
+  : 0;
+
+  const totalConDescuento = totalProducto - (totalProducto * (descuento / 100));
 
   // Hook para agregar producto al panel resumen de productos
   const handleAgregarProducto = () => {
@@ -552,26 +559,21 @@ function FormVentas({
           <Label className="text-2xl font-semibold text-green-900">Descuento a Aplicar (%)</Label>
           <Input
             type="number"
-            /* min={1}
-            max={1} */
-            value={cantidad === 0 ? "" : cantidad}
+            min={0}
+            max={100}
+            value={descuento === 0 ? "" : descuento}
             onChange={(e) => {
               const input = e.target.value;
 
-              // Permitir input vacío
               if (input === "") {
-                setCantidad(0);
+                setDescuento(0);
                 return;
               }
 
-              // Convertimos a numero
               const parsed = parseInt(input, 10);
-              // Ignorar si no es número válido
               if (isNaN(parsed)) return;
 
-              // Limitar al stock
-              const max = productoSeleccionado?.stock_actual ?? Infinity;
-              setCantidad(Math.min(parsed, max));
+              setDescuento(Math.min(parsed, 100)); // limitamos a 100%
             }}
             className="w-full md:max-w-2/3 text-black"
           />
@@ -581,7 +583,9 @@ function FormVentas({
         {/* Total de prod * cant */}
         <div className="flex flex-row gap-4 justify-between items-start mt-4">
           <Label className="text-2xl font-semibold text-green-900">Total</Label>
-          <p className="text-2xl font-semibold text-green-900">${totalProducto}</p>
+          <p className="text-2xl font-semibold text-green-900">
+            ${totalConDescuento.toFixed(2)}
+          </p>
         </div>
 
         {/* Botón Agregar Producto */}
