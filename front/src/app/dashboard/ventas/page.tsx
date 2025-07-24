@@ -19,7 +19,7 @@ import { useCajaStore } from "@/lib/cajaStore";
 
 function DashboardVenta() {
 
-  const [productos, setProductos] = useState<{ tipo: string; cantidad: number; precioTotal: number }[]>([]);
+  const [productos, setProductos] = useState<{ tipo: string; cantidad: number; precioTotal: number; }[]>([]);
   const [fechaActual, setFechaActual] = useState("");
   const [horaActual, setHoraActual] = useState("");
 

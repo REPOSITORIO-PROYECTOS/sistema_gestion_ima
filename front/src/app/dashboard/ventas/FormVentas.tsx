@@ -165,7 +165,7 @@ function FormVentas({
     onAgregarProducto({
       tipo: productoSeleccionado.nombre,
       cantidad,
-      precioTotal: totalProducto,
+      precioTotal: totalConDescuento,
     });
 
     setCantidad(1);
@@ -318,7 +318,6 @@ function FormVentas({
           subtotal: p.precioTotal,
           tasa_iva: 21.0                     
         };
-
       })
     };
 
