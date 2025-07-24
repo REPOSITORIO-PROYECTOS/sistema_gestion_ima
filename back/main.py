@@ -67,7 +67,6 @@ app.include_router(auth_router.router)
 app.include_router(articulos_router.router)
 app.include_router(actualizacion_masiva_router.router)
 app.include_router(clientes_router.router)
-app.include_router(ventas_router.router)
 app.include_router(usuarios_router.router)
 
 
