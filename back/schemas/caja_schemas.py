@@ -73,6 +73,7 @@ class CajaAbiertaResponse(BaseModel):
     fecha_apertura: datetime
     usuario_apertura: str
     saldo_inicial: float
+    estadi: str
 
 class ArqueoCerradoResponse(BaseModel):
     id_sesion: int
@@ -84,6 +85,7 @@ class ArqueoCerradoResponse(BaseModel):
     saldo_final_declarado: float | None
     saldo_final_calculado: float | None
     diferencia: float | None
+    estado: str
 
 class InformeCajasResponse(BaseModel):
     cajas_abiertas: List[CajaAbiertaResponse]
