@@ -26,7 +26,7 @@ class UsuarioResponse(BaseModel):
 class UsuarioCreate(BaseModel):
     nombre_usuario: str
     password: str = Field(min_length=8)
-    nombre_rol: str # La API es más amigable si acepta el nombre del rol
+    id_rol: int
 
 class CambiarRolUsuarioRequest(BaseModel):
     id_rol: int
