@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Presupuesto</title>
+    <!-- (Puedes usar los mismos estilos que la factura o personalizarlos) -->
+    <style>
+        body { font-family: Helvetica, Arial, sans-serif; font-size: 12px; }
+        .container { width: 180mm; margin: auto; }
+        .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #000; padding-bottom: 10px; }
+        .header .empresa { font-size: 16px; font-weight: bold; }
+        .cliente { border: 1px solid #ccc; padding: 10px; margin-top: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .text-right { text-align: right; }
+        .total { font-size: 14px; font-weight: bold; }
+        .footer { text-align: left; margin-top: 30px; font-size: 10px; color: #555; border-top: 1px solid #ccc; padding-top: 10px; }
+        .comprobante { text-align: right; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <div class="empresa">{{ data.emisor.razon_social }}</div>
+                <div>{{ data.emisor.domicilio }}</div>
+            <div class="comprobante">
+                <h2>PRESUPUESTO</h2>
+                <div>Fecha: <strong>{{ "now"|date("%d/%m/%Y") }}</strong></div>
+                <div>Validez: <strong>15 días</strong></div>
+            </div>
+            </div>
+        </div>
+        <div class="cliente">
+            <strong>Cliente:</strong> {{ data.receptor.nombre_razon_social }}<br>
+            <strong>CUIT/DNI:</strong> {{ data.receptor.cuit_o_dni }}
+        </div>
+        <table>
+            <!-- (La tabla es idéntica a la del remito) -->
+            <thead>
+                <tr>
+                    <th>Cantidad</th>
+                    <th>Descripción</th>
+                    <th class="text-right">Precio Unitario</th>
+                    <th class="text-right">Subtotal</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in data.transaccion.items %}
+                <tr>
+                    <td>{{ item.cantidad }}</td>
+                    <td>{{ item.descripcion }}</td>
+                    <td class="text-right">${{ "%.2f"|format(item.precio_unitario) }}</td>
+                    <td class="text-right">${{ "%.2f"|format(item.subtotal) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="3" class="text-right total">TOTAL</td>
+                    <td class="text-right total">${{ "%.2f"|format(data.transaccion.total) }}</td>
+                </tr>
+            </tfoot>
+        </table>
+        <div class="footer">
+            <strong>Términos y Condiciones:</strong> Los precios están expresados en Pesos Argentinos y no incluyen IVA.
+        </div>
+    </div>
+</body>
+</html>
