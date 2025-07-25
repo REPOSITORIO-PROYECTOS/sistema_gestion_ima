@@ -8,6 +8,13 @@ import { useAuthStore } from "@/lib/authStore";
 import { toast } from "sonner";
 import { DialogClose } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function EgresosForm() {
   
@@ -116,17 +123,22 @@ export default function EgresosForm() {
             </div>
 
             {/* Método de Egreso */}
-            <div className="flex items-center justify-between gap-4">
-                <Label className="text-right text-md md:text-lg">Método de Pago</Label>
-                <select
+            <div className="flex flex-row items-center w-full justify-between">
+                <Label className="text-md md:text-lg">Método de Pago</Label>
+                <Select
                     value={metodoPago}
-                    onChange={(e) => setMetodoPago(e.target.value)}
-                    className="w-full max-w-3/5 p-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-green-700"
+                    onValueChange={(value) => setMetodoPago(value)}
                 >
-                    <option value="efectivo">Efectivo</option>
-                    <option value="transferencia">Transferencia</option>
-                </select>
+                    <SelectTrigger className="w-full max-w-3/5 cursor-pointer text-black">
+                    <SelectValue placeholder="Seleccionar método" />
+                    </SelectTrigger>
+                    <SelectContent>
+                    <SelectItem value="efectivo">Efectivo</SelectItem>
+                    <SelectItem value="transferencia">Transferencia</SelectItem>
+                    </SelectContent>
+                </Select>
             </div>
+
 
             {/* Concepto del egreso */}
             <div className="flex items-center justify-between gap-4">
