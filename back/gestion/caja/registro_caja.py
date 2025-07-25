@@ -181,7 +181,7 @@ def registrar_venta(
             
 
             
-            print(f"[AFIP] Factura generada con éxito. CAE: {resultado_factura.get('cae')}")
+            #print(f"[AFIP] Factura generada con éxito. CAE: {resultado_factura.get('cae')}")
         
         except (ValueError, RuntimeError) as e_factura:
             # La venta se guardó, pero la facturación falló. Imprimimos una advertencia clara.
