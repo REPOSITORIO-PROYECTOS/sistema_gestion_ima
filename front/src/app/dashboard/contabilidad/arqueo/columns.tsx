@@ -80,18 +80,18 @@ export const columns: ColumnDef<ArqueoCaja>[] = [
     },
   },
   {
-    accessorKey: "saldo_final_calculado",
-    header: "Saldo Calculado",
-    cell: ({ row }) => {
-      const valor = row.getValue("saldo_final_calculado") as number | null;
-      return formatCurrency(valor);
-    },
-  },
-  {
     accessorKey: "saldo_final_declarado",
     header: "Saldo Declarado",
     cell: ({ row }) => {
       const valor = row.getValue("saldo_final_declarado") as number | null;
+      return formatCurrency(valor);
+    },
+  },
+    {
+    accessorKey: "saldo_final_calculado",
+    header: "Saldo Calculado",
+    cell: ({ row }) => {
+      const valor = row.getValue("saldo_final_calculado") as number | null;
       return formatCurrency(valor);
     },
   },
