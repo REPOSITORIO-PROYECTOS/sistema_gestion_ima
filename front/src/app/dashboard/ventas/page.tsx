@@ -19,7 +19,13 @@ import { useCajaStore } from "@/lib/cajaStore";
 
 function DashboardVenta() {
 
-  const [productos, setProductos] = useState<{ tipo: string; cantidad: number; precioTotal: number; }[]>([]);
+  const [productos, setProductos] = useState<{
+    tipo: string;
+    cantidad: number;
+    precioTotal: number;
+    descuentoAplicado?: boolean;
+    porcentajeDescuento?: number;
+  }[]>([]);
   const [fechaActual, setFechaActual] = useState("");
   const [horaActual, setHoraActual] = useState("");
 
@@ -134,11 +140,18 @@ function DashboardVenta() {
               {productos.map((prod, index) => (
                 <li
                   key={index}
-                  className="flex flex-row w-full justify-between items-center px-8 py-6 bg-emerald-100 rounded-lg text-green-950 font-semibold border-3 border-green-800 text-xl shadow-lg"
+                  className="flex flex-col md:flex-row w-full justify-between items-start md:items-center px-8 py-6 bg-emerald-100 rounded-lg text-green-950 font-semibold border-3 border-green-800 text-xl shadow-lg"
                 >
-                  <div>
-                    {prod.tipo} - x{prod.cantidad} U. - ${prod.precioTotal}
+                  <div className="flex flex-col">
+                    <span>{prod.tipo} - x{prod.cantidad} U. - ${prod.precioTotal}</span>
+
+                    {prod.descuentoAplicado && (
+                      <span className="text-green-800 text-sm font-normal italic">
+                        Descuento aplicado: {prod.porcentajeDescuento}% OFF
+                      </span>
+                    )}
                   </div>
+
                   <Button variant="delete" onClick={() => handleEliminarProducto(index)}>X</Button>
                 </li>
               ))}
