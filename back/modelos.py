@@ -3,6 +3,7 @@
 from datetime import datetime, date
 from typing import List, Optional
 from sqlmodel import Field, Relationship, SQLModel, JSON, Column
+from sqlalchemy import UniqueConstraint
 
 # ===================================================================
 # === MODELOS DE ENTIDADES PRINCIPALES
@@ -29,6 +30,11 @@ class Usuario(SQLModel, table=True):
     movimientos_de_stock: List["StockMovimiento"] = Relationship(back_populates="usuario")
     compras_registradas: List["Compra"] = Relationship(back_populates="usuario")
     ventas_realizadas: List["Venta"] = Relationship(back_populates="usuario")
+    # --- RELACIÓN CON EMPRESA ---
+    id_rol: int = Field(foreign_key="roles.id")
+    id_empresa: int = Field(foreign_key="empresas.id")
+    empresa: "Empresa" = Relationship(back_populates="usuarios")    
+    rol: Rol = Relationship(back_populates="usuarios")
 
 class Tercero(SQLModel, table=True):
     __tablename__ = "terceros"
@@ -57,14 +63,25 @@ class Tercero(SQLModel, table=True):
 
 class Categoria(SQLModel, table=True):
     __tablename__ = "categorias"
+    __table_args__ = (UniqueConstraint("nombre", "id_empresa", name="uq_nombre_empresa_categoria"),)
     id: Optional[int] = Field(default=None, primary_key=True)
-    nombre: str = Field(unique=True)
+    nombre: str 
+    id_empresa: int = Field(foreign_key="empresas.id")
+    articulos: List["Articulo"] = Relationship(back_populates="categoria")
+    id_empresa: int = Field(foreign_key="empresas.id")
+    empresa: "Empresa" = Relationship()
+    
     articulos: List["Articulo"] = Relationship(back_populates="categoria")
 
 class Marca(SQLModel, table=True):
     __tablename__ = "marcas"
+    __table_args__ = (UniqueConstraint("nombre", "id_empresa", name="uq_nombre_empresa_categoria"),)
     id: Optional[int] = Field(default=None, primary_key=True)
-    nombre: str = Field(unique=True)
+    nombre: str
+    articulos: List["Articulo"] = Relationship(back_populates="marca")
+    id_empresa: int = Field(foreign_key="empresas.id")
+    empresa: "Empresa" = Relationship()
+    
     articulos: List["Articulo"] = Relationship(back_populates="marca")
 
 # ===================================================================
@@ -110,6 +127,15 @@ class Articulo(SQLModel, table=True):
     
     componentes_combo: List["ArticuloCombo"] = Relationship(back_populates="combo_padre", sa_relationship_kwargs={'primaryjoin': 'Articulo.id == ArticuloCombo.id_articulo_padre'})
     parte_de_combos: List["ArticuloCombo"] = Relationship(back_populates="componente_hijo", sa_relationship_kwargs={'primaryjoin': 'Articulo.id == ArticuloCombo.id_articulo_hijo'})
+    # Relación con códigos de barras
+    codigos_barras: List["ArticuloCodigo"] = Relationship(back_populates="articulo")
+
+    # --- CAMPO Y RELACIÓN AÑADIDOS PARA MULTI-EMPRESA ---
+    # Asumo que Empresa ya existe en este archivo.
+    id_empresa: int = Field(foreign_key="empresas.id")
+    empresa: "Empresa" = Relationship() # No necesita back_populates si no lista artículos desde Empresa
+    
+    proveedor_principal: Optional["Tercero"] = Relationship(back_populates="articulos_proveidos")
 
 class DescuentoProveedor(SQLModel, table=True):
     __tablename__ = "descuento_proveedor"
@@ -260,3 +286,55 @@ class LlaveMaestra(SQLModel, table=True):
     llave: str = Field(index=True, unique=True)
     fecha_creacion: datetime = Field(default_factory=datetime.utcnow)
     fecha_expiracion: datetime
+    
+# ===================================================================
+# === MODELOS DE CONFIGURACIÓN Y MULTI-EMPRESA
+# ===================================================================   
+
+class Empresa(SQLModel, table=True):
+    __tablename__ = "empresas"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    nombre_legal: str = Field(index=True, unique=True) # Razón Social
+    nombre_fantasia: Optional[str]
+    cuit: str = Field(unique=True, index=True)
+    activa: bool = Field(default=True)
+    creada_en: datetime = Field(default_factory=datetime.utcnow)
+
+    # --- RELACIONES ---
+    
+    # Cada empresa tiene su propia configuración específica.
+    configuracion: Optional["ConfiguracionEmpresa"] = Relationship(back_populates="empresa")
+    
+    # Cada usuario pertenece a una empresa.
+    usuarios: List["Usuario"] = Relationship(back_populates="empresa")
+
+class ConfiguracionEmpresa(SQLModel, table=True):
+    __tablename__ = "configuracion_empresa"
+    
+    # La clave primaria es el ID de la empresa. Esto asegura que solo haya
+    # una fila de configuración por empresa. Es una relación uno a uno.
+    id_empresa: int = Field(foreign_key="empresas.id", primary_key=True)
+    link_google_sheets: Optional[str] = Field(default=None) # Enlace a Google Sheets para reportes
+    
+    # --- Configuración de Apariencia ---
+    nombre_negocio: Optional[str] # Nombre a mostrar en los tickets
+    color_principal: str = Field(default="#000000")
+    ruta_logo: Optional[str] = Field(default=None)
+    ruta_icono: Optional[str] = Field(default=None)
+    
+    # --- Configuración Fiscal (AFIP) ---
+    afip_condicion_iva: Optional[str] = Field(default=None) # Ej: Monotributo, Responsable Inscripto
+    afip_punto_venta_predeterminado: Optional[int] = Field(default=None)
+    
+    # --- Datos de Contacto del Negocio ---
+    direccion_negocio: Optional[str] = Field(default=None)
+    telefono_negocio: Optional[str] = Field(default=None)
+    mail_negocio: Optional[str] = Field(default=None)
+    
+    # --- Bóveda de Secretos ---
+    # Aquí irían los secretos ENCRIPTADOS. El nombre del campo lo deja claro.
+    afip_certificado_encrypted: Optional[str] = Field(default=None)
+    afip_clave_privada_encrypted: Optional[str] = Field(default=None)
+    
+    # --- RELACIÓN ---
+    empresa: Empresa = Relationship(back_populates="configuracion")

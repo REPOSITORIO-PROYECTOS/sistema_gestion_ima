@@ -1,6 +1,6 @@
 # back/schemas/usuario_schemas.py
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 class RolResponse(BaseModel):
     id: int
@@ -15,3 +15,10 @@ class UsuarioResponse(BaseModel):
 
     class Config:
         from_attributes = True
+        
+class CambiarPasswordRequest(BaseModel):
+    password_actual: str
+    password_nueva: str = Field(min_length=8)
+
+class CambiarNombreUsuarioRequest(BaseModel):
+    nuevo_nombre_usuario: str = Field(min_length=3)

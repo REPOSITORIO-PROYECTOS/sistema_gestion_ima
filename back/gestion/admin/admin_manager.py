@@ -98,3 +98,52 @@ def obtener_todos_los_usuarios(db: Session) -> List[Usuario]:
 def obtener_todos_los_roles(db: Session) -> List[Rol]:
     """Obtiene una lista de todos los roles disponibles."""
     return db.exec(select(Rol)).all()
+
+def modificar_password_usuario(db: Session, id_usuario: int, nueva_password: str) -> Usuario:
+    """Actualiza la contraseña de un usuario, hasheando la nueva."""
+    usuario = db.get(Usuario, id_usuario)
+    if not usuario:
+        raise ValueError(f"Usuario con ID {id_usuario} no encontrado.")
+    
+    usuario.password_hash = get_password_hash(nueva_password)
+    db.add(usuario)
+    db.commit()
+    db.refresh(usuario)
+    return usuario
+
+def modificar_nombre_usuario(db: Session, id_usuario: int, nuevo_nombre: str) -> Usuario:
+    """Actualiza el nombre de usuario, verificando que el nuevo no esté en uso."""
+    # Verificación de unicidad: ¿el nuevo nombre ya existe en otro usuario?
+    conflicto = db.exec(select(Usuario).where(Usuario.nombre_usuario == nuevo_nombre, Usuario.id != id_usuario)).first()
+    if conflicto:
+        raise ValueError(f"El nombre de usuario '{nuevo_nombre}' ya está en uso por otro usuario.")
+        
+    usuario = db.get(Usuario, id_usuario)
+    if not usuario:
+        raise ValueError(f"Usuario con ID {id_usuario} no encontrado.")
+    
+    usuario.nombre_usuario = nuevo_nombre
+    db.add(usuario)
+    db.commit()
+    db.refresh(usuario)
+    return usuario
+
+def modificar_password_propia(
+    db: Session,
+    usuario_actual: Usuario,
+    password_actual: str,
+    password_nueva: str
+) -> Usuario:
+    """
+    Actualiza la contraseña de un usuario, verificando primero la contraseña actual.
+    """
+    # 1. Verificar si la contraseña actual proporcionada es correcta
+    if not verificar_password(password_actual, usuario_actual.password_hash):
+        raise ValueError("La contraseña actual es incorrecta.")
+    
+    # 2. Hashear y guardar la nueva contraseña
+    usuario_actual.password_hash = get_password_hash(password_nueva)
+    db.add(usuario_actual)
+    db.commit()
+    db.refresh(usuario_actual)
+    return usuario_actual
