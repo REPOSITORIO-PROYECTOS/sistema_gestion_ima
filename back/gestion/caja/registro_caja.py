@@ -61,6 +61,27 @@ def registrar_ingreso_egreso(
         db.refresh(nuevo_movimiento)
         print(f"   -> ÉXITO. Movimiento registrado con ID: {nuevo_movimiento.id}")
         print("--- [FIN TRACE] ---\n")
+
+        try:
+
+            datos_para_sheets = {
+                    "Tipo_movimiento": "egreso",
+                    "descripcion": concepto,
+                    "monto": monto,
+            }
+
+            if not caller.registrar_movimiento(datos_para_sheets):
+                print("⚠️ [DRIVE] La función registrar_movimiento devolvió False.")
+           
+            else:
+               print(f"⚠️ [DRIVE] No se pudo encontrar el cliente con ID . No se registrará el movimiento en Drive.")
+
+        except Exception as e_sheets:
+            print(f"❌ [DRIVE] Ocurrió un error al intentar registrar en Google Sheets: {e_sheets}")
+        
+
+
+
         return nuevo_movimiento
     except Exception as e:
         print(f"   -> ERROR de BD al registrar el movimiento: {e}")
