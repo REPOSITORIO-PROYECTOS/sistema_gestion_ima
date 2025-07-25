@@ -8,10 +8,6 @@ from back.gestion.caja.cliente_publico import obtener_cliente_por_id
 # Importa todos tus modelos. Asegúrate de que las rutas sean correctas.
 from back.modelos import Tercero, Venta, VentaDetalle, CajaMovimiento, Articulo 
 from back.utils.mysql_handler import get_db_connection
-# Importamos los otros "gestores" que contendrán la lógica específica
-# Suponemos que existen estos módulos que también migraremos
-# from back.gestion.clientes_manager import verificar_cliente_y_cta_cte
-# from back.gestion.facturacion_manager import generar_comprobante
 from back.utils.tablas_handler import TablasHandler
 from back.gestion.facturacion_afip import generar_factura_para_venta
 
@@ -20,43 +16,57 @@ caller = TablasHandler()
   
 
 
-def registrar_ingreso_egreso(id_sesion_caja: int, concepto: str, monto: float, tipo: str, usuario: str):
-    """
-    Registra un ingreso o egreso simple en la caja.
-    'tipo' debe ser 'INGRESO' o 'EGRESO'.
-    """
-    if tipo.upper() not in ['INGRESO', 'EGRESO']:
-        return {"status": "error", "message": "Tipo de movimiento no válido."}
+from back.modelos import (
+    Venta,
+    VentaDetalle,
+    CajaMovimiento,
+    Articulo,
+    Tercero
+)
 
-    conn = get_db_connection()
-    if not conn:
-        return {"status": "error", "message": "Error de conexión a la base de datos."}
+def registrar_ingreso_egreso(
+    db: Session,
+    id_sesion_caja: int,
+    concepto: str,
+    monto: float,
+    tipo: str,
+    id_usuario: int
+) -> CajaMovimiento:
+    """
+    Registra un ingreso o egreso simple en la caja usando SQLModel.
+    'tipo' debe ser 'INGRESO' o 'EGRESO'. El monto siempre es positivo.
+    """
+    print(f"\n--- [TRACE: REGISTRAR MOVIMIENTO] ---")
+    print(f"1. Solicitud de {tipo} para Sesión ID: {id_sesion_caja}, Monto: {monto}")
+
+    if tipo.upper() not in ['INGRESO', 'EGRESO']:
+        raise ValueError("Tipo de movimiento no válido. Debe ser 'INGRESO' o 'EGRESO'.")
     
-    cursor = conn.cursor()
+    if monto <= 0:
+        raise ValueError("El monto del movimiento debe ser un número positivo.")
+
+    # Creamos el objeto del movimiento directamente con SQLModel
+    nuevo_movimiento = CajaMovimiento(
+        id_caja_sesion=id_sesion_caja,
+        id_usuario=id_usuario,
+        tipo=tipo.upper(),
+        concepto=concepto,
+        monto=monto,  # El monto siempre se guarda en positivo
+        metodo_pago="EFECTIVO" # Asumimos efectivo para movimientos simples
+    )
+
     try:
-        query = """
-            INSERT INTO caja_movimientos (id_sesion, fecha, usuario, tipo_movimiento, concepto, monto)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """
-        # Guardamos el monto como negativo si es un egreso para facilitar sumas
-        monto_a_registrar = monto if tipo.upper() == 'INGRESO' else -abs(monto)
-        
-        valores = (id_sesion_caja, datetime.now(), usuario, tipo.upper(), concepto, monto_a_registrar)
-        cursor.execute(query, valores)
-        conn.commit()
-        
-        return {
-            "status": "success",
-            "message": f"{tipo.capitalize()} de ${abs(monto):.2f} registrado.",
-            "id_movimiento": cursor.lastrowid
-        }
-    except Error as e:
-        conn.rollback()
-        return {"status": "error", "message": f"Error de base de datos: {e}"}
-    finally:
-        if conn.is_connected():
-            cursor.close()
-            conn.close()
+        db.add(nuevo_movimiento)
+        db.commit()
+        db.refresh(nuevo_movimiento)
+        print(f"   -> ÉXITO. Movimiento registrado con ID: {nuevo_movimiento.id}")
+        print("--- [FIN TRACE] ---\n")
+        return nuevo_movimiento
+    except Exception as e:
+        print(f"   -> ERROR de BD al registrar el movimiento: {e}")
+        db.rollback()
+        # Relanzamos la excepción para que el router la capture
+        raise RuntimeError(f"Error de base de datos al registrar el movimiento: {e}")
 
 
 
@@ -148,15 +158,7 @@ def registrar_venta(
             print("[AFIP] Intentando generar factura para la venta...")
             cliente = db.get(Tercero, id_cliente) if id_cliente else None
             
-            # Llamamos a la función que habla con el microservicio
-            #LA VOY A DEJAR DESHABILITADA POR AHORA
-            #resultado_factura = generar_factura_para_venta(venta=nueva_venta, cliente=cliente)
-            
-            # (Opcional) Si quieres guardar el CAE en la DB, lo harías aquí con otro commit.
-            # Por ejemplo:
-            # nueva_venta.cae = resultado_factura.get("cae")
-            # db.add(nueva_venta)
-            # db.commit()
+
             
             print(f"[AFIP] Factura generada con éxito. CAE: {resultado_factura.get('cae')}")
         

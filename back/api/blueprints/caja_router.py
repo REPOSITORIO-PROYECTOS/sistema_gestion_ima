@@ -8,14 +8,14 @@ from fastapi import BackgroundTasks
 # --- Módulos del proyecto ---
 from back.database import get_db
 from back.security import es_cajero, obtener_usuario_actual, verificar_llave_maestra_apertura
-from back.modelos import Usuario
+from back.modelos import Usuario, CajaMovimiento
 # Importamos toda la lógica de negocio de la caja
 from back.gestion.caja import apertura_cierre, registro_caja, consultas_caja
 # Importamos los schemas corregidos
 from back.schemas.caja_schemas import (
     AbrirCajaRequest, CerrarCajaRequest, EstadoCajaResponse,
     RegistrarVentaRequest, ArqueoCajaResponse, RespuestaGenerica,
-    MovimientoSimpleRequest, CajaSesionResponse, InformeCajasResponse # <-- ¡Importamos el nuevo schema!
+    MovimientoSimpleRequest, CajaSesionResponse, CajaMovimientoResponse, InformeCajasResponse # <-- ¡Importamos el nuevo schema!
 )
 
 router = APIRouter(
@@ -104,37 +104,56 @@ def api_registrar_venta(
         raise HTTPException(status_code=503, detail=str(e)) # 503 Service Unavailable
     
 
-@router.post("/ingresos", response_model=RespuestaGenerica)
-def api_registrar_ingreso(req: MovimientoSimpleRequest, db: Session = Depends(get_db), current_user: Usuario = Depends(obtener_usuario_actual)):
+@router.post("/ingresos", response_model=CajaMovimientoResponse) # <-- Usamos el modelo real como respuesta
+def api_registrar_ingreso(
+    req: MovimientoSimpleRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(obtener_usuario_actual)
+):
     """Registra un ingreso de efectivo en la caja."""
     sesion_activa = apertura_cierre.obtener_caja_abierta_por_usuario(db, current_user)
     if not sesion_activa:
         raise HTTPException(status_code=400, detail="Operación denegada: El usuario no tiene una caja abierta.")
     
-    resultado = registro_caja.registrar_ingreso_egreso(
-        id_sesion_caja=sesion_activa.id, concepto=req.concepto, monto=req.monto,
-        tipo="INGRESO", usuario=current_user.nombre_usuario
-    )
-    if resultado.get("status") == "success":
-        return RespuestaGenerica(status="success", message=resultado.get("message"), data={"id_movimiento": resultado.get("id_movimiento")})
-    else:
-        raise HTTPException(status_code=400, detail=resultado.get("message", "Error al registrar ingreso."))
+    try:
+        # Llamamos a la nueva función refactorizada
+        return registro_caja.registrar_ingreso_egreso(
+            db=db,
+            id_sesion_caja=sesion_activa.id,
+            concepto=req.concepto,
+            monto=req.monto,
+            tipo="INGRESO",
+            id_usuario=current_user.id
+        )
+    except (ValueError, RuntimeError) as e:
+        # Capturamos los errores de negocio o de base de datos
+        raise HTTPException(status_code=400, detail=str(e))
 
-@router.post("/egresos", response_model=RespuestaGenerica)
-def api_registrar_egreso(req: MovimientoSimpleRequest, db: Session = Depends(get_db), current_user: Usuario = Depends(obtener_usuario_actual)):
+
+@router.post("/egresos", response_model=CajaMovimientoResponse)
+def api_registrar_egreso(
+    req: MovimientoSimpleRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(obtener_usuario_actual)
+):
     """Registra un egreso de efectivo de la caja."""
     sesion_activa = apertura_cierre.obtener_caja_abierta_por_usuario(db, current_user)
     if not sesion_activa:
         raise HTTPException(status_code=400, detail="Operación denegada: El usuario no tiene una caja abierta.")
-
-    resultado = registro_caja.registrar_ingreso_egreso(
-        id_sesion_caja=sesion_activa.id, concepto=req.concepto, monto=req.monto,
-        tipo="EGRESO", usuario=current_user.nombre_usuario
-    )
-    if resultado.get("status") == "success":
-        return RespuestaGenerica(status="success", message=resultado.get("message"), data={"id_movimiento": resultado.get("id_movimiento")})
-    else:
-        raise HTTPException(status_code=400, detail=resultado.get("message", "Error al registrar egreso."))
+    
+    try:
+        # Llamamos a la nueva función refactorizada
+        return registro_caja.registrar_ingreso_egreso(
+            db=db,
+            id_sesion_caja=sesion_activa.id,
+            concepto=req.concepto,
+            monto=req.monto,
+            tipo="EGRESO",
+            id_usuario=current_user.id
+        )
+    except (ValueError, RuntimeError) as e:
+        # Capturamos los errores de negocio o de base de datos
+        raise HTTPException(status_code=400, detail=str(e))
 
 # =================================================================
 # === ENDPOINT DE SUPERVISIÓN ===

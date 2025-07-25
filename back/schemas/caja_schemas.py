@@ -31,9 +31,20 @@ class RegistrarVentaRequest(BaseModel):
     quiere_factura: bool = False
     tipo_comprobante_solicitado: Optional[str] = None
 
+class CajaMovimientoResponse(BaseModel):
+    id: int
+    id_caja_sesion: int
+    id_usuario: int
+    fecha: datetime
+    concepto: str
+    monto: float
+    metodo_pago: Optional[str] = None
+    class Config:
+        from_attributes = True
 class MovimientoSimpleRequest(BaseModel):
     concepto: str
-    monto: float = Field(..., gt=0)
+    monto: float = Field(..., ge=0)
+    metodo_pago: Optional[str] = None
 
 
 class EstadoCajaResponse(BaseModel):
