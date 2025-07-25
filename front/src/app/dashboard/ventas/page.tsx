@@ -16,9 +16,11 @@ import {
 } from "@/components/ui/dialog";
 import CajaForm from "./CajaForm";
 import { useCajaStore } from "@/lib/cajaStore";
+import EgresoForm from "./EgresoForm";
 
 function DashboardVenta() {
 
+  /* Estados de la Caja de Ventas */
   const [productos, setProductos] = useState<{
     tipo: string;
     cantidad: number;
@@ -27,11 +29,9 @@ function DashboardVenta() {
     porcentajeDescuento?: number;
   }[]>([]);
   const [fechaActual, setFechaActual] = useState("");
-  const [horaActual, setHoraActual] = useState("");
-
-  // Estados
-  const role = useAuthStore((state) => state.role);     
+  const [horaActual, setHoraActual] = useState("");  
   const { cajaAbierta } = useCajaStore();
+  const role = useAuthStore((state) => state.role);   
 
   // Hook para calcular fecha y hora en vivo
   useEffect(() => {
@@ -87,31 +87,45 @@ function DashboardVenta() {
 
         {/* Header de Informacion */}
         <div className="flex flex-wrap justify-between items-center p-4 gap-4 bg-neutral-800/90 rounded-xl px-6">
+          {/* Fecha y Hora */}
           <Input
-            value={fechaActual}
+            value={`${fechaActual}                               ${horaActual}`}
             disabled
             className="w-full sm:w-[48%] lg:w-[23%] text-white font-semibold border border-white bg-transparent placeholder-white disabled:opacity-100 rounded-lg"
           />
-          <Input
-            value={horaActual}
-            disabled
-            className="w-full sm:w-[48%] lg:w-[23%] text-white font-semibold border border-white bg-transparent placeholder-white disabled:opacity-100 rounded-lg"
-          />
+          {/* Muestra Rol */}
           <Input
             value={mostrarRol()}
             disabled
             className="w-full sm:w-[48%] lg:w-[23%] text-white font-semibold border border-white bg-transparent placeholder-white disabled:opacity-100 rounded-lg"
           />
-          {/* Boton abrir caja */}
+          
+          {/* Modal para egresos de dinero en efectivo */}
+          <Dialog>
+              <DialogTrigger asChild className="w-full sm:w-[48%] lg:w-[23%]">
+                <Button type="button" variant="success" disabled={!cajaAbierta}>
+                  Egresos de Dinero
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Egresos de Dinero en Efectivo</DialogTitle>
+                  <DialogDescription>Si desea retirar dinero en efectivo de la caja, complete los datos</DialogDescription>
+                </DialogHeader>
+
+                {/* Modal de Egreso de Dinero */}
+                <EgresoForm />
+              </DialogContent>
+          </Dialog>
+
+          {/* Boton Abrir / Cerrar Caja */}
           <Dialog>
               <DialogTrigger asChild className="w-full sm:w-[48%] lg:w-[23%]">
                   <Button type="submit" variant="success">
                     {cajaAbierta ? "Cerrar Caja" : "Abrir Caja"}
                   </Button>
               </DialogTrigger>
-
               <DialogContent className="sm:max-w-lg">
-
                 <DialogHeader>
                   <DialogTitle>Apertura / Cierre de Caja</DialogTitle>
                   <DialogDescription>Ingrese los datos solicitados para abrir la caja</DialogDescription>

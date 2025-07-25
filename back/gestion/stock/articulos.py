@@ -48,7 +48,7 @@ def obtener_todos_los_articulos(db: Session, skip: int = 0, limit: int = 100) ->
     """
     Obtiene una lista paginada de todos los artículos usando el ORM.
     """
-    statement = select(Articulo).order_by(Articulo.descripcion).offset(skip).limit(limit)
+    statement = select(Articulo).order_by(Articulo.descripcion).offset(skip).limit(limit).distinct()
     return db.exec(statement).all()
 
 def obtener_articulo_por_codigo_barras(db: Session, codigo_barras: str) -> Optional[Articulo]:
