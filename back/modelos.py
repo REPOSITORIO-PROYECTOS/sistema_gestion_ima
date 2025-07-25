@@ -31,10 +31,8 @@ class Usuario(SQLModel, table=True):
     compras_registradas: List["Compra"] = Relationship(back_populates="usuario")
     ventas_realizadas: List["Venta"] = Relationship(back_populates="usuario")
     # --- RELACIÓN CON EMPRESA ---
-    id_rol: int = Field(foreign_key="roles.id")
     id_empresa: int = Field(foreign_key="empresas.id")
     empresa: "Empresa" = Relationship(back_populates="usuarios")    
-    rol: Rol = Relationship(back_populates="usuarios")
 
 class Tercero(SQLModel, table=True):
     __tablename__ = "terceros"
@@ -59,7 +57,15 @@ class Tercero(SQLModel, table=True):
     notas: Optional[str]
     compras_realizadas: List["Compra"] = Relationship(back_populates="proveedor")
     ventas_recibidas: List["Venta"] = Relationship(back_populates="cliente")
-    articulos_proveidos: List["Articulo"] = Relationship(back_populates="proveedor_principal")
+    id_empresa: int = Field(foreign_key="empresas.id")
+    empresa: "Empresa" = Relationship() # No necesita back_populates si Empresa no lista terceros
+
+    # --- NUEVA RELACIÓN PARA LAS PLANTILLAS DE IMPORTACIÓN ---
+    plantillas_mapeo: List["PlantillaMapeoProveedor"] = Relationship(back_populates="proveedor")
+
+    # --- NUEVA RELACIÓN PARA LOS ARTÍCULOS ASOCIADOS ---
+    articulos_asociados: List["ArticuloProveedor"] = Relationship(back_populates="proveedor")
+
 
 class Categoria(SQLModel, table=True):
     __tablename__ = "categorias"
@@ -68,11 +74,8 @@ class Categoria(SQLModel, table=True):
     nombre: str 
     id_empresa: int = Field(foreign_key="empresas.id")
     articulos: List["Articulo"] = Relationship(back_populates="categoria")
-    id_empresa: int = Field(foreign_key="empresas.id")
     empresa: "Empresa" = Relationship()
     
-    articulos: List["Articulo"] = Relationship(back_populates="categoria")
-
 class Marca(SQLModel, table=True):
     __tablename__ = "marcas"
     __table_args__ = (UniqueConstraint("nombre", "id_empresa", name="uq_nombre_empresa_categoria"),)
@@ -82,8 +85,6 @@ class Marca(SQLModel, table=True):
     id_empresa: int = Field(foreign_key="empresas.id")
     empresa: "Empresa" = Relationship()
     
-    articulos: List["Articulo"] = Relationship(back_populates="marca")
-
 # ===================================================================
 # === MODELO DE ARTÍCULO Y GESTIÓN DE INVENTARIO
 # ===================================================================
@@ -92,7 +93,6 @@ class Articulo(SQLModel, table=True):
     __tablename__ = "articulos"
     id: Optional[int] = Field(default=None, primary_key=True)
     codigo_interno: Optional[str] = Field(index=True, unique=True, nullable=True)
-    codigo_proveedor: Optional[str] = Field(index=True, nullable=True)
     descripcion: str
     unidad_compra: str = Field(default="Unidad")
     unidad_venta: str = Field(default="Unidad")
@@ -110,14 +110,15 @@ class Articulo(SQLModel, table=True):
     activo: bool = Field(default=True)
     es_combo: bool = Field(default=False)
     maneja_lotes: bool = Field(default=False)
-    id_proveedor_principal: Optional[int] = Field(default=None, foreign_key="terceros.id")
+    
     id_categoria: Optional[int] = Field(default=None, foreign_key="categorias.id")
     id_marca: Optional[int] = Field(default=None, foreign_key="marcas.id")
 
-    proveedor_principal: Optional["Tercero"] = Relationship(back_populates="articulos_proveidos")
     categoria: Optional["Categoria"] = Relationship(back_populates="articulos")
     marca: Optional["Marca"] = Relationship(back_populates="articulos")
-    
+    empresa: "Empresa" = Relationship()
+    proveedores: List["ArticuloProveedor"] = Relationship(back_populates="articulo")
+   
     codigos: List["ArticuloCodigo"] = Relationship(back_populates="articulo")
     movimientos_stock: List["StockMovimiento"] = Relationship(back_populates="articulo")
     
@@ -133,10 +134,7 @@ class Articulo(SQLModel, table=True):
     # --- CAMPO Y RELACIÓN AÑADIDOS PARA MULTI-EMPRESA ---
     # Asumo que Empresa ya existe en este archivo.
     id_empresa: int = Field(foreign_key="empresas.id")
-    empresa: "Empresa" = Relationship() # No necesita back_populates si no lista artículos desde Empresa
     
-    proveedor_principal: Optional["Tercero"] = Relationship(back_populates="articulos_proveidos")
-
 class DescuentoProveedor(SQLModel, table=True):
     __tablename__ = "descuento_proveedor"
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -144,15 +142,25 @@ class DescuentoProveedor(SQLModel, table=True):
     porcentaje_descuento: float
     activo: bool = Field(default=True)
 
-class PlantillaProveedor(SQLModel, table=True):
-    __tablename__ = "plantilla_proveedor"
+class PlantillaMapeoProveedor(SQLModel, table=True):
+    __tablename__ = "plantilla_mapeo_proveedor" # Renombrado para claridad
+    __table_args__ = (UniqueConstraint("nombre_plantilla", "id_empresa", name="uq_nombre_plantilla_empresa"),)
+    
     id: Optional[int] = Field(default=None, primary_key=True)
-    id_proveedor: int = Field(foreign_key="terceros.id")
     nombre_plantilla: str
+    
+    # Relaciones clave
+    id_proveedor: int = Field(foreign_key="terceros.id")
+    id_empresa: int = Field(foreign_key="empresas.id")
+    
+    # Configuración del mapeo (tu implementación era perfecta)
     mapeo_columnas: Dict[str, str] = Field(sa_column=Column(JSON))
-    nombre_hoja_excel: Optional[str] = Field(default=None)
-    fila_inicio: int = Field(default=1)
-    fila_fin: Optional[int] = Field(default=None)
+    nombre_hoja_excel: Optional[str] = Field(default=None) # Ej: "Lista Precios"
+    fila_inicio: int = Field(default=2) # Es más común que la fila 1 sea de encabezados
+
+    # Relaciones para navegar
+    proveedor: Tercero = Relationship(back_populates="plantillas_mapeo")
+    empresa: "Empresa" = Relationship()
 
 class ArticuloCombo(SQLModel, table=True):
     __tablename__ = "articulo_combo"
@@ -341,3 +349,16 @@ class ConfiguracionEmpresa(SQLModel, table=True):
     
     # --- RELACIÓN ---
     empresa: Empresa = Relationship(back_populates="configuracion")
+    
+    
+class ArticuloProveedor(SQLModel, table=True):
+    __tablename__ = "articulo_proveedor"
+    id_articulo: int = Field(foreign_key="articulos.id", primary_key=True)
+    id_proveedor: int = Field(foreign_key="terceros.id", primary_key=True)
+    
+    # Este es el campo clave para la importación
+    codigo_articulo_proveedor: str = Field(index=True) 
+
+    # Relaciones para poder navegar desde este objeto
+    articulo: Articulo = Relationship(back_populates="proveedores")
+    proveedor: Tercero = Relationship(back_populates="articulos_asociados")

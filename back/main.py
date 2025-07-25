@@ -1,8 +1,10 @@
 # back/main.py
 
-from back.api.blueprints import admin_router, articulos_router, auth_router,actualizacion_masiva_router,clientes_router
+from back.api.blueprints import admin_router, articulos_router, auth_router,actualizacion_masiva_router,clientes_router, configuracion_router, importaciones_router, proveedores_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
 
 # Importamos los routers que acabamos de crear
 from back.api.blueprints import caja_router
@@ -68,6 +70,9 @@ app.include_router(articulos_router.router)
 app.include_router(actualizacion_masiva_router.router)
 app.include_router(clientes_router.router)
 app.include_router(usuarios_router.router)
+app.include_router(importaciones_router.router)
+app.include_router(proveedores_router.router)
+app.include_router(configuracion_router.router)
 
 
 # --- Endpoint Raíz ---
@@ -77,3 +82,5 @@ async def read_root():
     Endpoint principal que da la bienvenida a la API.
     """
     return {"message": "Bienvenido a la API del Sistema de Gestión IMA v1.0. La arquitectura ha sido actualizada."}
+
+app.mount("/static", StaticFiles(directory="back/static"), name="static")
