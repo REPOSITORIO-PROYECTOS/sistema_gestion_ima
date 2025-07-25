@@ -57,8 +57,7 @@ type Cliente = {
 // Dropdown tipo de cliente
 const tipoCliente = [
   { id: "0", nombre: "Cliente Final" },
-  { id: "1", nombre: "Cliente con CUIT" },
-  { id: "2", nombre: "Cliente sin CUIT" },
+  { id: "1", nombre: "Cliente Registrado" },
 ];
 
 function FormVentas({
@@ -103,6 +102,7 @@ function FormVentas({
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null);
   const [openCliente, setOpenCliente] = useState(false);
+  const [busquedaCliente, setBusquedaCliente] = useState("");
 
   // Ingresar el CUIT de un Cliente Final - POST
   const [cuitManual, setCuitManual] = useState("");
@@ -416,7 +416,7 @@ function FormVentas({
             )}
 
             {/* Si el tipo de cliente es con CUIT... */}
-            {tipoClienteSeleccionado.id === "1" || tipoClienteSeleccionado.id === "2" ? (
+            {tipoClienteSeleccionado.id === "1" && (
             <div className="w-full flex flex-col gap-2">
               {!clientes.length ? (
                 <p className="text-green-900 font-semibold">Cargando clientes...</p>
@@ -442,20 +442,25 @@ function FormVentas({
                     sideOffset={8}
                   >
                     <Command>
-                      <CommandInput placeholder="Buscar cliente por nombre..." />
+                      <CommandInput
+                        placeholder="Buscar cliente por nombre o CUIT..."
+                        value={busquedaCliente}
+                        onValueChange={setBusquedaCliente}
+                      />
                       <CommandEmpty>No se encontró ningún cliente.</CommandEmpty>
                       <CommandGroup>
                         {clientes
                           .filter((cliente) => {
-                            // Filtrado según tipo de cliente seleccionado
-                            if (tipoClienteSeleccionado.id === "1") return !!cliente.cuit;
-                            if (tipoClienteSeleccionado.id === "2") return !cliente.cuit;
-                            return false;
+                            const texto = busquedaCliente.toLowerCase();
+                            return (
+                              cliente.nombre_razon_social.toLowerCase().includes(texto) ||
+                              cliente.cuit?.toString().includes(texto)
+                            );
                           })
                           .map((cliente) => (
                             <CommandItem
                               key={cliente.id}
-                              value={cliente.nombre_razon_social}
+                              value={`${cliente.nombre_razon_social} ${cliente.cuit || ""}`}
                               className="pl-2 pr-4 py-2 text-sm text-black cursor-pointer"
                               onSelect={() => {
                                 setClienteSeleccionado(cliente);
@@ -466,14 +471,14 @@ function FormVentas({
                                 {cliente.nombre_razon_social} ({cliente.cuit || "Sin CUIT"})
                               </span>
                             </CommandItem>
-                          ))}
+                        ))}
                       </CommandGroup>
                     </Command>
                   </PopoverContent>
                 </Popover>
               )}
             </div>
-          ) : null}
+          )}
           </div>
         </div>
         <span className="block w-full h-0.5 bg-green-900"></span>
@@ -618,7 +623,6 @@ function FormVentas({
 
         {/* --------------------------------------- */} <hr className="p-0.75 bg-green-900 my-8"/> {/* --------------------------------------- */}
 
-
         {/* Método de Pago y condicional efectivo */}
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-4 items-start justify-between md:flex-row">
@@ -684,7 +688,6 @@ function FormVentas({
           )}
         </div>
         <span className="block w-full h-0.5 bg-green-900"></span>
-
 
         {/* Opciones de Tipo de Facturación */}
         <RadioGroup
@@ -780,7 +783,6 @@ function FormVentas({
         </RadioGroup>
         <span className="block w-full h-0.5 bg-green-900"></span>
 
-
         {/* Observaciones */}
         <div className="flex flex-col w-full gap-2">
           <Label className="text-green-900 text-xl" htmlFor="message-2">Observaciones</Label>
@@ -818,7 +820,7 @@ function FormVentas({
         <span className="block w-full h-0.5 bg-green-900"></span>
                 
         {/* Total Venta */}
-        <div className="flex flex-col gap-4 p-4 border border-green-900 rounded-lg">
+        <div className="flex flex-col gap-4 p-6 border border-green-900 rounded-lg">
           <Label className="text-2xl font-semibold text-green-900">Resumen del Pedido</Label>
           <p className="text-xl text-green-900">
             <span className="font-semibold">Total sin descuento:</span> ${totalVenta}
@@ -830,7 +832,6 @@ function FormVentas({
             <span className="font-semibold">Total con descuento:</span> ${totalConDescuento}
           </p>
         </div>
-
 
         {/* Botón Final: Registra venta y envia toda la info al server */}
         <Button
