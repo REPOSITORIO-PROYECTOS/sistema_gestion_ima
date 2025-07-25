@@ -106,3 +106,68 @@ Validación del Frontend: La tarea más inmediata es que el equipo de frontend a
 Completar Lógica de Artículos: Implementar en el frontend los endpoints ya creados en el backend para gestionar los múltiples códigos de barras.
 Refactorizar Lógica Heredada: Módulos como registro_caja.py todavía usan mysql-connector para algunas operaciones y deben ser migrados a SQLModel para una consistencia total.
 Implementar Nuevas Funcionalidades: Desarrollar la lógica de negocio y los endpoints para las funcionalidades avanzadas ya diseñadas, como la actualización masiva de precios y la creación de combos de productos.
+
+
+Documento de Contexto y Estado del Proyecto: Sistema de Gestión IMA
+Fecha de Estado: 25 de Julio de 2025
+1. Resumen Ejecutivo
+El proyecto consiste en el desarrollo y refactorización del backend para un sistema de gestión multi-tenant (multi-empresa). Partimos de una base de código funcional pero con áreas de "lógica heredada" (conexiones directas a MySQL) y problemas críticos de entorno que impedían su funcionamiento (502 Bad Gateway). Nuestro trabajo se ha centrado en estabilizar la aplicación, modernizar la arquitectura para que sea 100% consistente con SQLModel (ORM), y diseñar soluciones escalables y seguras para funcionalidades complejas como la generación de comprobantes fiscales y la importación masiva de datos. La arquitectura ahora está preparada para dar servicio a múltiples empresas, tratando los datos de cada una como una entidad aislada y segura.
+2. Arquitectura Fundamental (Confirmada y Estable)
+Esta es la "ley" sobre la que opera todo el sistema. Cualquier nuevo desarrollo debe respetarla.
+Fuente Única de Verdad: Base de datos MySQL.
+Backend: FastAPI con SQLModel (la capa que une SQLAlchemy y Pydantic).
+Capas de Lógica Estrictas:
+back/api/blueprints/ (Routers): Capa de presentación. Define los endpoints, valida los datos de entrada/salida con Schemas y llama a la lógica de negocio. No contiene lógica de negocio.
+back/gestion/ (Managers): Capa de lógica de negocio. Contiene las funciones de Python que interactúan con la base de datos a través del ORM (SQLModel). Es agnóstica a HTTP.
+back/schemas/ (Schemas): Contratos de datos (Pydantic) que definen la estructura de los JSON que viajan a través de la API.
+back/modelos.py (Modelos): Definición de las tablas de la base de datos como clases de Python (SQLModel), incluyendo sus relaciones.
+3. Problemas Críticos Resueltos (La Estabilización)
+502 Bad Gateway al Arrancar:
+Diagnóstico: ImportError: cannot import name 'ventas_router'. El archivo main.py intentaba importar un router que no existía o no estaba correctamente expuesto, causando un crash inmediato en la aplicación.
+Solución: Se corrigieron las importaciones en main.py para que solo incluyeran los routers existentes, permitiendo que la aplicación arrancara.
+Fallo Total de Autenticación (AttributeError en bcrypt):
+Diagnóstico: Una incompatibilidad de versiones entre las librerías passlib y bcrypt causaba un crash cada vez que se intentaba verificar o hashear una contraseña. Esto rompía el login (/auth/token) y, en consecuencia, todos los endpoints protegidos.
+Solución: Se ejecutó el comando pip install --force-reinstall "passlib[bcrypt]==1.7.4" en el entorno virtual del servidor y se reinició la aplicación.
+Desincronización Frontend/Backend:
+Diagnóstico: El frontend enviaba datos en formatos o con cabeceras que el backend no esperaba (ej: x-admin-token en vez de Authorization: Bearer <token>, id_rol cuando se esperaba nombre_rol, form-urlencoded vs json).
+Solución: Se ha estandarizado la comunicación. Todos los endpoints protegidos ahora esperan Authorization: Bearer <token>, y los schemas del backend se han ajustado para coincidir con los datos que envía el frontend.
+4. Estado Actual de los Módulos y Decisiones de Diseño
+Modelo de Datos Multi-Empresa:
+Decisión: El sistema debe soportar múltiples empresas. Se ha rediseñado el modelos.py.
+Implementación: Se crearon los modelos Empresa y ConfiguracionEmpresa. Los modelos clave como Usuario, Articulo, Categoria y Marca ahora están vinculados a una Empresa a través de un id_empresa. Esto garantiza el aislamiento de datos (data tenancy).
+Pendiente: Refactorizar toda la capa de gestion (managers) para que las consultas siempre filtren por el id_empresa del usuario autenticado.
+Gestión de Caja:
+Estado: Completamente refactorizada a SQLModel.
+Funcionalidad: Soporta apertura, cierre, ingresos y egresos de forma transaccionalmente segura. Se añadió una lógica de "Admin Override" que permite a un administrador o gerente cerrar la caja abierta de cualquier usuario.
+Gestión de Usuarios y Configuración:
+admin_manager.py: Contiene la lógica para que un admin gestione a otros usuarios (crear, activar/desactivar, cambiar rol/nombre/contraseña).
+usuarios_router.py (/users/me): Contiene los endpoints para que un usuario gestione su propia cuenta (cambiar su contraseña, ver sus datos).
+configuracion_manager.py: Se ha creado la lógica para gestionar la configuración específica de cada empresa (nombre, logo, datos fiscales), almacenada en la nueva tabla ConfiguracionEmpresa.
+Generación de Comprobantes (Boletas):
+Decisión: El backend es el único responsable de generar los documentos para garantizar consistencia y seguridad.
+Arquitectura: Se ha diseñado un sistema stateless multi-empresa.
+Endpoint: POST /comprobantes/generar.
+Flujo: El frontend envía un JSON complejo que contiene toda la información: datos del emisor, del receptor y de la transacción. El backend no depende de su propia base de datos para generar el comprobante.
+Flexibilidad: El JSON de entrada especifica el formato (pdf o ticket) y el tipo (factura, remito, presupuesto, recibo). El backend selecciona la plantilla HTML+CSS adecuada y la renderiza como PDF.
+Facturación AFIP:
+Decisión: La lógica de comunicación con AFIP está encapsulada en su propio módulo (facturacion_afip.py).
+Integración: El "orquestador" de comprobantes (generador_comprobantes.py) llama a este módulo "especialista" únicamente cuando se solicita tipo="factura".
+Importación de Listas de Proveedores (Actualización Masiva):
+Decisión: Se debe permitir la actualización de costos y precios a partir de archivos Excel de proveedores, cada uno con su propio formato.
+Arquitectura: Se ha diseñado un sistema de Plantillas de Mapeo.
+Flujo:
+Configuración: Un admin define una plantilla para un proveedor, mapeando las columnas del Excel (ej: "PRECIO LISTA") a los campos de la base de datos (ej: precio_costo). Esto se guarda en la tabla PlantillaProveedor.
+Pre-visualización: Un usuario sube un Excel. El backend usa la plantilla para leerlo y devuelve un informe de los cambios que se harían, sin aplicarlos (/preview/{id_proveedor}).
+Confirmación: Se debe implementar un futuro endpoint que reciba la confirmación y aplique los cambios en la base de datos.
+Bóveda de Secretos (Credenciales AFIP):
+Decisión: Las credenciales de AFIP de cada empresa son demasiado sensibles para estar en la base de datos principal, incluso encriptadas.
+Arquitectura Final: Se ha diseñado la creación de un microservicio "Bóveda" independiente.
+Flujo: La API principal, cuando necesite facturar, hará una llamada HTTP interna y segura a este microservicio, solicitando las credenciales para un CUIT específico. El microservicio las desencriptará en memoria y las devolverá. Esto proporciona el máximo nivel de aislamiento y seguridad.
+5. Próximos Pasos Fundamentales
+Implementar el Microservicio Bóveda: Construir la pequeña API FastAPI para la gestión de secretos.
+Refactorizar los Managers para Multi-Tenancy: Modificar todas las consultas (artículos, clientes, etc.) para que siempre incluyan el filtro where(Modelo.id_empresa == current_user.id_empresa).
+Construir el Frontend para las nuevas funcionalidades:
+Panel de configuración de la empresa.
+Sistema de configuración de plantillas de proveedores.
+Interfaz para el flujo de importación/pre-visualización/confirmación de listas de precios.
+Implementar el endpoint de confirmación para la actualización masiva de precios.

@@ -1,7 +1,7 @@
 #/sistema_gestion_ima/back/modelos.py
 
 from datetime import datetime, date
-from typing import List, Optional
+from typing import Dict, List, Optional
 from sqlmodel import Field, Relationship, SQLModel, JSON, Column
 from sqlalchemy import UniqueConstraint
 
@@ -149,7 +149,10 @@ class PlantillaProveedor(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     id_proveedor: int = Field(foreign_key="terceros.id")
     nombre_plantilla: str
-    mapeo_columnas: dict = Field(sa_column=Column(JSON))
+    mapeo_columnas: Dict[str, str] = Field(sa_column=Column(JSON))
+    nombre_hoja_excel: Optional[str] = Field(default=None)
+    fila_inicio: int = Field(default=1)
+    fila_fin: Optional[int] = Field(default=None)
 
 class ArticuloCombo(SQLModel, table=True):
     __tablename__ = "articulo_combo"
