@@ -97,6 +97,8 @@ function FormVentas({
     stock_actual: number;
   } | null>(null);
 
+  const token = useAuthStore((state) => state.token);
+
   // Listado de Clientes - GET
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null);
@@ -105,18 +107,15 @@ function FormVentas({
   // Ingresar el CUIT de un Cliente Final - POST
   const [cuitManual, setCuitManual] = useState("");
 
-  /* 
-    AGREGAR LOGICA DE REGISTRO? 
-  */
-
-  const token = useAuthStore((state) => state.token);
-    
-
-
   // Cantidad de un producto particular - se * por el producto y se saca el valor total
   const [cantidad, setCantidad] = useState(1)
-  // Porcentaje de Descuento sobre total
+  // Porcentaje de Descuento sobre un producto en especifico
   const [descuento, setDescuento] = useState(0);
+
+  // Porcentaje de Descuento sobre valor final
+  const [descuentoSobreTotal, setDescuentoSobreTotal] = useState(0);
+  const totalConDescuento = Math.round(totalVenta * (1 - descuentoSobreTotal / 100));
+
 
   // Input de Busqueda para Productos
   /* const [searchProducto, setSearchProducto] = useState(""); */
@@ -137,11 +136,9 @@ function FormVentas({
   const [isLoading, setIsLoading] = useState(false);
 
   // Estado para la opción de facturación
-  const [tipoFacturacion, setTipoFacturacion] = useState("factura");
   const { habilitarExtras } = useFacturacionStore();  
-
+  const [tipoFacturacion, setTipoFacturacion] = useState("factura");
   
-
 
   /* Hooks */ /* -------------------------------------------------------------- */
 
@@ -165,7 +162,7 @@ function FormVentas({
   ? getPrecioProducto(productoSeleccionado) * cantidad
   : 0;
 
-  const totalConDescuento = totalProducto - (totalProducto * (descuento / 100));
+  const productoConDescuento = totalProducto - (totalProducto * (descuento / 100));
 
   // Hook para agregar producto al panel resumen de productos
   const handleAgregarProducto = () => {
@@ -178,7 +175,7 @@ function FormVentas({
     onAgregarProducto({
       tipo: productoSeleccionado.nombre,
       cantidad,
-      precioTotal: totalConDescuento,
+      precioTotal: productoConDescuento,
       descuentoAplicado,
       porcentajeDescuento,
     });
@@ -544,6 +541,7 @@ function FormVentas({
           <Label className="text-2xl font-semibold text-green-900">Cantidad</Label>
           <Input
             type="number"
+            onWheel={(e) => (e.target as HTMLInputElement).blur()}
             min={1}
             max={productoSeleccionado?.stock_actual || 9999}
             value={cantidad === 0 ? "" : cantidad}
@@ -575,6 +573,7 @@ function FormVentas({
           <Label className="text-2xl font-semibold text-green-900">Descuento a Aplicar (%)</Label>
           <Input
             type="number"
+            onWheel={(e) => (e.target as HTMLInputElement).blur()}
             min={0}
             max={100}
             value={descuento === 0 ? "" : descuento}
@@ -600,7 +599,7 @@ function FormVentas({
         <div className="flex flex-row gap-4 justify-between items-start mt-4">
           <Label className="text-2xl font-semibold text-green-900">Total</Label>
           <p className="text-2xl font-semibold text-green-900">
-            ${totalConDescuento.toFixed(2)}
+            ${productoConDescuento.toFixed(2)}
           </p>
         </div>
 
@@ -646,6 +645,7 @@ function FormVentas({
                 <Label className="text-2xl font-semibold text-white">Costo del Pedido:</Label>
                 <Input
                   type="number"
+                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
                   value={totalVenta}
                   disabled
                   className="w-full md:max-w-1/2 font-semibold text-white"
@@ -655,6 +655,7 @@ function FormVentas({
                 <Label className="text-2xl font-semibold text-white">Con cuánto abona:</Label>
                 <Input
                   type="number"
+                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
                   value={montoPagado === 0 ? "" : montoPagado}
                   onChange={(e) => {
                     const input = e.target.value;
@@ -790,14 +791,46 @@ function FormVentas({
             onChange={(e) => setObservaciones(e.target.value)}
           />
         </div>
+        <span className="block w-full h-0.5 bg-green-900"></span>
 
-        {/* --------------------------------------- */} <hr className="p-0.75 bg-green-900 my-8"/> {/* --------------------------------------- */}
-        
-        {/* Total Venta */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-between items-center px-2">
-          <Label className="text-2xl font-semibold text-green-900">Total del Pedido</Label>
-          <p className="text-3xl font-semibold text-green-900">${totalVenta}</p>
+        {/* Descuento a Aplicar sobre el TOTAL */}
+        <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
+          <Label className="text-2xl font-semibold text-green-900">Descuento Sobre Total (%)</Label>
+          <Input
+            type="number"
+            min={0}
+            max={100}
+            value={descuentoSobreTotal === 0 ? "" : descuentoSobreTotal}
+            onWheel={(e) => (e.target as HTMLInputElement).blur()}
+            onChange={(e) => {
+              const input = e.target.value;
+              if (input === "") {
+                setDescuentoSobreTotal(0);
+                return;
+              }
+              const parsed = parseInt(input, 10);
+              if (isNaN(parsed)) return;
+              setDescuentoSobreTotal(Math.min(parsed, 100));
+            }}
+            className="w-full md:max-w-2/3 text-black"
+          />
         </div>
+        <span className="block w-full h-0.5 bg-green-900"></span>
+                
+        {/* Total Venta */}
+        <div className="flex flex-col gap-4 p-4 border border-green-900 rounded-lg">
+          <Label className="text-2xl font-semibold text-green-900">Resumen del Pedido</Label>
+          <p className="text-xl text-green-900">
+            <span className="font-semibold">Total sin descuento:</span> ${totalVenta}
+          </p>
+          <p className="text-xl text-green-400">
+            <span className="font-semibold">Descuento aplicado al total:</span> {descuentoSobreTotal}%
+          </p>
+          <p className="text-2xl font-bold text-green-900">
+            <span className="font-semibold">Total con descuento:</span> ${totalConDescuento}
+          </p>
+        </div>
+
 
         {/* Botón Final: Registra venta y envia toda la info al server */}
         <Button
