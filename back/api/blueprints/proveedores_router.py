@@ -11,7 +11,7 @@ from back.modelos import Usuario
 from back.schemas.caja_schemas import RespuestaGenerica
 
 # Lógica de negocio (Managers)
-from back.gestion.contabilidad import proveedores_manager
+from back.gestion.contabilidad.proveedores_contabilidad import proveedores_manager
 
 # Schemas específicos
 from back.schemas.proveedor_schemas import (
