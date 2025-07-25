@@ -6,7 +6,6 @@ import {
   NavigationMenuLink,
   NavigationMenuList,
 } from "@/components/ui/navigation-menu"
-
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,11 +13,9 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react';
-
 import { useAuthStore } from '@/lib/authStore'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image';
@@ -33,9 +30,10 @@ type NavLink = {
 function NavBar({ links, role }: { links: NavLink[], role: string }) {
 
   const pathname = usePathname();
+  const router = useRouter();
+  const usuario = useAuthStore((state) => state.usuario);
   const [show, setShow] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
-  const router = useRouter();
 
   // Oculta NavBar en scroll
   useEffect(() => {
@@ -48,6 +46,12 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, [lastScrollY]);
+
+  // Detecta las iniciales del nombre_usuario para display en avatar
+  const avatarText = usuario?.nombre_usuario
+  ? usuario.nombre_usuario.slice(0, 2).toUpperCase()
+  : 'US';
+
 
   return (
 
@@ -98,10 +102,18 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="cursor-pointer bg-green-300 text-gray-800 font-semibold p-2 rounded-full w-14 h-14 flex items-center justify-center">
-                  IM
+                  {avatarText}
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-white">
+
+                {/* Nombre Usuario */}
+                <DropdownMenuItem className="text-gray-600">
+                  {usuario?.nombre_usuario}
+                </DropdownMenuItem>
+
+                <DropdownMenuSeparator />
+
                 {/* Cerrar Sesión */}
                 <DropdownMenuItem 
                   className="cursor-pointer text-red-600"
@@ -112,6 +124,7 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                 >
                   Cerrar Sesión
                 </DropdownMenuItem>
+
                 {/* Seccion gestion de usuarios */}
                 <DropdownMenuItem 
                   className="cursor-pointer"
@@ -132,6 +145,14 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-white">
+                
+                {/* Nombre Usuario */}
+                <DropdownMenuItem className="px-4 text-gray-600">
+                  {usuario?.nombre_usuario}
+                </DropdownMenuItem>
+
+                <DropdownMenuSeparator />
+
                 {links.map(({ href, name, roles }) => {
                   const isAllowed = roles.includes(role);
                   return (

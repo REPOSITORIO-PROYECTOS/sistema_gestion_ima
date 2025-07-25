@@ -21,7 +21,7 @@ router = APIRouter(
 
 # --- Endpoints para Gestión de Plantillas ---
 
-@router.post("/proveedores/{proveedor_id}/plantilla", response_model=PlantillaRead)
+@router.post("/proveedores/{proveedor_id}/crear-plantilla", response_model=PlantillaRead)
 def crear_o_actualizar_plantilla_proveedor(
     proveedor_id: int,
     plantilla_data: PlantillaCreate,
@@ -35,6 +35,7 @@ def crear_o_actualizar_plantilla_proveedor(
         return plantilla
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    
 
 @router.get("/proveedores/{proveedor_id}/plantilla", response_model=PlantillaRead)
 def obtener_plantilla_de_proveedor(

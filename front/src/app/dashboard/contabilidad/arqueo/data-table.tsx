@@ -31,6 +31,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import type { Row } from "@tanstack/react-table";
+import type { ArqueoCaja } from "./columns";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
@@ -44,7 +46,7 @@ export function DataTable<TData, TValue>({
 
     const [sorting, setSorting] = useState<SortingState>([])
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-    const [currentStatus, setCurrentStatus] = useState("all")
+    /* const [currentStatus, setCurrentStatus] = useState("all") */
 
     const table = useReactTable({
         data,
@@ -79,23 +81,22 @@ export function DataTable<TData, TValue>({
             />
 
             {/* Input de Seleccion por status */}
-            <Select value={currentStatus} onValueChange={(value) => {
-            setCurrentStatus(value)
-            table.getColumn("tipoUsuario")?.setFilterValue(value === "all" ? undefined : value)}}>
-
+            <Select
+                onValueChange={(value) =>
+                    table.getColumn("estado")?.setFilterValue(value === "all" ? undefined : value)
+                }
+                >
                 <SelectTrigger className="w-full sm:w-1/2 md:max-w-1/4 cursor-pointer">
-                    <SelectValue placeholder="Usuario"/>
+                    <SelectValue placeholder="Filtrar por Estado" />
                 </SelectTrigger>
-
                 <SelectContent>
                     <SelectGroup>
-                        <SelectLabel>Producto</SelectLabel>
-                        <SelectItem value="all">Todos</SelectItem>
-                        <SelectItem value="Proveedor">Proveedor</SelectItem>
-                        <SelectItem value="Cliente">Cliente</SelectItem>
+                    <SelectLabel>Estado</SelectLabel>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="ABIERTA">Abierta</SelectItem>
+                    <SelectItem value="CERRADA">Cerrada</SelectItem>
                     </SelectGroup>
                 </SelectContent>
-
             </Select>
         </div>
 
@@ -190,21 +191,43 @@ export function DataTable<TData, TValue>({
                 </div>
             </div>
 
-            {/* Balance Total */}
+            {/* Resumen de Arqueo */}
+            {/* Se resta el total de todos los saldo_inicial a saldo_final_declarado de cajas cerradas, y se compara con saldo_final_calculado */}
             <div className="text-center sm:text-right text-xl font-bold p-4">
             {(() => {
-                const rows = table.getFilteredRowModel().rows;
-                const total = rows.reduce((acc, row) => {
-                const { operacion, costo } = row.original as { operacion: string; costo: number };
-                return operacion === "Venta" ? acc + costo : acc - costo;
+                const rows = table.getFilteredRowModel().rows as Row<ArqueoCaja>[];
+
+                const cerradas = rows.filter((row) => row.original.estado === "CERRADA");
+
+                const totalGanancia = cerradas.reduce((acc, row) => {
+                const { saldo_final_declarado, saldo_inicial } = row.original;
+                return acc + ((saldo_final_declarado ?? 0) - (saldo_inicial ?? 0));
                 }, 0);
 
-                const formatted = new Intl.NumberFormat("es-AR", {
-                style: "currency",
-                currency: "ARS",
-                }).format(total);
+                const totalCalculado = cerradas.reduce((acc, row) => {
+                const { saldo_final_calculado } = row.original;
+                return acc + (saldo_final_calculado ?? 0);
+                }, 0);
 
-                return `Balance = ${formatted}`;
+                const coincide = totalGanancia === totalCalculado;
+
+                const format = (n: number) =>
+                new Intl.NumberFormat("es-AR", {
+                    style: "currency",
+                    currency: "ARS",
+                }).format(n);
+
+                return (
+                <div className="flex flex-col md:flex-row gap-6 bg-green-300 px-6 py-4 rounded-lg w-full md:justify-between">
+                    <span>Total declarado: {format(totalGanancia)}</span>
+                    <span>Total calculado: {format(totalCalculado)}</span>
+                    {coincide ? (
+                    <span className="text-green-600">✔ Coinciden</span>
+                    ) : (
+                    <span className="text-red-600">✘ No coinciden</span>
+                    )}
+                </div>
+                );
             })()}
             </div>
 

@@ -37,10 +37,11 @@ def get_estado_caja_propia(db: Session = Depends(get_db), current_user: Usuario 
         return EstadoCajaResponse(caja_abierta=True, id_sesion=sesion_abierta.id, fecha_apertura=sesion_abierta.fecha_apertura)
     return EstadoCajaResponse(caja_abierta=False)
 
+
 @router.post(
     "/abrir",
     response_model=CajaSesionResponse,
-    dependencies=[Depends(es_cajero), Depends(verificar_llave_maestra_apertura)]
+    dependencies=[Depends(es_cajero)]
 )
 def api_abrir_caja(
     req: AbrirCajaRequest,

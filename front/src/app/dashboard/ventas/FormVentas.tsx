@@ -33,6 +33,7 @@ import {
 
 import { ChevronsUpDown } from "lucide-react";
 import { useFacturacionStore } from "@/lib/facturacionStore";
+import { useAuthStore } from "@/lib/authStore"
 
 
 interface ProductoAPI {
@@ -65,7 +66,13 @@ function FormVentas({
   totalVenta,           /* Valor total de todos los productos - costo total del pedido */
   productosVendidos     /* Lista con todos los productos vendidos y su cantidad */
 }: {
-  onAgregarProducto: (prod: { tipo: string; cantidad: number; precioTotal: number }) => void,
+    onAgregarProducto: (prod: {
+    tipo: string;
+    cantidad: number;
+    precioTotal: number;
+    descuentoAplicado: boolean;
+    porcentajeDescuento: number;
+  }) => void
   totalVenta: number,
   productosVendidos: { tipo: string; cantidad: number; precioTotal: number }[]
 }) {
@@ -101,6 +108,9 @@ function FormVentas({
   /* 
     AGREGAR LOGICA DE REGISTRO? 
   */
+
+  const token = useAuthStore((state) => state.token);
+    
 
 
   // Cantidad de un producto particular - se * por el producto y se saca el valor total
@@ -160,16 +170,22 @@ function FormVentas({
   // Hook para agregar producto al panel resumen de productos
   const handleAgregarProducto = () => {
 
-    if (!productoSeleccionado) return; // Protege contra null
+    if (!productoSeleccionado) return;
+
+    const descuentoAplicado = descuento > 0;
+    const porcentajeDescuento = descuento;
 
     onAgregarProducto({
       tipo: productoSeleccionado.nombre,
       cantidad,
-      precioTotal: totalProducto,
+      precioTotal: totalConDescuento,
+      descuentoAplicado,
+      porcentajeDescuento,
     });
 
     setCantidad(1);
   };
+
 
   // Effect para mostrar la calculadora de vuelto si es pago con efectivo
   useEffect(() => {
@@ -318,7 +334,6 @@ function FormVentas({
           subtotal: p.precioTotal,
           tasa_iva: 21.0                     
         };
-
       })
     };
 
@@ -326,7 +341,8 @@ function FormVentas({
       const response = await fetch("https://sistema-ima.sistemataup.online/api/caja/ventas/registrar", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(ventaPayload)
       });

@@ -13,7 +13,7 @@ class RespuestaGenerica(BaseModel):
 
 class AbrirCajaRequest(BaseModel):
     saldo_inicial: float = Field(..., ge=0)
-    llave_maestra: str = Field(..., max_length=20, description="Llave maestra para abrir la caja")
+   
 
 class CerrarCajaRequest(BaseModel):
     saldo_final_declarado: float = Field(..., ge=0)
@@ -73,6 +73,7 @@ class CajaAbiertaResponse(BaseModel):
     fecha_apertura: datetime
     usuario_apertura: str
     saldo_inicial: float
+    estado: str
 
 class ArqueoCerradoResponse(BaseModel):
     id_sesion: int
@@ -84,6 +85,7 @@ class ArqueoCerradoResponse(BaseModel):
     saldo_final_declarado: float | None
     saldo_final_calculado: float | None
     diferencia: float | None
+    estado: str
 
 class InformeCajasResponse(BaseModel):
     cajas_abiertas: List[CajaAbiertaResponse]
