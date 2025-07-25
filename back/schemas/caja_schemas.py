@@ -35,12 +35,13 @@ class CajaMovimientoResponse(BaseModel):
     id: int
     id_caja_sesion: int
     id_usuario: int
-    fecha: datetime
+    #fecha: datetime
     concepto: str
     monto: float
     metodo_pago: Optional[str] = None
     class Config:
         from_attributes = True
+
 class MovimientoSimpleRequest(BaseModel):
     concepto: str
     monto: float = Field(..., ge=0)
