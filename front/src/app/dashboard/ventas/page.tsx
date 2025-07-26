@@ -89,7 +89,7 @@ function DashboardVenta() {
         <div className="flex flex-wrap justify-between items-center p-4 gap-4 bg-neutral-800/90 rounded-xl px-6">
           {/* Fecha y Hora */}
           <Input
-            value={`${fechaActual}                               ${horaActual}`}
+            value={`${fechaActual}                       ${horaActual}`}
             disabled
             className="w-full sm:w-[48%] lg:w-[23%] text-white font-semibold border border-white bg-transparent placeholder-white disabled:opacity-100 rounded-lg"
           />

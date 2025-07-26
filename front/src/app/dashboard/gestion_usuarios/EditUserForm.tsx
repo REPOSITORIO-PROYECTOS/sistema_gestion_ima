@@ -6,6 +6,8 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Button } from "@/components/ui/button";
 import { Role, Usuario } from "@/lib/authStore";
 import { useAuthStore } from "@/lib/authStore";
+import { Input } from "@/components/ui/input"; 
+import { toast } from "sonner"; 
 
 export default function EditUserForm({
   user,
@@ -18,6 +20,9 @@ export default function EditUserForm({
   const [roles, setRoles] = useState<Role[]>([]);
   const [selectedRoleId, setSelectedRoleId] = useState<number>(user.rol.id);
   const [loading, setLoading] = useState(false);
+  const [nuevoNombreUsuario, setNuevoNombreUsuario] = useState(user.nombre_usuario || "");
+  const [passwordActual, setPasswordActual] = useState("");
+  const [passwordNueva, setPasswordNueva] = useState("");
 
   /* GET Roles para Editar el del user actual */
   useEffect(() => {
@@ -40,33 +45,6 @@ export default function EditUserForm({
     }
     fetchRoles();
   }, [token]);
-
-  /* PATCH Para cambiar rol de usuario */
-  const cambiarRol = async () => {
-    if (!token) return;
-    setLoading(true);
-    try {
-      const res = await fetch(
-        `https://sistema-ima.sistemataup.online/api/admin/usuarios/${user.id}/rol`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
-          },
-          body: JSON.stringify({ id_rol: selectedRoleId }),
-        }
-      );
-      if (!res.ok) throw new Error("Error al cambiar el rol");
-      alert("✅ Rol actualizado con éxito.");
-      onUpdated?.();
-    } catch (e) {
-      alert("❌ No se pudo actualizar el rol.");
-      console.log(e);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   /* DELETE Para desactivar usuario */
   const desactivarUsuario = async () => {
@@ -128,10 +106,99 @@ export default function EditUserForm({
     }
   };
 
+  /* PATCH de modificaciones de user unificado */
+  const guardarCambios = async () => {
+    if (!token) return;
+    setLoading(true);
+
+    try {
+      // 1. Validar y cambiar rol
+      if (selectedRoleId !== user.rol.id) {
+        const resRol = await fetch(
+          `https://sistema-ima.sistemataup.online/api/admin/usuarios/${user.id}/rol`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`,
+            },
+            body: JSON.stringify({ id_rol: selectedRoleId }),
+          }
+        );
+        if (!resRol.ok) throw new Error("Error al cambiar el rol");
+        toast.success("✅ Rol actualizado con éxito.");
+      }
+
+      // 2. Validar y cambiar nombre de usuario
+      if (nuevoNombreUsuario !== user.nombre_usuario) {
+        if (nuevoNombreUsuario.length < 3) {
+          toast.error("❌ El nombre de usuario debe tener al menos 3 caracteres.");
+        } else {
+          const resNombre = await fetch("https://sistema-ima.sistemataup.online/api/me/username", {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`,
+            },
+            body: JSON.stringify({ nuevo_nombre_usuario: nuevoNombreUsuario }),
+          });
+
+          if (resNombre.status === 409) {
+            toast.error("❌ Ese nombre de usuario ya está en uso.");
+          } else if (!resNombre.ok) {
+            throw new Error("Error al cambiar el nombre de usuario");
+          } else {
+            toast.success("✅ Nombre de usuario actualizado.");
+          }
+        }
+      }
+
+      // 3. Validar y cambiar contraseña
+      if (passwordActual || passwordNueva) {
+        if (!passwordActual || !passwordNueva) {
+          toast.error("❌ Completá ambas contraseñas.");
+        } else if (passwordNueva.length < 8) {
+          toast.error("❌ La nueva contraseña debe tener al menos 8 caracteres.");
+        } else {
+          const resPassword = await fetch("https://sistema-ima.sistemataup.online/api/me/password", {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              password_actual: passwordActual,
+              password_nueva: passwordNueva,
+            }),
+          });
+
+          if (resPassword.status === 400) {
+            toast.error("❌ Contraseña actual incorrecta.");
+          } else if (!resPassword.ok) {
+            throw new Error("Error al cambiar la contraseña");
+          } else {
+            toast.success("✅ Contraseña actualizada.");
+            setPasswordActual("");
+            setPasswordNueva("");
+          }
+        }
+      }
+
+      onUpdated?.();
+    } catch (e) {
+      toast.error("❌ Error general al guardar los cambios.");
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+
+      {/* Rol */}
       <div>
-        <Label>Rol actual</Label>
+        <Label>Seleccione un nuevo rol:</Label>
         <Select
           value={selectedRoleId.toString()}
           onValueChange={(val) => setSelectedRoleId(Number(val))}
@@ -149,14 +216,56 @@ export default function EditUserForm({
         </Select>
       </div>
 
-      {/* Modificar Rol */}
+      {/* Nombre de usuario */}
+      <div className="space-y-2">
+        <Label>Nuevo nombre de usuario</Label>
+        <Input
+          type="text"
+          placeholder="Nombre de usuario"
+          value={nuevoNombreUsuario}
+          onChange={(e) => setNuevoNombreUsuario(e.target.value)}
+        />
+      </div>
+
+      {/* Contraseña */}
+      <div className="space-y-2">
+        <Label>Contraseña actual</Label>
+        <Input
+          type="password"
+          placeholder="********"
+          value={passwordActual}
+          onChange={(e) => setPasswordActual(e.target.value)}
+        />
+
+        <Label>Nueva contraseña</Label>
+        <Input
+          type="password"
+          placeholder="********"
+          value={passwordNueva}
+          onChange={(e) => setPasswordNueva(e.target.value)}
+        />
+      </div>
+
+      {/* Submit Modificaciones */}
       <Button
         variant="success"
-        onClick={cambiarRol}
-        disabled={selectedRoleId === user.rol.id || loading}
+        onClick={guardarCambios}
+        disabled={loading}
         className="w-full"
       >
-        Guardar cambios
+        Guardar todos los cambios
+      </Button>
+
+      <hr className="h-0.5 text-green-800"/>
+
+      {/* Activar Usuario */}
+      <Button
+        variant="default"
+        onClick={activarUsuario}
+        disabled={loading}
+        className="w-full"
+      >
+        Activar usuario
       </Button>
 
       {/* Desactivar Usuario */}
@@ -167,16 +276,6 @@ export default function EditUserForm({
         className="w-full"
       >
         Desactivar usuario
-      </Button>
-
-      {/* Activar Usuario */}
-      <Button
-        variant="default"
-        onClick={activarUsuario}
-        disabled={loading}
-        className="w-full"
-      >
-        Activar usuario
       </Button>
     </div>
   );

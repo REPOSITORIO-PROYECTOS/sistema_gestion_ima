@@ -84,7 +84,7 @@ export default function GestionUsuarios() {
 
   }, [token]);
 
-  // Creamos una ref para exponerla afuera del useEffect
+  // Ref para exponer afuera del useEffect
   const fetchUsuariosRef = useRef<() => void>(() => {});
 
   return (
@@ -102,7 +102,7 @@ export default function GestionUsuarios() {
         {/* Botón + Modal */}
         <Dialog>
           <DialogTrigger asChild>
-            <Button variant="success" className="w-full !py-6 sm:!max-w-1/4 text-lg font-semibold">+ Crear nuevo usuario</Button>
+            <Button variant="success" className="w-full !py-6 sm:!max-w-2/5 lg:w-1/4 text-lg font-semibold">+ Crear nuevo usuario</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -117,13 +117,13 @@ export default function GestionUsuarios() {
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="flex flex-col sm:flex-row items-center bg-green-100 rounded-lg px-4 py-3 gap-4 w-full sm:max-w-2/3 md:max-w-1/4 cursor-help">
-                <h2 className="text-xl font-bold text-green-950 w-2/3">Llave Caja:</h2>
+              <div className="flex flex-col sm:flex-row items-center bg-green-100 rounded-lg px-4 py-3 gap-4 w-full sm:max-w-3/5 md:max-w-2/5 lg:w-1/4 cursor-help">
+                <h2 className="text-xl font-bold text-green-950 w-full md:w-2/3">Llave Caja:</h2>
                 <Input
                   type="text"
                   value={llaveMaestra}
                   disabled
-                  className="border-2 border-green-800 text-center w-1/2"
+                  className="border-2 border-green-800 text-center w-full md:w-1/2"
                 />
               </div>
             </TooltipTrigger>
