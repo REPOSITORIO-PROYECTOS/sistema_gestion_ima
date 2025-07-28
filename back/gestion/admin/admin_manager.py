@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 
 # --- Módulos del Proyecto ---
 from back.modelos import Usuario, Rol
-from back.security import get_password_hash
+from back.security import get_password_hash,verificar_password
 from back.schemas.admin_schemas import UsuarioCreate
 
 # ===================================================================
