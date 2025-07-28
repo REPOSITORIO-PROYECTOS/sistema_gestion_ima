@@ -1,6 +1,7 @@
 # back/reportes/generador_comprobantes.py
 # VERSIÓN MULTI-EMPRESA
 
+from http.client import HTTPException
 import os
 from jinja2 import Environment, FileSystemLoader
 from weasyprint import HTML, CSS
@@ -9,7 +10,7 @@ from weasyprint import HTML, CSS
 # Ya no necesitamos los modelos de la DB para esta función
 from back.schemas.comprobante_schemas import GenerarComprobanteRequest
 # Seguimos usando el especialista de AFIP
-from back.gestion.facturacion_afip import generar_factura_afip # Asumimos un nuevo nombre
+from back.gestion.facturacion_afip import generar_factura_para_venta # Asumimos un nuevo nombre
 
 TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'plantillas')
 
@@ -26,7 +27,7 @@ def generar_comprobante_stateless(data: GenerarComprobanteRequest) -> bytes:
         print("   -> Tipo 'factura' detectado. Llamando al especialista de AFIP...")
         try:
             # Pasamos los datos del emisor y la transacción al especialista
-            datos_afip = generar_factura_afip(emisor=data.emisor, receptor=data.receptor, transaccion=data.transaccion)
+            datos_afip = generar_factura_para_venta(emisor=data.emisor, receptor=data.receptor, transaccion=data.transaccion)
             print("   -> Datos de AFIP recibidos con éxito.")
         except (ValueError, RuntimeError) as e:
             raise HTTPException(status_code=503, detail=f"Servicio de AFIP no disponible: {e}")
