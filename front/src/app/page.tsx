@@ -12,8 +12,7 @@ const API_URL = "https://sistema-ima.sistemataup.online/api"
 function Login() {
   
   const router = useRouter()
-
-  // Store
+  
   const setToken = useAuthStore(state => state.setToken)
   const setUsuario = useAuthStore(state => state.setUsuario)
   const setRole = useAuthStore(state => state.setRole)
@@ -23,7 +22,9 @@ function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
 
+  // Login App
   const handleLogin = async (e: FormEvent) => {
+
     e.preventDefault()
 
     if (!username || !password) {
@@ -34,6 +35,7 @@ function Login() {
     try {
       setLoading(true)
 
+      // Autenticamos las credenciales en el back end
       const response = await fetch(`${API_URL}/auth/token`, {
         method: "POST",
         headers: {
@@ -49,6 +51,7 @@ function Login() {
       /* console.log("🔑 Token recibido:", data) */ // solo para debug
       setToken(access_token)
 
+      // Despues de autenticar, traemos los datos del usuario con:
       const meResponse = await fetch(`${API_URL}/users/me`, {
         headers: {
           Authorization: `Bearer ${access_token}`,
