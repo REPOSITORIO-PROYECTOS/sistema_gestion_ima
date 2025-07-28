@@ -97,7 +97,7 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
         {/* Desplegables */}
         <div className="flex items-center">
 
-          {/* Avatar con desplegable cerrar sesion */}
+          {/* DESKTOP - Avatar con desplegable */}
           <div className="hidden md:flex">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -107,9 +107,17 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-white">
 
-                {/* Nombre Usuario */}
-                <DropdownMenuItem className="text-gray-600">
+                {/* Nombre Usuarios */}
+                <DropdownMenuItem className="text-gray-600 cursor-pointer">
                   {usuario?.nombre_usuario}
+                </DropdownMenuItem>
+
+                {/* Panel Usuario */}
+                <DropdownMenuItem 
+                  className="text-black cursor-pointer"
+                  onClick={() => router.push('/dashboard/panel_usuario')}
+                >
+                  Editar Usuario
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator />
@@ -132,11 +140,20 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                 >
                   Gestión de Usuarios
                 </DropdownMenuItem>
+
+                {/* Gestión de Usarios */}
+                <DropdownMenuItem 
+                  className="cursor-pointer"
+                  onClick={() => { router.push('/dashboard/gestion_de_negocio'); }}
+                >
+                  Gestión de Negocio
+                </DropdownMenuItem>
+
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
 
-          {/* Menu hamburguesa mobile */}
+          {/* MOBILE - Menu hamburguesa */}
           <div className="md:hidden ml-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -146,9 +163,17 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-white">
                 
-                {/* Nombre Usuario */}
-                <DropdownMenuItem className="px-4 text-gray-600">
+                {/* Nombre Usuarios */}
+                <DropdownMenuItem className="text-gray-600 cursor-pointer">
                   {usuario?.nombre_usuario}
+                </DropdownMenuItem>
+
+                {/* Panel Usuario */}
+                <DropdownMenuItem 
+                  className="text-black cursor-pointer"
+                  onClick={() => router.push('/dashboard/panel_usuario')}
+                >
+                  Editar Usuario
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator />
@@ -162,7 +187,7 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                         onClick={(e) => {
                           if (!isAllowed) e.preventDefault();
                         }}
-                        className={`block px-4 py-2 text-sm ${
+                        className={`block py-2 text-sm ${
                           isAllowed
                             ? 'text-green-900 hover:bg-green-100'
                             : 'text-gray-400 cursor-not-allowed'
@@ -175,6 +200,8 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                 })}
 
                 <DropdownMenuSeparator />
+
+                {/* Cerrar Sesión */}
                 <DropdownMenuItem 
                   className="text-red-600"
                   onClick={() => {
@@ -184,11 +211,21 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                 >
                   Cerrar Sesión
                 </DropdownMenuItem>
+
+                {/* Gestión de Usarios */}
                 <DropdownMenuItem 
                   onClick={() => { router.push('/dashboard/gestion_usuarios'); }}
                 >
                   Gestión de Usuarios
                 </DropdownMenuItem>
+
+                {/* Gestión de Usarios */}
+                <DropdownMenuItem 
+                  onClick={() => { router.push('/dashboard/gestion_de_negocio'); }}
+                >
+                  Gestión de Negocio
+                </DropdownMenuItem>
+
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

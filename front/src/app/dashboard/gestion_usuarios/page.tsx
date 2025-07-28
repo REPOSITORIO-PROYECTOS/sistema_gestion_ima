@@ -21,8 +21,6 @@ import { Input } from "@/components/ui/input";
 import { useEffect, useRef, useState } from "react";
 import { useAuthStore } from "@/lib/authStore";
 import { Usuario } from "@/lib/authStore";
-import { useFacturacionStore } from "@/lib/facturacionStore";
-import * as Switch from '@radix-ui/react-switch';
 import EditUserForm from "./EditUserForm";
 import { Badge } from "@/components/ui/badge";
 
@@ -30,10 +28,9 @@ export default function GestionUsuarios() {
 
   const [llaveMaestra, setLlaveMaestra] = useState("");
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
-  const { habilitarExtras, toggleExtras } = useFacturacionStore();
   const token = useAuthStore((state) => state.token);
 
-  // Fetch de llave maestra
+  // GET Llave maestra
   useEffect(() => {
     if (!token) return;
 
@@ -41,7 +38,7 @@ export default function GestionUsuarios() {
       try {
         const res = await fetch("https://sistema-ima.sistemataup.online/api/auth/llave-actual", {
           headers: {
-            'x-admin-token': token,
+            Authorization: `Bearer ${token}`,
           },
         });
 
@@ -187,27 +184,6 @@ export default function GestionUsuarios() {
           </TableBody>
 
         </Table>
-      </div>
-
-      {/* Toggle de Facturación en Caja */}
-      <div className="flex items-center gap-4">
-        <h3 className="text-lg font-semibold text-green-950">
-          Habilitar Remito / Presupuesto
-        </h3>
-
-        <Switch.Root
-          checked={habilitarExtras}
-          onCheckedChange={toggleExtras}
-          className={`relative w-16 h-8 rounded-full ${
-            habilitarExtras ? "bg-green-900" : "bg-gray-300"
-          } cursor-pointer transition-colors`}
-        >
-          <Switch.Thumb
-            className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-300 ${
-              habilitarExtras ? "translate-x-8" : "translate-x-0"
-            }`}
-          />
-        </Switch.Root>
       </div>
 
     </div>
