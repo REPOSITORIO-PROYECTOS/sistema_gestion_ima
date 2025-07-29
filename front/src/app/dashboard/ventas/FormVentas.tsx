@@ -262,6 +262,7 @@ function FormVentas({
   // POST Ventas - Registra la venta completa
   const handleSubmit = async (e: React.FormEvent) => {
 
+    // Validamos datos pre envio
     if (productosVendidos.length === 0) {
       toast.error("❌ No hay productos cargados en la venta.");
       setIsLoading(false);
@@ -278,7 +279,7 @@ function FormVentas({
     setIsLoading(true);
     e.preventDefault();
   
-    
+    // Payload de Venta
     const ventaPayload = {
       id_sesion_caja: 3,
       id_cliente:
@@ -334,6 +335,7 @@ function FormVentas({
       })
     };
 
+    // Llamada al Registro
     try {
       const response = await fetch("https://sistema-ima.sistemataup.online/api/caja/ventas/registrar", {
         method: "POST",
@@ -349,6 +351,90 @@ function FormVentas({
         const data = await response.json();
         toast.success("✅ Venta registrada: " + data.message);
 
+        // Funcion Generar Comprobante
+        const generarComprobante = async () => {
+        try {
+          const req = {
+            formato: "pdf", // o "ticket"
+            tipo: tipoFacturacion.toLowerCase(), // factura, remito, etc.
+            emisor: {
+              cuit: "30XXXXXXXXX", // CUIT del negocio
+              razon_social: "Empresa Demo Swing",
+              domicilio: "Av. Siempre Viva 123",
+              punto_venta: 1,
+              condicion_iva: "Responsable Inscripto",
+              afip_certificado: "BASE64_ENCODED_CERT", // opcional
+              afip_clave_privada: "BASE64_ENCODED_KEY"  // opcional
+            },
+            receptor: {
+              nombre_razon_social:
+                tipoClienteSeleccionado.id === "0"
+                  ? "Consumidor Final"
+                  : clienteSeleccionado?.nombre_razon_social ?? "Consumidor Final",
+              cuit_o_dni:
+                tipoClienteSeleccionado.id === "0"
+                  ? cuitManual || "0"
+                  : clienteSeleccionado?.cuit || clienteSeleccionado?.identificacion_fiscal || "0",
+              domicilio: "Sin especificar",
+              condicion_iva:
+                tipoClienteSeleccionado.id === "0"
+                  ? "Consumidor Final"
+                  : clienteSeleccionado?.condicion_iva ?? "Consumidor Final"
+            },
+            transaccion: {
+              items: productosVendidos.map((p) => {
+                const productoReal = productos.find((prod) => prod.nombre === p.tipo);
+                return {
+                  descripcion: productoReal?.nombre || p.tipo,
+                  cantidad: p.cantidad,
+                  precio_unitario: productoReal ? getPrecioProducto(productoReal) : 0,
+                  subtotal: p.precioTotal,
+                  tasa_iva: 21
+                };
+              }),
+              total: totalConDescuento,
+              descuento_general: descuentoSobreTotal || 0,
+              observaciones: observaciones || ""
+            }
+          };
+
+          console.log(req)
+
+          const response = await fetch("https://sistema-ima.sistemataup.online/api/comprobantes/generar", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify(req)
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            toast.error("❌ Error al generar comprobante: " + error.detail);
+            return;
+          }
+
+          // Espera un PDF, descargamos como blob
+          const blob = await response.blob();
+
+          // Crea un link de descarga e imprime
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = `comprobante-${Date.now()}.pdf`;
+          link.click();
+          URL.revokeObjectURL(url);
+
+          toast.success("✅ Comprobante generado correctamente");
+
+        } catch (error) {
+          console.error("❌ Error al generar comprobante:", error);
+          toast.error("❌ Error al generar comprobante");
+        }
+        };
+        await generarComprobante();
+
       } else {
 
         const error = await response.json();
@@ -361,8 +447,7 @@ function FormVentas({
 
     } finally { setIsLoading(false); }
 
-    // Se printea el Payload para debug
-    console.log(JSON.stringify(ventaPayload, null, 2));
+    console.log(JSON.stringify(ventaPayload, null, 2)); // solo debug
   };
 
   /* -------------------------------------------------------------- */

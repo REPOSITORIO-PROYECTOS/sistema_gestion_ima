@@ -1,16 +1,16 @@
 'use client';
 
 import { useState } from "react";
-import { useAuthStore } from "@/lib/authStore"; // Ajustá la ruta si es distinta
+import { useAuthStore } from "@/lib/authStore"; 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner"; // Si usás otra librería de toasts, ajustá esto
+import { toast } from "sonner";
 
 export default function PanelUsuario() {
 
   const usuario = useAuthStore((state) => state.usuario);
-  const setUsuario = useAuthStore((state) => state.setUsuario);
-  const setNombreUsuario = useAuthStore((state) => state.setNombreUsuario);
+  /* const setUsuario = useAuthStore((state) => state.setUsuario);
+  const setNombreUsuario = useAuthStore((state) => state.setNombreUsuario); */
 
   const [nuevoNombreUsuario, setNuevoNombreUsuario] = useState(usuario?.nombre_usuario ?? "");
   const [passwordActual, setPasswordActual] = useState("");
@@ -23,6 +23,11 @@ export default function PanelUsuario() {
 
   // PATCH Username
   const handleUsernameChange = async () => {
+    
+    const confirmLogout = window.confirm(
+      "Cambiar el nombre de usuario cerrará tu sesión actual y deberás volver a logearte, ¿Deseás continuar?"
+    );
+    if (!confirmLogout) return;
 
     try {
       setLoading(true);
@@ -42,14 +47,15 @@ export default function PanelUsuario() {
         throw new Error(error.detail || "Error al cambiar el nombre de usuario");
       }
 
-      const data = await res.json();
-      setUsuario(data);
-      setNombreUsuario(data.nombre_usuario);
-      toast.success("Nombre de usuario actualizado");
+      toast.success("Nombre de usuario actualizado. Cerrando sesión...");
+
+      // Desloguea y redirige
+      useAuthStore.getState().logout();
+      window.location.href = "/"; 
 
     } catch (error) {
-      console.log(error)
-      
+      console.log(error);
+      toast.error("Ocurrió un error al cambiar el nombre de usuario");
     } finally {
       setLoading(false);
     }
@@ -57,6 +63,17 @@ export default function PanelUsuario() {
 
   // PATCH Password
   const handlePasswordChange = async () => {
+
+    if (!passwordActual || !passwordNueva) {
+      toast.warning("Completa ambos campos de contraseña");
+      return;
+    }
+
+    if (passwordActual === passwordNueva) {
+      toast.warning("La nueva contraseña no puede ser igual a la actual");
+      return;
+    }
+
     try {
       setLoading(true);
       const res = await fetch("https://sistema-ima.sistemataup.online/api/users/me/password", {
@@ -71,9 +88,10 @@ export default function PanelUsuario() {
         }),
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.detail || "Error al cambiar la contraseña");
+        throw new Error(data.detail || "Error al cambiar la contraseña");
       }
 
       toast.success("Contraseña actualizada");
@@ -81,7 +99,7 @@ export default function PanelUsuario() {
       setPasswordNueva("");
 
     } catch (error) {
-      console.log(error)
+      console.error(error);
 
     } finally {
       setLoading(false);
