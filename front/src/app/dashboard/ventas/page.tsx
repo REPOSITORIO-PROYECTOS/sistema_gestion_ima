@@ -36,6 +36,7 @@ function DashboardVenta() {
   // Hook para calcular fecha y hora en vivo
   useEffect(() => {
     const updateDateTime = () => {
+      
       const now = new Date();
 
       setFechaActual(
@@ -43,6 +44,7 @@ function DashboardVenta() {
           day: "2-digit",
           month: "2-digit",
           year: "numeric",
+          timeZone: "America/Argentina/Buenos_Aires",
         })
       );
 
@@ -50,6 +52,8 @@ function DashboardVenta() {
         now.toLocaleTimeString("es-AR", {
           hour: "2-digit",
           minute: "2-digit",
+          hour12: false,
+          timeZone: "America/Argentina/Buenos_Aires",
         })
       );
     };

@@ -185,7 +185,6 @@ function FormVentas({
     setCantidad(1);
   };
 
-
   // Effect para mostrar la calculadora de vuelto si es pago con efectivo
   useEffect(() => {
     if (metodoPago === 'efectivo' && typeof montoPagado === 'number') {
@@ -207,7 +206,7 @@ function FormVentas({
   }, [montoPagado, metodoPago, totalVenta]);
 
   /* Formateos Numéricos */
-  // Formatea el input numérico
+  // Formatea el input en string para mejor UI
   function formatearMoneda(valor: string): string {
     const limpio = valor.replace(/[^\d]/g, "");     // Todo menos dígitos
     if (!limpio) return "";
@@ -215,13 +214,13 @@ function FormVentas({
     return `$${conPuntos}`;
   }
 
-  // Ayuda a limpiar el numero de input
+  // Ayuda a limpiar el string para hacer number
   function limpiarMoneda(valor: string): number {
     if (!valor) return 0;
     const limpio = valor
-      .replace(/\./g, "")    // Quitamos puntos (separador de miles)
-      .replace(",", ".")     // Reemplazamos la coma decimal por punto
-      .replace(/[^\d.]/g, ""); // Quitamos todo menos números y punto decimal
+      .replace(/\./g, "")           // Quitamos puntos (separador de miles)
+      .replace(",", ".")            // Reemplazamos la coma decimal por punto
+      .replace(/[^\d.]/g, "");      // Quitamos todo menos números y punto decimal
     return parseFloat(limpio) || 0;
   }
 
@@ -282,22 +281,51 @@ function FormVentas({
   // POST Ventas - Registra la venta completa
   const handleSubmit = async (e: React.FormEvent) => {
 
-    // Validamos datos pre envio
+    // Animacion de carga
+    setIsLoading(true);
+    e.preventDefault();
+
+    /* Validaciones - no se puede mandar venta sin: */
+
+    // Productos en el carrito
     if (productosVendidos.length === 0) {
       toast.error("❌ No hay productos cargados en la venta.");
       setIsLoading(false);
       return;
     }
 
+    // Con menos plata de lo que cuesta el pedido
     if (metodoPago === "efectivo" && montoPagado < totalVenta) {
       toast.error("❌ El monto pagado no puede ser menor al total del pedido.");
       setIsLoading(false);
       return;
     }
 
-    // Animacion de carga
-    setIsLoading(true);
-    e.preventDefault();
+    // Sin identificar el cliente
+    if (!clienteSeleccionado) {
+      toast.error("❌ Debe seleccionar un cliente.");
+      setIsLoading(false);
+      return;
+    }
+
+    if (
+      clienteSeleccionado.nombre_razon_social.toLowerCase().includes("consumidor final") &&
+      cuitManual.trim() === ""
+    ) {
+      toast.error("❌ Debe ingresar un CUIT para el Consumidor Final.");
+      setIsLoading(false);
+      return;
+    }
+
+    if (
+      clienteSeleccionado.nombre_razon_social.toLowerCase().includes("consumidor final") &&
+      !/^\d{11}$/.test(cuitManual.trim())
+    ) {
+      toast.error("❌ El CUIT debe tener 11 dígitos numéricos.");
+      setIsLoading(false);
+      return;
+    }
+
   
     // Payload de Venta
     const ventaPayload = {
