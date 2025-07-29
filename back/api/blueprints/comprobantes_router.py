@@ -11,7 +11,7 @@ from back.gestion.reportes.generador_comprobantes import generar_comprobante_sta
 router = APIRouter(
     prefix="/comprobantes",
     tags=["Generación de Comprobantes"],
-    dependencies=[Depends(es_cajero)] # Aún protegido por un login de usuario
+   # dependencies=[Depends(es_cajero)] # Aún protegido por un login de usuario
 )
 
 @router.post(
@@ -29,6 +29,7 @@ def api_generar_comprobante(req: GenerarComprobanteRequest):
     un comprobante en PDF (factura, remito, presupuesto o recibo).
     """
     try:
+        print("ENTRANDO ALA FUNCION DE GENERAR COMPROBANTE")
         pdf_bytes = generar_comprobante_stateless(req)
         
         filename = f"{req.tipo}_{req.emisor.punto_venta}_{req.receptor.cuit_o_dni}.pdf"
