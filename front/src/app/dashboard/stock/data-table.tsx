@@ -71,32 +71,6 @@ export function DataTable<TData, TValue>({
         },
     })
 
-
-    /* Handlers */
-
-    /* Sync tabla de clientes en backend */
-    const handleSyncClientes = async () => {
-
-        toast("Sincronizando clientes... Por favor espera");
-
-        try {
-            const response = await fetch("https://sistema-ima.sistemataup.online/api/sincronizar/clientes", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({}),
-            });
-
-            if (!response.ok) throw new Error("Fallo en la respuesta del servidor");
-
-            toast.success("Clientes sincronizados ✅");
-        } catch (error) {
-            console.error("Error al sincronizar usuarios:", error);
-            toast.error("Error al sincronizar usuarios ❌");
-        }
-    };
-
     /* Sync tabla de articulos en backend */
     const handleSyncArticulos = async () => {
         
@@ -146,7 +120,7 @@ export function DataTable<TData, TValue>({
 
                 {/* Botones para sincronización */}
                 <div className="flex gap-2 md:flex-row flex-col">
-                    <Button variant="outline" onClick={handleSyncClientes}>Sincronizar Clientes</Button>
+                    
                     <Button variant="outline" onClick={handleSyncArticulos}>Sincronizar Artículos</Button>
                 </div>
 

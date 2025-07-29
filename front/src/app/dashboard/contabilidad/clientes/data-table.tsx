@@ -31,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { toast } from "sonner"
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
@@ -61,6 +62,29 @@ export function DataTable<TData, TValue>({
         },
     })
 
+    /* Sync tabla de clientes en backend */
+    const handleSyncClientes = async () => {
+
+        toast("Sincronizando clientes... Por favor espera");
+
+        try {
+            const response = await fetch("https://sistema-ima.sistemataup.online/api/sincronizar/clientes", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({}),
+            });
+
+            if (!response.ok) throw new Error("Fallo en la respuesta del servidor");
+
+            toast.success("Clientes sincronizados ✅");
+        } catch (error) {
+            console.error("Error al sincronizar usuarios:", error);
+            toast.error("Error al sincronizar usuarios ❌");
+        }
+    };
+
     return (
 
     <div>
@@ -80,29 +104,35 @@ export function DataTable<TData, TValue>({
                 className="w-full sm:w-1/2 md:max-w-1/4"
             />
 
-            {/* Input de Seleccion por status */}
-            <Select
-                value={currentStatus}
-                onValueChange={(value) => {
-                    setCurrentStatus(value);
-                    table.getColumn("cuit")?.setFilterValue(
-                    value === "all" ? undefined : value === "con" ? "con" : "sin"
-                    );
-                }}
-                >
-                <SelectTrigger className="w-full sm:w-1/2 md:max-w-1/6 cursor-pointer">
-                    <SelectValue placeholder="Filtrar por CUIT" />
-                </SelectTrigger>
+            <div className="flex flex-row gap-2 md:justify-end sm:w-1/2 md:max-w-2/5">
 
-                <SelectContent>
-                    <SelectGroup>
-                    <SelectLabel>CUIT</SelectLabel>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="con">Con CUIT</SelectItem>
-                    <SelectItem value="sin">Sin CUIT</SelectItem>
-                    </SelectGroup>
-                </SelectContent>
-            </Select>
+                {/* Sincro tabla de clientes */}
+                <Button variant="outline" className="w-2/3 md:w-1/3" onClick={handleSyncClientes}>Sincronizar Clientes</Button>
+
+                {/* Input de Seleccion por status */}
+                <Select
+                    value={currentStatus}
+                    onValueChange={(value) => {
+                        setCurrentStatus(value);
+                        table.getColumn("cuit")?.setFilterValue(
+                        value === "all" ? undefined : value === "con" ? "con" : "sin"
+                        );
+                    }}
+                    >
+                    <SelectTrigger className="cursor-pointer w-1/3">
+                        <SelectValue placeholder="Filtrar por CUIT" />
+                    </SelectTrigger>
+
+                    <SelectContent>
+                        <SelectGroup>
+                        <SelectLabel>CUIT</SelectLabel>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="con">Con CUIT</SelectItem>
+                        <SelectItem value="sin">Sin CUIT</SelectItem>
+                        </SelectGroup>
+                    </SelectContent>
+                </Select>
+            </div>
         </div>
 
         {/* Tabla */}
