@@ -30,6 +30,16 @@ export default function EgresosForm() {
     const [monto, setMonto] = useState("");
     const [concepto, setConcepto] = useState("");
 
+    // Ayuda a limpiar el numero de input
+    function limpiarMoneda(valor: string): number {
+        if (!valor) return 0;
+        const limpio = valor
+        .replace(/\./g, "")    // Quitamos puntos (separador de miles)
+        .replace(",", ".")     // Reemplazamos la coma decimal por punto
+        .replace(/[^\d.]/g, ""); // Quitamos todo menos números y punto decimal
+        return parseFloat(limpio) || 0;
+    }
+
     /* Soluciona problema de input de nombre de usuario vacio */
     useEffect(() => {
         if (usuario?.nombre_usuario) {
@@ -57,7 +67,7 @@ export default function EgresosForm() {
 
         const payload = {
             concepto,
-            monto: parseFloat(monto),
+            monto: limpiarMoneda(monto),
             metodo_pago: metodoPago,
         };
 
@@ -78,9 +88,11 @@ export default function EgresosForm() {
             }
 
             // Éxito
-            alert("Egreso registrado correctamente.");
-            toast.success("Egreso registrado correctamente!")
-            document.getElementById("close-caja-modal")?.click(); // Cierra modal
+            alert("Egreso de dinero registrado correctamente.");
+            toast.success("Egreso de dinero registrado correctamente!")
+
+            // Cierra Modal
+            document.getElementById("close-caja-modal")?.click();
 
             // Limpiar campos
             setConcepto("");
@@ -94,89 +106,107 @@ export default function EgresosForm() {
         } finally { setIsLoading(false); }
     };
 
-
     return (
-    <>
-        <form onSubmit={handleSubmit}>
+        <>
+            <form onSubmit={handleSubmit}>
 
-            <div className="grid gap-6 py-4">
+                <div className="grid gap-6 py-4">
 
-            {/* Input Nombre */}
-            <div className="flex items-center justify-between gap-4">
-                <Label className="text-right text-md md:text-lg">Nombre</Label>
-                <Input value={nombreUsuario} onChange={(e) => setNombreUsuario(e.target.value)} placeholder="Nombre de Usuario" className="w-full max-w-3/5" />
-            </div>
+                    {/* Input Nombre */}
+                    <div className="flex items-center justify-between gap-4">
+                        <Label className="text-right text-md md:text-lg">Nombre</Label>
+                        <Input value={nombreUsuario} onChange={(e) => setNombreUsuario(e.target.value)} placeholder="Nombre de Usuario" className="w-full max-w-3/5" />
+                    </div>
 
-            {/* Input monto a solicitar */}
-            <div className="flex items-center justify-between gap-4">
-                <Label className="text-right text-md md:text-lg">
-                    Monto solicitado: 
-                </Label>
-                <Input
-                    type="number"
-                    min="0"
-                    value={monto}
-                    onChange={(e) => setMonto(e.target.value)}
-                    placeholder="Monto"
-                    className="w-full max-w-3/5"
-                />
-            </div>
+                    {/* Input monto a solicitar */}
+                    <div className="flex items-center justify-between gap-4">
+                        <Label className="text-right text-md md:text-lg">
+                            Monto solicitado: 
+                        </Label>
+                        <Input
+                            type="text"
+                            inputMode="numeric"
+                            value={monto}
+                            onChange={(e) => {
+                                const valor = e.target.value;
 
-            {/* Método de Egreso */}
-            <div className="flex flex-row items-center w-full justify-between">
-                <Label className="text-md md:text-lg">Método de Pago</Label>
-                <Select
-                    value={metodoPago}
-                    onValueChange={(value) => setMetodoPago(value)}
-                >
-                    <SelectTrigger className="w-full max-w-3/5 cursor-pointer text-black">
-                    <SelectValue placeholder="Seleccionar método" />
-                    </SelectTrigger>
-                    <SelectContent>
-                    <SelectItem value="efectivo">Efectivo</SelectItem>
-                    <SelectItem value="transferencia">Transferencia</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
+                                // Limpiamos cualquier carácter no numérico válido
+                                const limpio = valor
+                                .replace(/\D/g, "")     // Quitar todo lo que no sea número
+                                .replace(/^0+/, "");    // Evitar ceros al inicio
 
+                                // Formateamos como moneda argentina (con puntos y $)
+                                const numero = parseFloat(limpio) / 100;
+                                const formateado = isNaN(numero)
+                                ? ""
+                                : numero.toLocaleString("es-AR", {
+                                    style: "currency",
+                                    currency: "ARS",
+                                    minimumFractionDigits: 2,
+                                    });
 
-            {/* Concepto del egreso */}
-            <div className="flex items-center justify-between gap-4">
-                <Label className="text-right text-md md:text-lg">Concepto</Label>
-                <Input
-                    value={concepto}
-                    onChange={(e) => setConcepto(e.target.value)}
-                    placeholder="Motivo del egreso"
-                    className="w-full max-w-3/5"
-                />
-            </div>
+                                setMonto(formateado);
+                            }}
+                            placeholder="$ 0,00"
+                            className="w-full max-w-3/5"
+                        />
+                    </div>
 
-            {/* Fecha */}
-            <div className="flex items-center justify-between gap-4">
-                <Label className="text-right sm:text-lg">Fecha</Label>
-                <Input value={fechaActual} disabled className="w-full max-w-3/5 text-green-950 font-semibold border border-white placeholder-white disabled:opacity-100 rounded-lg" />
-            </div>
+                    {/* Método de Egreso */}
+                    <div className="flex flex-row items-center w-full justify-between">
+                        <Label className="text-md md:text-lg">Método de Pago</Label>
+                        <Select
+                            value={metodoPago}
+                            onValueChange={(value) => setMetodoPago(value)}
+                        >
+                            <SelectTrigger className="w-full max-w-3/5 cursor-pointer text-black">
+                            <SelectValue placeholder="Seleccionar método" />
+                            </SelectTrigger>
+                            <SelectContent>
+                            <SelectItem value="efectivo">Efectivo</SelectItem>
+                            <SelectItem value="transferencia">Transferencia</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
 
-            {/* Hora */}
-            <div className="flex items-center justify-between gap-4">
-                <Label className="text-right sm:text-lg">Hora</Label>
-                <Input value={horaActual} disabled className="w-full max-w-3/5 text-green-950 font-semibold border border-white placeholder-white disabled:opacity-100 rounded-lg" />
-            </div>
-            </div>
+                    {/* Detalle del egreso */}
+                    <div className="flex items-center justify-between gap-4">
+                        <Label className="text-right text-md md:text-lg">Concepto</Label>
+                        <Input
+                            value={concepto}
+                            onChange={(e) => setConcepto(e.target.value)}
+                            placeholder="Detalle del egreso"
+                            className="w-full max-w-3/5"
+                        />
+                    </div>
 
-            {/* Boton para enviar el egreso */}
-            <div className="flex justify-end mt-4 gap-2">
-                <Button type="button" variant="destructive" className="w-full" onClick={handleSubmit} disabled={isLoading}>
-                {isLoading && <Loader2 className="animate-spin mr-2 h-4 w-4" />}
-                    Enviar egreso
-                </Button>
-            </div>
+                    {/* Fecha */}
+                    <div className="flex items-center justify-between gap-4">
+                        <Label className="text-right sm:text-lg">Fecha</Label>
+                        <Input value={fechaActual} disabled className="w-full max-w-3/5 text-green-950 font-semibold border border-white placeholder-white disabled:opacity-100 rounded-lg" />
+                    </div>
 
-        </form>
+                    {/* Hora */}
+                    <div className="flex items-center justify-between gap-4">
+                        <Label className="text-right sm:text-lg">Hora</Label>
+                        <Input value={horaActual} disabled className="w-full max-w-3/5 text-green-950 font-semibold border border-white placeholder-white disabled:opacity-100 rounded-lg" />
+                    </div>
+                    </div>
 
-        <DialogClose asChild>
-            <button id="close-caja-modal" className="hidden" />
-        </DialogClose>
-    </>
+                    {/* Boton para enviar el egreso */}
+                    
+                    <div className="flex justify-end mt-4 gap-2">
+                    <Button type="button" variant="destructive" className="w-full" onClick={handleSubmit} disabled={isLoading}>
+                    {isLoading && <Loader2 className="animate-spin mr-2 h-4 w-4" />}
+                        Enviar egreso
+                    </Button>
+                </div>
+
+            </form>
+
+            <DialogClose asChild>
+                <button id="close-caja-modal" className="hidden" />
+            </DialogClose>
+        </>
     );
 }

@@ -102,7 +102,7 @@ export const columns: ColumnDef<ArqueoCaja>[] = [
       const valor = row.getValue("diferencia") as number | null;
       const formato = formatCurrency(valor);
       return (
-        <span className={valor === 0 ? "text-red-600" : "text-green-600"}>
+        <span className={valor === 0 ? "text-green-600" : "text-red-600"}>
           {valor! > 0 ? "+" : ""}
           {formato}
         </span>

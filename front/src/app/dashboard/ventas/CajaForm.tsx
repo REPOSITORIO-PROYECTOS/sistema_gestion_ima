@@ -33,14 +33,38 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
   // Monto final al cerrar la caja
   const [saldoFinalDeclarado, setSaldoFinalDeclarado] = useState("");
 
-  /* Soluciona problema de input de nombre de usuario vacio */
+  // Soluciona problema de input de nombre de usuario vacio 
   useEffect(() => {
     if (usuario?.nombre_usuario) {
       setNombreUsuario(usuario.nombre_usuario);
     }
   }, [usuario]);
 
-  /* Abrir Caja */
+
+
+
+  /* Formateos Numéricos */
+  // Formatea el input numérico
+  function formatearMoneda(valor: string): string {
+    const limpio = valor.replace(/[^\d]/g, "");     // Todo menos dígitos
+    if (!limpio) return "";
+    const conPuntos = parseInt(limpio).toLocaleString("es-AR");
+    return `$${conPuntos}`;
+  }
+
+  // Ayuda a limpiar el numero de input
+  function limpiarMoneda(valor: string): number {
+    if (!valor) return 0;
+    const limpio = valor
+      .replace(/\./g, "")    // Quitamos puntos (separador de miles)
+      .replace(",", ".")     // Reemplazamos la coma decimal por punto
+      .replace(/[^\d.]/g, ""); // Quitamos todo menos números y punto decimal
+    return parseFloat(limpio) || 0;
+  }
+
+
+
+  // Abrir Caja
   const handleSubmit = async (e: React.FormEvent) => {
     
     e.preventDefault();
@@ -52,6 +76,14 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
     }
 
     if (parseFloat(saldoInicial) < 0) {
+      toast.error("El monto inicial no puede ser negativo");
+      return;
+    }
+
+    // Necesario para mejor UI numérica y convertir ese valor a float
+    const saldoInicialLimpio = limpiarMoneda(saldoInicial);
+
+    if (saldoInicialLimpio < 0) {
       toast.error("El monto inicial no puede ser negativo");
       return;
     }
@@ -70,7 +102,7 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
         },
         body: JSON.stringify({ 
           llave,
-          saldo_inicial: parseFloat(saldoInicial),
+          saldo_inicial: saldoInicialLimpio,
         }),
       });
 
@@ -87,7 +119,7 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          saldo_inicial: parseFloat(saldoInicial),
+          saldo_inicial: saldoInicialLimpio,
         }),
       });
 
@@ -108,7 +140,6 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
       document.getElementById("close-caja-modal")?.click();
     }
   };
-
 
   // Cerrar caja
   const handleCerrarCaja = async () => {
@@ -142,6 +173,8 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
         return toast.error(`⛔ ${validarData.detail || "Llave incorrecta."}`);
       }
 
+      const saldoFinalLimpio = limpiarMoneda(saldoFinalDeclarado);
+
       // Si la llave es válida, cerramos la caja
       const cerrarRes = await fetch("https://sistema-ima.sistemataup.online/api/caja/cerrar", {
         method: "POST",
@@ -150,7 +183,7 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          saldo_final_declarado: parseFloat(saldoFinalDeclarado),
+          saldo_final_declarado: saldoFinalLimpio,
         }),
       });
 
@@ -204,15 +237,15 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
               {cajaAbierta ? "Monto de Cierre" : "Monto Inicial"}
             </Label>
             <Input
-              type="number"
-              min="0"
+              type="text"
               value={cajaAbierta ? saldoFinalDeclarado : saldoInicial}
-              onChange={(e) =>
-                cajaAbierta
-                  ? setSaldoFinalDeclarado(e.target.value)
-                  : setSaldoInicial(e.target.value)
-              }
-              placeholder="Monto"
+              onChange={(e) => {
+                const formateado = formatearMoneda(e.target.value);
+                return cajaAbierta
+                  ? setSaldoFinalDeclarado(formateado)
+                  : setSaldoInicial(formateado);
+              }}
+              placeholder="$0"
               className="w-full max-w-3/5"
             />
           </div>
