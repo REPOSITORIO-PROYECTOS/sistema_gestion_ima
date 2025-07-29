@@ -10,57 +10,49 @@ import {
 } from "@/components/ui/select"
 import { useState } from "react";
 
-/* Dependiendo el tipo de modo se crea o modifica un item */
 type StockFormProps = {
   mode: "create" | "edit";
   initialData?: {
-    id: string;
-    nombre: string;
-    cantidad: number;
-    ubicacion: string;
-    costoUnitario: number;
+    id: number;
+    descripcion: string;
+    stock_actual: number;
+    ubicacion?: string;
+    precio_venta: number;
   };
 };
 
 export default function AddStockForm({ mode, initialData }: StockFormProps) {
-
-  const [nombre, setNombre] = useState(initialData?.nombre || "");
-  const [cantidad, setCantidad] = useState(initialData?.cantidad?.toString() || "");
+  const [descripcion, setDescripcion] = useState(initialData?.descripcion || "");
+  const [stock, setStock] = useState(initialData?.stock_actual?.toString() || "");
   const [ubicacion, setUbicacion] = useState(initialData?.ubicacion || "");
-  const [costo, setCosto] = useState(initialData?.costoUnitario?.toString() || "");
+  const [precioVenta, setPrecioVenta] = useState(initialData?.precio_venta?.toString() || "");
 
   const handleSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
+    e.preventDefault();
 
-      if (mode === "create") {
-          
-      // POST: Crear producto nuevo
-      console.log("POST", { nombre, cantidad, ubicacion, costo });
-
-      } else {
-
-      // PATCH: Editar producto existente
+    if (mode === "create") {
+      console.log("POST", { descripcion, stock, ubicacion, precioVenta });
+    } else {
       console.log("PATCH", {
-          id: initialData?.id,
-          nombre,
-          cantidad,
-          ubicacion,
-          costo,
+        id: initialData?.id,
+        descripcion,
+        stock,
+        ubicacion,
+        precioVenta,
       });
-      }
+    }
   };
 
   return (
-
     <form onSubmit={handleSubmit}>
       <div className="grid gap-6 py-4">
         <div className="grid grid-cols-4 items-center gap-4">
           <Label className="text-right">Nombre</Label>
-          <Input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Jugo de Manzana" className="col-span-3" />
+          <Input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Jugo de Manzana" className="col-span-3" />
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
-          <Label className="text-right">Cantidad</Label>
-          <Input value={cantidad} onChange={(e) => setCantidad(e.target.value)} placeholder="Ej: 10" className="col-span-3" />
+          <Label className="text-right">Stock</Label>
+          <Input value={stock} onChange={(e) => setStock(e.target.value)} placeholder="Ej: 10" className="col-span-3" />
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
           <Label className="text-right">Ubicación</Label>
@@ -79,8 +71,8 @@ export default function AddStockForm({ mode, initialData }: StockFormProps) {
           </div>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
-          <Label className="text-right">Costo Unitario</Label>
-          <Input value={costo} onChange={(e) => setCosto(e.target.value)} placeholder="Ej: $1000" className="col-span-3" />
+          <Label className="text-right">Precio Venta</Label>
+          <Input value={precioVenta} onChange={(e) => setPrecioVenta(e.target.value)} placeholder="Ej: $1000" className="col-span-3" />
         </div>
       </div>
       <div className="flex justify-end mt-4">

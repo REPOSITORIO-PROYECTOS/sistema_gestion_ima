@@ -54,7 +54,7 @@ export function DataTable<TData, TValue>({
 
     const [sorting, setSorting] = useState<SortingState>([])
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-    const [currentStatus, setCurrentStatus] = useState("all")
+    /* const [currentStatus, setCurrentStatus] = useState("all") */
 
     const table = useReactTable({
         data,
@@ -120,7 +120,6 @@ export function DataTable<TData, TValue>({
 
                 {/* Botones para sincronización */}
                 <div className="flex gap-2 md:flex-row flex-col">
-                    
                     <Button variant="outline" onClick={handleSyncArticulos}>Sincronizar Artículos</Button>
                 </div>
 
@@ -128,11 +127,17 @@ export function DataTable<TData, TValue>({
                 <div className="flex flex-row justify-between items-center md:justify-start gap-2 w-full">
 
                     {/* Input de Búsqueda por Producto */}
-                    <Input placeholder="Filtrar por producto" value={(table.getColumn("producto")?.getFilterValue() as string) ?? ""}
-                    onChange={(event) => table.getColumn("producto")?.setFilterValue(event.target.value)} className="w-1/2 md:max-w-1/4" />
+                    <Input
+                        placeholder="Filtrar por producto"
+                        value={(table.getColumn("descripcion")?.getFilterValue() as string) ?? ""}
+                        onChange={(event) =>
+                            table.getColumn("descripcion")?.setFilterValue(event.target.value)
+                        }
+                        className="w-1/2 md:max-w-1/4"
+                    />
 
                     {/* Input de Filtrado por Ubicación */}
-                    <Select value={currentStatus} onValueChange={(value) => {
+                    {/* <Select value={currentStatus} onValueChange={(value) => {
                     setCurrentStatus(value)
                     table.getColumn("ubicacion")?.setFilterValue(value === "all" ? undefined : value)}}>
 
@@ -150,9 +155,7 @@ export function DataTable<TData, TValue>({
                                 <SelectItem value="Sucursal Norte">Sucursal Norte</SelectItem>
                             </SelectGroup>
                         </SelectContent>
-
-                    </Select>
-
+                    </Select> */}
                 </div>
             </div>
 
@@ -188,7 +191,7 @@ export function DataTable<TData, TValue>({
 
                             {/* Filas Tabla */}
                             {row.getVisibleCells().map((cell) => (
-                            <TableCell key={cell.id} className="px-4">
+                            <TableCell key={cell.id} className="px-6">
                                 {flexRender(cell.column.columnDef.cell, cell.getContext())}
                             </TableCell>
                             ))}
@@ -247,9 +250,7 @@ export function DataTable<TData, TValue>({
                     </div>
 
                 </div>
-                
             </div>
-
         </div>
     )
 }

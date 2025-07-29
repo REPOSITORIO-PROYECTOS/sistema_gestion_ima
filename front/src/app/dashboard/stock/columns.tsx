@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import { ColumnDef } from "@tanstack/react-table"
-import { Button } from "@/components/ui/button"
-import { ArrowUpDown } from "lucide-react"
+import { ColumnDef } from "@tanstack/react-table";
+import { Button } from "@/components/ui/button";
+import { ArrowUpDown } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -10,22 +10,20 @@ import {
   DialogTitle,
   DialogDescription,
   DialogTrigger,
-  /* DialogTrigger, */
-} from "@/components/ui/dialog"
-import AddStockForm from "./StockForm"
+} from "@/components/ui/dialog";
+import AddStockForm from "./StockForm";
 
-export type Stock = {
-  id: string;
-  producto: string;
-  cantidad: number;
-  costo: number;
-  ubicacion: string;
-  fecha: Date;
-};
+export interface ProductoAPI {
+  id: number;
+  descripcion: string;
+  precio_venta: number;
+  venta_negocio: number;
+  stock_actual: number;
+}
 
-export const columns: ColumnDef<Stock>[] = [
+export const columns: ColumnDef<ProductoAPI>[] = [
   {
-    accessorKey: "producto",
+    accessorKey: "descripcion",
     header: ({ column }) => (
       <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
         Nombre de Producto
@@ -34,78 +32,67 @@ export const columns: ColumnDef<Stock>[] = [
     ),
   },
   {
-    accessorKey: "cantidad",
-    header: "Cantidad",
-  },
-  {
-    accessorKey: "fecha",
-    header: "Fecha",
+    accessorKey: "precio_venta",
+    header: "Precio de Venta al Público",
     cell: ({ row }) => {
-      const fecha = row.getValue("fecha") as Date;
-      const fechaFormateada = new Date(fecha).toLocaleString("es-AR", {
-        year: "numeric",
-        month: "short",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-
-      return <div className="font-medium">{fechaFormateada}</div>;
-    },
-  },
-  {
-    accessorKey: "ubicacion",
-    header: "Ubicación",
-  },
-  {
-    accessorKey: "costo",
-    header: () => <div className="text-right">Costo</div>,
-    cell: ({ row }) => {
-      const amount = parseFloat(row.getValue("costo"));
+      const value = row.getValue("precio_venta") as number;
       const formatted = new Intl.NumberFormat("es-AR", {
         style: "currency",
         currency: "ARS",
-      }).format(amount);
-
-      return <div className="text-right font-semibold">{formatted}</div>;
+      }).format(value);
+      return <div className="font-medium">{formatted}</div>;
+    },
+  },
+  {
+    accessorKey: "venta_negocio",
+    header: "Precio de Venta a Clientes",
+    cell: ({ row }) => {
+      const value = row.getValue("venta_negocio") as number;
+      const formatted = new Intl.NumberFormat("es-AR", {
+        style: "currency",
+        currency: "ARS",
+      }).format(value);
+      return <div className="font-medium">{formatted}</div>;
+    },
+  },
+  {
+    accessorKey: "stock_actual",
+    header: "Stock",
+    cell: ({ row }) => {
+      const stock = row.getValue("stock_actual") as number;
+      return <div className="font-medium">{stock}</div>;
     },
   },
   {
     id: "actions",
     cell: ({ row }) => {
-
-      const stock = row.original;
+      const producto = row.original;
 
       return (
         <Dialog>
-
           <DialogTrigger asChild>
             <Button variant="secondary">Editar</Button>
           </DialogTrigger>
 
           <DialogContent className="sm:max-w-lg">
-
             <DialogHeader>
-              <DialogTitle>Editar Producto: {stock.producto}</DialogTitle>
+              <DialogTitle>Editar Producto: {producto.descripcion}</DialogTitle>
               <DialogDescription>Modifica los datos necesarios</DialogDescription>
             </DialogHeader>
 
-            {/* Componente Form para Stock - mode="edit", que envía metodo PUT */}
             <AddStockForm
               mode="edit"
               initialData={{
-                id: stock.id,
-                nombre: stock.producto,
-                cantidad: stock.cantidad,
-                ubicacion: stock.ubicacion,
-                costoUnitario: stock.costo,
+                id: producto.id,
+                descripcion: producto.descripcion,
+                stock_actual: producto.stock_actual,
+                ubicacion: "", // si no viene del backend
+                precio_venta: producto.precio_venta,
               }}
             />
-
           </DialogContent>
-
         </Dialog>
       );
     },
-  }
+  },
 ];
