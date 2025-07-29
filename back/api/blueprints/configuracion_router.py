@@ -63,4 +63,25 @@ async def subir_logo_empresa(
     
     return RespuestaGenerica(status="ok", message=f"Logo subido correctamente. Ruta: {public_path}")
 
-# Podrías crear un endpoint similar para `/upload-icono` si lo necesitas
+@router.post("/upload-icono", response_model=RespuestaGenerica)
+async def subir_icono_empresa(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(obtener_usuario_actual),
+    archivo: UploadFile = File(...)
+):
+    """Sube o reemplaza el icono de la empresa."""
+    
+    # Generamos un nombre de archivo único para evitar colisiones
+    file_extension = Path(archivo.filename).suffix
+    file_name = f"icono_empresa_{current_user.id_empresa}{file_extension}"
+    file_path = STATIC_DIR / file_name
+    
+    # Guardamos el archivo en el disco
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(archivo.file, buffer)
+        
+    # Guardamos la ruta PÚBLICA en la base de datos
+    public_path = f"/static/logos_empresas/{file_name}"
+    configuracion_manager.actualizar_ruta_archivo(db, current_user.id_empresa, "icono", public_path)
+    
+    return RespuestaGenerica(status="ok", message=f"Icono subido correctamente. Ruta: {public_path}")

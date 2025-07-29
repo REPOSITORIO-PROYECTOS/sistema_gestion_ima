@@ -19,6 +19,7 @@ class UsuarioResponse(BaseModel):
     nombre_usuario: str
     activo: bool  # <-- Incluimos el estado para que el frontend lo pueda mostrar
     rol: RolResponse
+    id_empresa: int
 
     class Config:
         from_attributes = True

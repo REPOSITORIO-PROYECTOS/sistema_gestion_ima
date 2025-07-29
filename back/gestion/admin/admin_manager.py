@@ -34,7 +34,8 @@ def crear_usuario(db: Session, usuario_data: UsuarioCreate) -> Usuario:
     nuevo_usuario = Usuario(
         nombre_usuario=usuario_data.nombre_usuario,
         password_hash=password_hasheada,
-        id_rol=usuario_data.id_rol # Usamos directamente el ID recibido
+        id_rol=usuario_data.id_rol,  # Usamos directamente el ID recibido
+        id_empresa=usuario_data.id_empresa
     )
     
     # 5. Guardar en la base de datos
