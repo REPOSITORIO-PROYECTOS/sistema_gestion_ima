@@ -133,7 +133,7 @@ export function DataTable<TData, TValue>({
                         onChange={(event) =>
                             table.getColumn("descripcion")?.setFilterValue(event.target.value)
                         }
-                        className="w-1/2 md:max-w-1/4"
+                        className="w-full md:max-w-1/4"
                     />
 
                     {/* Input de Filtrado por Ubicación */}

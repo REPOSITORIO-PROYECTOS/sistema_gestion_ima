@@ -128,6 +128,8 @@ function FormVentas({
   // Estados para la opcion de efectivo y vuelto
   const [montoPagado, setMontoPagado] = useState<number>(0);
   const [vuelto, setVuelto] = useState<number>(0);
+  const [inputEfectivo, setInputEfectivo] = useState(""); 
+
 
   // Estado para las observaciones de la venta
   const [observaciones, setObservaciones] = useState("")
@@ -204,6 +206,24 @@ function FormVentas({
     }
   }, [montoPagado, metodoPago, totalVenta]);
 
+  /* Formateos Numéricos */
+  // Formatea el input numérico
+  function formatearMoneda(valor: string): string {
+    const limpio = valor.replace(/[^\d]/g, "");     // Todo menos dígitos
+    if (!limpio) return "";
+    const conPuntos = parseInt(limpio).toLocaleString("es-AR");
+    return `$${conPuntos}`;
+  }
+
+  // Ayuda a limpiar el numero de input
+  function limpiarMoneda(valor: string): number {
+    if (!valor) return 0;
+    const limpio = valor
+      .replace(/\./g, "")    // Quitamos puntos (separador de miles)
+      .replace(",", ".")     // Reemplazamos la coma decimal por punto
+      .replace(/[^\d.]/g, ""); // Quitamos todo menos números y punto decimal
+    return parseFloat(limpio) || 0;
+  }
 
   /* Endpoints */ /* -------------------------------------------------------------- */
 
@@ -726,35 +746,35 @@ function FormVentas({
               </SelectContent>
             </Select>
           </div>
-
-          {metodoPago === 'efectivo' && (
-            /* Caja de Vuelto en Efectivo: */
+          
+          {/* Caja de Vuelto en Efectivo: */}
+          {metodoPago === 'efectivo' && (      
             <div className="flex flex-col gap-4 p-4 bg-green-800 rounded-lg mt-2">
+              
               <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
                 <Label className="text-2xl font-semibold text-white">Costo del Pedido:</Label>
                 <Input
-                  type="number"
-                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                  value={totalVenta}
+                  type="text"
+                  value={formatearMoneda(totalVenta.toString())}
                   disabled
                   className="w-full md:max-w-1/2 font-semibold text-white"
-                />                
+                />
               </div>
+
               <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
                 <Label className="text-2xl font-semibold text-white">Con cuánto abona:</Label>
                 <Input
-                  type="number"
-                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                  value={montoPagado === 0 ? "" : montoPagado}
+                  inputMode="numeric"
+                  value={inputEfectivo}
                   onChange={(e) => {
-                    const input = e.target.value;
-                    if (input === "") {
-                      setMontoPagado(0);
-                      return;
-                    }
-                    const parsed = parseInt(input, 10);
-                    if (isNaN(parsed)) return;
-                    setMontoPagado(parsed);
+                    const valorInput = e.target.value;
+
+                    // Limpiar y obtener valor numérico real
+                    const valorNumerico = limpiarMoneda(valorInput);
+
+                    // Actualiza ambos estados: visual + interno
+                    setInputEfectivo(formatearMoneda(valorInput));
+                    setMontoPagado(valorNumerico);
                   }}
                   className="w-full md:max-w-1/2 font-semibold text-white"
                 />
@@ -763,8 +783,8 @@ function FormVentas({
               <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
                 <Label className="text-2xl font-semibold text-white">Vuelto:</Label>
                 <Input
-                  type="number"
-                  value={vuelto}
+                  type="text"
+                  value={formatearMoneda(vuelto.toString())}
                   disabled
                   className="w-full md:max-w-1/2 font-semibold text-white"
                 />

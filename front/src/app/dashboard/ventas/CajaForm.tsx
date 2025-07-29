@@ -40,9 +40,6 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
     }
   }, [usuario]);
 
-
-
-
   /* Formateos Numéricos */
   // Formatea el input numérico
   function formatearMoneda(valor: string): string {
@@ -61,8 +58,6 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
       .replace(/[^\d.]/g, ""); // Quitamos todo menos números y punto decimal
     return parseFloat(limpio) || 0;
   }
-
-
 
   // Abrir Caja
   const handleSubmit = async (e: React.FormEvent) => {
