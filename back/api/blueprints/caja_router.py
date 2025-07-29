@@ -167,3 +167,4 @@ def get_lista_de_arqueos(db: Session = Depends(get_db)):
     """
     # La llamada a la función no cambia de nombre, pero ahora devuelve la nueva estructura.
     return consultas_caja.obtener_arqueos_de_caja(db=db)
+

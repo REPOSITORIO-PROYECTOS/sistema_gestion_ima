@@ -171,3 +171,57 @@ Panel de configuración de la empresa.
 Sistema de configuración de plantillas de proveedores.
 Interfaz para el flujo de importación/pre-visualización/confirmación de listas de precios.
 Implementar el endpoint de confirmación para la actualización masiva de precios.
+
+Documento de Contexto y Estado del Proyecto: Sistema de Gestión IMA
+Fecha de Estado: 25 de Julio de 2025
+1. Resumen Ejecutivo y Misión del Proyecto
+El proyecto es el backend de un Sistema de Gestión (ERP) multi-tenant (multi-empresa), construido con FastAPI y SQLModel, y un frontend en Next.js. La misión inicial fue estabilizar una base de código existente que sufría de problemas críticos de arranque (502 Bad Gateway) y fallos de autenticación. La misión ha evolucionado hacia la refactorización completa a una arquitectura ORM consistente, la implementación de un modelo de datos multi-empresa seguro y aislado, y el diseño de soluciones escalables para funcionalidades complejas como la facturación fiscal (AFIP) y la importación de datos. El objetivo final es un sistema robusto, seguro y mantenible, capaz de dar servicio a múltiples empresas clientes.
+2. Arquitectura Fundamental del Backend (Reglas Inquebrantables)
+Cualquier nuevo desarrollo debe adherirse estrictamente a esta arquitectura para mantener la consistencia y calidad del código.
+ORM Exclusivo: Se ha tomado la decisión de abandonar por completo el uso de mysql-connector. Toda la interacción con la base de datos se realiza a través de SQLModel y su sistema de Session. Esto garantiza seguridad (prevención de Inyección SQL), mantenibilidad y transacciones atómicas.
+Capas de Lógica Estrictas:
+back/modelos.py: Define las tablas de la DB como clases de Python. Es la única fuente de la verdad sobre la estructura de los datos.
+back/schemas/: Define los "contratos de datos" (DTOs) con Pydantic. Valida toda la información que entra y sale de la API.
+back/gestion/ (Managers): Contiene toda la lógica de negocio. Estas funciones reciben la Session de la base de datos y los schemas de Pydantic, y devuelven objetos de los modelos. No saben nada de HTTP.
+back/api/blueprints/ (Routers): La capa más externa. Define las rutas HTTP, maneja las dependencias de seguridad, llama a las funciones de los "managers" y gestiona las respuestas y errores HTTP.
+3. Modelo de Datos Multi-Empresa
+Esta es la decisión de arquitectura más importante que hemos tomado.
+Nuevos Modelos Centrales: Se crearon los modelos Empresa y ConfiguracionEmpresa.
+Aislamiento de Datos (Data Tenancy): Los modelos clave (Usuario, Articulo, Categoria, Marca, y eventualmente Venta, Compra, Tercero) deben tener una clave foránea id_empresa.
+Regla de Oro para las Consultas: Toda consulta en la capa de gestion (managers) debe filtrar obligatoriamente por el id_empresa del usuario que realiza la acción. Esto previene que los datos de una empresa se filtren a otra.
+4. Sistema de Seguridad y Bóveda de Secretos
+Autenticación: Flujo estándar OAuth2 con Tokens JWT. El endpoint /auth/token valida las credenciales y emite un access_token.
+Autorización: Se utiliza una factoría de dependencias es_rol(["rol_requerido"]) que protege los routers o endpoints. La función principal obtener_usuario_actual valida el token y siempre consulta la DB en tiempo real para obtener el usuario, su rol y su empresa.
+Bóveda de Secretos (Decisión Final): Las credenciales sensibles (certificados y claves de AFIP) NO se guardan en la base de datos principal. Se ha diseñado la arquitectura de un microservicio "Bóveda" independiente.
+Funcionamiento: La API principal, cuando necesita facturar, hace una llamada HTTP interna al microservicio Bóveda, solicitando las credenciales para un CUIT de empresa específico. La Bóveda las desencripta en memoria y las devuelve. Esto proporciona el máximo nivel de seguridad y aislamiento.
+5. Funcionalidades Clave Diseñadas
+Generación de Comprobantes (Facturas, Remitos, etc.):
+Arquitectura: Es un sistema "stateless" (sin estado).
+Endpoint: POST /comprobantes/generar.
+Flujo: El frontend es responsable de enviar un JSON completo con toda la información: datos del emisor, del receptor y de la transacción. El backend actúa como un procesador bajo demanda.
+Flexibilidad: El payload especifica el formato (pdf o ticket) y el tipo (factura, remito, etc.). El backend selecciona la plantilla HTML+CSS adecuada y la convierte a PDF con WeasyPrint.
+Integración AFIP: La lógica está encapsulada en facturacion_afip.py. El generador de comprobantes solo la llama cuando tipo="factura".
+Importación Masiva de Listas de Precios:
+Objetivo: Permitir la actualización de costos y precios a partir de archivos Excel de proveedores, cada uno con su propio formato.
+Arquitectura: Sistema de Plantillas de Mapeo.
+Flujo de 3 Pasos:
+Configuración: Un super-administrador define una plantilla para un proveedor, mapeando las columnas del Excel a los campos de la base de datos (guardado en el modelo PlantillaProveedor).
+Pre-visualización: El usuario sube un Excel. El backend lo lee usando la plantilla y devuelve un informe de los cambios sin aplicarlos.
+Confirmación: Un futuro endpoint recibirá la confirmación y ejecutará la actualización masiva.
+6. Arquitectura del Frontend (Next.js)
+Framework: Next.js con App Router.
+Estado Global: Zustand (useAuthStore). Crítico: El store guarda el objeto usuario completo después del login, incluyendo usuario.rol y usuario.empresa. Esto es fundamental para la renderización condicional y las llamadas a la API.
+Estructura de Rutas:
+Páginas Públicas/Landing: Deben vivir en una sección separada (ej: app/(landing)/) para optimizar el rendimiento y el SEO.
+Aplicación Privada: Vive dentro de un Grupo de Rutas app/(dashboard)/. Un archivo layout.tsx en la raíz de este grupo actúa como el guardián principal, verificando la autenticación del usuario.
+Paneles Ocultos: Se crean como sub-rutas dentro del grupo protegido (ej: app/(dashboard)/super-admin/empresas/page.tsx), y se les añade un segundo guardián a nivel de página o de layout anidado para verificar el rol ("Admin", "Soporte").
+7. Problemas Históricos Resueltos (Contexto de Depuración)
+502 Bad Gateway: La causa raíz eran errores de arranque (ImportError) en main.py por referencias a routers o schemas inexistentes o con nombres incorrectos. La solución fue verificar y corregir todas las importaciones.
+Fallos de Autenticación: La causa raíz era una incompatibilidad de versiones de passlib y bcrypt. La solución fue forzar la reinstalación de una versión compatible (pip install --force-reinstall "passlib[bcrypt]==1.7.4").
+Fechas y Horas: El backend guarda todo en UTC. El frontend es el único responsable de convertir y formatear las fechas a la zona horaria local del usuario.
+8. Rol y Tono del Asistente
+Actuar como un arquitecto de software senior y mentor.
+Priorizar la seguridad, escalabilidad y mantenibilidad en todas las soluciones.
+Explicar el "porqué" de las decisiones de arquitectura, no solo el "cómo".
+Proporcionar código completo, limpio y profesional que siga la arquitectura establecida.
+Ser estructurado, claro y didáctico.
