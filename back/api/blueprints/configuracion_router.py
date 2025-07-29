@@ -13,7 +13,7 @@ from back.schemas.caja_schemas import RespuestaGenerica
 
 # Lógica de negocio y Schemas
 from back.gestion import configuracion_manager
-from back.schemas.configuracion_schemas import ConfiguracionRead, ConfiguracionUpdate
+from back.schemas.configuracion_schemas import ConfiguracionResponse, ConfiguracionUpdate
 
 router = APIRouter(prefix="/configuracion", tags=["Configuración de Empresa"])
 
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/configuracion", tags=["Configuración de Empresa"])
 STATIC_DIR = Path("back/static/logos_empresas")
 STATIC_DIR.mkdir(parents=True, exist_ok=True) # Asegura que el directorio exista
 
-@router.get("/mi-empresa", response_model=ConfiguracionRead)
+@router.get("/mi-empresa", response_model=ConfiguracionResponse)
 def obtener_mi_configuracion(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(obtener_usuario_actual)
@@ -30,7 +30,7 @@ def obtener_mi_configuracion(
     config = configuracion_manager.obtener_configuracion_empresa(db, current_user.id_empresa)
     return config
 
-@router.patch("/mi-empresa", response_model=ConfiguracionRead)
+@router.patch("/mi-empresa", response_model=ConfiguracionResponse)
 def actualizar_mi_configuracion(
     req: ConfiguracionUpdate,
     db: Session = Depends(get_db),
