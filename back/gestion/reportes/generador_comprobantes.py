@@ -27,7 +27,10 @@ def generar_comprobante_stateless(data: GenerarComprobanteRequest) -> bytes:
         print("   -> Tipo 'factura' detectado. Llamando al especialista de AFIP...")
         try:
             # Pasamos los datos del emisor y la transacción al especialista
-            datos_afip = generar_factura_para_venta(emisor=data.emisor, receptor=data.receptor, transaccion=data.transaccion)
+            datos_afip = generar_factura_para_venta(
+                venta=data.transaccion,  # El parámetro 'venta' recibe los datos de la transacción.
+                cliente=data.receptor   # El parámetro 'cliente' recibe los datos del receptor.
+            )
             print("   -> Datos de AFIP recibidos con éxito.")
         except (ValueError, RuntimeError) as e:
             raise HTTPException(status_code=503, detail=f"Servicio de AFIP no disponible: {e}")
