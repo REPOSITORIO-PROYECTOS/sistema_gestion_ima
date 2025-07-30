@@ -114,7 +114,7 @@ def api_registrar_venta(
             cliente_db = db.get(Tercero, req.id_cliente) if req.id_cliente else None
             
             # Mapeamos los datos para el especialista de AFIP
-            venta_data_schema = TransaccionData(total=venta_creada.total, items=[ItemTransaccion.model_validate(art) for art in req.articulos_vendidos])
+            venta_data_schema = TransaccionData(total=venta_creada.total, items=[ItemData.model_validate(art) for art in req.articulos_vendidos])
             cliente_data_schema = ReceptorData.model_validate(cliente_db) if cliente_db else None
 
             factura_generada = generar_factura_para_venta(venta_data=venta_data_schema, cliente_data=cliente_data_schema)
