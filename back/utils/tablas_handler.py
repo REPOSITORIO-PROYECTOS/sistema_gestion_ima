@@ -133,6 +133,7 @@ class TablasHandler:
                 return False
 
 
+
             for item_a_restar in lista_items:
                 id_producto = item_a_restar.get("id_articulo")
                 cantidad_a_restar = item_a_restar.get("cantidad")
