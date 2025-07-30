@@ -122,3 +122,4 @@ def facturar_lote_de_ventas(
 
     # El commit se hará en el router, después de que esta función termine exitosamente.
     return resultado_afip
+
