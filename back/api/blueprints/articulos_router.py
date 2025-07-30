@@ -26,13 +26,15 @@ def api_get_all_articulos(
     
     return lista_articulos
 
+
 @router.get("/obtener/{id_articulo}", response_model=ArticuloResponse)
-def api_get_articulo(id_articulo: int, db: Session = Depends(get_db)):
+def api_get_articulo(id_articulo: int, db: Session = Depends(get_db),current_user: Usuario = Depends(obtener_usuario_actual)):
     # Esta función ya era compatible, no necesita cambios.
     articulo_db = mod_articulos.obtener_articulo_por_id(db, id_articulo)
     if not articulo_db:
         raise HTTPException(status_code=404, detail=f"Artículo con ID {id_articulo} no encontrado.")
     return articulo_db
+
 
 @router.post("/crear", response_model=ArticuloResponse, status_code=201, dependencies=[Depends(es_admin)])
 def api_create_articulo(req: ArticuloCreate, db: Session = Depends(get_db)):

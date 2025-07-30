@@ -27,7 +27,8 @@ def abrir_caja(db: Session, usuario_apertura: Usuario, saldo_inicial: float) -> 
     nueva_sesion = CajaSesion(
         saldo_inicial=saldo_inicial,
         id_usuario_apertura=usuario_apertura.id,
-        estado="ABIERTA"
+        estado="ABIERTA",
+        id_empresa= usuario_apertura.id_empresa
     )
 
     try:
