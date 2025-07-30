@@ -34,6 +34,7 @@ class RegistrarVentaRequest(BaseModel):
     id_cliente: Optional[int] = None
     metodo_pago: str
     total_venta: float
+    paga_con: float
     articulos_vendidos: List[ArticuloVendido]
     quiere_factura: bool = False
     tipo_comprobante_solicitado: Optional[str] = None

@@ -78,9 +78,9 @@ def api_registrar_venta(
 
     # --- Lógica de Vuelto y Descuentos ---
     vuelto = None
-    if req.monto_recibido:
+    if req.paga_con:
         try:
-            vuelto = registro_caja.calcular_vuelto(req.total_venta, req.monto_recibido)
+            vuelto = registro_caja.calcular_vuelto(req.total_venta, req.paga_con)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
     
