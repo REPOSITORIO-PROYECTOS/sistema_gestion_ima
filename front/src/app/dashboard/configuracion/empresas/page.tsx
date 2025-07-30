@@ -345,6 +345,7 @@ function CreateAdminUserModal({ empresa, onClose, onUserCreated }: { empresa: Em
             const newUserPayload = {
                 nombre_usuario: nombreUsuario,
                 password: password,
+                id_rol: 2, // Asumiendo que el ID del rol de administrador es 2
                 nombre_rol: "Admin",
                 id_empresa: empresa.id
             };
