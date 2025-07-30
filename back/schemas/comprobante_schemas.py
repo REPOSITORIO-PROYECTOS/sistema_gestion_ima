@@ -48,3 +48,17 @@ class GenerarComprobanteRequest(BaseModel):
     emisor: EmisorData
     receptor: ReceptorData
     transaccion: TransaccionData
+    
+class FacturarLoteRequest(BaseModel):
+    # Una lista de IDs de CajaMovimiento (de tipo VENTA) que se quieren facturar.
+    ids_movimientos: List[int] = Field(..., min_length=1)
+    
+    # El ID del cliente al que se le va a facturar.
+    # Si es None o no se envía, se asume "Consumidor Final".
+    id_cliente_final: Optional[int] = None
+
+class FacturarLoteResponse(BaseModel):
+    status: str
+    mensaje: str
+    datos_factura: Dict[str, Any] # La respuesta de AFIP (CAE, nro, etc.)
+    ids_procesados: List[int]

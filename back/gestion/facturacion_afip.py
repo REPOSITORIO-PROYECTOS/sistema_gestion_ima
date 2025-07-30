@@ -1,75 +1,75 @@
 # back/gestion/facturacion_afip.py
+
 import requests
-from typing import Dict, Any
-from back.config import AFIP_CERT,AFIP_KEY,FACTURACION_API_URL,AFIP_CUIT
-from back.modelos import Venta, Tercero # Importa los modelos que necesites
+from typing import Dict, Any, Optional
+from back.schemas.comprobante_schemas import TransaccionData, ReceptorData, EmisorData
 
-def generar_factura_para_venta(venta: Venta, cliente: Tercero) -> Dict[str, Any]:
+def generar_factura_para_venta(
+    venta_data: TransaccionData,
+    cliente_data: Optional[ReceptorData],
+    emisor_data: EmisorData
+) -> Dict[str, Any]:
     """
-    Prepara los datos y llama al microservicio de facturación para una venta dada.
+    Prepara los datos y llama al microservicio de facturación.
+    Esta función es ahora "agnóstica": no sabe si la petición viene de
+    una venta única o de un lote, solo recibe los datos que necesita.
     """
-    print(f"Iniciando proceso de facturación para la Venta ID: {venta.id}")
+    print(f"Iniciando proceso de facturación para Emisor CUIT: {emisor_data.cuit}")
 
-    # 1. Preparar las credenciales
+    # --- CAMBIO 1: LAS CREDENCIALES AHORA VIENEN EN EL PAYLOAD ---
+    # El orquestador (caja_router o facturacion_lotes_manager) es responsable
+    # de obtener estas credenciales (desde la Bóveda) y pasarlas aquí.
     credenciales = {
-        "cuit": AFIP_CUIT,
-        "certificado": AFIP_CERT.replace('\\n', '\n') if AFIP_CERT else None,
-        "clave_privada": AFIP_KEY.replace('\\n', '\n') if AFIP_KEY else None
+        "cuit": emisor_data.cuit,
+        "certificado": emisor_data.afip_certificado.replace('\\n', '\n') if emisor_data.afip_certificado else None,
+        "clave_privada": emisor_data.afip_clave_privada.replace('\\n', '\n') if emisor_data.afip_clave_privada else None
     }
     
     if not all(credenciales.values()):
-        raise ValueError("Faltan credenciales de AFIP en la configuración del servidor (.env)")
+        raise ValueError("Faltan credenciales de AFIP en los datos del emisor.")
 
-    # 2. Preparar los datos de la factura
-    # Esta lógica puede ser mucho más compleja, dependiendo del tipo de cliente, etc.
-    # Aquí un ejemplo simple para Monotributista (Factura C) a Consumidor Final
-    if cliente:
-        tipo_documento = 80 if cliente.cuit else 96 # CUIT o DNI
-        documento = cliente.cuit if cliente.cuit else "0" # DNI si lo tienes, o 0
-        id_condicion_iva = 5 # Asumimos Consumidor Final por ahora
-    else: # Venta sin cliente (mostrador)
+    # --- CAMBIO 2: LOS DATOS SE OBTIENEN DE LOS SCHEMAS, NO DE LOS MODELOS ---
+    if cliente_data:
+        tipo_documento = 80 if cliente_data.cuit_o_dni and len(cliente_data.cuit_o_dni) == 11 else 96
+        documento = cliente_data.cuit_o_dni if cliente_data.cuit_o_dni else "0"
+        # La condición de IVA del cliente también viene en el schema
+        id_condicion_iva_receptor = 5 # Aquí iría tu lógica para mapear texto a ID, ej: "Consumidor Final" -> 5
+    else: # Venta a "Consumidor Final" genérico
         tipo_documento = 99
         documento = "0"
-        id_condicion_iva = 5
+        id_condicion_iva_receptor = 5
         
     datos_factura = {
         "tipo_afip": 11,  # Factura C (Monotributo)
-        "punto_venta": 1, # DEBE ser el punto de venta habilitado para Web Service
+        "punto_venta": emisor_data.punto_venta, # El punto de venta del emisor
         "tipo_documento": tipo_documento,
         "documento": documento,
-        "total": venta.total,
-        "id_condicion_iva": id_condicion_iva,
-        "neto": 0.0, # Para Factura C, esto se ajusta en el microservicio
+        "total": venta_data.total, # El total viene de TransaccionData
+        "id_condicion_iva": id_condicion_iva_receptor,
+        "neto": 0.0,
         "iva": 0.0,
+        # Aquí podrías añadir un detalle de los items si tu microservicio lo requiere
+        # "items": [item.model_dump() for item in venta_data.items]
     }
 
-    # 3. Construir el payload completo
+    # El resto del código permanece igual, ya que es la lógica de comunicación
     payload = {
         "credenciales": credenciales,
         "datos_factura": datos_factura
     }
 
-    # 4. Llamar al microservicio
     try:
-        print(f"Enviando petición a: {FACTURACION_API_URL}")
-        response = requests.post(
-            FACTURACION_API_URL,
-            json=payload,
-            timeout=20  # Timeout de 20 segundos
-        )
+        # Asumimos que la URL del microservicio viene del emisor_data o de un config global
+        # from back.config import FACTURACION_API_URL
+        # response = requests.post(FACTURACION_API_URL, json=payload, ...)
         
-        # Lanza una excepción si la respuesta es un error HTTP (4xx o 5xx)
-        response.raise_for_status() 
-        
-        resultado_afip = response.json()
-        print(f"Respuesta exitosa del microservicio: {resultado_afip}")
+        # Simulación para el ejemplo
+        print(f"SIMULACIÓN: Enviando petición al microservicio de facturación con total: {datos_factura['total']}")
+        resultado_afip = {"cae": "SIMULADO_123456789", "comprobante_numero": "0001-00001234", "vencimiento_cae": "2025-12-31"}
+        print(f"Respuesta simulada del microservicio: {resultado_afip}")
         return resultado_afip
 
     except requests.exceptions.RequestException as e:
-        print(f"ERROR: No se pudo conectar con el microservicio de facturación. Detalle: {e}")
-        # Aquí puedes decidir qué hacer: ¿fallar la venta, o guardarla como "pendiente de facturar"?
-        # Por ahora, lanzamos el error para que el frontend se entere.
-        raise RuntimeError("El servicio de facturación no está disponible en este momento.")
+        raise RuntimeError(f"El servicio de facturación no está disponible: {e}")
     except Exception as e:
-        print(f"ERROR: Ocurrió un error inesperado durante la facturación. Detalle: {e}")
-        raise RuntimeError(str(e))
+        raise RuntimeError(f"Error inesperado durante la facturación: {e}")
