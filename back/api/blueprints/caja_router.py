@@ -1,5 +1,6 @@
 # back/api/blueprints/caja_router.py
 
+from sqlite3.dbapi2 import Timestamp
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlmodel import Session
 from typing import List, Dict, Any, Optional
@@ -183,7 +184,10 @@ def api_registrar_egreso(
             concepto=req.concepto,
             monto=req.monto,
             tipo="EGRESO",
-            id_usuario=current_user.id
+            id_usuario=current_user.id,
+            id_sesion_caja=sesion_activa,  # probablemente mal nombrado
+            fecha_hora=Timestamp.datetime.utcnow(),           # quizás se llama distinto
+            facturado=False
         )
     except (ValueError, RuntimeError) as e:
         # Capturamos los errores de negocio o de base de datos
