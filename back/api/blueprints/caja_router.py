@@ -197,8 +197,8 @@ def api_registrar_egreso(
             concepto=movimiento.concepto,
             monto=movimiento.monto,
             metodo_pago=movimiento.metodo_pago,
-            fecha_hora=movimiento.fecha_hora,  # Si usás timestamp, mapearlo aquí
-            facturado=movimiento.facturado
+            fecha_hora=datetime.now(timezone.utc),  # Si usás timestamp, mapearlo aquí
+            facturado=False
         )
 
     except (ValueError, RuntimeError) as e:
