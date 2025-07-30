@@ -179,7 +179,7 @@ def api_registrar_egreso(
     try:
         movimiento = registro_caja.registrar_ingreso_egreso(
             db=db,
-            id_sesion_caja=sesion_activa,
+            id_sesion_caja=sesion_activa.id,
             concepto=req.concepto,
             monto=req.monto,
             tipo="EGRESO",
