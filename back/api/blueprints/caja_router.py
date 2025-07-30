@@ -15,7 +15,7 @@ from back.gestion.facturacion_afip import generar_factura_para_venta
 
 # Schemas necesarios para este router
 from back.schemas.caja_schemas import (
-    AbrirCajaRequest, CerrarCajaRequest, EstadoCajaResponse,
+    AbrirCajaRequest, CajaMovimientoResponse, CerrarCajaRequest, EstadoCajaResponse,
     RegistrarVentaRequest, InformeCajasResponse, RespuestaGenerica,
     MovimientoSimpleRequest, TipoMovimiento
 )
@@ -130,13 +130,7 @@ def api_registrar_venta(
             resultado_afip = {"estado": "FALLIDO", "error": str(e)}
 
     # --- PASO 3: INTEGRACIÓN CON GOOGLE SHEETS (SEGUNDO PLANO) ---
-    cliente_final = db.get(Tercero, req.id_cliente) if req.id_cliente else None
-    background_tasks.add_task(
-        registro_caja.sincronizar_venta_con_sheets,
-        venta=venta_creada,
-        cliente=cliente_final,
-        resultado_afip=resultado_afip
-    )
+    
 
     # --- PASO 4: RESPUESTA FINAL AL CLIENTE ---
     return RespuestaGenerica(
@@ -168,24 +162,36 @@ def api_registrar_ingreso(req: MovimientoSimpleRequest, background_tasks: Backgr
         db.rollback()
         raise HTTPException(status_code=409, detail=str(e))
 
-@router.post("/egresos", response_model=RespuestaGenerica, tags=["Caja - Operaciones"])
-def api_registrar_egreso(req: MovimientoSimpleRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: Usuario = Depends(obtener_usuario_actual)):
+
+
+@router.post("/egresos", response_model=CajaMovimientoResponse)
+def api_registrar_egreso(
+    req: MovimientoSimpleRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(obtener_usuario_actual)
+):
+    """Registra un egreso de efectivo de la caja."""
     sesion_activa = apertura_cierre.obtener_caja_abierta_por_usuario(db, current_user)
     if not sesion_activa:
         raise HTTPException(status_code=400, detail="Operación denegada: El usuario no tiene una caja abierta.")
     
     try:
-        movimiento_creado = registro_caja.registrar_movimiento_simple(
-            db=db, usuario_actual=current_user, id_sesion_caja=sesion_activa.id,
-            monto=req.monto, concepto=req.concepto, tipo=TipoMovimiento.EGRESO
+        # Llamamos a la nueva función refactorizada
+        return registro_caja.registrar_ingreso_egreso(
+            db=db,
+            id_sesion_caja=sesion_activa.id,
+            concepto=req.concepto,
+            monto=req.monto,
+            tipo="EGRESO",
+            id_usuario=current_user.id
         )
-        db.commit()
-        background_tasks.add_task(registro_caja.sincronizar_movimiento_simple_con_sheets, movimiento=movimiento_creado)
-        return RespuestaGenerica(status="success", message=f"Egreso registrado con éxito. ID: {movimiento_creado.id}", data={"id_movimiento": movimiento_creado.id})
-    except ValueError as e:
-        db.rollback()
-        raise HTTPException(status_code=409, detail=str(e))
+    except (ValueError, RuntimeError) as e:
+        # Capturamos los errores de negocio o de base de datos
+        raise HTTPException(status_code=400, detail=str(e))
+    
 
+
+    
 # =================================================================
 # === ENDPOINT DE SUPERVISIÓN (SIN CAMBIOS) ===
 # =================================================================
