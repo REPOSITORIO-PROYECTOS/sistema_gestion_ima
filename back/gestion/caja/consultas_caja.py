@@ -2,8 +2,8 @@
 # VERSIÓN CORREGIDA Y UNIFICADA
 
 import logging
-from sqlmodel import Session, select, Optional
-from typing import List, Dict, Any
+from sqlmodel import Session, select
+from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import aliased  
 # Importamos los modelos necesarios, creando alias para evitar conflictos en el JOIN
 from back.modelos import CajaSesion, Usuario, CajaMovimiento
