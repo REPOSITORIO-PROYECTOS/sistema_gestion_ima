@@ -37,12 +37,16 @@ def _recalcular_precio_venta(articulo: Articulo):
 # === OPERACIONES DE LECTURA (GET)
 # ===================================================================
 
-def obtener_articulo_por_id(db: Session, articulo_id: int) -> Optional[Articulo]:
+def obtener_articulo_por_id(id_empresa: int, db: Session, articulo_id: int) -> Optional[Articulo]:
     """
     Obtiene un artículo específico por su ID usando el ORM.
     Devuelve el objeto Articulo o None si no se encuentra.
     """
-    return db.get(Articulo, articulo_id)
+    statement = (
+            select(Articulo)
+            .where(Articulo.id_empresa == id_empresa)
+    )
+    return db.exec(statement).all()
 
 def obtener_todos_los_articulos(id_empresa,db: Session, skip: int = 0, limit: int = 100) -> List[Articulo]:
     """
@@ -74,8 +78,7 @@ def obtener_articulo_por_codigo_barras(db: Session, codigo_barras: str) -> Optio
 # ===================================================================
 # === OPERACIONES DE ESCRITURA (CREATE, UPDATE, DELETE)
 # ===================================================================
-
-def crear_articulo(db: Session, articulo_data: ArticuloCreate) -> Articulo:
+def crear_articulo(id_empresa: int, db: Session, articulo_data: ArticuloCreate) -> Articulo:
     """
     Crea un nuevo artículo en la base de datos a partir de datos validados por un schema.
     Lanza una excepción ValueError si ya existe un código duplicado.
@@ -85,7 +88,8 @@ def crear_articulo(db: Session, articulo_data: ArticuloCreate) -> Articulo:
         if db.exec(statement).first():
             raise ValueError(f"El código interno '{articulo_data.codigo_interno}' ya está en uso.")
 
-    db_articulo = Articulo.from_orm(articulo_data)
+    # Creamos el artículo con los datos del schema + la empresa
+    db_articulo = Articulo(**articulo_data.dict(), id_empresa=id_empresa)
     
     # Recalculamos el precio de venta automáticamente antes de guardarlo
     _recalcular_precio_venta(db_articulo)
@@ -96,28 +100,37 @@ def crear_articulo(db: Session, articulo_data: ArticuloCreate) -> Articulo:
     
     return db_articulo
 
-def actualizar_articulo(db: Session, articulo_id: int, articulo_data: ArticuloUpdate) -> Optional[Articulo]:
+
+def actualizar_articulo(id_empresa: int, db: Session, articulo_id: int, articulo_data: ArticuloUpdate) -> Optional[Articulo]:
     """
-    Actualiza un artículo existente. Solo modifica los campos que se proporcionan en el schema.
+    Actualiza un artículo existente de una empresa específica.
+    Solo modifica los campos que se proporcionan en el schema.
     Recalcula el precio de venta si es necesario.
     """
-    db_articulo = db.get(Articulo, articulo_id)
+    # Consultamos el artículo solo si pertenece a la empresa
+    stmt = select(Articulo).where(
+        Articulo.id == articulo_id,
+        Articulo.id_empresa == id_empresa
+    )
+    db_articulo = db.exec(stmt).first()
+
     if not db_articulo:
         return None
 
+    # Actualizamos los campos recibidos en el schema
     update_data = articulo_data.dict(exclude_unset=True)
-    
     for key, value in update_data.items():
         setattr(db_articulo, key, value)
-        
-    # Después de aplicar los cambios, recalculamos el precio
+
+    # Recalculamos el precio
     _recalcular_precio_venta(db_articulo)
 
     db.add(db_articulo)
     db.commit()
     db.refresh(db_articulo)
-    
+
     return db_articulo
+
 
 def eliminar_articulo(db: Session, articulo_id: int) -> Optional[Articulo]:
     """

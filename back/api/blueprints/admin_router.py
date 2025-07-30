@@ -32,9 +32,10 @@ def api_crear_usuario(req: UsuarioCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=409, detail=str(e))
 
 @router.get("/usuarios/listar", response_model=List[UsuarioResponse], summary="Obtener lista de todos los usuarios")
-def api_obtener_usuarios(db: Session = Depends(get_db)):
+def api_obtener_usuarios(db: Session = Depends(get_db),current_user: Usuario = Depends(obtener_usuario_actual)):
     """Obtiene una lista de todos los usuarios con su información de rol y estado."""
-    return admin_manager.obtener_todos_los_usuarios(db)
+    id_empresa = current_user.id_empresa
+    return admin_manager.obtener_todos_los_usuarios(id_empresa,db)
 
 @router.get("/usuarios/{usuario_id}", response_model=UsuarioResponse, summary="Obtener un usuario por ID")
 def api_obtener_usuario_por_id(usuario_id: int, db: Session = Depends(get_db)):

@@ -6,7 +6,7 @@ from typing import Optional, List
 from sqlalchemy.orm import selectinload
 
 # --- Módulos del Proyecto ---
-from back.modelos import Usuario, Rol
+from back.modelos import Tercero, Usuario, Rol
 from back.security import get_password_hash,verificar_password
 from back.schemas.admin_schemas import UsuarioCreate
 
@@ -92,9 +92,9 @@ def activar_usuario(db: Session, usuario_id_a_activar: int) -> Usuario:
     db.refresh(usuario_a_activar)
     return usuario_a_activar
 
-def obtener_todos_los_usuarios(db: Session) -> List[Usuario]:
+def obtener_todos_los_usuarios(id_empresa,db: Session) -> List[Usuario]:
     """Obtiene una lista de todos los usuarios del sistema con su rol precargado."""
-    return db.exec(select(Usuario).options(selectinload(Usuario.rol))).all()
+    return db.exec(select(Usuario).where(Tercero.id_empresa==id_empresa).options(selectinload(Usuario.rol))).all()
 
 def obtener_todos_los_roles(db: Session) -> List[Rol]:
     """Obtiene una lista de todos los roles disponibles."""

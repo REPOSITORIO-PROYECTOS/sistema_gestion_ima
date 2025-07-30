@@ -210,14 +210,16 @@ def api_registrar_egreso(
 @router.get("/arqueos", response_model=InformeCajasResponse, tags=["Caja - Supervisión"])
 def get_lista_de_arqueos(
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(obtener_usuario_actual) # <-- Inyectamos el usuario actual
+    current_user: Usuario = Depends(obtener_usuario_actual),
+      # <-- Inyectamos el usuario actual
 ):
     """
     Obtiene un informe de cajas abiertas y cerradas para la empresa del usuario.
     """
     try:
+        id_empresa = current_user.id_empresa
         # Le pasamos el usuario completo a la función de lógica de negocio
-        return consultas_caja.obtener_arqueos_de_caja(db=db, usuario_actual=current_user)
+        return consultas_caja.obtener_arqueos_de_caja(id_empresa,db=db, usuario_actual=current_user)
     except Exception as e:
         # Si la capa de negocio lanza un error, lo convertimos en un 500.
         raise HTTPException(status_code=500, detail="Ocurrió un error al generar el informe de arqueos.")
@@ -237,6 +239,7 @@ def get_todos_los_movimientos(
     de ingresos, egresos y ventas, con el estado de facturación incluido.
     """
     # Llamamos a nuestra nueva y potente función de consulta
+    id_empresa = current_user.id_empresa
     movimientos = consultas_caja.obtener_todos_los_movimientos_de_caja(
         db=db,
         usuario_actual=current_user

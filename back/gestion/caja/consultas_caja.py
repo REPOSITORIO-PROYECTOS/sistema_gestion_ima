@@ -6,13 +6,13 @@ from sqlmodel import Session, select
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import aliased, selectinload  
 # Importamos los modelos necesarios, creando alias para evitar conflictos en el JOIN
-from back.modelos import CajaSesion, Usuario, CajaMovimiento, Tercero, Venta
+from back.modelos import Articulo, CajaSesion, Usuario, CajaMovimiento, Tercero, Venta
 from back.modelos import Usuario as UsuarioApertura
 from back.modelos import Usuario as UsuarioCierre
 from back.schemas.caja_schemas import TipoMovimiento
 
 
-def obtener_arqueos_de_caja(db: Session, usuario_actual: Usuario) -> Dict[str, List[Dict[str, Any]]]:
+def obtener_arqueos_de_caja(id_empresa,db: Session, usuario_actual: Usuario) -> Dict[str, List[Dict[str, Any]]]:
     """
     Obtiene un informe de cajas abiertas y cerradas, filtrando por la empresa
     del usuario actual y usando JOINs seguros.
@@ -39,7 +39,7 @@ def obtener_arqueos_de_caja(db: Session, usuario_actual: Usuario) -> Dict[str, L
             .join(UsuarioCierre, CajaSesion.id_usuario_cierre == UsuarioCierre.id, isouter=True)
             # ¡CAMBIO 3: FILTRO DE SEGURIDAD MULTI-EMPRESA!
             # Nos unimos a la tabla de usuarios de apertura para filtrar por empresa.
-            .where(UsuarioApertura.id_empresa == usuario_actual.id_empresa)
+            .where(UsuarioApertura.id_empresa == usuario_actual.id_empresa,Articulo.id_empresa == id_empresa)
             .where(CajaSesion.estado == "CERRADA")
             .order_by(CajaSesion.fecha_cierre.desc())
         )
