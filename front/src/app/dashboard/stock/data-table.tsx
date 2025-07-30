@@ -4,14 +4,6 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import {
   ColumnDef,
   ColumnFiltersState,
   SortingState,
@@ -39,7 +31,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import AddStockForm from "./StockForm"
 import { toast } from "sonner";
 
 interface DataTableProps<TData, TValue> {
@@ -100,23 +91,6 @@ export function DataTable<TData, TValue>({
 
             {/* Inputs de Filtrado + Creación */}
             <div className="flex flex-col md:flex-row-reverse justify-between gap-2 pb-4">
-
-                {/* Modal para crear items */}
-                <Dialog>
-                    <DialogTrigger asChild>
-                        <Button variant="success">+ Agregar Producto</Button>
-                    </DialogTrigger>
-
-                    <DialogContent className="sm:max-w-lg">
-                        <DialogHeader>
-                        <DialogTitle>Agregar un Producto Nuevo</DialogTitle>
-                        <DialogDescription>Todos los campos son obligatorios</DialogDescription>
-                        </DialogHeader>
-
-                        {/* Llamamos al Form con el modo crear */}
-                        <AddStockForm mode="create" />
-                    </DialogContent>
-                </Dialog>
 
                 {/* Botones para sincronización */}
                 <div className="flex gap-2 md:flex-row flex-col">

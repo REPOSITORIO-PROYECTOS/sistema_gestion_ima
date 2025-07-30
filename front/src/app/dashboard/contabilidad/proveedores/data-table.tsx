@@ -106,7 +106,7 @@ export function DataTable<TData, TValue>({
                 />
 
                 {/* Sincro tabla de proveedores */}
-                <Button variant="outline" className="w-2/3 md:w-1/3" onClick={handleSyncProveedores}>Sincronizar Proveedores</Button>
+                <Button variant="outline" className="w-full sm:w-1/3 md:w-1/4" onClick={handleSyncProveedores}>Sincronizar Proveedores</Button>
 
             </div>
         </div>
