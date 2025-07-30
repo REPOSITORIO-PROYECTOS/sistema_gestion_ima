@@ -4,8 +4,8 @@ from sqlmodel import Session
 from typing import List
 
 from back.database import get_db
-from back.security import es_admin
-from back.modelos import Articulo # <-- Ya no necesitamos Usuario aquí
+from back.security import es_admin, obtener_usuario_actual
+from back.modelos import Articulo, Usuario # <-- Ya no necesitamos Usuario aquí
 from back.gestion.stock import articulos as mod_articulos
 from back.schemas.articulo_schemas import ArticuloCreate, ArticuloUpdate, ArticuloResponse
 from back.schemas.caja_schemas import RespuestaGenerica
@@ -15,13 +15,14 @@ router = APIRouter(prefix="/articulos", tags=["Artículos"])
 @router.get("/obtener_todos", response_model=List[ArticuloResponse]) # <-- CORRECCIÓN: Usamos el schema de respuesta
 def api_get_all_articulos(
     db: Session = Depends(get_db), 
+    current_user: Usuario = Depends(obtener_usuario_actual),
     pagina: int = Query(1, ge=1, description="Número de página"), 
     limite: int = Query(100, ge=1, le=200, description="Tamaño de la página")
 ):
     skip = (pagina - 1) * limite
-    
+    id_empresa = current_user.id_empresa
     # --- CORRECCIÓN: Llamamos a la función con el nombre correcto ---
-    lista_articulos = mod_articulos.obtener_todos_los_articulos(db=db, skip=skip, limit=limite)
+    lista_articulos = mod_articulos.obtener_todos_los_articulos(id_empresa,db=db, skip=skip, limit=limite)
     
     return lista_articulos
 

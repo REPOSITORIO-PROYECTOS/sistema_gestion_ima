@@ -44,11 +44,18 @@ def obtener_articulo_por_id(db: Session, articulo_id: int) -> Optional[Articulo]
     """
     return db.get(Articulo, articulo_id)
 
-def obtener_todos_los_articulos(db: Session, skip: int = 0, limit: int = 100) -> List[Articulo]:
+def obtener_todos_los_articulos(id_empresa,db: Session, skip: int = 0, limit: int = 100) -> List[Articulo]:
     """
     Obtiene una lista paginada de todos los artículos usando el ORM.
     """
-    statement = select(Articulo).order_by(Articulo.descripcion).offset(skip).limit(limit).distinct()
+    statement = (
+            select(Articulo)
+            .where(Articulo.id_empresa == id_empresa)
+            .order_by(Articulo.descripcion)
+            .offset(skip)
+            .limit(limit)
+            .distinct()
+        )
     return db.exec(statement).all()
 
 def obtener_articulo_por_codigo_barras(db: Session, codigo_barras: str) -> Optional[Articulo]:
