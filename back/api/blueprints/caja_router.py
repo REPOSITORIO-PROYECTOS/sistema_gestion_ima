@@ -19,7 +19,7 @@ from back.schemas.caja_schemas import (
     RegistrarVentaRequest, InformeCajasResponse, RespuestaGenerica,
     MovimientoSimpleRequest, TipoMovimiento
 )
-from back.schemas.comprobante_schemas import TransaccionData, ReceptorData, ItemTransaccion
+from back.schemas.comprobante_schemas import TransaccionData, ReceptorData, ItemData
 
 router = APIRouter(
     prefix="/caja",
