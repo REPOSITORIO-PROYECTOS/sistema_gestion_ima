@@ -94,7 +94,7 @@ def activar_usuario(db: Session, usuario_id_a_activar: int) -> Usuario:
 
 def obtener_todos_los_usuarios(id_empresa,db: Session) -> List[Usuario]:
     """Obtiene una lista de todos los usuarios del sistema con su rol precargado."""
-    return db.exec(select(Usuario).where(Tercero.id_empresa==id_empresa).options(selectinload(Usuario.rol))).all()
+    return db.exec(select(Usuario).where(Usuario.id_empresa==id_empresa).options(selectinload(Usuario.rol))).all()
 
 def obtener_todos_los_roles(db: Session) -> List[Rol]:
     """Obtiene una lista de todos los roles disponibles."""
