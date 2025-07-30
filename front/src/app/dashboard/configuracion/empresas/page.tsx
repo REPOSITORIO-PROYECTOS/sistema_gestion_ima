@@ -349,7 +349,7 @@ function CreateAdminUserModal({ empresa, onClose, onUserCreated }: { empresa: Em
                 id_empresa: empresa.id
             };
 
-            const res = await fetch(`${API_URL}/admin/usuarios`, {
+            const res = await fetch(`${API_URL}/admin/usuarios/crear`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                 body: JSON.stringify(newUserPayload),
