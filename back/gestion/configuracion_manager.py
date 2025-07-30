@@ -1,76 +1,65 @@
 # back/gestion/configuracion_manager.py
 
-# /back/gestion/configuracion_manager.py
-
+import os
+import shutil
+from fastapi import UploadFile
 from sqlmodel import Session
-from fastapi import HTTPException
-
-from back.modelos import ConfiguracionEmpresa
+from back.modelos import ConfiguracionEmpresa, Usuario
 from back.schemas.configuracion_schemas import ConfiguracionUpdate
 
-def obtener_configuracion_empresa(db: Session, id_empresa: int) -> ConfiguracionEmpresa:
+# Creamos una carpeta 'static/uploads' en la raíz del proyecto si no existe
+UPLOADS_DIR = os.path.join("static", "uploads")
+os.makedirs(UPLOADS_DIR, exist_ok=True)
+
+def obtener_configuracion_por_id_empresa(db: Session, id_empresa: int) -> ConfiguracionEmpresa:
     """
-    Obtiene la configuración de una empresa. Si no existe, crea una por defecto y la devuelve.
-    Esto asegura que el frontend siempre reciba un objeto de configuración válido.
+    Obtiene la configuración de una empresa. Si no existe, la crea al vuelo.
     """
     config = db.get(ConfiguracionEmpresa, id_empresa)
-    
     if not config:
-        # No existe configuración, creamos una con valores por defecto
-        config = ConfiguracionEmpresa(id_empresa=id_empresa)
-        db.add(config)
-        db.commit()
-        db.refresh(config)
-        
+        raise ValueError(f"No se encontró una configuración para la empresa con ID {id_empresa}. Esto no debería ocurrir si la empresa fue creada correctamente.")
     return config
 
-def actualizar_configuracion_empresa(db: Session, id_empresa: int, data_update: ConfiguracionUpdate) -> ConfiguracionEmpresa:
-    """Actualiza la configuración de una empresa con los datos proporcionados."""
+def actualizar_configuracion_parcial(db: Session, id_empresa: int, data: ConfiguracionUpdate) -> ConfiguracionEmpresa:
+    """
+    Actualiza solo los campos de la configuración que vienen en la petición.
+    """
+    config_db = obtener_configuracion_por_id_empresa(db, id_empresa)
     
-    config_db = obtener_configuracion_empresa(db, id_empresa) # Usamos la función anterior para asegurar que exista
-
-    # Obtenemos los datos del schema de Pydantic que no son None
-    update_data = data_update.model_dump(exclude_unset=True)
-
-    # Iteramos y actualizamos solo los campos enviados
+    update_data = data.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(config_db, key, value)
         
     db.add(config_db)
     db.commit()
     db.refresh(config_db)
-    
     return config_db
 
-def actualizar_ruta_archivo(db: Session, id_empresa: int, tipo: str, ruta: str) -> ConfiguracionEmpresa:
-    """Actualiza la ruta del logo o del icono de la empresa."""
+def guardar_archivo_configuracion(db: Session, id_empresa: int, file: UploadFile, tipo_archivo: str) -> ConfiguracionEmpresa:
+    """
+    Guarda un archivo (logo o ícono) en el disco y actualiza la ruta en la DB.
+    """
+    if tipo_archivo not in ["logo", "icono"]:
+        raise ValueError("El tipo de archivo debe ser 'logo' o 'icono'.")
+
+    config_db = obtener_configuracion_por_id_empresa(db, id_empresa)
     
-    config_db = obtener_configuracion_empresa(db, id_empresa)
+    file_extension = os.path.splitext(file.filename)[1]
+    filename = f"{tipo_archivo}_empresa_{id_empresa}{file_extension}"
     
-    if tipo == "logo":
-        config_db.ruta_logo = ruta
-    elif tipo == "icono":
-        config_db.ruta_icono = ruta
-    else:
-        raise HTTPException(status_code=400, detail="Tipo de archivo no válido. Debe ser 'logo' o 'icono'.")
+    file_path = os.path.join(UPLOADS_DIR, filename)
+    # La ruta que guardamos en la DB es relativa para que el frontend pueda usarla
+    relative_path = f"/{file_path.replace(os.path.sep, '/')}"
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    if tipo_archivo == 'logo':
+        config_db.ruta_logo = relative_path
+    elif tipo_archivo == 'icono':
+        config_db.ruta_icono = relative_path
         
     db.add(config_db)
     db.commit()
     db.refresh(config_db)
-    
     return config_db
-
-
-RAZONES_DE_EGRESO_COMUNES = [
-    "Pago a proveedor menor",
-    "Pago de delivery / mensajería",
-    "Compra de artículos de limpieza",
-    "Compra de insumos de oficina",
-    "Adelanto de sueldo",
-    "Retiro de socio",
-    "Otros gastos"
-]
-
-def obtener_razones_de_egreso():
-    """Devuelve la lista de razones de egreso predefinidas."""
-    return RAZONES_DE_EGRESO_COMUNES

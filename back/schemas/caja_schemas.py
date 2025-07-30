@@ -119,3 +119,40 @@ class InformeCajasResponse(BaseModel):
 class ListaMovimientosResponse(BaseModel):
     total: int
     movimientos: List[CajaMovimientoResponse]
+    
+class _InfoClienteAnidado(BaseModel):
+    """
+    Sub-schema privado para representar solo los datos del cliente que necesitamos
+    dentro de la respuesta del movimiento.
+    """
+    id: int
+    nombre_razon_social: str
+
+class _InfoVentaAnidada(BaseModel):
+    """
+    Sub-schema privado para anidar la información clave de la venta.
+    """
+    id: int
+    facturada: bool
+    datos_factura: Optional[Dict[str, Any]] = None
+    cliente: Optional[_InfoClienteAnidado] = None
+
+class MovimientoContableResponse(BaseModel):
+    """
+    El schema principal de respuesta para cada fila del 'Libro Mayor de Caja'.
+    Representa un movimiento (ingreso, egreso o venta) con toda la información
+    relevante para el frontend.
+    """
+    # --- Datos del Movimiento (siempre presentes) ---
+    id: int
+    timestamp: datetime # Usamos 'timestamp' para coincidir con tu modelo 'CajaMovimiento'
+    tipo: str
+    concepto: str
+    monto: float
+    metodo_pago: Optional[str] = None # Hacemos opcional para cubrir todos los casos
+    
+    # --- Datos Anidados de la Venta (solo si el movimiento es de tipo 'VENTA') ---
+    venta: Optional[_InfoVentaAnidada] = None
+
+    class Config:
+        from_attributes = True # Para Pydantic v2 (reemplaza a orm_mode = True)

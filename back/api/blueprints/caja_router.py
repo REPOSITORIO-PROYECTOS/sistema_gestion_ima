@@ -19,7 +19,7 @@ from back.gestion.facturacion_afip import generar_factura_para_venta
 from back.schemas.caja_schemas import (
     AbrirCajaRequest, CajaMovimientoResponse, CerrarCajaRequest, EstadoCajaResponse,
     RegistrarVentaRequest, InformeCajasResponse, RespuestaGenerica,
-    MovimientoSimpleRequest, TipoMovimiento
+    MovimientoSimpleRequest, TipoMovimiento, MovimientoContableResponse 
 )
 from back.schemas.comprobante_schemas import TransaccionData, ReceptorData, ItemData
 
@@ -221,3 +221,24 @@ def get_lista_de_arqueos(
     except Exception as e:
         # Si la capa de negocio lanza un error, lo convertimos en un 500.
         raise HTTPException(status_code=500, detail="Ocurrió un error al generar el informe de arqueos.")
+    
+@router.get(
+    "/movimientos/todos", # Una ruta clara
+    summary="Obtiene el 'Libro Mayor' de todos los movimientos de caja de la empresa",
+    response_model=List[MovimientoContableResponse],
+    tags=["Caja - Supervisión"]
+)
+def get_todos_los_movimientos(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(obtener_usuario_actual)
+):
+    """
+    Endpoint maestro para el tablero de contabilidad. Devuelve una lista completa
+    de ingresos, egresos y ventas, con el estado de facturación incluido.
+    """
+    # Llamamos a nuestra nueva y potente función de consulta
+    movimientos = consultas_caja.obtener_todos_los_movimientos_de_caja(
+        db=db,
+        usuario_actual=current_user
+    )
+    return movimientos

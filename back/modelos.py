@@ -192,6 +192,7 @@ class CajaSesion(SQLModel, table=True):
     estado: str = Field(default="ABIERTA")
     id_usuario_apertura: int = Field(foreign_key="usuarios.id")
     id_usuario_cierre: Optional[int] = Field(default=None, foreign_key="usuarios.id")
+    id_empresa: int = Field(foreign_key="empresas.id")
     usuario_apertura: Usuario = Relationship(back_populates="sesiones_abiertas", sa_relationship_kwargs={'foreign_keys': '[CajaSesion.id_usuario_apertura]'})
     usuario_cierre: Optional[Usuario] = Relationship(back_populates="sesiones_cerradas", sa_relationship_kwargs={'foreign_keys': '[CajaSesion.id_usuario_cierre]'})
     movimientos: List["CajaMovimiento"] = Relationship(back_populates="caja_sesion")
@@ -212,6 +213,7 @@ class CajaMovimiento(SQLModel, table=True):
     usuario: Usuario = Relationship(back_populates="movimientos_de_caja")
     venta: Optional["Venta"] = Relationship(back_populates="movimientos_de_caja")
 
+
 class StockMovimiento(SQLModel, table=True):
     __tablename__ = "stock_movimientos"
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -228,6 +230,8 @@ class StockMovimiento(SQLModel, table=True):
     usuario: Usuario = Relationship(back_populates="movimientos_de_stock")
     compra_detalle: Optional["CompraDetalle"] = Relationship(back_populates="movimiento_stock")
     venta_detalle: Optional["VentaDetalle"] = Relationship(back_populates="movimiento_stock")
+    id_empresa: int = Field(foreign_key="empresas.id")
+    empresa: "Empresa" = Relationship()
     
 # ===================================================================
 # === MODELOS DE DOCUMENTOS (COMPRAS Y VENTAS)
@@ -245,6 +249,9 @@ class Compra(SQLModel, table=True):
     proveedor: Tercero = Relationship(back_populates="compras_realizadas")
     usuario: Usuario = Relationship(back_populates="compras_registradas")
     items: List["CompraDetalle"] = Relationship(back_populates="compra")
+    id_empresa: int = Field(foreign_key="empresas.id")
+    empresa: "Empresa" = Relationship()
+
 
 class CompraDetalle(SQLModel, table=True):
     __tablename__ = "compra_detalle"
@@ -275,6 +282,9 @@ class Venta(SQLModel, table=True):
     caja_sesion: CajaSesion = Relationship(back_populates="ventas")
     items: List["VentaDetalle"] = Relationship(back_populates="venta")
     movimientos_de_caja: List[CajaMovimiento] = Relationship(back_populates="venta")
+    id_empresa: int = Field(foreign_key="empresas.id")
+    empresa: "Empresa" = Relationship() # Puedes añadir back_populates si quieres
+
 
 class VentaDetalle(SQLModel, table=True):
     __tablename__ = "venta_detalle"
