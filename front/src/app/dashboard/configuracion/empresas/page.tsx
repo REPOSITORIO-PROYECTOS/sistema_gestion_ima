@@ -170,7 +170,7 @@ function ConfiguracionModal({ empresa, onClose, onUpdated }: { empresa: Empresa;
         if (!token) return;
         setIsLoading(true);
         try {
-            const res = await fetch(`${API_URL}/configuracion/empresa/${empresa.id}`, { headers: { Authorization: `Bearer ${token}` } });
+            const res = await fetch(`${API_URL}/configuracion/mi-empresa/${empresa.id}`, { headers: { Authorization: `Bearer ${token}` } });
             if (!res.ok) throw new Error("No se pudo cargar la configuración de la empresa.");
             setConfig(await res.json());
         } catch (error) {
@@ -186,7 +186,7 @@ function ConfiguracionModal({ empresa, onClose, onUpdated }: { empresa: Empresa;
     const handleUpdate = async (updateData: Partial<ConfiguracionEmpresa>) => {
         setIsLoading(true);
         try {
-            const res = await fetch(`${API_URL}/configuracion/empresa/${empresa.id}`, {
+            const res = await fetch(`${API_URL}/configuracion/mi-empresa/${empresa.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify(updateData),
