@@ -4,6 +4,7 @@ from sqlite3.dbapi2 import Timestamp
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlmodel import Session
 from typing import List, Dict, Any, Optional
+from datetime import datetime, timezone
 
 # --- Módulos del Proyecto ---
 from back.database import get_db
@@ -185,7 +186,7 @@ def api_registrar_egreso(
             monto=req.monto,
             tipo="EGRESO",
             id_usuario=current_user.id,  
-            fecha_hora=Timestamp.datetime.utcnow(),          
+            fecha_hora = datetime.now(timezone.utc),          
             facturado=False
         )
     except (ValueError, RuntimeError) as e:
