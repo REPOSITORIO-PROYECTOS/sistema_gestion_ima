@@ -1,40 +1,56 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DataTable } from "./data-table";
 import { columns } from "./columns";
-import { ProductosProveedor } from "./columns";
+import type { Proveedor } from "./columns";
+import { useAuthStore } from "@/lib/authStore";
 
 function Proveedores() {
-  const [data, setData] = useState<ProductosProveedor[]>([]);
 
-  const handleFileUpload = async (file: File) => {
-    const formData = new FormData();
-    formData.append("file", file);
+  const [data, setData] = useState<Proveedor[]>([]);
+  const [loading, setLoading] = useState(true);
+  const token = useAuthStore((state) => state.token);
+  
+  // GET Proveedores
+  useEffect(() => {
 
-    try {
-      const res = await fetch("https://tuservidor/api/endpoint", {
-        method: "POST",
-        body: formData,
-      });
+    const fetchProveedores = async () => {
+      
+      try {
+        const res = await fetch("https://sistema-ima.sistemataup.online/api/proveedores/obtener-todos", {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+          },
+        });
 
-      if (!res.ok) throw new Error("Error en el backend");
+        if (!res.ok) {
+          throw new Error("Error al obtener proveedores");
+        }
 
-      const parsedData = await res.json();
-      setData(parsedData); 
-    } catch (err) {
-      console.error(err);
-      alert("Hubo un error al subir el archivo.");
-    }
-  };
+        const data = await res.json();
+        console.log(data)
+        setData(data);
+
+      } catch (error) {
+        console.error("Error al traer proveedores:", error);
+
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProveedores();
+  }, [token]);
 
   return (
-    <div>
-      <DataTable
-        columns={columns}
-        data={data}
-        onFileUpload={handleFileUpload} 
-      />
+    <div className="p-4">
+      {loading ? (
+        <p className="text-center text-gray-500">Cargando proveedores...</p>
+      ) : (
+        <DataTable columns={columns} data={data} />
+      )}
     </div>
   );
 }

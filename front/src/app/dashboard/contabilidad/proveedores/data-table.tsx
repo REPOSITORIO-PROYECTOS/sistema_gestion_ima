@@ -31,7 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import ExcelUploader from "./ExcelUploader"
+import { toast } from "sonner"
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -42,12 +42,32 @@ interface DataTableProps<TData, TValue> {
 export function DataTable<TData, TValue>({
   columns,
   data,
-  onFileUpload, 
 }: DataTableProps<TData, TValue>) {
 
     const [sorting, setSorting] = useState<SortingState>([])
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-    const [currentStatus, setCurrentStatus] = useState("all")
+
+    const handleSyncProveedores = async () => {
+
+        toast("Sincronizando proveedores... Por favor espera");
+
+        try {
+            /* const response = await fetch("https://sistema-ima.sistemataup.online/api/sincronizar/clientes", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({}),
+            }); */
+
+           /*  if (!response.ok) throw new Error("Fallo en la respuesta del servidor"); */
+
+            toast.success("Proveedores sincronizados ✅");
+        } catch (error) {
+            console.error("Error al sincronizar usuarios:", error);
+            toast.error("Error al sincronizar usuarios ❌");
+        }
+    };
 
     const table = useReactTable({
         data,
@@ -73,40 +93,20 @@ export function DataTable<TData, TValue>({
         {/* Selectores Filtrado */}
         <div className="flex flex-col md:flex-row-reverse justify-between gap-2 pb-4">
 
-            {/* Area para Excel */}
-            {onFileUpload && 
-            <ExcelUploader onFileSelect={onFileUpload} 
-            />}
-
-            <div className="flex flex-col sm:flex-row justify-between items-center md:justify-start gap-2 w-full">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-2 w-full">
 
                 {/* Input de Búsqueda por proveedor */}
-                <Input placeholder="Filtrar por Proveedor" 
-                    value={(table.getColumn("proveedor")?.getFilterValue() as string) ?? ""}
-                    onChange={(event) => table.getColumn("proveedor")?.setFilterValue(event.target.value)} 
-                    className="w-full sm:w-1/2 md:max-w-1/4" 
+                <Input
+                    placeholder="Buscar por razón social"
+                    value={(table.getColumn("nombre_razon_social")?.getFilterValue() as string) ?? ""}
+                    onChange={(event) =>
+                        table.getColumn("nombre_razon_social")?.setFilterValue(event.target.value)
+                    }
+                    className="w-full sm:w-1/2 md:max-w-1/4"
                 />
 
-                {/* Input de Seleccion por status */}
-                <Select value={currentStatus} onValueChange={(value) => {
-                setCurrentStatus(value)
-                table.getColumn("producto")?.setFilterValue(value === "all" ? undefined : value)}}>
-
-                    <SelectTrigger className="w-full sm:w-1/2 md:max-w-1/4 cursor-pointer">
-                        <SelectValue placeholder="Materia Prima"/>
-                    </SelectTrigger>
-
-                    <SelectContent>
-                        <SelectGroup>
-                            <SelectLabel>Materia Prima</SelectLabel>
-                            <SelectItem value="all">Todos</SelectItem>
-                            <SelectItem value="Naranja">Naranja</SelectItem>
-                            <SelectItem value="Manzana">Manzana</SelectItem>
-                            <SelectItem value="Durazno">Durazno</SelectItem>
-                        </SelectGroup>
-                    </SelectContent>
-
-                </Select>
+                {/* Sincro tabla de proveedores */}
+                <Button variant="outline" className="w-2/3 md:w-1/3" onClick={handleSyncProveedores}>Sincronizar Proveedores</Button>
 
             </div>
         </div>
