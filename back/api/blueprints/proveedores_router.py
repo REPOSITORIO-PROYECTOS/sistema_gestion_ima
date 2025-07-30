@@ -25,7 +25,7 @@ from back.schemas.proveedor_schemas import (
 # Creamos el router con prefijo y tag para la documentación
 router = APIRouter(prefix="/proveedores", tags=["Proveedores y Mapeos"])
 
-@router.post("/", response_model=ProveedorRead, status_code=201)
+@router.post("/crear", response_model=ProveedorRead, status_code=201)
 def crear_proveedor(
     req: ProveedorCreate,
     db: Session = Depends(get_db),
@@ -36,7 +36,7 @@ def crear_proveedor(
     nuevo_proveedor = proveedores_manager.crear_proveedor(db, req, current_user.id_empresa)
     return nuevo_proveedor
 
-@router.get("/", response_model=List[ProveedorRead])
+@router.get("/obtener-todos", response_model=List[ProveedorRead])
 def listar_proveedores(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(obtener_usuario_actual)
