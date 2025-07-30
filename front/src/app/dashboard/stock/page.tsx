@@ -3,16 +3,23 @@
 import { useEffect, useState } from "react";
 import { DataTable } from "./data-table";
 import { columns, ProductoAPI } from "./columns";
+import { useAuthStore } from "@/lib/authStore";
 
 export default function Page() {
     
   const [productos, setProductos] = useState<ProductoAPI[]>([]);
   const [loading, setLoading] = useState(true);
+  const token = useAuthStore((state) => state.token);
 
   useEffect(() => {
     const fetchProductos = async () => {
       try {
-        const res = await fetch("https://sistema-ima.sistemataup.online/api/articulos/obtener_todos");
+        const res = await fetch("https://sistema-ima.sistemataup.online/api/articulos/obtener_todos", {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+          },
+        });
         const data: ProductoAPI[] = await res.json();
         setProductos(data);
       } catch (err) {
@@ -23,7 +30,8 @@ export default function Page() {
     };
 
     fetchProductos();
-  }, []);
+  }, [token]);
+
 
   if (loading) return <p className="text-center py-10">Cargando productos...</p>;
 

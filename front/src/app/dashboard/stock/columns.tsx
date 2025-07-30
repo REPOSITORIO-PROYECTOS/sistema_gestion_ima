@@ -3,15 +3,6 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { ArrowUpDown } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import AddStockForm from "./StockForm";
 
 export interface ProductoAPI {
   id: number;
@@ -63,36 +54,14 @@ export const columns: ColumnDef<ProductoAPI>[] = [
       return <div className="font-medium">{stock}</div>;
     },
   },
-  {
+  /* {
     id: "actions",
     cell: ({ row }) => {
       const producto = row.original;
 
       return (
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button variant="secondary">Editar</Button>
-          </DialogTrigger>
-
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Editar Producto: {producto.descripcion}</DialogTitle>
-              <DialogDescription>Modifica los datos necesarios</DialogDescription>
-            </DialogHeader>
-
-            <AddStockForm
-              mode="edit"
-              initialData={{
-                id: producto.id,
-                descripcion: producto.descripcion,
-                stock_actual: producto.stock_actual,
-                ubicacion: "", // si no viene del backend
-                precio_venta: producto.precio_venta,
-              }}
-            />
-          </DialogContent>
-        </Dialog>
+        
       );
     },
-  },
+  }, */
 ];

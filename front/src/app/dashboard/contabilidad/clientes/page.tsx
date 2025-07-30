@@ -2,30 +2,54 @@
 
 import { useEffect, useState } from "react";
 import { DataTable } from "./data-table";
-import { columns, Cliente } from "./columns";
-
-// GET Clientes para Tabla Clientes
-async function getClientes(): Promise<Cliente[]> {
-
-  const res = await fetch("https://sistema-ima.sistemataup.online/api/clientes/obtener-todos");
-  const data = await res.json();
-  return data.filter((cliente: Cliente) => cliente);
-
-}
+import { columns } from "./columns";
+import type { Cliente } from "./columns";
+import { useAuthStore } from "@/lib/authStore";
 
 function ClientesPage() {
-  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [data, setData] = useState<Cliente[]>([]);
+  const [loading, setLoading] = useState(true);
+  const token = useAuthStore((state) => state.token);
 
+  // GET Clientes
   useEffect(() => {
-    getClientes()
-      .then((data) => {
-        setClientes(data);
-        /* console.log("Clientes obtenidos:", data); */
-      })
-      .catch((err) => console.error("❌ Error al obtener clientes:", err));
-  }, []);
+    const fetchClientes = async () => {
+      try {
+        const res = await fetch("https://sistema-ima.sistemataup.online/api/clientes/obtener-todos", {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+          },
+        });
 
-  return <DataTable columns={columns} data={clientes} />;
+        if (!res.ok) {
+          throw new Error("Error al obtener clientes");
+        }
+
+        const data = await res.json();
+        const clientesFiltrados = data.filter((cliente: Cliente) => cliente);
+        setData(clientesFiltrados);
+
+      } catch (error) {
+        console.error("Error al traer clientes:", error);
+
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchClientes();
+  }, [token]);
+
+  return (
+    <div className="p-4">
+      {loading ? (
+        <p className="text-center text-gray-500">Cargando clientes...</p>
+      ) : (
+        <DataTable columns={columns} data={data} />
+      )}
+    </div>
+  );
 }
 
 export default ClientesPage;
