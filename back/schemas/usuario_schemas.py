@@ -12,7 +12,7 @@ class UsuarioResponse(BaseModel):
     nombre_usuario: str
     activo: bool
     rol: RolResponse # Anidamos el schema del rol para obtener sus datos
-
+    id_empresa: int
     class Config:
         from_attributes = True
         
