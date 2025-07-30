@@ -28,6 +28,7 @@ class UsuarioCreate(BaseModel):
     nombre_usuario: str
     password: str = Field(min_length=8)
     id_rol: int
+    id_empresa: int
 
 class CambiarRolUsuarioRequest(BaseModel):
     id_rol: int
