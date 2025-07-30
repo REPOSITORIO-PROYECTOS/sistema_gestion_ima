@@ -137,7 +137,9 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
   };
 
   // Cerrar caja
-  const handleCerrarCaja = async () => {
+  const handleCerrarCaja = async (e: React.FormEvent) => {
+
+    e.preventDefault();
 
     if (!nombreUsuario.trim() || !saldoFinalDeclarado.trim() || !llave.trim()) {
       toast.error("Por favor, completá todos los campos.");
@@ -198,6 +200,7 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
     } catch (error) {
       console.error("Error al cerrar caja:", error);
       toast.error("Ocurrió un error inesperado.");
+      
     } finally {
       setIsLoading(false);
       document.getElementById("close-caja-modal")?.click();

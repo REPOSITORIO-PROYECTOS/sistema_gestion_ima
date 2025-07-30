@@ -229,19 +229,25 @@ function FormVentas({
   useEffect(() => {
     const fetchClientes = async () => {
       try {
-        const res = await fetch("https://sistema-ima.sistemataup.online/api/clientes/obtener-todos");
+        const res = await fetch("https://sistema-ima.sistemataup.online/api/clientes/obtener-todos",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+        );
         const data: Cliente[] = await res.json();
         const clientesActivos = data.filter((cliente: Cliente) => cliente.activo);
 
         setClientes(clientesActivos);
-        /* console.log("Clientes obtenidos:", clientesActivos); */    // solo debug
+
       } catch (error) {
         console.error("❌ Error al obtener clientes:", error);
       }
     };
 
     fetchClientes();
-  }, []);
+  }, [token]);
 
   // GET Productos - trae los productos reales de la empresa
   useEffect(() => {
@@ -249,10 +255,14 @@ function FormVentas({
     const fetchProductos = async () => {
 
       try {
-        const res = await fetch("https://sistema-ima.sistemataup.online/api/articulos/obtener_todos");
+        const res = await fetch("https://sistema-ima.sistemataup.online/api/articulos/obtener_todos",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+        );
         const data: ProductoAPI[] = await res.json();
-        
-        /* console.log(data) */   // Solo debug
 
         const productosMapeados = data.map((item) => ({
           id: String(item.id),
@@ -275,7 +285,7 @@ function FormVentas({
     };
     
     fetchProductos();
-  }, []);
+  }, [token]);
 
   // POST Ventas - Registra la venta completa
   const handleSubmit = async (e: React.FormEvent) => {
@@ -325,16 +335,12 @@ function FormVentas({
       return;
     }
 
-  
     // Payload de Venta
     const ventaPayload = {
-      id_sesion_caja: 3,
       id_cliente:
         tipoClienteSeleccionado.id === "0"
-          ? 8                                     // Cliente Final: ID fijo
-          : clienteSeleccionado?.id ?? 8,         // Cliente con/sin CUIT            
-      usuario: "admin",
-      id_usuario: 1,                              // debe ser dinamico con el tipo de usuario / admin=1, cajero=2, etc
+          ? 999                                     // Cliente Final: ID fijo
+          : clienteSeleccionado?.id ?? 999,         // Cliente con/sin CUIT            
       metodo_pago: metodoPago.toUpperCase(),
       total_venta: totalVenta,
       cuit: (() => {

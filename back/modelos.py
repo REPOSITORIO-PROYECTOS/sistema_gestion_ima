@@ -344,6 +344,10 @@ class ConfiguracionEmpresa(SQLModel, table=True):
     color_principal: str = Field(default="#000000")
     ruta_logo: Optional[str] = Field(default=None)
     ruta_icono: Optional[str] = Field(default=None)
+    recargo_transferencia: float = Field(default=0.0)
+    concepto_recargo_transferencia: str = Field(default="Recargo por Transferencia")
+    recargo_banco: float = Field(default=0.0)
+    concepto_recargo_banco: str = Field(default="Recargo por Pago con Banco")
     
     # --- Configuración Fiscal (AFIP) ---
     afip_condicion_iva: Optional[str] = Field(default=None) # Ej: Monotributo, Responsable Inscripto

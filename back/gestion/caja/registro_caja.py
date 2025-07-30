@@ -7,7 +7,7 @@ from typing import List, Tuple, Dict, Any
 from datetime import datetime
 from back.gestion.caja.cliente_publico import obtener_cliente_por_id
 # Importa todos tus modelos. Asegúrate de que las rutas sean correctas.
-from back.modelos import Usuario, Venta, VentaDetalle, Articulo, CajaMovimiento, Tercero, CajaSesion
+from back.modelos import Usuario, Venta, VentaDetalle, Articulo, CajaMovimiento, Tercero, CajaSesion, ConfiguracionEmpresa
 from back.schemas.caja_schemas import ArticuloVendido, RegistrarVentaRequest, TipoMovimiento
 from back.utils.mysql_handler import get_db_connection
 from back.utils.tablas_handler import TablasHandler
@@ -24,17 +24,16 @@ def registrar_venta_y_movimiento_caja(
     db: Session,
     usuario_actual: Usuario,
     id_sesion_caja: int,
-    total_venta: float,
+    total_venta: float, # Este es el total de los productos ANTES de recargos
     metodo_pago: str,
     articulos_vendidos: List[ArticuloVendido],
     id_cliente: int = None
 ) -> Tuple[Venta, CajaMovimiento]:
     """
-    Registra una Venta y su Movimiento de Caja de forma ATÓMICA en la DB.
-    Esta es la única fuente de la verdad. No habla con servicios externos.
-    Devuelve los objetos creados para que el orquestador los use.
+    Registra una Venta, aplica recargos dinámicos según la configuración
+    de la empresa, y sincroniza el resultado final con Google Sheets.
     """
-    # Validación de stock y pertenencia de artículos a la empresa
+    # --- 1. VALIDACIÓN DE ARTÍCULOS Y STOCK (Sin Cambios) ---
     for item in articulos_vendidos:
         articulo_db = db.get(Articulo, item.id_articulo)
         if not articulo_db:
@@ -44,12 +43,36 @@ def registrar_venta_y_movimiento_caja(
         if articulo_db.stock_actual < item.cantidad:
             raise ValueError(f"Stock insuficiente para '{articulo_db.descripcion}'.")
 
-    # Creación de objetos de la venta
+    # --- 2. LÓGICA DE RECARGO DINÁMICO ---
+    total_final_con_recargo = total_venta
+    monto_recargo = 0.0
+    concepto_recargo = ""
+    metodo_pago_upper = metodo_pago.upper()
+
+    config_empresa = db.get(ConfiguracionEmpresa, usuario_actual.id_empresa)
+    if not config_empresa:
+        raise RuntimeError("No se encontró la configuración para la empresa.")
+
+    porcentaje_recargo = 0.0
+    if metodo_pago_upper == "TRANSFERENCIA":
+        porcentaje_recargo = config_empresa.recargo_transferencia
+        concepto_recargo = config_empresa.concepto_recargo_transferencia
+    elif metodo_pago_upper == "BANCARIO":
+        porcentaje_recargo = config_empresa.recargo_banco
+        concepto_recargo = config_empresa.concepto_recargo_banco
+    
+    if porcentaje_recargo > 0:
+        monto_recargo = total_venta * (porcentaje_recargo / 100.0)
+        total_final_con_recargo = total_venta + monto_recargo
+        print(f"Recargo del {porcentaje_recargo}% aplicado. Monto: {monto_recargo:.2f}. Total final: {total_final_con_recargo:.2f}")
+
+    # --- 3. CREACIÓN DE OBJETOS PARA LA BASE DE DATOS ---
     nueva_venta = Venta(
-        total=total_venta,
+        total=total_final_con_recargo, # <-- Usamos el total CON recargo
         id_cliente=id_cliente,
         id_usuario=usuario_actual.id,
         id_caja_sesion=id_sesion_caja,
+        id_empresa=usuario_actual.id_empresa
     )
     db.add(nueva_venta)
     db.flush()
@@ -66,26 +89,42 @@ def registrar_venta_y_movimiento_caja(
         articulo_a_actualizar.stock_actual -= item.cantidad
         db.add(articulo_a_actualizar)
 
-    movimiento_caja = CajaMovimiento(
+    movimiento_principal = CajaMovimiento(
         tipo=TipoMovimiento.VENTA.value,
         concepto=f"Venta ID: {nueva_venta.id}",
-        monto=total_venta,
+        monto=total_final_con_recargo, # <-- Usamos el total CON recargo
         metodo_pago=metodo_pago,
         id_caja_sesion=id_sesion_caja,
         id_usuario=usuario_actual.id,
         id_venta=nueva_venta.id,
     )
-    db.add(movimiento_caja)
+    db.add(movimiento_principal)
+
+    if monto_recargo > 0:
+        movimiento_recargo = CajaMovimiento(
+            tipo=TipoMovimiento.INGRESO.value,
+            concepto=concepto_recargo,
+            monto=monto_recargo,
+            metodo_pago=metodo_pago,
+            id_caja_sesion=id_sesion_caja,
+            id_usuario=usuario_actual.id,
+            id_venta=nueva_venta.id
+        )
+        db.add(movimiento_recargo)
+        
     db.flush()
 
-# =============================================================================
-# === PARTE DE SINCRONIZACION CON GOOGLE SHEETS NO TOCAR ======================
-# =============================================================================
-
-
+    # --- 4. SINCRONIZACIÓN CON GOOGLE SHEETS (TU LÓGICA ORIGINAL) ---
+    # Esta parte ahora se ejecuta DENTRO de la misma función, antes del commit.
+    # El router la convertirá en una tarea en segundo plano.
     try:
-            print("[DRIVE] Intentando registrar movimiento en Google Sheets...")
-            cliente_sheets_data = obtener_cliente_por_id(id_cliente) # Asumo que esta función devuelve un dict
+        print("[DRIVE] Intentando registrar movimiento en Google Sheets...")
+        # Obtenemos la URL de Sheets de la configuración de la empresa
+        link_sheets = config_empresa.link_google_sheets if config_empresa else None
+        
+        if link_sheets:
+            google_sheet_id = link_sheets.split('/d/')[1].split('/')[0]
+            cliente_sheets_data = obtener_cliente_por_id(id_cliente)
 
             if cliente_sheets_data:
                 datos_para_sheets = {
@@ -95,20 +134,26 @@ def registrar_venta_y_movimiento_caja(
                     "razon_social": cliente_sheets_data.get("Nombre de Contacto", "N/A"),
                     "Tipo_movimiento": "venta",
                     "descripcion": f"Venta de {len(articulos_vendidos)} artículos",
-                    "monto": total_venta,
+                    "monto": total_final_con_recargo, # <-- Usamos el total CON recargo
                 }
-                if not caller.registrar_movimiento(datos_para_sheets):
+                
+                # Pasamos el ID dinámico de la hoja al handler
+                if not caller.registrar_movimiento(google_sheet_id, datos_para_sheets):
                     print("⚠️ [DRIVE] La función registrar_movimiento devolvió False.")
-                if not caller.restar_stock(articulos_vendidos):
+                
+                # Convertimos los ArticuloVendido al formato que espera restar_stock
+                articulos_para_sheets = [art.model_dump() for art in articulos_vendidos]
+                if not caller.restar_stock(google_sheet_id, articulos_para_sheets):
                     print("⚠️ [DRIVE] Ocurrió un error al intentar actualizar el stock en Google Sheets.")
             else:
-                print(f"⚠️ [DRIVE] No se pudo encontrar el cliente con ID {id_cliente}. No se registrará el movimiento en Drive.")
+                print(f"⚠️ [DRIVE] No se pudo encontrar el cliente con ID {id_cliente}. No se registrará el movimiento.")
+        else:
+            print(f"ADVERTENCIA: La empresa ID {usuario_actual.id_empresa} no tiene un link de Google Sheets configurado.")
 
     except Exception as e_sheets:
         print(f"❌ [DRIVE] Ocurrió un error al intentar registrar en Google Sheets: {e_sheets}")
 
-    return nueva_venta, movimiento_caja
-
+    return nueva_venta, movimiento_principal
 
 
 
