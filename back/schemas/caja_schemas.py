@@ -4,7 +4,14 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
+from enum import Enum
 
+# --- Enum para Tipo de Movimiento ---
+class TipoMovimiento(str, Enum):
+    VENTA = "VENTA"
+    INGRESO = "INGRESO"
+    EGRESO = "EGRESO"
+    
 # --- Schemas Genéricos ---
 class RespuestaGenerica(BaseModel):
     status: str
@@ -33,12 +40,16 @@ class RegistrarVentaRequest(BaseModel):
 
 class CajaMovimientoResponse(BaseModel):
     id: int
-    id_caja_sesion: int
+    id_sesion_caja: int # Renombramos para consistencia
+    id_venta_asociada: Optional[int] = None # Para saber si viene de una venta
     id_usuario: int
-    #fecha: datetime
+    tipo: str # <-- ESENCIAL: Para saber si es VENTA, INGRESO o EGRESO
     concepto: str
     monto: float
     metodo_pago: Optional[str] = None
+    fecha_hora: datetime # <-- ESENCIAL: Para poder ordenar por fecha
+    facturado: bool # <-- CLAVE: Para tu filtro de facturación
+
     class Config:
         from_attributes = True
 
@@ -102,3 +113,8 @@ class ArqueoCerradoResponse(BaseModel):
 class InformeCajasResponse(BaseModel):
     cajas_abiertas: List[CajaAbiertaResponse]
     arqueos_cerrados: List[ArqueoCerradoResponse]
+    
+    
+class ListaMovimientosResponse(BaseModel):
+    total: int
+    movimientos: List[CajaMovimientoResponse]

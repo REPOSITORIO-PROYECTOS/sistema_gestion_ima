@@ -264,6 +264,8 @@ class Venta(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     total: float
+    facturada: bool = Field(default=False, index=True)
+    datos_factura: Optional[Dict[str, str]] = Field(default=None, sa_column=Column(JSON))
     estado: str = Field(default="COMPLETADA")
     id_cliente: Optional[int] = Field(default=None, foreign_key="terceros.id")
     id_usuario: int = Field(foreign_key="usuarios.id")

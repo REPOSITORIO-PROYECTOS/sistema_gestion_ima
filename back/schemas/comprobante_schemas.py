@@ -1,7 +1,7 @@
 # back/schemas/comprobante_schemas.py
 
 from pydantic import BaseModel, Field
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Dict, Any
 
 # --- Definición de Tipos ---
 TipoFormato = Literal["pdf", "ticket"]
@@ -38,7 +38,7 @@ class TransaccionData(BaseModel):
     descuento_especifico: Optional[float] = 0.0
     impuestos: Optional[float] = 0.0
     observaciones: Optional[str] = None
-    
+    datos_factura_previa: Optional[Dict[str, Any]] = None
 
 # --- El Schema Principal de la Petición ---
 

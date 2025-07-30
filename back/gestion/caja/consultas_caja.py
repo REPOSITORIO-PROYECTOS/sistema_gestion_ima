@@ -2,13 +2,15 @@
 # VERSIÓN CORREGIDA Y UNIFICADA
 
 import logging
-from sqlmodel import Session, select
+from sqlmodel import Session, select, Optional
 from typing import List, Dict, Any
 from sqlalchemy.orm import aliased  
 # Importamos los modelos necesarios, creando alias para evitar conflictos en el JOIN
-from back.modelos import CajaSesion, Usuario
+from back.modelos import CajaSesion, Usuario, CajaMovimiento
 from back.modelos import Usuario as UsuarioApertura
 from back.modelos import Usuario as UsuarioCierre
+from back.schemas.caja_schemas import TipoMovimiento
+
 
 def obtener_arqueos_de_caja(db: Session) -> Dict[str, List[Dict[str, Any]]]:
     """
@@ -81,3 +83,48 @@ def obtener_arqueos_de_caja(db: Session) -> Dict[str, List[Dict[str, Any]]]:
     except Exception as e:
         logging.error(f"Error al generar el informe de cajas: {e}", exc_info=True) # exc_info=True da más detalles
         return informe_final
+    
+def obtener_movimientos_de_caja(
+    db: Session,
+    usuario_actual: Usuario, # <-- AÑADIDO: Para la seguridad Multi-Empresa
+    *,
+    tipo_movimiento: Optional[TipoMovimiento] = None,
+    id_sesion: Optional[int] = None
+) -> List[CajaMovimiento]:
+    """
+    Obtiene una lista de movimientos de caja para la empresa del usuario actual,
+    aplicando filtros dinámicos y garantizando el aislamiento de datos.
+
+    Args:
+        db: La sesión activa de la base de datos.
+        usuario_actual: El usuario autenticado que realiza la petición.
+        facturado: (Opcional) Filtra movimientos que están o no facturados.
+        tipo_movimiento: (Opcional) Filtra por tipo (VENTA, INGRESO, EGRESO).
+        id_sesion: (Opcional) Filtra los movimientos de una sesión de caja específica.
+
+    Returns:
+        Una lista de objetos del modelo SQLModel 'CajaMovimiento' que coinciden
+        con los criterios de búsqueda.
+    """
+    # 1. Creamos la consulta base.
+    #    Unimos (JOIN) con CajaSesion para poder filtrar por el id_empresa.
+    query = select(CajaMovimiento).join(CajaSesion)
+
+    # 2. **FILTRO DE SEGURIDAD OBLIGATORIO (MULTI-EMPRESA)**
+    query = query.join(Usuario, CajaSesion.id_usuario_apertura == Usuario.id)\
+                 .where(Usuario.id_empresa == usuario_actual.id_empresa)
+
+
+    # 3. Aplicamos los filtros opcionales de la API.
+    if tipo_movimiento is not None:
+        query = query.where(CajaMovimiento.tipo == tipo_movimiento.value)
+
+    if id_sesion is not None:
+        query = query.where(CajaMovimiento.id_caja_sesion == id_sesion)
+
+    # 4. Ordenamos los resultados por el campo 'timestamp' de tu modelo.
+    query = query.order_by(CajaMovimiento.timestamp.desc())
+
+    # 5. Ejecutamos la consulta y devolvemos los resultados.
+    resultados = db.exec(query).all()
+    return resultados

@@ -1,170 +1,196 @@
 # back/api/blueprints/caja_router.py
-# VERSIÓN FINAL, COMPLETA Y SINCRONIZADA
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlmodel import Session
-from typing import List
-from fastapi import BackgroundTasks 
-# --- Módulos del proyecto ---
+from typing import List, Dict, Any, Optional
+
+# --- Módulos del Proyecto ---
 from back.database import get_db
-from back.security import es_cajero, obtener_usuario_actual, verificar_llave_maestra_apertura
-from back.modelos import Usuario, CajaMovimiento
-# Importamos toda la lógica de negocio de la caja
+from back.security import es_cajero, obtener_usuario_actual
+from back.modelos import Usuario, Tercero, Venta, CajaMovimiento
+
+# Especialistas de la capa de gestión
 from back.gestion.caja import apertura_cierre, registro_caja, consultas_caja
-# Importamos los schemas corregidos
+from back.gestion.facturacion_afip import generar_factura_para_venta
+
+# Schemas necesarios para este router
 from back.schemas.caja_schemas import (
     AbrirCajaRequest, CerrarCajaRequest, EstadoCajaResponse,
-    RegistrarVentaRequest, ArqueoCajaResponse, RespuestaGenerica,
-    MovimientoSimpleRequest, CajaSesionResponse, CajaMovimientoResponse, InformeCajasResponse # <-- ¡Importamos el nuevo schema!
+    RegistrarVentaRequest, InformeCajasResponse, RespuestaGenerica,
+    MovimientoSimpleRequest, TipoMovimiento
 )
+from back.schemas.comprobante_schemas import TransaccionData, ReceptorData, ItemTransaccion
 
 router = APIRouter(
     prefix="/caja",
     tags=["Caja"],
-    #dependencies=[Depends(es_cajero)]
 )
 
 # =================================================================
-# === ENDPOINTS DE GESTIÓN DE SESIÓN DE CAJA ===
+# === ENDPOINTS DE GESTIÓN DE SESIÓN DE CAJA (SIN CAMBIOS) ===
 # =================================================================
 
 @router.get("/estado", response_model=EstadoCajaResponse)
 def get_estado_caja_propia(db: Session = Depends(get_db), current_user: Usuario = Depends(obtener_usuario_actual)):
-    """Verifica si el usuario autenticado tiene una caja abierta."""
-    # CORRECCIÓN: Pasamos el objeto 'current_user' completo a la lógica de negocio.
     sesion_abierta = apertura_cierre.obtener_caja_abierta_por_usuario(db, current_user)
     if sesion_abierta:
         return EstadoCajaResponse(caja_abierta=True, id_sesion=sesion_abierta.id, fecha_apertura=sesion_abierta.fecha_apertura)
     return EstadoCajaResponse(caja_abierta=False)
 
-
-@router.post(
-    "/abrir",
-    response_model=CajaSesionResponse,
-    dependencies=[Depends(es_cajero)]
-)
-def api_abrir_caja(
-    req: AbrirCajaRequest,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(obtener_usuario_actual)
-):
-    """
-    Abre una nueva sesión de caja para el usuario autenticado.
-    Esta operación está protegida por rol Y por una llave maestra.
-    """
+@router.post("/abrir", response_model=RespuestaGenerica, dependencies=[Depends(es_cajero)])
+def api_abrir_caja(req: AbrirCajaRequest, db: Session = Depends(get_db), current_user: Usuario = Depends(obtener_usuario_actual)):
     try:
-        return apertura_cierre.abrir_caja(db=db, usuario_apertura=current_user, saldo_inicial=req.saldo_inicial)
+        sesion = apertura_cierre.abrir_caja(db=db, usuario_apertura=current_user, saldo_inicial=req.saldo_inicial)
+        db.commit()
+        return RespuestaGenerica(status="success", message=f"Caja abierta con éxito. Sesión ID: {sesion.id}", data={"id_sesion": sesion.id})
     except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e)) # 409 Conflict
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(e))
 
-
-@router.post("/cerrar", response_model=CajaSesionResponse)
+@router.post("/cerrar", response_model=RespuestaGenerica)
 def api_cerrar_caja(req: CerrarCajaRequest, db: Session = Depends(get_db), current_user: Usuario = Depends(obtener_usuario_actual)):
-    """Cierra la sesión de caja abierta del usuario autenticado."""
     try:
-        # CORRECCIÓN: Pasamos 'current_user' y el response_model ahora coincide con lo que devuelve la función.
-        # Esto soluciona el error 422.
-        return apertura_cierre.cerrar_caja(db=db, usuario_cierre=current_user, saldo_final_declarado=req.saldo_final_declarado)
+        sesion = apertura_cierre.cerrar_caja(db=db, usuario_cierre=current_user, saldo_final_declarado=req.saldo_final_declarado)
+        db.commit()
+        return RespuestaGenerica(status="success", message=f"Caja cerrada con éxito. Sesión ID: {sesion.id}", data={"id_sesion": sesion.id})
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e)) # 404 Not Found
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(e))
 
 # =================================================================
-# === ENDPOINTS DE OPERACIONES DENTRO DE LA CAJA ===
+# === ENDPOINTS DE OPERACIONES REFACTORIZADOS ===
 # =================================================================
-# NOTA: Estos endpoints todavía usan lógica heredada. Se mantienen para no romper la funcionalidad.
 
-@router.post("/ventas/registrar") # Ya no usamos response_model=RespuestaGenerica
+@router.post("/ventas/registrar", response_model=RespuestaGenerica, tags=["Caja - Operaciones"])
 def api_registrar_venta(
-    req: RegistrarVentaRequest, 
-    # background_tasks: BackgroundTasks, # <-- Descomenta para hacerlo asíncrono
-    db: Session = Depends(get_db), 
+    req: RegistrarVentaRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
     current_user: Usuario = Depends(obtener_usuario_actual)
 ):
-    """Registra una nueva venta Y la envía a facturar al microservicio."""
+    """
+    Orquesta el proceso completo de registro de una venta: DB, AFIP y Sheets.
+    Maneja descuentos y calcula el vuelto si es necesario.
+    """
     sesion_activa = apertura_cierre.obtener_caja_abierta_por_usuario(db, current_user)
     if not sesion_activa:
         raise HTTPException(status_code=400, detail="Operación denegada: El usuario no tiene una caja abierta.")
+
+    # --- Lógica de Vuelto y Descuentos ---
+    vuelto = None
+    if req.monto_recibido:
+        try:
+            vuelto = registro_caja.calcular_vuelto(req.total_venta, req.monto_recibido)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
     
+    # El `total_venta` que llega ya debería tener los descuentos aplicados por el frontend.
+    # La lógica de negocio `registrar_venta` guarda este total final.
+
+    # --- PASO 1: TRANSACCIÓN CRÍTICA CON LA BASE DE DATOS ---
     try:
-        resultado_completo = registro_caja.registrar_venta(
-            db=db, id_sesion_caja=sesion_activa.id, articulos_vendidos=[art.model_dump() for art in req.articulos_vendidos],
-            id_cliente=req.id_cliente, id_usuario=current_user.id, metodo_pago=req.metodo_pago.upper(), total_venta=req.total_venta
+        venta_creada, _ = registro_caja.registrar_venta_y_movimiento_caja(
+            db=db,
+            usuario_actual=current_user,
+            id_sesion_caja=sesion_activa.id,
+            total_venta=req.total_venta,
+            metodo_pago=req.metodo_pago.upper(),
+            articulos_vendidos=req.articulos_vendidos,
+            id_cliente=req.id_cliente
         )
-        
-        # La facturación se puede hacer en segundo plano para una respuesta más rápida
-        # background_tasks.add_task(llamar_a_facturacion, venta_creada, cliente)
-        
-        return {"status": "success", "message": "Venta registrada y facturada con éxito", "data": resultado_completo}
-    
+        db.commit()
+        db.refresh(venta_creada)
     except ValueError as e:
-        # Este error ahora puede venir de la lógica de venta o de la de facturación
-        raise HTTPException(status_code=400, detail=str(e))
-    except RuntimeError as e:
-        # Este error viene del microservicio (ej. no disponible)
-        raise HTTPException(status_code=503, detail=str(e)) # 503 Service Unavailable
-    
+        db.rollback()
+        raise HTTPException(status_code=409, detail=f"Conflicto de negocio: {e}")
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {e}")
 
-@router.post("/ingresos", response_model=CajaMovimientoResponse) # <-- Usamos el modelo real como respuesta
-def api_registrar_ingreso(
-    req: MovimientoSimpleRequest,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(obtener_usuario_actual)
-):
-    """Registra un ingreso de efectivo en la caja."""
+    # --- PASO 2: INTEGRACIÓN CON AFIP Y ACTUALIZACIÓN DE LA VENTA ---
+    resultado_afip: Dict[str, Any] = {"estado": "NO_SOLICITADA"}
+    if req.quiere_factura:
+        try:
+            cliente_db = db.get(Tercero, req.id_cliente) if req.id_cliente else None
+            
+            # Mapeamos los datos para el especialista de AFIP
+            venta_data_schema = TransaccionData(total=venta_creada.total, items=[ItemTransaccion.model_validate(art) for art in req.articulos_vendidos])
+            cliente_data_schema = ReceptorData.model_validate(cliente_db) if cliente_db else None
+
+            factura_generada = generar_factura_para_venta(venta_data=venta_data_schema, cliente_data=cliente_data_schema)
+            
+            venta_creada.facturada = True
+            venta_creada.datos_factura = factura_generada
+            db.add(venta_creada)
+            db.commit()
+            
+            resultado_afip = {"estado": "EXITOSO", **factura_generada}
+
+        except (ValueError, RuntimeError) as e:
+            resultado_afip = {"estado": "FALLIDO", "error": str(e)}
+
+    # --- PASO 3: INTEGRACIÓN CON GOOGLE SHEETS (SEGUNDO PLANO) ---
+    cliente_final = db.get(Tercero, req.id_cliente) if req.id_cliente else None
+    background_tasks.add_task(
+        registro_caja.sincronizar_venta_con_sheets,
+        venta=venta_creada,
+        cliente=cliente_final,
+        resultado_afip=resultado_afip
+    )
+
+    # --- PASO 4: RESPUESTA FINAL AL CLIENTE ---
+    return RespuestaGenerica(
+        status="success",
+        message="Venta registrada.",
+        data={
+            "id_venta": venta_creada.id,
+            "vuelto": vuelto,
+            "facturacion_afip": resultado_afip
+        }
+    )
+
+@router.post("/ingresos", response_model=RespuestaGenerica, tags=["Caja - Operaciones"])
+def api_registrar_ingreso(req: MovimientoSimpleRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: Usuario = Depends(obtener_usuario_actual)):
     sesion_activa = apertura_cierre.obtener_caja_abierta_por_usuario(db, current_user)
     if not sesion_activa:
         raise HTTPException(status_code=400, detail="Operación denegada: El usuario no tiene una caja abierta.")
     
     try:
-        # Llamamos a la nueva función refactorizada
-        return registro_caja.registrar_ingreso_egreso(
-            db=db,
-            id_sesion_caja=sesion_activa.id,
-            concepto=req.concepto,
-            monto=req.monto,
-            tipo="INGRESO",
-            id_usuario=current_user.id
+        movimiento_creado = registro_caja.registrar_movimiento_simple(
+            db=db, usuario_actual=current_user, id_sesion_caja=sesion_activa.id,
+            monto=req.monto, concepto=req.concepto, tipo=TipoMovimiento.INGRESO,
+            metodo_pago=req.metodo_pago if req.metodo_pago else "EFECTIVO"
         )
-    except (ValueError, RuntimeError) as e:
-        # Capturamos los errores de negocio o de base de datos
-        raise HTTPException(status_code=400, detail=str(e))
+        db.commit()
+        background_tasks.add_task(registro_caja.sincronizar_movimiento_simple_con_sheets, movimiento=movimiento_creado)
+        return RespuestaGenerica(status="success", message=f"Ingreso registrado con éxito. ID: {movimiento_creado.id}", data={"id_movimiento": movimiento_creado.id})
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(e))
 
-
-@router.post("/egresos", response_model=CajaMovimientoResponse)
-def api_registrar_egreso(
-    req: MovimientoSimpleRequest,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(obtener_usuario_actual)
-):
-    """Registra un egreso de efectivo de la caja."""
+@router.post("/egresos", response_model=RespuestaGenerica, tags=["Caja - Operaciones"])
+def api_registrar_egreso(req: MovimientoSimpleRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: Usuario = Depends(obtener_usuario_actual)):
     sesion_activa = apertura_cierre.obtener_caja_abierta_por_usuario(db, current_user)
     if not sesion_activa:
         raise HTTPException(status_code=400, detail="Operación denegada: El usuario no tiene una caja abierta.")
     
     try:
-        # Llamamos a la nueva función refactorizada
-        return registro_caja.registrar_ingreso_egreso(
-            db=db,
-            id_sesion_caja=sesion_activa.id,
-            concepto=req.concepto,
-            monto=req.monto,
-            tipo="EGRESO",
-            id_usuario=current_user.id
+        movimiento_creado = registro_caja.registrar_movimiento_simple(
+            db=db, usuario_actual=current_user, id_sesion_caja=sesion_activa.id,
+            monto=req.monto, concepto=req.concepto, tipo=TipoMovimiento.EGRESO
         )
-    except (ValueError, RuntimeError) as e:
-        # Capturamos los errores de negocio o de base de datos
-        raise HTTPException(status_code=400, detail=str(e))
+        db.commit()
+        background_tasks.add_task(registro_caja.sincronizar_movimiento_simple_con_sheets, movimiento=movimiento_creado)
+        return RespuestaGenerica(status="success", message=f"Egreso registrado con éxito. ID: {movimiento_creado.id}", data={"id_movimiento": movimiento_creado.id})
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(e))
 
 # =================================================================
-# === ENDPOINT DE SUPERVISIÓN ===
+# === ENDPOINT DE SUPERVISIÓN (SIN CAMBIOS) ===
 # =================================================================
 
 @router.get("/arqueos", response_model=InformeCajasResponse, tags=["Caja - Supervisión"])
-def get_lista_de_arqueos(db: Session = Depends(get_db)):
-    """
-    Obtiene un informe completo con una lista de cajas actualmente abiertas
-    y una lista de todos los arqueos de cajas cerradas.
-    """
-    # La llamada a la función no cambia de nombre, pero ahora devuelve la nueva estructura.
-    return consultas_caja.obtener_arqueos_de_caja(db=db)
-
+def get_lista_de_arqueos(db: Session = Depends(get_db), current_user: Usuario = Depends(obtener_usuario_actual)):
+    # La lógica multi-empresa debe aplicarse en la función de consulta
+    return consultas_caja.obtener_arqueos_de_caja(db=db, usuario_actual=current_user)
