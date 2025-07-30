@@ -65,12 +65,11 @@ export default function UserForm() {
 
     // Payload de User
     const newUser = {
+      id_empresa: 1,
       nombre_usuario,
       password,
       id_rol: selectedRoleId,
     };
-
-    console.log(newUser)
 
     try {
       const res = await fetch("https://sistema-ima.sistemataup.online/api/admin/usuarios/crear", {
@@ -81,7 +80,6 @@ export default function UserForm() {
         },
         body: JSON.stringify(newUser),
       });
-
 
       if (!res.ok) {
         const errorData = await res.json();
