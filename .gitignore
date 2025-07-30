@@ -78,3 +78,7 @@ coverage.xml
 
 *.README.md
 *.md
+
+boveda_microservicio/
+prueba_local_completa.py
+prueba_local_comprobantes.py
