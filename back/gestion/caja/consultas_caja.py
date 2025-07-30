@@ -9,7 +9,7 @@ from sqlalchemy.orm import aliased, selectinload
 from back.modelos import CajaSesion, Usuario, CajaMovimiento, Tercero, Venta
 from back.modelos import Usuario as UsuarioApertura
 from back.modelos import Usuario as UsuarioCierre
-from back.schemas.caja_schemas import TipoMovimiento, venta
+from back.schemas.caja_schemas import TipoMovimiento
 
 
 def obtener_arqueos_de_caja(db: Session, usuario_actual: Usuario) -> Dict[str, List[Dict[str, Any]]]:
