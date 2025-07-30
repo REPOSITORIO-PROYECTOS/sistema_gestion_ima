@@ -1,4 +1,5 @@
 import os
+from back.schemas.caja_schemas import ArticuloVendido
 import gspread
 from google.oauth2.service_account import Credentials
 from typing import List, Dict, Any, Optional, Tuple
@@ -112,7 +113,7 @@ class TablasHandler:
         
 
 
-    def restar_stock(self, lista_items: List[Dict[str, Any]]) -> bool:
+    def restar_stock(self, lista_items: List[ArticuloVendido]) -> bool:
 
         if not self.client:
             print("❌ ERROR [STOCK]: Cliente de Google Sheets no disponible.")
@@ -135,8 +136,8 @@ class TablasHandler:
 
 
             for item_a_restar in lista_items:
-                id_producto = item_a_restar.get("id_articulo")
-                cantidad_a_restar = item_a_restar.get("cantidad")
+                id_producto = item_a_restar.id_articulo
+                cantidad_a_restar = item_a_restar.cantidad
 
                 if not id_producto or cantidad_a_restar is None:
                     print(f"⚠️ ADVERTENCIA [STOCK]: Item inválido en la lista, saltando: {item_a_restar}")
