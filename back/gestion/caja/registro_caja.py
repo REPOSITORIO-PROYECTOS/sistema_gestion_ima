@@ -156,7 +156,9 @@ def registrar_ingreso_egreso(
         tipo=tipo.upper(),
         concepto=concepto,
         monto=monto,  # El monto siempre se guarda en positivo
-        metodo_pago="EFECTIVO" # Asumimos efectivo para movimientos simples
+        metodo_pago="EFECTIVO", # Asumimos efectivo para movimientos simples
+        facturado=facturado,
+        fecha_hora=fecha_hora,
     )
 
     try:
