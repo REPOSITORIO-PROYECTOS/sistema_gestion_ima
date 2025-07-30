@@ -39,7 +39,7 @@ def obtener_arqueos_de_caja(id_empresa,db: Session, usuario_actual: Usuario) -> 
             .join(UsuarioCierre, CajaSesion.id_usuario_cierre == UsuarioCierre.id, isouter=True)
             # ¡CAMBIO 3: FILTRO DE SEGURIDAD MULTI-EMPRESA!
             # Nos unimos a la tabla de usuarios de apertura para filtrar por empresa.
-            .where(UsuarioApertura.id_empresa == usuario_actual.id_empresa,Articulo.id_empresa == id_empresa)
+            .where(UsuarioApertura.id_empresa == usuario_actual.id_empresa)
             .where(CajaSesion.estado == "CERRADA")
             .order_by(CajaSesion.fecha_cierre.desc())
         )
@@ -101,7 +101,7 @@ def obtener_todos_los_movimientos_de_caja(db: Session, usuario_actual: Usuario) 
 
     # 2. **FILTRO DE SEGURIDAD OBLIGATORIO (MULTI-EMPRESA)**
     query = query.join(CajaSesion).join(Usuario, CajaSesion.id_usuario_apertura == Usuario.id)\
-                 .where(Usuario.id_empresa == usuario_actual.id_empresa)
+                 .where(CajaSesion.id_empresa == usuario_actual.id_empresa)
     # 3. Cargamos las relaciones necesarias de forma eficiente.
     query = query.options(
         selectinload(CajaMovimiento.venta).selectinload(Venta.cliente)
