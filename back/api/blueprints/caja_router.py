@@ -184,9 +184,8 @@ def api_registrar_egreso(
             concepto=req.concepto,
             monto=req.monto,
             tipo="EGRESO",
-            id_usuario=current_user.id,
-            id_sesion_caja=1,  # probablemente mal nombrado
-            fecha_hora=Timestamp.datetime.utcnow(),           # quizás se llama distinto
+            id_usuario=current_user.id,  
+            fecha_hora=Timestamp.datetime.utcnow(),          
             facturado=False
         )
     except (ValueError, RuntimeError) as e:
