@@ -12,12 +12,12 @@ from back.modelos import Usuario as UsuarioCierre
 from back.schemas.caja_schemas import TipoMovimiento
 
 
-def obtener_arqueos_de_caja(db: Session) -> Dict[str, List[Dict[str, Any]]]:
+def obtener_arqueos_de_caja(db: Session, usuario_actual: Usuario) -> Dict[str, List[Dict[str, Any]]]:
     """
-    Obtiene un informe completo con dos listas: una de cajas cerradas (arqueos)
-    y otra de cajas actualmente abiertas. Mantiene el nombre original de la función.
+    Obtiene un informe de cajas abiertas y cerradas, filtrando por la empresa
+    del usuario actual y usando JOINs seguros.
     """
-    logging.info("Solicitando informe unificado de cajas (abiertas y cerradas).")
+    logging.info(f"Solicitando informe de cajas para la Empresa ID: {usuario_actual.id_empresa}.")
     
     informe_final = {
         "cajas_abiertas": [],
@@ -26,30 +26,33 @@ def obtener_arqueos_de_caja(db: Session) -> Dict[str, List[Dict[str, Any]]]:
 
     try:
         # --- PREPARACIÓN DE ALIAS ---
-        # Creamos alias explícitos para la tabla Usuario.
-        # Esto es fundamental para que el ORM no se confunda.
         UsuarioApertura = aliased(Usuario, name="usuario_apertura")
         UsuarioCierre = aliased(Usuario, name="usuario_cierre")
 
-        # --- CONSULTA 1: OBTENER ARQUEOS DE CAJAS CERRADAS ---
+        # --- CONSULTA 1: ARQUEOS DE CAJAS CERRADAS ---
         consulta_cerradas = (
             select(CajaSesion, UsuarioApertura.nombre_usuario, UsuarioCierre.nombre_usuario)
+            # ¡CAMBIO 1: JOIN de Apertura!
             .join(UsuarioApertura, CajaSesion.id_usuario_apertura == UsuarioApertura.id)
-            .join(UsuarioCierre, CajaSesion.id_usuario_cierre == UsuarioCierre.id) # isouter=True es bueno, pero para CERRADA debería ser un inner join
+            # ¡CAMBIO 2: JOIN de Cierre ahora es un LEFT JOIN (isouter=True) para ser más seguro!
+            # Esto evita errores si una caja cerrada no tiene un usuario de cierre asignado.
+            .join(UsuarioCierre, CajaSesion.id_usuario_cierre == UsuarioCierre.id, isouter=True)
+            # ¡CAMBIO 3: FILTRO DE SEGURIDAD MULTI-EMPRESA!
+            # Nos unimos a la tabla de usuarios de apertura para filtrar por empresa.
+            .where(UsuarioApertura.id_empresa == usuario_actual.id_empresa)
             .where(CajaSesion.estado == "CERRADA")
             .order_by(CajaSesion.fecha_cierre.desc())
         )
         resultados_cerradas = db.exec(consulta_cerradas).all()
         
-        logging.info(f"Se encontraron {len(resultados_cerradas)} arqueos cerrados.")
-
-        for sesion, nombre_usuario_apertura, nombre_usuario_cierre in resultados_cerradas:
+        for sesion, nombre_apertura, nombre_cierre in resultados_cerradas:
             informe_final["arqueos_cerrados"].append({
                 "id_sesion": sesion.id,
                 "fecha_apertura": sesion.fecha_apertura,
                 "fecha_cierre": sesion.fecha_cierre,
-                "usuario_apertura": nombre_usuario_apertura,
-                "usuario_cierre": nombre_usuario_cierre,
+                "usuario_apertura": nombre_apertura,
+                # ¡CAMBIO 4: MANEJO SEGURO DE POSIBLES NULOS!
+                "usuario_cierre": nombre_cierre if nombre_cierre else "N/A",
                 "saldo_inicial": sesion.saldo_inicial,
                 "saldo_final_declarado": sesion.saldo_final_declarado,
                 "saldo_final_calculado": sesion.saldo_final_calculado,
@@ -57,23 +60,22 @@ def obtener_arqueos_de_caja(db: Session) -> Dict[str, List[Dict[str, Any]]]:
                 "estado": sesion.estado
             })
 
-        # --- CONSULTA 2: OBTENER CAJAS ACTUALMENTE ABIERTAS ---
-        # La consulta de abiertas también debe usar el alias para ser consistente
+        # --- CONSULTA 2: CAJAS ACTUALMENTE ABIERTAS ---
         consulta_abiertas = (
             select(CajaSesion, UsuarioApertura.nombre_usuario)
             .join(UsuarioApertura, CajaSesion.id_usuario_apertura == UsuarioApertura.id)
+            # ¡CAMBIO 3 (REPETIDO): FILTRO DE SEGURIDAD MULTI-EMPRESA!
+            .where(UsuarioApertura.id_empresa == usuario_actual.id_empresa)
             .where(CajaSesion.estado == "ABIERTA")
             .order_by(CajaSesion.fecha_apertura.asc())
         )
         resultados_abiertas = db.exec(consulta_abiertas).all()
 
-        logging.info(f"Se encontraron {len(resultados_abiertas)} cajas abiertas.")
-
-        for sesion, nombre_usuario_apertura in resultados_abiertas:
+        for sesion, nombre_apertura in resultados_abiertas:
             informe_final["cajas_abiertas"].append({
                 "id_sesion": sesion.id,
                 "fecha_apertura": sesion.fecha_apertura,
-                "usuario_apertura": nombre_usuario_apertura,
+                "usuario_apertura": nombre_apertura,
                 "saldo_inicial": sesion.saldo_inicial,
                 "estado": sesion.estado
             })
@@ -81,8 +83,9 @@ def obtener_arqueos_de_caja(db: Session) -> Dict[str, List[Dict[str, Any]]]:
         return informe_final
 
     except Exception as e:
-        logging.error(f"Error al generar el informe de cajas: {e}", exc_info=True) # exc_info=True da más detalles
-        return informe_final
+        logging.error(f"Error al generar el informe de cajas para la empresa {usuario_actual.id_empresa}: {e}", exc_info=True)
+        # Relanzamos la excepción para que el router devuelva un 500, pero con el log ya escrito.
+        raise e
     
 def obtener_movimientos_de_caja(
     db: Session,

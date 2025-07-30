@@ -189,8 +189,17 @@ def api_registrar_egreso(req: MovimientoSimpleRequest, background_tasks: Backgro
 # =================================================================
 # === ENDPOINT DE SUPERVISIÓN (SIN CAMBIOS) ===
 # =================================================================
-
 @router.get("/arqueos", response_model=InformeCajasResponse, tags=["Caja - Supervisión"])
-def get_lista_de_arqueos(db: Session = Depends(get_db), current_user: Usuario = Depends(obtener_usuario_actual)):
-    # La lógica multi-empresa debe aplicarse en la función de consulta
-    return consultas_caja.obtener_arqueos_de_caja(db=db, usuario_actual=current_user)
+def get_lista_de_arqueos(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(obtener_usuario_actual) # <-- Inyectamos el usuario actual
+):
+    """
+    Obtiene un informe de cajas abiertas y cerradas para la empresa del usuario.
+    """
+    try:
+        # Le pasamos el usuario completo a la función de lógica de negocio
+        return consultas_caja.obtener_arqueos_de_caja(db=db, usuario_actual=current_user)
+    except Exception as e:
+        # Si la capa de negocio lanza un error, lo convertimos en un 500.
+        raise HTTPException(status_code=500, detail="Ocurrió un error al generar el informe de arqueos.")
