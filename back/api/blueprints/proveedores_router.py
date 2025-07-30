@@ -45,6 +45,7 @@ def listar_proveedores(
     proveedores = proveedores_manager.obtener_proveedores(db, current_user.id_empresa)
     return proveedores
 
+
 @router.post("/plantilla", response_model=PlantillaMapeoRead)
 def crear_o_actualizar_plantilla(
     req: PlantillaMapeoCreate,
@@ -62,6 +63,7 @@ def crear_o_actualizar_plantilla(
     
     plantilla = proveedores_manager.crear_o_actualizar_plantilla(db, req, current_user.id_empresa)
     return plantilla
+
 
 @router.post("/{id_proveedor}/asociar-articulo", response_model=RespuestaGenerica)
 def asociar_articulo_con_proveedor(
