@@ -132,7 +132,9 @@ def registrar_ingreso_egreso(
     concepto: str,
     monto: float,
     tipo: str,
-    id_usuario: int
+    id_usuario: int,
+    facturado: bool,
+    fecha_hora: datetime
 ) -> CajaMovimiento:
     """
     Registra un ingreso o egreso simple en la caja usando SQLModel.
