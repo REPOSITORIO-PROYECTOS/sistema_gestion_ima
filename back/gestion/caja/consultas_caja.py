@@ -6,13 +6,13 @@ from sqlmodel import Session, select
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import aliased, selectinload  
 # Importamos los modelos necesarios, creando alias para evitar conflictos en el JOIN
-from back.modelos import CajaSesion, Usuario, CajaMovimiento, Tercero, Venta
+from back.modelos import Articulo, CajaSesion, Usuario, CajaMovimiento, Tercero, Venta
 from back.modelos import Usuario as UsuarioApertura
 from back.modelos import Usuario as UsuarioCierre
 from back.schemas.caja_schemas import TipoMovimiento
 
 
-def obtener_arqueos_de_caja(db: Session, usuario_actual: Usuario) -> Dict[str, List[Dict[str, Any]]]:
+def obtener_arqueos_de_caja(id_empresa,db: Session, usuario_actual: Usuario) -> Dict[str, List[Dict[str, Any]]]:
     """
     Obtiene un informe de cajas abiertas y cerradas, filtrando por la empresa
     del usuario actual y usando JOINs seguros.
@@ -101,7 +101,7 @@ def obtener_todos_los_movimientos_de_caja(db: Session, usuario_actual: Usuario) 
 
     # 2. **FILTRO DE SEGURIDAD OBLIGATORIO (MULTI-EMPRESA)**
     query = query.join(CajaSesion).join(Usuario, CajaSesion.id_usuario_apertura == Usuario.id)\
-                 .where(Usuario.id_empresa == usuario_actual.id_empresa)
+                 .where(CajaSesion.id_empresa == usuario_actual.id_empresa)
     # 3. Cargamos las relaciones necesarias de forma eficiente.
     query = query.options(
         selectinload(CajaMovimiento.venta).selectinload(Venta.cliente)

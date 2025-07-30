@@ -30,27 +30,32 @@ def api_get_all_articulos(
 @router.get("/obtener/{id_articulo}", response_model=ArticuloResponse)
 def api_get_articulo(id_articulo: int, db: Session = Depends(get_db),current_user: Usuario = Depends(obtener_usuario_actual)):
     # Esta función ya era compatible, no necesita cambios.
-    articulo_db = mod_articulos.obtener_articulo_por_id(db, id_articulo)
+    id_empresa = current_user.id_empresa
+
+    articulo_db = mod_articulos.obtener_articulo_por_id(id_empresa,db, id_articulo)
     if not articulo_db:
         raise HTTPException(status_code=404, detail=f"Artículo con ID {id_articulo} no encontrado.")
     return articulo_db
 
 
 @router.post("/crear", response_model=ArticuloResponse, status_code=201, dependencies=[Depends(es_admin)])
-def api_create_articulo(req: ArticuloCreate, db: Session = Depends(get_db)):
+def api_create_articulo(req: ArticuloCreate, db: Session = Depends(get_db),current_user: Usuario = Depends(obtener_usuario_actual)):
     try:
         # --- CORRECCIÓN: Pasamos el objeto del schema 'req' directamente, sin .model_dump() ---
-        nuevo_articulo = mod_articulos.crear_articulo(db, req)
+        id_empresa = current_user.id_empresa
+        nuevo_articulo = mod_articulos.crear_articulo(id_empresa,db, req)
         return nuevo_articulo
     except ValueError as e:
         # El manager ahora lanza ValueError para códigos duplicados, lo capturamos aquí.
         raise HTTPException(status_code=409, detail=str(e)) # 409 Conflict es más apropiado
+    
 
 @router.patch("/actualizar/{id_articulo}", response_model=ArticuloResponse, dependencies=[Depends(es_admin)])
-def api_update_articulo(id_articulo: int, req: ArticuloUpdate, db: Session = Depends(get_db)):
+def api_update_articulo(id_articulo: int, req: ArticuloUpdate, db: Session = Depends(get_db),current_user: Usuario = Depends(obtener_usuario_actual)):
     try:
+        id_empresa = current_user.id_empresa
         # --- CORRECCIÓN: Pasamos el objeto del schema 'req' directamente ---
-        articulo_actualizado = mod_articulos.actualizar_articulo(db, id_articulo, req)
+        articulo_actualizado = mod_articulos.actualizar_articulo(id_empresa,db, id_articulo, req)
         
         if not articulo_actualizado:
             # Esta comprobación es más robusta
@@ -59,6 +64,7 @@ def api_update_articulo(id_articulo: int, req: ArticuloUpdate, db: Session = Dep
         return articulo_actualizado
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    
 
 @router.delete("/eliminar/{id_articulo}", response_model=RespuestaGenerica, dependencies=[Depends(es_admin)])
 def api_delete_articulo(id_articulo: int, db: Session = Depends(get_db)):
