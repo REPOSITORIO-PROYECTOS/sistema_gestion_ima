@@ -35,7 +35,6 @@ import { ChevronsUpDown } from "lucide-react";
 import { useFacturacionStore } from "@/lib/facturacionStore";
 import { useAuthStore } from "@/lib/authStore"
 
-
 interface ProductoAPI {
   id: number;
   descripcion: string;

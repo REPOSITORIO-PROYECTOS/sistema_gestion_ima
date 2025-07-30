@@ -55,8 +55,7 @@ export const columns: ColumnDef<ArqueoCaja>[] = [
     header: "Apertura",
     cell: ({ row }) => {
       const fecha = row.getValue("fecha_apertura") as string;
-      const formateada = new Date(fecha).toLocaleString("es-AR");
-      return <span>{formateada}</span>;
+      return <span>{formatDateArgentina(fecha)}</span>;
     },
   },
   {
@@ -66,7 +65,7 @@ export const columns: ColumnDef<ArqueoCaja>[] = [
       const fecha = row.getValue("fecha_cierre") as string | null;
       return (
         <span className={fecha ? "" : "text-blue-600 font-medium"}>
-          {fecha ? new Date(fecha).toLocaleString("es-AR") : "Caja abierta"}
+          {fecha ? formatDateArgentina(fecha) : "Caja abierta"}
         </span>
       );
     },
@@ -87,7 +86,7 @@ export const columns: ColumnDef<ArqueoCaja>[] = [
       return formatCurrency(valor);
     },
   },
-    {
+  {
     accessorKey: "saldo_final_calculado",
     header: "Saldo Calculado",
     cell: ({ row }) => {
@@ -111,10 +110,22 @@ export const columns: ColumnDef<ArqueoCaja>[] = [
   },
 ];
 
+// Formatea números como moneda ARS
 function formatCurrency(value: number | null) {
   if (value === null) return "-";
   return new Intl.NumberFormat("es-AR", {
     style: "currency",
     currency: "ARS",
   }).format(value);
+}
+
+// Convierte string ISO (UTC) a fecha/hora local argentina
+function formatDateArgentina(fecha: string): string {
+  const fechaUTC = fecha.endsWith("Z") ? fecha : `${fecha}Z`; // ← forzamos que sea UTC
+  return new Date(fechaUTC).toLocaleString("es-AR", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    hour12: false,
+    dateStyle: "short",
+    timeStyle: "short",
+  });
 }

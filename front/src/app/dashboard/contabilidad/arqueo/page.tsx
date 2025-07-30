@@ -28,7 +28,7 @@ export default function ArqueoCajaPage() {
 
         const result = await res.json();
 
-        // Simplemente concatenamos las listas, sin modificar estado
+        // Concatenamos las listas de abiertas y cerradas
         const combinados: ArqueoCaja[] = [
           ...result.cajas_abiertas,
           ...result.arqueos_cerrados,
