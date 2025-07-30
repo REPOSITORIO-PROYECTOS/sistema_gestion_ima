@@ -165,7 +165,6 @@ def api_registrar_ingreso(req: MovimientoSimpleRequest, background_tasks: Backgr
         raise HTTPException(status_code=409, detail=str(e))
 
 
-
 @router.post("/egresos", response_model=CajaMovimientoResponse)
 def api_registrar_egreso(
     req: MovimientoSimpleRequest,
@@ -178,23 +177,32 @@ def api_registrar_egreso(
         raise HTTPException(status_code=400, detail="Operación denegada: El usuario no tiene una caja abierta.")
     
     try:
-        # Llamamos a la nueva función refactorizada
-        return registro_caja.registrar_ingreso_egreso(
+        movimiento = registro_caja.registrar_ingreso_egreso(
             db=db,
             id_sesion_caja=sesion_activa.id,
             concepto=req.concepto,
             monto=req.monto,
             tipo="EGRESO",
             id_usuario=current_user.id,  
-            fecha_hora = datetime.now(timezone.utc),          
+            fecha_hora=datetime.now(timezone.utc),
             facturado=False
         )
+
+        return CajaMovimientoResponse(
+            id=movimiento.id,
+            id_sesion_caja=movimiento.id_caja_sesion,  # ⚠️ Asegurate que este es el nombre correcto
+            id_venta_asociada=movimiento.id_venta,
+            id_usuario=movimiento.id_usuario,
+            tipo=movimiento.tipo,
+            concepto=movimiento.concepto,
+            monto=movimiento.monto,
+            metodo_pago=movimiento.metodo_pago,
+            fecha_hora=movimiento.fecha_hora,  # Si usás timestamp, mapearlo aquí
+            facturado=movimiento.facturado
+        )
+
     except (ValueError, RuntimeError) as e:
-        # Capturamos los errores de negocio o de base de datos
         raise HTTPException(status_code=400, detail=str(e))
-    
-
-
     
 # =================================================================
 # === ENDPOINT DE SUPERVISIÓN (SIN CAMBIOS) ===

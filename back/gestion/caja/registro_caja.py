@@ -151,7 +151,7 @@ def registrar_ingreso_egreso(
 
     # Creamos el objeto del movimiento directamente con SQLModel
     nuevo_movimiento = CajaMovimiento(
-        id_caja_sesion=id_sesion_caja,
+        id_sesion_caja=id_sesion_caja,
         id_usuario=id_usuario,
         tipo=tipo.upper(),
         concepto=concepto,
