@@ -185,7 +185,7 @@ def api_registrar_egreso(
             monto=req.monto,
             tipo="EGRESO",
             id_usuario=current_user.id,
-            id_sesion_caja=sesion_activa,  # probablemente mal nombrado
+            id_sesion_caja="1",  # probablemente mal nombrado
             fecha_hora=Timestamp.datetime.utcnow(),           # quizás se llama distinto
             facturado=False
         )
