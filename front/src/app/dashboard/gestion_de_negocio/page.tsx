@@ -17,15 +17,18 @@ import { useRef } from "react";
 export default function GestionNegocio() {
 
   const { setNavbarColor, setLogoUrl, navbarColor, logoUrl } = useThemeStore()
-    const {
+  const {
     habilitarExtras,
     toggleExtras,
-    recargoActivo,
-    toggleRecargo,
+    recargoTransferenciaActivo,
+    toggleRecargoTransferencia,
     recargoTransferencia,
     setRecargoTransferencia,
+    recargoBancarioActivo,
+    toggleRecargoBancario,
+    recargoBancario,
+    setRecargoBancario,
   } = useFacturacionStore();
-
 
   // Handler para cambiar el LOGO de la empresa
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -80,54 +83,78 @@ export default function GestionNegocio() {
 
       <hr className="h-0.25 my-4" />  {/* --------------------------------------------------------------- */}
 
-      {/* Toggle de Recargo y Input */}
+      {/* Toggle de Recargo Transferencia */}
       <div className="flex flex-col gap-2">
         <div className="flex flex-col sm:flex-row items-center gap-4">
           <Switch.Root
-            checked={recargoActivo}
-            onCheckedChange={toggleRecargo}
+            checked={recargoTransferenciaActivo}
+            onCheckedChange={toggleRecargoTransferencia}
             className={`relative w-16 h-8 rounded-full ${
-              recargoActivo ? "bg-green-900" : "bg-gray-300"
+              recargoTransferenciaActivo ? "bg-green-900" : "bg-gray-300"
             } cursor-pointer transition-colors`}
           >
             <Switch.Thumb
               className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-300 ${
-                recargoActivo ? "translate-x-8" : "translate-x-0"
+                recargoTransferenciaActivo ? "translate-x-8" : "translate-x-0"
               }`}
             />
           </Switch.Root>
 
           <h3 className="text-lg font-semibold text-green-950">
-            Habilitar Recargo por Transferencia o Bancario
+            Habilitar Recargo por Transferencia
           </h3>
         </div>
 
-        {/* Input para el porcentaje */}
         <Input
           type="number"
           placeholder="Ej: 10"
-          disabled={!recargoActivo}
+          disabled={!recargoTransferenciaActivo}
           value={recargoTransferencia}
           onChange={(e) => {
             const rawValue = e.target.value;
-
-            // Si el campo está vacío, se permite borrar todo
-            if (rawValue === "") {
-              setRecargoTransferencia(0); // o podrías usar un estado auxiliar para el raw input si preferís mantenerlo vacío
-              return;
-            }
-
+            if (rawValue === "") return setRecargoTransferencia(0);
             const val = Number(rawValue);
-
-            if (val >= 0 && val <= 100) {
-              setRecargoTransferencia(val);
-            }
+            if (val >= 0 && val <= 100) setRecargoTransferencia(val);
           }}
           className="w-1/3 mt-2"
         />
-        <span className="text-sm text-muted-foreground ml-1">
-          Ingresá el % de recargo que se aplicará si el método de pago es transferencia o bancario.
-        </span>
+      </div>
+
+      {/* Toggle de Recargo Bancario */}
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-col sm:flex-row items-center gap-4">
+          <Switch.Root
+            checked={recargoBancarioActivo}
+            onCheckedChange={toggleRecargoBancario}
+            className={`relative w-16 h-8 rounded-full ${
+              recargoBancarioActivo ? "bg-green-900" : "bg-gray-300"
+            } cursor-pointer transition-colors`}
+          >
+            <Switch.Thumb
+              className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-300 ${
+                recargoBancarioActivo ? "translate-x-8" : "translate-x-0"
+              }`}
+            />
+          </Switch.Root>
+
+          <h3 className="text-lg font-semibold text-green-950">
+            Habilitar Recargo por Bancario
+          </h3>
+        </div>
+
+        <Input
+          type="number"
+          placeholder="Ej: 10"
+          disabled={!recargoBancarioActivo}
+          value={recargoBancario}
+          onChange={(e) => {
+            const rawValue = e.target.value;
+            if (rawValue === "") return setRecargoBancario(0);
+            const val = Number(rawValue);
+            if (val >= 0 && val <= 100) setRecargoBancario(val);
+          }}
+          className="w-1/3 mt-2"
+        />
       </div>
 
       <hr className="h-0.25 my-4" />  {/* --------------------------------------------------------------- */}
