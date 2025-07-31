@@ -83,38 +83,38 @@ function Login() {
   }
 
   return (
-    <div className="flex flex-col h-screen justify-center items-center gap-10 bg-sky-500 px-8 py-8 md:h-screen">
+    <div className="flex flex-col h-screen justify-center items-center gap-10 bg-sky-700 px-8 py-8 md:h-screen">
       
       <Image src="/logo_software.png" alt="Swing Jugos" width={80} height={80} />
 
-      <form onSubmit={handleLogin} className="w-[95%] sm:w-1/2 lg:w-1/3 form-login bg-sky-700 shadow-2xl flex flex-col items-center justify-center p-10 gap-10 rounded-4xl">
+      <form onSubmit={handleLogin} className="w-[95%] sm:w-1/2 lg:w-1/3 form-login bg-slate-100 shadow-2xl flex flex-col items-center justify-center p-10 gap-10 rounded-4xl">
         
         {/* Usuario */}
         <div className="flex flex-col gap-1 relative">
-          <label htmlFor="username" className="text-white">Usuario</label>
+          <label htmlFor="username" className="text-sky-800">Usuario</label>
           <input
             id="username"
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="border !border-white text-white bg-transparent px-3 py-2 rounded w-full focus:!outline-none focus:!ring-0 focus:!border-white hover:!border-white"
+            className="border !border-sky-800 text-sky-800 bg-transparent px-3 py-2 rounded w-full focus:!outline-none focus:!ring-0 focus:!border-sky-800"
           />
         </div>
 
         {/* Contraseña */}
         <div className="flex flex-col gap-1 relative">
-          <label htmlFor="password" className="text-white">Contraseña</label>
+          <label htmlFor="password" className="text-sky-800">Contraseña</label>
           <input
             id="password"
             type={showPassword ? "text" : "password"}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="border !border-white text-white bg-transparent px-3 py-2 rounded w-full pr-10"
+            className="border !border-sky-800 text-sky-800 bg-transparent px-3 py-2 rounded w-full pr-10"
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-[41px] text-white cursor-pointer"
+            className="absolute right-3 top-[41px] text-sky-800 cursor-pointer"
           >
             {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
           </button>
