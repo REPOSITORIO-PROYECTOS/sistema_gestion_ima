@@ -15,7 +15,6 @@ export default function Page() {
     const fetchProductos = async () => {
       try {
         const res = await fetch("https://sistema-ima.sistemataup.online/api/articulos/obtener_todos", {
-          method: "GET",
           headers: {
             "Authorization": `Bearer ${token}`,
           },

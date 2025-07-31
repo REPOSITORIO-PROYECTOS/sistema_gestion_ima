@@ -295,7 +295,6 @@ function FormVentas({
     e.preventDefault();
 
     /* Validaciones - no se puede mandar venta sin: */
-
     // Productos en el carrito
     if (productosVendidos.length === 0) {
       toast.error("❌ No hay productos cargados en la venta.");
@@ -317,6 +316,7 @@ function FormVentas({
       return;
     }
 
+    // Sin el CUIT del consumidor final que esta registrandose en la sesion
     if (
       clienteSeleccionado.nombre_razon_social.toLowerCase().includes("consumidor final") &&
       cuitManual.trim() === ""
@@ -326,6 +326,7 @@ function FormVentas({
       return;
     }
 
+    // El CUIT argentino debe tener si o si 11 digitos:
     if (
       clienteSeleccionado.nombre_razon_social.toLowerCase().includes("consumidor final") &&
       !/^\d{11}$/.test(cuitManual.trim())
@@ -338,16 +339,12 @@ function FormVentas({
     // Payload de Venta
     const ventaPayload = {
       id_cliente:
+        // Si el cliente no esta registrado manda 999, si sí, entonces manda el id de ese cliente
         tipoClienteSeleccionado.id === "0"
-          ? 999                                     // Cliente Final: ID fijo
-          : clienteSeleccionado?.id ?? 999,         // Cliente con/sin CUIT            
+          ? 999                                     
+          : clienteSeleccionado?.id ?? 999,               
       metodo_pago: metodoPago.toUpperCase(),
       total_venta: totalVenta,
-      cuit: (() => {
-        if (tipoClienteSeleccionado.id === "0") return cuitManual || null;
-        if (tipoClienteSeleccionado.id === "1") return clienteSeleccionado?.cuit || null;
-        return null;
-      })(),
       paga_con: (() => {
         switch (metodoPago) {
           case "efectivo":
@@ -360,7 +357,9 @@ function FormVentas({
             return "Otro";
         }
       })(),
+
       quiere_factura: true,
+      
       tipo_comprobante_solicitado: (() => {
         switch (tipoFacturacion) {
           case "factura":
@@ -387,9 +386,12 @@ function FormVentas({
         };
       })
     };
+    /* console.log(JSON.stringify(ventaPayload, null, 2)); */
 
-    // Llamada al Registro
+
+    // GENERAR COMPROBANTE - Endpoint que se encarga de imprimir el ticket o comprobante de la venta realizada
     try {
+
       const response = await fetch("https://sistema-ima.sistemataup.online/api/caja/ventas/registrar", {
         method: "POST",
         headers: {
@@ -404,87 +406,89 @@ function FormVentas({
         const data = await response.json();
         toast.success("✅ Venta registrada: " + data.message);
 
-        // Funcion Generar Comprobante
         const generarComprobante = async () => {
-        try {
-          const req = {
-            formato: "pdf", // o "ticket"
-            tipo: tipoFacturacion.toLowerCase(), // factura, remito, etc.
-            emisor: {
-              cuit: "30XXXXXXXXX", // CUIT del negocio
-              razon_social: "Empresa Demo Swing",
-              domicilio: "Av. Siempre Viva 123",
-              punto_venta: 1,
-              condicion_iva: "Responsable Inscripto",
-              afip_certificado: "BASE64_ENCODED_CERT", // opcional
-              afip_clave_privada: "BASE64_ENCODED_KEY"  // opcional
-            },
-            receptor: {
-              nombre_razon_social:
-                tipoClienteSeleccionado.id === "0"
-                  ? "Consumidor Final"
-                  : clienteSeleccionado?.nombre_razon_social ?? "Consumidor Final",
-              cuit_o_dni:
-                tipoClienteSeleccionado.id === "0"
-                  ? cuitManual || "0"
-                  : clienteSeleccionado?.cuit || clienteSeleccionado?.identificacion_fiscal || "0",
-              domicilio: "Sin especificar",
-              condicion_iva:
-                tipoClienteSeleccionado.id === "0"
-                  ? "Consumidor Final"
-                  : clienteSeleccionado?.condicion_iva ?? "Consumidor Final"
-            },
-            transaccion: {
-              items: productosVendidos.map((p) => {
-                const productoReal = productos.find((prod) => prod.nombre === p.tipo);
-                return {
-                  descripcion: productoReal?.nombre || p.tipo,
-                  cantidad: p.cantidad,
-                  precio_unitario: productoReal ? getPrecioProducto(productoReal) : 0,
-                  subtotal: p.precioTotal,
-                  tasa_iva: 21
-                };
-              }),
-              total: totalConDescuento,
-              descuento_general: descuentoSobreTotal || 0,
-              observaciones: observaciones || ""
+
+          try {
+
+            // Payload para el comprobante a imprimir
+            const req = {
+              formato: "pdf", // o "ticket"
+              tipo: tipoFacturacion.toLowerCase(), // factura, remito, etc.
+              emisor: {
+                cuit: "30XXXXXXXXX", // CUIT del negocio
+                razon_social: "Empresa Demo Swing",
+                domicilio: "Av. Siempre Viva 123",
+                punto_venta: 1,
+                condicion_iva: "Responsable Inscripto",
+                afip_certificado: "BASE64_ENCODED_CERT", // opcional
+                afip_clave_privada: "BASE64_ENCODED_KEY"  // opcional
+              },
+              receptor: {
+                nombre_razon_social:
+                  tipoClienteSeleccionado.id === "0"
+                    ? "Consumidor Final"
+                    : clienteSeleccionado?.nombre_razon_social ?? "Consumidor Final",
+                cuit_o_dni:
+                  tipoClienteSeleccionado.id === "0"
+                    ? cuitManual || "0"
+                    : clienteSeleccionado?.cuit || clienteSeleccionado?.identificacion_fiscal || "0",
+                domicilio: "Sin especificar",
+                condicion_iva:
+                  tipoClienteSeleccionado.id === "0"
+                    ? "Consumidor Final"
+                    : clienteSeleccionado?.condicion_iva ?? "Consumidor Final"
+              },
+              transaccion: {
+                items: productosVendidos.map((p) => {
+                  const productoReal = productos.find((prod) => prod.nombre === p.tipo);
+                  return {
+                    descripcion: productoReal?.nombre || p.tipo,
+                    cantidad: p.cantidad,
+                    precio_unitario: productoReal ? getPrecioProducto(productoReal) : 0,
+                    subtotal: p.precioTotal,
+                    tasa_iva: 21
+                  };
+                }),
+                total: totalConDescuento,
+                descuento_general: descuentoSobreTotal || 0,
+                observaciones: observaciones || ""
+              }
+            };
+
+            /* console.log(req) */
+
+            const response = await fetch("https://sistema-ima.sistemataup.online/api/comprobantes/generar", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`
+              },
+              body: JSON.stringify(req)
+            });
+
+            if (!response.ok) {
+              const error = await response.json();
+              toast.error("❌ Error al generar comprobante: " + error.detail);
+              return;
             }
-          };
 
-          console.log(req)
+            // Espera un PDF, descargamos como blob
+            const blob = await response.blob();
 
-          const response = await fetch("https://sistema-ima.sistemataup.online/api/comprobantes/generar", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify(req)
-          });
+            // Crea un link de descarga e imprime
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `comprobante-${Date.now()}.pdf`;
+            link.click();
+            URL.revokeObjectURL(url);
 
-          if (!response.ok) {
-            const error = await response.json();
-            toast.error("❌ Error al generar comprobante: " + error.detail);
-            return;
+            toast.success("✅ Comprobante generado correctamente");
+
+          } catch (error) {
+            console.error("❌ Error al generar comprobante:", error);
+            toast.error("❌ Error al generar comprobante");
           }
-
-          // Espera un PDF, descargamos como blob
-          const blob = await response.blob();
-
-          // Crea un link de descarga e imprime
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          link.href = url;
-          link.download = `comprobante-${Date.now()}.pdf`;
-          link.click();
-          URL.revokeObjectURL(url);
-
-          toast.success("✅ Comprobante generado correctamente");
-
-        } catch (error) {
-          console.error("❌ Error al generar comprobante:", error);
-          toast.error("❌ Error al generar comprobante");
-        }
         };
         await generarComprobante();
 
@@ -499,8 +503,6 @@ function FormVentas({
       alert("❌ Error al registrar venta:\n" + JSON.stringify(error, null, 2));
 
     } finally { setIsLoading(false); }
-
-    console.log(JSON.stringify(ventaPayload, null, 2)); // solo debug
   };
 
   /* -------------------------------------------------------------- */
@@ -759,7 +761,9 @@ function FormVentas({
           + Agregar producto
         </Button>
 
-        {/* --------------------------------------- */} <hr className="p-0.75 bg-green-900 my-8"/> {/* --------------------------------------- */}
+
+        <hr className="p-0.75 bg-green-900 my-8"/> {/* --------------------------------------- */}
+
 
         {/* Método de Pago y condicional efectivo */}
         <div className="flex flex-col gap-4">
