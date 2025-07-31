@@ -360,20 +360,7 @@ function FormVentas({
 
       quiere_factura: true,
       
-      tipo_comprobante_solicitado: (() => {
-        switch (tipoFacturacion) {
-          case "factura":
-            return "Factura";
-          case "comprobante":
-            return "Recibo";
-          case "remito":
-            return "Remito";
-          case "presupuesto":
-            return "Presupuesto";
-          default:
-            return "Desconocido";
-        }
-      })(),
+      tipo_comprobante_solicitado: tipoFacturacion.toLowerCase(),
       articulos_vendidos: productosVendidos.map((p) => {
         const productoReal = productos.find(prod => prod.nombre === p.tipo);
         return {
@@ -386,8 +373,6 @@ function FormVentas({
         };
       })
     };
-    /* console.log(JSON.stringify(ventaPayload, null, 2)); */
-
 
     // GENERAR COMPROBANTE - Endpoint que se encarga de imprimir el ticket o comprobante de la venta realizada
     try {
@@ -413,7 +398,7 @@ function FormVentas({
             // Payload para el comprobante a imprimir
             const req = {
               formato: "pdf", // o "ticket"
-              tipo: tipoFacturacion.toLowerCase(), // factura, remito, etc.
+              tipo: tipoFacturacion.toLowerCase(),
               emisor: {
                 cuit: "30XXXXXXXXX", // CUIT del negocio
                 razon_social: "Empresa Demo Swing",
@@ -856,7 +841,7 @@ function FormVentas({
             className="flex flex-row items-center w-full md:w-[48%] lg:flex-row cursor-pointer text-black border-green-900 hover:bg-green-400 dark:hover:bg-green-700 gap-3 rounded-lg border p-3 transition-colors duration-200 data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900"
           >
             <RadioGroupItem
-              value="comprobante"
+              value="recibo"
               id="comprobante"
               className="data-[state=checked]:border-white data-[state=checked]:bg-white"
             />
