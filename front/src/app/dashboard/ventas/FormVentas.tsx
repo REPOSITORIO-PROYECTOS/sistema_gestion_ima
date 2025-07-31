@@ -153,6 +153,7 @@ function FormVentas({
     totalConRecargo += (totalConDescuento * recargoBancario) / 100;
   }
 
+  const { formatoComprobante } = useFacturacionStore();
 
 
   /* Hooks */ /* -------------------------------------------------------------- */
@@ -414,12 +415,12 @@ function FormVentas({
 
             // Payload para el comprobante a imprimir
             const req = {
-              formato: "pdf", // o "ticket"
+              formato: formatoComprobante.toLowerCase(),          // por ahora, "pdf" o "ticket" desde facturacionStore
               tipo: tipoFacturacion.toLowerCase(),                                  
               emisor: {
-                cuit: "30XXXXXXXXX", // CUIT del negocio
-                razon_social: "Empresa Demo Swing",
-                domicilio: "Av. Siempre Viva 123",
+                cuit: "30XXXXXXXXX",                  // CUIT de la empresa emisora - todo esto es dinamico
+                razon_social: "Empresa Demo Swing",   // nombre de la empresa emisora
+                domicilio: "Av. Siempre Viva 123",    // dom de la empresa emisora
                 punto_venta: 1,
                 condicion_iva: "Responsable Inscripto",
                 afip_certificado: "BASE64_ENCODED_CERT", // opcional
@@ -456,6 +457,8 @@ function FormVentas({
                 observaciones: observaciones || ""
               }
             };
+
+            console.log(req)
 
             const response = await fetch("https://sistema-ima.sistemataup.online/api/comprobantes/generar", {
               method: "POST",
