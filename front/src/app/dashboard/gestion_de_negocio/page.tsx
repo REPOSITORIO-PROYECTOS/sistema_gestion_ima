@@ -73,17 +73,19 @@ export default function GestionNegocio() {
 
       {/* Header para personalización */}
       <div className="space-y-2">
-        <h2 className="text-2xl font-bold text-green-950">Configuración del Apariencia</h2>
+        <h2 className="text-2xl font-bold text-green-950">Configuración de la Apariencia</h2>
         <p className="text-muted-foreground">Administrá la apariencia de tu aplicación.</p>
       </div>
 
       {/* Configuración de Negocios */}
-      <div className="flex flex-col items-start gap-4 p-4">
+      <div className="flex flex-col items-start gap-8 p-4">
 
+        {/* Color del Nav */}
         <div className="flex flex-col gap-2">
-          <label className="block text-md font-semibold mb-1">Color del NavBar</label>
+          <label className="block text-md font-semibold mb-1">Color de la barra de Navegación</label>
+          
           <Select value={navbarColor} onValueChange={setNavbarColor}>
-            <SelectTrigger className="w-[200px] cursor-pointer">
+            <SelectTrigger className="w-2/3 cursor-pointer">
               <SelectValue placeholder="Selecciona un color" />
             </SelectTrigger>
             <SelectContent>
@@ -93,9 +95,11 @@ export default function GestionNegocio() {
               <SelectItem value="bg-gray-800">Gris Oscuro</SelectItem>
             </SelectContent>
           </Select>
+          
         </div>
 
-        <div className="flex flex-col items-center gap-4 mb-6">
+        {/* Switch de Imagen */}
+        <div className="flex flex-col items-start gap-4 mb-6">
           <label className="text-md font-semibold mb-1">Logo actual:</label>
           <div className="flex flex-col sm:flex-row items-center gap-4">
             <Image src={logoUrl} alt="Logo actual" width={60} height={60} />

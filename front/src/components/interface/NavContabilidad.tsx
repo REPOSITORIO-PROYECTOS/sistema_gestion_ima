@@ -6,7 +6,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 
 function NavContabilidad({ links }: { links: { href: string; name: string }[] }) {
 
-  const pathname = usePathname()
+  const pathname = usePathname() 
 
   return (
 
@@ -33,12 +33,12 @@ function NavContabilidad({ links }: { links: { href: string; name: string }[] })
       </NavigationMenu>
 
       {/* Nav en menú dropdown para mobile */}
-      <div className="md:hidden mb-4">
+      <div className="md:hidden my-4">
         <Select onValueChange={(value) => (window.location.href = value)}>
-          <SelectTrigger className="w-full">
+          <SelectTrigger>
             <SelectValue placeholder="Elija que seccion desea ver..." />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent >
             {links.map(({ href, name }) => (
               <SelectItem key={href} value={href}>
                 {name}

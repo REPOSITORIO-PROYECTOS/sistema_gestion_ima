@@ -103,11 +103,11 @@ export function DataTable<TData, TValue>({
                 />
 
                 {/* Botones para sincronización */}
-                <div className="flex gap-2 md:flex-row flex-col">
+                <div className="flex gap-2 w-full md:w-1/3 md:flex-row flex-col">
                     <Button variant="outline" onClick={handleSyncArticulos}>Sincronizar Artículos</Button>
                 </div>
 
-                <div className="flex justify-center items-center w-1/2 p-4 text-sm bg-yellow-100 border border-yellow-300 rounded-lg text-yellow-800">
+                <div className="flex justify-center items-center w-full md:w-1/2 p-4 text-sm bg-yellow-100 border border-yellow-300 rounded-lg text-yellow-800">
                     Para agregar nuevos productos dirigirse a la sección de contabilidad / proveedores.
                 </div>
 
