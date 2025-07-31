@@ -1,18 +1,18 @@
 'use client';
 
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem
-} from "@/components/ui/select"
 import { useFacturacionStore } from '@/lib/facturacionStore';
 import * as Switch from '@radix-ui/react-switch';
 import { useThemeStore } from '@/lib/themeStore'
 import { Input } from "@/components/ui/input";
 import Image from "next/image"
 import { useRef } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function GestionNegocio() {
 
@@ -28,7 +28,11 @@ export default function GestionNegocio() {
     toggleRecargoBancario,
     recargoBancario,
     setRecargoBancario,
+    formatoComprobante, 
+    setFormatoComprobante
   } = useFacturacionStore();
+
+  const formatosDisponibles = ["PDF", "Ticket"]; // escalable a mas formatos..
 
   // Handler para cambiar el LOGO de la empresa
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -60,14 +64,45 @@ export default function GestionNegocio() {
         <p className="text-muted-foreground">Administrá los usuarios de tu aplicación.</p>
       </div>
 
+      <hr className="h-0.25 my-4" />  {/* --------------------------------------------------------------- */}
+
+      {/* Header para método de pago y recargos*/}
+      <div className="space-y-2">
+        <h2 className="text-xl font-bold text-green-950">Configuración sobre métodos de pago</h2>
+        <p className="text-muted-foreground">Administrá el tipo de ticket para imprimir.</p>
+      </div>
+
+      {/* Toggle de Facturación en Caja */}
+      <div>
+        <label className="text-sm font-medium text-gray-700 mb-1 block">Formato del Comprobante</label>
+        <Select
+          value={formatoComprobante}
+          onValueChange={setFormatoComprobante}
+        >
+          <SelectTrigger className="w-[180px] cursor-pointer">
+            <SelectValue placeholder="Seleccionar formato" />
+          </SelectTrigger>
+          <SelectContent>
+            {formatosDisponibles.map((formato) => (
+              <SelectItem key={formato} value={formato}>
+                {formato}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* Toggle de Facturación en Caja */}
       <div className="flex flex-col sm:flex-row items-center gap-4">
         <Switch.Root
+          disabled={formatoComprobante !== "PDF"}
           checked={habilitarExtras}
           onCheckedChange={toggleExtras}
           className={`relative w-16 h-8 rounded-full ${
             habilitarExtras ? "bg-green-900" : "bg-gray-300"
-          } cursor-pointer transition-colors`}
+          } cursor-pointer transition-colors ${
+            formatoComprobante !== "PDF" ? "opacity-50 cursor-not-allowed" : ""
+          }`}
         >
           <Switch.Thumb
             className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-300 ${
@@ -82,6 +117,12 @@ export default function GestionNegocio() {
       </div>
 
       <hr className="h-0.25 my-4" />  {/* --------------------------------------------------------------- */}
+
+      {/* Header para método de pago y recargos*/}
+      <div className="space-y-2">
+        <h2 className="text-xl font-bold text-green-950">Recargos asociados a métodos de pago.</h2>
+        <p className="text-muted-foreground">Desde acá podes asignar recargos a las opciones de transferencia o pago bancario.</p>
+      </div>
 
       {/* Toggle de Recargo Transferencia */}
       <div className="flex flex-col gap-2">
@@ -159,14 +200,14 @@ export default function GestionNegocio() {
 
       <hr className="h-0.25 my-4" />  {/* --------------------------------------------------------------- */}
 
-      {/* Header para personalización */}
-      <div className="space-y-2">
-        <h2 className="text-2xl font-bold text-green-950">Configuración de la Apariencia</h2>
-        <p className="text-muted-foreground">Administrá la apariencia de tu aplicación.</p>
-      </div>
-
-      {/* Configuración de Negocios */}
+      {/* Configuración de Negocios - UI */}
       <div className="flex flex-col items-start gap-8 p-4">
+
+        {/* Header para personalización */}
+        <div className="space-y-2">
+          <h2 className="text-xl font-bold text-green-950">Configuración de la Apariencia.</h2>
+          <p className="text-muted-foreground">Administrá la apariencia de tu aplicación.</p>
+        </div>
 
         {/* Color del Nav */}
         <div className="flex flex-col gap-2">

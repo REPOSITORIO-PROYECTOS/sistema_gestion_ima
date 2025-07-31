@@ -16,14 +16,9 @@ export interface MovimientoAPI {
   monto: number;
   metodo_pago?: string;
   fecha_hora: string;
+  facturado: boolean;
   venta?: {
-    id: number;
     facturada: boolean;
-    datos_factura: null;
-    cliente: {
-      id: number;
-      nombre_razon_social: string;
-    };
   };
 }
 

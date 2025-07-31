@@ -83,53 +83,52 @@ function Login() {
   }
 
   return (
-    <div className="flex flex-col h-screen justify-center items-center gap-10 bg-emerald-600 px-6 py-8 md:h-screen">
-      <Image src="/logo.png" alt="Swing Jugos" width={80} height={80} />
+    <div className="flex flex-col h-screen justify-center items-center gap-10 bg-sky-700 px-8 py-8 md:h-screen">
+      
+      <Image src="/logo_software.png" alt="Swing Jugos" width={80} height={80} />
 
-      <form onSubmit={handleLogin} className="form-login bg-amber-500 shadow-2xl flex flex-col items-center justify-center p-8 gap-10 border-3 border-orange-700 rounded-4xl md:w-1/3">
+      <form onSubmit={handleLogin} className="w-[95%] sm:w-1/2 lg:w-1/3 form-login bg-slate-100 shadow-2xl flex flex-col items-center justify-center p-10 gap-10 rounded-4xl">
+        
         {/* Usuario */}
-        <div className="flex flex-col gap-1">
-          <label htmlFor="username" className="text-white">Usuario</label>
+        <div className="flex flex-col gap-1 relative">
+          <label htmlFor="username" className="text-sky-800">Usuario</label>
           <input
             id="username"
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="border !border-white text-white bg-transparent px-3 py-2 rounded focus:!outline-none focus:!ring-0 focus:!border-white hover:!border-white"
+            className="border !border-sky-800 text-sky-800 bg-transparent px-3 py-2 rounded w-full focus:!outline-none focus:!ring-0 focus:!border-sky-800"
           />
         </div>
 
         {/* Contraseña */}
         <div className="flex flex-col gap-1 relative">
-          <label htmlFor="password" className="text-white">Contraseña</label>
+          <label htmlFor="password" className="text-sky-800">Contraseña</label>
           <input
             id="password"
             type={showPassword ? "text" : "password"}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="border !border-white text-white bg-transparent px-3 py-2 rounded w-full pr-10"
+            className="border !border-sky-800 text-sky-800 bg-transparent px-3 py-2 rounded w-full pr-10"
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-[41px] text-white cursor-pointer"
+            className="absolute right-3 top-[41px] text-sky-800 cursor-pointer"
           >
             {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
           </button>
         </div>
 
         {/* Submit */}
-        <div className="w-full flex flex-col items-center gap-2">
-          <button
-            type="submit"
-            disabled={loading}
-            className={`flex justify-center items-center p-2 w-1/2 text-white border-2 border-white bg-amber-700 rounded-xl cursor-pointer transition hover:bg-amber-800 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            {loading ? 'Ingresando...' : 'Ingresar'}
-          </button>
-        </div>
-
-        <a href="#" className="text-white font-semibold hover:text-amber-900 transition">¿Olvidaste tu contraseña?</a>
+        <button
+          type="submit"
+          disabled={loading}
+          className={`flex w-4/5 sm:max-w-1/2 sm:w-1/2 justify-center items-center px-4 py-3 text-white border-2 border-white bg-blue-700 rounded-xl cursor-pointer transition hover:bg-sky-800 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+        >
+          {loading ? 'Ingresando...' : 'Ingresar'}
+        </button>
+ 
       </form>
     </div>
   )

@@ -6,7 +6,6 @@ interface FacturacionStore {
   toggleExtras: () => void;
   setHabilitarExtras: (val: boolean) => void;
 
-  // Nuevo estado para recargos
   recargoTransferenciaActivo: boolean;
   toggleRecargoTransferencia: () => void;
   recargoTransferencia: number;
@@ -16,6 +15,10 @@ interface FacturacionStore {
   toggleRecargoBancario: () => void;
   recargoBancario: number;
   setRecargoBancario: (val: number) => void;
+
+  /** NUEVO: formato de comprobante */
+  formatoComprobante: string;
+  setFormatoComprobante: (val: string) => void;
 }
 
 export const useFacturacionStore = create<FacturacionStore>()(
@@ -37,6 +40,10 @@ export const useFacturacionStore = create<FacturacionStore>()(
         set((state) => ({ recargoBancarioActivo: !state.recargoBancarioActivo })),
       recargoBancario: 0,
       setRecargoBancario: (val) => set({ recargoBancario: val }),
+
+      formatoComprobante: "ticket", 
+      setFormatoComprobante: (val) => set({ formatoComprobante: val }),
+
     }),
     {
       name: 'facturacion-storage',

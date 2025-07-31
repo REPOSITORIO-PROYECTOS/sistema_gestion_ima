@@ -31,13 +31,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { MovimientoAPI } from "./columns";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
 }
 
-export function DataTable<TData, TValue>({
+export function DataTable<TData extends MovimientoAPI, TValue>({
   columns,
   data,
 }: DataTableProps<TData, TValue>) {
@@ -47,23 +48,27 @@ export function DataTable<TData, TValue>({
     const [facturadoFilter, setFacturadoFilter] = useState("all");
     const [rowSelection, setRowSelection] = useState({});
 
-    const table = useReactTable({
+    const table = useReactTable<TData>({
         data,
         columns,
         getCoreRowModel: getCoreRowModel(),
         getPaginationRowModel: getPaginationRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
-        enableRowSelection: true, 
+        enableRowSelection: (row) => {
+            const tipo = row.original.tipo;
+            const facturada = row.original.venta?.facturada;
+            return !(tipo === "EGRESO" || facturada === true);
+        },
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
-        onRowSelectionChange: setRowSelection, 
+        onRowSelectionChange: setRowSelection,
         state: {
             sorting,
             columnFilters,
-            rowSelection, 
+            rowSelection,
         },
-    });
+        });
 
     return (
 
@@ -74,7 +79,6 @@ export function DataTable<TData, TValue>({
 
                 {/* Inputs de Filtrado */}
                 <div className="flex flex-col-reverse md:flex-row justify-between items-center gap-2 w-full">
-
 
                     <div className="flex flex-col md:flex-row w-full md:w-2/3 gap-4">
                         {/* Input de Búsqueda por Producto */}

@@ -25,6 +25,7 @@ export default function ContabilidadPage() {
         if (!res.ok) throw new Error("Error al obtener los movimientos");
         const json = await res.json();
         setData(json);
+        console.log(json)
 
       } catch (err) {
         console.error("Error:", err);
