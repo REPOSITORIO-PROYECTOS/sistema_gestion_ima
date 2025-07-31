@@ -89,48 +89,28 @@ export function DataTable<TData, TValue>({
 
         <div>
 
-            {/* Inputs de Filtrado + Creación */}
-            <div className="flex flex-col md:flex-row-reverse justify-between gap-2 pb-4">
+            {/* Headers de la Tabla */}
+            <div className="flex flex-col md:flex-row justify-between items-center gap-2 pb-4">
+
+                {/* Input de Búsqueda por Producto */}
+                <Input
+                    placeholder="Filtrar por producto"
+                    value={(table.getColumn("descripcion")?.getFilterValue() as string) ?? ""}
+                    onChange={(event) =>
+                        table.getColumn("descripcion")?.setFilterValue(event.target.value)
+                    }
+                    className="w-full md:max-w-1/5"
+                />
 
                 {/* Botones para sincronización */}
                 <div className="flex gap-2 md:flex-row flex-col">
                     <Button variant="outline" onClick={handleSyncArticulos}>Sincronizar Artículos</Button>
                 </div>
 
-                {/* Inputs de Filtrado */}
-                <div className="flex flex-row justify-between items-center md:justify-start gap-2 w-full">
-
-                    {/* Input de Búsqueda por Producto */}
-                    <Input
-                        placeholder="Filtrar por producto"
-                        value={(table.getColumn("descripcion")?.getFilterValue() as string) ?? ""}
-                        onChange={(event) =>
-                            table.getColumn("descripcion")?.setFilterValue(event.target.value)
-                        }
-                        className="w-full md:max-w-1/4"
-                    />
-
-                    {/* Input de Filtrado por Ubicación */}
-                    {/* <Select value={currentStatus} onValueChange={(value) => {
-                    setCurrentStatus(value)
-                    table.getColumn("ubicacion")?.setFilterValue(value === "all" ? undefined : value)}}>
-
-                        <SelectTrigger className="w-1/2 md:max-w-1/4 cursor-pointer">
-                            <SelectValue placeholder="Ubicación"/>
-                        </SelectTrigger>
-
-                        <SelectContent>
-                            <SelectGroup>
-                                <SelectLabel>Ubicación</SelectLabel>
-                                <SelectItem value="all">Todas</SelectItem>
-                                <SelectItem value="Depósito A">Depósito A</SelectItem>
-                                <SelectItem value="Depósito B">Depósito B</SelectItem>
-                                <SelectItem value="Sucursal Centro">Sucursal Centro</SelectItem>
-                                <SelectItem value="Sucursal Norte">Sucursal Norte</SelectItem>
-                            </SelectGroup>
-                        </SelectContent>
-                    </Select> */}
+                <div className="flex justify-center items-center w-1/2 p-4 text-sm bg-yellow-100 border border-yellow-300 rounded-lg text-yellow-800">
+                    Para agregar nuevos productos dirigirse a la sección de contabilidad / proveedores.
                 </div>
+
             </div>
 
             {/* Tabla */}
