@@ -358,7 +358,7 @@ function FormVentas({
         }
       })(),
 
-      quiere_factura: true,
+      quiere_factura: true,     // si marca factura en tipoFacturacion true, si no false
       
       tipo_comprobante_solicitado: tipoFacturacion.toLowerCase(),
       articulos_vendidos: productosVendidos.map((p) => {

@@ -16,7 +16,7 @@ export default function ContabilidadPage() {
   useEffect(() => {
     const fetchMovimientos = async () => {
       try {
-        const res = await fetch("https://sistema-ima.sistemataup.online/caja/movimientos/todos", {
+        const res = await fetch("https://sistema-ima.sistemataup.online/api/caja/movimientos/todos", {
           headers: {
             "Authorization": `Bearer ${token}`,
           },
