@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Remito Venta N° {{ venta.id }}</title>
+    <title>Remito Venta N° {{ venta.id | default('S/N') }}</title>
     <style>
         body { font-family: Helvetica, Arial, sans-serif; font-size: 12px; }
         .container { width: 180mm; margin: auto; }
@@ -29,7 +29,7 @@
             </div>
             <div class="comprobante">
                 <h2>REMITO</h2>
-                <div>N°: <strong>{{ '%08d' % venta.id }}</strong></div>
+                <div>N°: <strong>{{ venta.id | default('S/N') }}</strong></div>
                 <div>Fecha: <strong>{{ venta.fecha.strftime('%d/%m/%Y') }}</strong></div>
             </div>
         </div>

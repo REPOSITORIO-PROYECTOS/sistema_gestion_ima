@@ -61,10 +61,11 @@ def generar_comprobante_stateless(data: GenerarComprobanteRequest) -> bytes:
 
     contexto = {
         "data": data,
+        "venta": data.transaccion, # <-- La clave es añadir esto
         "afip": datos_afip,
         "AFIP_CUIT": AFIP_CUIT,
-        "fecha_emision": datetime.now() # Añadimos la fecha actual al contexto
-    }
+        "fecha_emision": datetime.now() 
+        }
     
     try:
         env = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
