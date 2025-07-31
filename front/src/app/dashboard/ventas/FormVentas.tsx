@@ -365,7 +365,7 @@ function FormVentas({
           case "factura":
             return "Factura";
           case "comprobante":
-            return "Comprobante";
+            return "Recibo";
           case "remito":
             return "Remito";
           case "presupuesto":

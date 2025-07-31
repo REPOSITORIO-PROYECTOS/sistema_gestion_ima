@@ -75,12 +75,12 @@ export default function EgresosForm() {
             setIsLoading(true);
 
             const response = await fetch("https://sistema-ima.sistemataup.online/api/caja/egresos", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${token}`,
-            },
-            body: JSON.stringify(payload),
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`,
+                },
+                body: JSON.stringify(payload),
             });
 
             if (!response.ok) {
@@ -88,7 +88,6 @@ export default function EgresosForm() {
             }
 
             // Éxito
-            alert("Egreso de dinero registrado correctamente.");
             toast.success("Egreso de dinero registrado correctamente!")
 
             // Cierra Modal
