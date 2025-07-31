@@ -75,16 +75,42 @@ export function DataTable<TData, TValue>({
                 {/* Inputs de Filtrado */}
                 <div className="flex flex-col-reverse md:flex-row justify-between items-center gap-2 w-full">
 
-                    {/* Input de Búsqueda por Producto */}
-                    <Input
-                        placeholder="Filtrar por tipo"
-                        value={(table.getColumn("tipo")?.getFilterValue() as string) ?? ""}
-                        onChange={(event) =>
-                            table.getColumn("tipo")?.setFilterValue(event.target.value)
-                        }
-                        className="w-full md:w-1/4"
-                    />
 
+                    <div className="flex flex-col md:flex-row w-full md:w-2/3 gap-4">
+                        {/* Input de Búsqueda por Producto */}
+                        <Input
+                            placeholder="Filtrar por tipo"
+                            value={(table.getColumn("tipo")?.getFilterValue() as string) ?? ""}
+                            onChange={(event) =>
+                                table.getColumn("tipo")?.setFilterValue(event.target.value)
+                            }
+                            className="w-full md:w-1/4"
+                        />
+
+                        {/* Dropdown de si esta facturado o no */}
+                        <Select
+                            value={facturadoFilter}
+                            onValueChange={(value) => {
+                                setFacturadoFilter(value);
+                                table.getColumn("facturado")?.setFilterValue(
+                                    value === "all" ? undefined : value
+                                );
+                            }}
+                            >
+                            <SelectTrigger className="w-full md:w-1/4 cursor-pointer">
+                                <SelectValue placeholder="Facturado" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectGroup>
+                                <SelectLabel>Facturado</SelectLabel>
+                                <SelectItem value="all">Todos</SelectItem>
+                                <SelectItem value="true">Sí</SelectItem>
+                                <SelectItem value="false">No</SelectItem>
+                                </SelectGroup>
+                            </SelectContent>
+                        </Select>
+                    </div>
+            
                     {/* Facturador Global */}
                     <Button
                         className="w-full md:w-1/4"
@@ -97,29 +123,6 @@ export function DataTable<TData, TValue>({
                     >
                         Facturar Lote
                     </Button>
-
-                    {/* Dropdown de si esta facturado o no */}
-                    <Select
-                        value={facturadoFilter}
-                        onValueChange={(value) => {
-                            setFacturadoFilter(value);
-                            table.getColumn("facturado")?.setFilterValue(
-                                value === "all" ? undefined : value
-                            );
-                        }}
-                        >
-                        <SelectTrigger className="w-full md:w-1/4 cursor-pointer">
-                            <SelectValue placeholder="Facturado" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectGroup>
-                            <SelectLabel>Facturado</SelectLabel>
-                            <SelectItem value="all">Todos</SelectItem>
-                            <SelectItem value="true">Sí</SelectItem>
-                            <SelectItem value="false">No</SelectItem>
-                            </SelectGroup>
-                        </SelectContent>
-                    </Select>
                 </div>
             </div>
 
