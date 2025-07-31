@@ -357,10 +357,8 @@ function FormVentas({
             return "Otro";
         }
       })(),
-
-      quiere_factura: true,     // si marca factura en tipoFacturacion true, si no false
-      
       tipo_comprobante_solicitado: tipoFacturacion.toLowerCase(),
+      quiere_factura: tipoFacturacion === "factura",   // si marca factura en tipoFacturacion true, si no false
       articulos_vendidos: productosVendidos.map((p) => {
         const productoReal = productos.find(prod => prod.nombre === p.tipo);
         return {
@@ -439,8 +437,6 @@ function FormVentas({
                 observaciones: observaciones || ""
               }
             };
-
-            /* console.log(req) */
 
             const response = await fetch("https://sistema-ima.sistemataup.online/api/comprobantes/generar", {
               method: "POST",

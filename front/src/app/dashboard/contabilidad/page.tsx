@@ -40,17 +40,14 @@ export default function ContabilidadPage() {
   }, [token]);
 
   return (
-    <div className="flex flex-col p-4 gap-6">
-      <div>
-        <h1 className="text-3xl font-semibold">Sección de Contabilidad</h1>
-        <p className="text-gray-600 mt-1">Historial de movimientos.</p>
-      </div>
+    <div className="flex flex-col gap-6">
 
       {loading ? (
         <p>Cargando movimientos...</p>
       ) : (
         <DataTable columns={columns} data={data} />
       )}
+      
     </div>
   );
 }

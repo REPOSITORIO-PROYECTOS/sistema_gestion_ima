@@ -7,6 +7,7 @@ import { columns } from "./columns";
 import type { ArqueoCaja } from "./columns";
 
 export default function ArqueoCajaPage() {
+  
   const token = useAuthStore((state) => state.token);
   const [data, setData] = useState<ArqueoCaja[]>([]);
   const [loading, setLoading] = useState(true);

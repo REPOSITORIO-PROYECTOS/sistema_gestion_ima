@@ -10,7 +10,7 @@ function NavContabilidad({ links }: { links: { href: string; name: string }[] })
 
   return (
 
-    <nav className="w-full">
+    <nav className='p-4'>
 
       {/* Nav en escritorio */}
       <NavigationMenu className="hidden md:flex">
