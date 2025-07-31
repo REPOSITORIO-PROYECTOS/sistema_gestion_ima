@@ -38,15 +38,6 @@ def obtener_mi_configuracion(
     config = configuracion_manager.obtener_configuracion_empresa(db, current_user.id_empresa)
     return config
 
-@router.patch("/mi-empresa", response_model=ConfiguracionResponse)
-def actualizar_mi_configuracion(
-    req: ConfiguracionUpdate,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(obtener_usuario_actual)
-):
-    """Actualiza los datos de configuración de la empresa del usuario."""
-    config_actualizada = configuracion_manager.actualizar_configuracion_empresa(db, current_user.id_empresa, req)
-    return config_actualizada
 
 @router.post("/upload-logo", response_model=RespuestaGenerica)
 async def subir_logo_empresa(
