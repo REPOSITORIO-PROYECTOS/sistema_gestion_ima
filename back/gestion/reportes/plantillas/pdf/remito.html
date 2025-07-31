@@ -30,7 +30,7 @@
             <div class="comprobante">
                 <h2>REMITO</h2>
                 <div>N°: <strong>{{ venta.id | default('S/N') }}</strong></div>
-                <div>Fecha: <strong>{{ venta.fecha.strftime('%d/%m/%Y') }}</strong></div>
+                <div>Fecha: <strong>{{ fecha_emision | date }}</strong></div>
             </div>
         </div>
         <div class="cliente">
