@@ -16,9 +16,18 @@ import { useRef } from "react";
 
 export default function GestionNegocio() {
 
-  const { habilitarExtras, toggleExtras } = useFacturacionStore();
   const { setNavbarColor, setLogoUrl, navbarColor, logoUrl } = useThemeStore()
+    const {
+    habilitarExtras,
+    toggleExtras,
+    recargoActivo,
+    toggleRecargo,
+    recargoTransferencia,
+    setRecargoTransferencia,
+  } = useFacturacionStore();
 
+
+  // Handler para cambiar el LOGO de la empresa
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -50,10 +59,6 @@ export default function GestionNegocio() {
 
       {/* Toggle de Facturación en Caja */}
       <div className="flex flex-col sm:flex-row items-center gap-4">
-        <h3 className="text-lg font-semibold text-green-950">
-          Habilitar Remito / Presupuesto
-        </h3>
-
         <Switch.Root
           checked={habilitarExtras}
           onCheckedChange={toggleExtras}
@@ -67,9 +72,65 @@ export default function GestionNegocio() {
             }`}
           />
         </Switch.Root>
+
+        <h3 className="text-lg font-semibold text-green-950">
+          Habilitar Remito / Presupuesto
+        </h3>
       </div>
 
-      <hr className="h-0.25 my-4" />
+      <hr className="h-0.25 my-4" />  {/* --------------------------------------------------------------- */}
+
+      {/* Toggle de Recargo y Input */}
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-col sm:flex-row items-center gap-4">
+          <Switch.Root
+            checked={recargoActivo}
+            onCheckedChange={toggleRecargo}
+            className={`relative w-16 h-8 rounded-full ${
+              recargoActivo ? "bg-green-900" : "bg-gray-300"
+            } cursor-pointer transition-colors`}
+          >
+            <Switch.Thumb
+              className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-300 ${
+                recargoActivo ? "translate-x-8" : "translate-x-0"
+              }`}
+            />
+          </Switch.Root>
+
+          <h3 className="text-lg font-semibold text-green-950">
+            Habilitar Recargo por Transferencia o Bancario
+          </h3>
+        </div>
+
+        {/* Input para el porcentaje */}
+        <Input
+          type="number"
+          placeholder="Ej: 10"
+          disabled={!recargoActivo}
+          value={recargoTransferencia}
+          onChange={(e) => {
+            const rawValue = e.target.value;
+
+            // Si el campo está vacío, se permite borrar todo
+            if (rawValue === "") {
+              setRecargoTransferencia(0); // o podrías usar un estado auxiliar para el raw input si preferís mantenerlo vacío
+              return;
+            }
+
+            const val = Number(rawValue);
+
+            if (val >= 0 && val <= 100) {
+              setRecargoTransferencia(val);
+            }
+          }}
+          className="w-1/3 mt-2"
+        />
+        <span className="text-sm text-muted-foreground ml-1">
+          Ingresá el % de recargo que se aplicará si el método de pago es transferencia o bancario.
+        </span>
+      </div>
+
+      <hr className="h-0.25 my-4" />  {/* --------------------------------------------------------------- */}
 
       {/* Header para personalización */}
       <div className="space-y-2">

@@ -5,6 +5,12 @@ interface FacturacionStore {
   habilitarExtras: boolean;
   toggleExtras: () => void;
   setHabilitarExtras: (val: boolean) => void;
+
+  // Nuevo estado para recargos
+  recargoActivo: boolean;
+  toggleRecargo: () => void;
+  recargoTransferencia: number;
+  setRecargoTransferencia: (val: number) => void;
 }
 
 export const useFacturacionStore = create<FacturacionStore>()(
@@ -14,9 +20,15 @@ export const useFacturacionStore = create<FacturacionStore>()(
       toggleExtras: () =>
         set((state) => ({ habilitarExtras: !state.habilitarExtras })),
       setHabilitarExtras: (val) => set({ habilitarExtras: val }),
+
+      recargoActivo: false,
+      toggleRecargo: () =>
+        set((state) => ({ recargoActivo: !state.recargoActivo })),
+      recargoTransferencia: 0,
+      setRecargoTransferencia: (val) => set({ recargoTransferencia: val }),
     }),
     {
-      name: 'facturacion-storage', 
+      name: 'facturacion-storage',
     }
   )
 );

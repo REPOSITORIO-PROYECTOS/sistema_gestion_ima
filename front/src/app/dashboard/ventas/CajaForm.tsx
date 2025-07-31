@@ -17,10 +17,10 @@ interface CajaFormProps {
 
 export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
   
+  const { cajaAbierta, setCajaAbierta, clearCaja } = useCajaStore();
   const token = useAuthStore((state) => state.token);
   const usuario = useAuthStore((state) => state.usuario);
-
-  const { cajaAbierta, setCajaAbierta, clearCaja } = useCajaStore();
+  
   const [nombreUsuario, setNombreUsuario] = useState(usuario?.nombre_usuario || "");
   const [llave, setLlave] = useState("");
   const [isLoading, setIsLoading] = useState(false);

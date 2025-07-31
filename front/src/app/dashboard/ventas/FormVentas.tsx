@@ -115,7 +115,6 @@ function FormVentas({
   const [descuentoSobreTotal, setDescuentoSobreTotal] = useState(0);
   const totalConDescuento = Math.round(totalVenta * (1 - descuentoSobreTotal / 100));
 
-
   // Input de Busqueda para Productos
   /* const [searchProducto, setSearchProducto] = useState(""); */
   const [open, setOpen] = useState(false);
@@ -129,16 +128,23 @@ function FormVentas({
   const [vuelto, setVuelto] = useState<number>(0);
   const [inputEfectivo, setInputEfectivo] = useState(""); 
 
-
   // Estado para las observaciones de la venta
   const [observaciones, setObservaciones] = useState("")
 
   // Estado animación para spinner de carga submit
   const [isLoading, setIsLoading] = useState(false);
 
-  // Estado para la opción de facturación
+  // Estado para la opción de facturación - habilitaciones y recargos de la facturacionStore
   const { habilitarExtras } = useFacturacionStore();  
   const [tipoFacturacion, setTipoFacturacion] = useState("factura");
+  const { recargoActivo, recargoTransferencia } = useFacturacionStore();
+
+  const tieneRecargo = recargoActivo && (metodoPago === "transferencia" || metodoPago === "bancario");
+
+  const totalConRecargo = tieneRecargo
+    ? totalConDescuento + (totalConDescuento * recargoTransferencia / 100)
+    : totalConDescuento;
+
   
 
   /* Hooks */ /* -------------------------------------------------------------- */
@@ -968,6 +974,14 @@ function FormVentas({
           </p>
           <p className="text-2xl font-bold text-green-900">
             <span className="font-semibold">Total con descuento:</span> ${totalConDescuento}
+          </p>
+          {tieneRecargo && (
+            <p className="text-xl text-red-500">
+              <span className="font-semibold">Recargo por método de pago:</span> {recargoTransferencia}% (${(totalConDescuento * recargoTransferencia / 100).toFixed(2)})
+            </p>
+          )}
+          <p className="text-2xl font-bold text-green-900">
+            <span className="font-semibold">Total Final:</span> ${totalConRecargo.toFixed(2)}
           </p>
         </div>
 
