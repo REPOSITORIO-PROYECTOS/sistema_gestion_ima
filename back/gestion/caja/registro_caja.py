@@ -118,13 +118,8 @@ def registrar_venta_y_movimiento_caja(
     # Esta parte ahora se ejecuta DENTRO de la misma función, antes del commit.
     # El router la convertirá en una tarea en segundo plano.
     try:
-        print("[DRIVE] Intentando registrar movimiento en Google Sheets...")
-        # Obtenemos la URL de Sheets de la configuración de la empresa
-        link_sheets = config_empresa.link_google_sheets if config_empresa else None
-        
-        if link_sheets:
-            google_sheet_id = link_sheets.split('/d/')[1].split('/')[0]
-            cliente_sheets_data = obtener_cliente_por_id(id_cliente)
+            print("[DRIVE] Intentando registrar movimiento en Google Sheets...")
+            cliente_sheets_data = obtener_cliente_por_id(id_cliente) # Asumo que esta función devuelve un dict
 
             if cliente_sheets_data:
                 datos_para_sheets = {
@@ -134,21 +129,14 @@ def registrar_venta_y_movimiento_caja(
                     "razon_social": cliente_sheets_data.get("Nombre de Contacto", "N/A"),
                     "Tipo_movimiento": "venta",
                     "descripcion": f"Venta de {len(articulos_vendidos)} artículos",
-                    "monto": total_final_con_recargo, # <-- Usamos el total CON recargo
+                    "monto": total_venta,
                 }
-                
-                # Pasamos el ID dinámico de la hoja al handler
-                if not caller.registrar_movimiento(google_sheet_id, datos_para_sheets):
+                if not caller.registrar_movimiento(datos_para_sheets):
                     print("⚠️ [DRIVE] La función registrar_movimiento devolvió False.")
-                
-                # Convertimos los ArticuloVendido al formato que espera restar_stock
-                articulos_para_sheets = [art.model_dump() for art in articulos_vendidos]
-                if not caller.restar_stock(google_sheet_id, articulos_para_sheets):
+                if not caller.restar_stock(articulos_vendidos):
                     print("⚠️ [DRIVE] Ocurrió un error al intentar actualizar el stock en Google Sheets.")
             else:
-                print(f"⚠️ [DRIVE] No se pudo encontrar el cliente con ID {id_cliente}. No se registrará el movimiento.")
-        else:
-            print(f"ADVERTENCIA: La empresa ID {usuario_actual.id_empresa} no tiene un link de Google Sheets configurado.")
+                print(f"⚠️ [DRIVE] No se pudo encontrar el cliente con ID {id_cliente}. No se registrará el movimiento en Drive.")
 
     except Exception as e_sheets:
         print(f"❌ [DRIVE] Ocurrió un error al intentar registrar en Google Sheets: {e_sheets}")
