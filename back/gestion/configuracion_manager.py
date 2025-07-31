@@ -5,7 +5,7 @@ import shutil
 from fastapi import UploadFile
 from sqlmodel import Session
 from back.modelos import ConfiguracionEmpresa, Usuario
-from back.schemas.configuracion_schemas import ConfiguracionUpdate
+from back.schemas.configuracion_schemas import ConfiguracionUpdate, RecargoData, RecargoUpdate
 
 # Creamos una carpeta 'static/uploads' en la raíz del proyecto si no existe
 UPLOADS_DIR = os.path.join("static", "uploads")
@@ -73,3 +73,48 @@ def actualizar_configuracion_parcial(db: Session, id_empresa: int, data: Configu
     db.commit()
     db.refresh(config_db)
     return config_db
+
+def obtener_recargo_por_tipo(db: Session, id_empresa: int, tipo: str) -> RecargoData:
+    """
+    Obtiene el porcentaje y concepto de un tipo de recargo específico
+    ('transferencia' o 'banco') para una empresa.
+    """
+    config_db = obtener_configuracion_por_id_empresa(db, id_empresa)
+    
+    if tipo == "transferencia":
+        return RecargoData(
+            porcentaje=config_db.recargo_transferencia,
+            concepto=config_db.concepto_recargo_transferencia
+        )
+    elif tipo == "banco":
+        return RecargoData(
+            porcentaje=config_db.recargo_banco,
+            concepto=config_db.concepto_recargo_banco
+        )
+    else:
+        raise ValueError("Tipo de recargo no válido. Debe ser 'transferencia' o 'banco'.")
+
+def actualizar_recargo_por_tipo(db: Session, id_empresa: int, tipo: str, data: RecargoUpdate) -> RecargoData:
+    """
+    Actualiza el porcentaje y/o concepto de un tipo de recargo específico
+    para una empresa.
+    """
+    config_db = obtener_configuracion_por_id_empresa(db, id_empresa)
+
+    if tipo == "transferencia":
+        config_db.recargo_transferencia = data.porcentaje
+        if data.concepto is not None:
+            config_db.concepto_recargo_transferencia = data.concepto
+    elif tipo == "banco":
+        config_db.recargo_banco = data.porcentaje
+        if data.concepto is not None:
+            config_db.concepto_recargo_banco = data.concepto
+    else:
+        raise ValueError("Tipo de recargo no válido. Debe ser 'transferencia' o 'banco'.")
+        
+    db.add(config_db)
+    db.commit()
+    db.refresh(config_db)
+    
+    # Devolvemos los datos actualizados usando la otra función para no repetir código
+    return obtener_recargo_por_tipo(db, id_empresa, tipo)

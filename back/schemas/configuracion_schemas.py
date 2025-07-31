@@ -31,3 +31,13 @@ class ConfiguracionResponse(BaseModel):
 
     class Config:
         from_attributes = True
+        
+class RecargoData(BaseModel):
+    """Schema para devolver la información de un recargo."""
+    porcentaje: float
+    concepto: str
+
+class RecargoUpdate(BaseModel):
+    """Schema para recibir la actualización de un recargo."""
+    porcentaje: float = Field(..., ge=0) # El porcentaje debe ser 0 o mayor
+    concepto: Optional[str] = None # Hacemos el concepto opcional

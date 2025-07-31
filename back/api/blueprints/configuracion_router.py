@@ -13,7 +13,7 @@ from back.schemas.caja_schemas import RespuestaGenerica
 
 # Lógica de negocio y Schemas
 from back.gestion import configuracion_manager
-from back.schemas.configuracion_schemas import ConfiguracionResponse, ConfiguracionUpdate
+from back.schemas.configuracion_schemas import ConfiguracionResponse, ConfiguracionUpdate, RecargoData, RecargoUpdate
 
 router = APIRouter(prefix="/configuracion", tags=["Configuración de Empresa"])
 
@@ -112,3 +112,65 @@ def actualizar_mi_configuracion(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error interno: {e}")
+    
+@router.get(
+    "/mi-empresa/recargo/transferencia",
+    response_model=RecargoData,
+    summary="Obtiene el recargo actual por Transferencia"
+)
+def get_recargo_transferencia(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(obtener_usuario_actual)
+):
+    """Obtiene el recargo por transferencia de la empresa del usuario autenticado."""
+    try:
+        return configuracion_manager.obtener_recargo_por_tipo(db, current_user.id_empresa, "transferencia")
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+@router.patch(
+    "/mi-empresa/recargo/transferencia",
+    response_model=RecargoData,
+    summary="Actualiza el recargo por Transferencia"
+)
+def patch_recargo_transferencia(
+    data: RecargoUpdate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(obtener_usuario_actual)
+):
+    """Actualiza el recargo por transferencia de la empresa del usuario autenticado."""
+    try:
+        return configuracion_manager.actualizar_recargo_por_tipo(db, current_user.id_empresa, "transferencia", data)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+@router.get(
+    "/mi-empresa/recargo/banco",
+    response_model=RecargoData,
+    summary="Obtiene el recargo actual por Pago Bancario"
+)
+def get_recargo_banco(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(obtener_usuario_actual)
+):
+    """Obtiene el recargo por pago bancario de la empresa del usuario autenticado."""
+    try:
+        return configuracion_manager.obtener_recargo_por_tipo(db, current_user.id_empresa, "banco")
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+@router.patch(
+    "/mi-empresa/recargo/banco",
+    response_model=RecargoData,
+    summary="Actualiza el recargo por Pago Bancario"
+)
+def patch_recargo_banco(
+    data: RecargoUpdate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(obtener_usuario_actual)
+):
+    """Actualiza el recargo por pago bancario de la empresa del usuario autenticado."""
+    try:
+        return configuracion_manager.actualizar_recargo_por_tipo(db, current_user.id_empresa, "banco", data)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
