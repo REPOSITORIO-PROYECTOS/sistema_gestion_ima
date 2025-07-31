@@ -19,6 +19,7 @@ import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/lib/authStore'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image';
+import { useThemeStore } from '@/lib/themeStore'
 
 type NavLink = {
   href: string
@@ -34,6 +35,9 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
   const usuario = useAuthStore((state) => state.usuario);
   const [show, setShow] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
+
+  const navbarColor = useThemeStore((state) => state.navbarColor)
+  const logoUrl = useThemeStore((state) => state.logoUrl)
 
   // Oculta NavBar en scroll
   useEffect(() => {
@@ -52,15 +56,13 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
   ? usuario.nombre_usuario.slice(0, 2).toUpperCase()
   : 'US';
 
-
   return (
-
     <nav className={`fixed top-0 z-10 w-full transition-transform duration-300 ${show ? 'translate-y-0' : '-translate-y-full'}`}>
-      <div className="bg-green-800 shadow px-4 py-4 flex justify-between items-center">
+      <div className={`${navbarColor} shadow px-4 py-4 flex justify-between items-center`}>
 
         {/* Logo */}
         <a href="/dashboard" className="text-xl font-bold flex items-center gap-2">
-          <Image src="/logo.png" alt="Swing Jugos" width={60} height={60} />
+          <Image src={logoUrl} alt="Swing Jugos" width={60} height={60} />
         </a>
 
         {/* Menú de secciones - responsivo */}
@@ -107,12 +109,10 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-white">
 
-                {/* Nombre Usuarios */}
                 <DropdownMenuItem className="text-gray-600 cursor-pointer">
                   {usuario?.nombre_usuario}
                 </DropdownMenuItem>
 
-                {/* Panel Usuario */}
                 <DropdownMenuItem 
                   className="text-black cursor-pointer"
                   onClick={() => router.push('/dashboard/panel_usuario')}
@@ -122,7 +122,6 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
 
                 <DropdownMenuSeparator />
 
-                {/* Cerrar Sesión */}
                 <DropdownMenuItem 
                   className="cursor-pointer text-red-600"
                   onClick={() => {
@@ -133,7 +132,6 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                   Cerrar Sesión
                 </DropdownMenuItem>
 
-                {/* Seccion gestion de usuarios */}
                 <DropdownMenuItem 
                   className="cursor-pointer"
                   onClick={() => router.push('/dashboard/gestion_usuarios')}
@@ -141,7 +139,6 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                   Gestión de Usuarios
                 </DropdownMenuItem>
 
-                {/* Gestión de Usarios */}
                 <DropdownMenuItem 
                   className="cursor-pointer"
                   onClick={() => { router.push('/dashboard/gestion_de_negocio'); }}
@@ -163,12 +160,10 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-white">
                 
-                {/* Nombre Usuarios */}
                 <DropdownMenuItem className="text-gray-600 cursor-pointer">
                   {usuario?.nombre_usuario}
                 </DropdownMenuItem>
 
-                {/* Panel Usuario */}
                 <DropdownMenuItem 
                   className="text-black cursor-pointer"
                   onClick={() => router.push('/dashboard/panel_usuario')}
@@ -201,7 +196,6 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
 
                 <DropdownMenuSeparator />
 
-                {/* Cerrar Sesión */}
                 <DropdownMenuItem 
                   className="text-red-600"
                   onClick={() => {
@@ -212,14 +206,12 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                   Cerrar Sesión
                 </DropdownMenuItem>
 
-                {/* Gestión de Usarios */}
                 <DropdownMenuItem 
                   onClick={() => { router.push('/dashboard/gestion_usuarios'); }}
                 >
                   Gestión de Usuarios
                 </DropdownMenuItem>
 
-                {/* Gestión de Usarios */}
                 <DropdownMenuItem 
                   onClick={() => { router.push('/dashboard/gestion_de_negocio'); }}
                 >
@@ -235,5 +227,6 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
     </nav>
   );
 }
+
 
 export default NavBar;
