@@ -4,6 +4,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export interface MovimientoAPI {
   id: number;
@@ -15,10 +16,39 @@ export interface MovimientoAPI {
   monto: number;
   metodo_pago?: string;
   fecha_hora: string;
-  facturado: boolean;
+  venta?: {
+    id: number;
+    facturada: boolean;
+    datos_factura: null;
+    cliente: {
+      id: number;
+      nombre_razon_social: string;
+    };
+  };
 }
 
 export const columns: ColumnDef<MovimientoAPI>[] = [
+  {
+    id: "select",
+    header: ({ table }) => (
+      <Checkbox
+        checked={table.getIsAllPageRowsSelected()}
+        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+        aria-label="Seleccionar todo"
+        className="cursor-pointer"
+      />
+    ),
+    cell: ({ row }) => (
+      <Checkbox
+        checked={row.getIsSelected()}
+        onCheckedChange={(value) => row.toggleSelected(!!value)}
+        aria-label="Seleccionar fila"
+        className="cursor-pointer"
+      />
+    ),
+    enableSorting: false,
+    enableHiding: false,
+  },
   {
     accessorKey: "tipo",
     header: ({ column }) => (
@@ -34,13 +64,13 @@ export const columns: ColumnDef<MovimientoAPI>[] = [
 
       switch (tipo) {
         case "VENTA":
-          customClass = "bg-green-900 text-white";
+          customClass = "ml-6 bg-green-900 text-white";
           break;
         case "APERTURA":
-          customClass = "bg-sky-500 text-white";
+          customClass = "ml-6 bg-sky-500 text-white";
           break;
         case "EGRESO":
-          customClass = "bg-red-800 text-white";
+          customClass = "ml-6 bg-red-800 text-white";
           break;
         default:
           variant = "secondary";
@@ -81,8 +111,25 @@ export const columns: ColumnDef<MovimientoAPI>[] = [
     },
   },
   {
-    accessorKey: "facturado",
+    accessorFn: row => row.venta?.facturada, 
+    id: "facturado",
     header: "Facturado",
-    cell: ({ row }) => (row.getValue("facturado") ? "Sí" : "No"),
-  },
+    filterFn: (row, id, value) => {
+      const rowValue = row.getValue(id);
+      if (value === "true") return rowValue === true;
+      if (value === "false") return rowValue === false;
+      return true;
+    },
+    cell: ({ row }) => {
+      const value = row.getValue("facturado") as boolean;
+      const badgeClass = value ? "ml-6 bg-green-600 text-white" : "ml-6 bg-red-600 text-white";
+      const label = value ? "Sí" : "No";
+
+      return (
+        <Badge className={badgeClass} variant="default">
+          {label}
+        </Badge>
+      );
+    },
+  }
 ];

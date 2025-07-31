@@ -26,8 +26,6 @@ export default function ContabilidadPage() {
         const json = await res.json();
         setData(json);
 
-        console.log(json)
-
       } catch (err) {
         console.error("Error:", err);
 

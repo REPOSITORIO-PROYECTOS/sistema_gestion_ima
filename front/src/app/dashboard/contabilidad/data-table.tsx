@@ -44,21 +44,26 @@ export function DataTable<TData, TValue>({
 
     const [sorting, setSorting] = useState<SortingState>([])
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+    const [facturadoFilter, setFacturadoFilter] = useState("all");
+    const [rowSelection, setRowSelection] = useState({});
 
     const table = useReactTable({
         data,
         columns,
         getCoreRowModel: getCoreRowModel(),
         getPaginationRowModel: getPaginationRowModel(),
-        onSortingChange: setSorting,
         getSortedRowModel: getSortedRowModel(),
-        onColumnFiltersChange: setColumnFilters,
         getFilteredRowModel: getFilteredRowModel(),
+        enableRowSelection: true, 
+        onSortingChange: setSorting,
+        onColumnFiltersChange: setColumnFilters,
+        onRowSelectionChange: setRowSelection, 
         state: {
-        sorting,
-        columnFilters,
+            sorting,
+            columnFilters,
+            rowSelection, 
         },
-    })
+    });
 
     return (
 
@@ -68,7 +73,7 @@ export function DataTable<TData, TValue>({
             <div className="flex flex-col md:flex-row-reverse justify-between gap-2 pb-4">
 
                 {/* Inputs de Filtrado */}
-                <div className="flex flex-row justify-between items-center md:justify-start gap-2 w-full">
+                <div className="flex flex-col-reverse md:flex-row justify-between items-center gap-2 w-full">
 
                     {/* Input de Búsqueda por Producto */}
                     <Input
@@ -77,29 +82,44 @@ export function DataTable<TData, TValue>({
                         onChange={(event) =>
                             table.getColumn("tipo")?.setFilterValue(event.target.value)
                         }
-                        className="w-full md:max-w-1/4"
+                        className="w-full md:w-1/4"
                     />
 
-                    {/* Input de Filtrado por Ubicación */}
-                    {/* <Select value={currentStatus} onValueChange={(value) => {
-                    setCurrentStatus(value)
-                    table.getColumn("ubicacion")?.setFilterValue(value === "all" ? undefined : value)}}>
+                    {/* Facturador Global */}
+                    <Button
+                        className="w-full md:w-1/4"
+                        variant="outline"
+                        onClick={() => {
+                            const selected = table.getSelectedRowModel().rows.map(row => row.original);
+                            console.log("Filas seleccionadas:", selected);
+                            // acá podrías hacer un fetch o lo que necesites
+                        }}
+                    >
+                        Facturar Lote
+                    </Button>
 
-                        <SelectTrigger className="w-1/2 md:max-w-1/4 cursor-pointer">
-                            <SelectValue placeholder="Ubicación"/>
+                    {/* Dropdown de si esta facturado o no */}
+                    <Select
+                        value={facturadoFilter}
+                        onValueChange={(value) => {
+                            setFacturadoFilter(value);
+                            table.getColumn("facturado")?.setFilterValue(
+                                value === "all" ? undefined : value
+                            );
+                        }}
+                        >
+                        <SelectTrigger className="w-full md:w-1/4 cursor-pointer">
+                            <SelectValue placeholder="Facturado" />
                         </SelectTrigger>
-
                         <SelectContent>
                             <SelectGroup>
-                                <SelectLabel>Ubicación</SelectLabel>
-                                <SelectItem value="all">Todas</SelectItem>
-                                <SelectItem value="Depósito A">Depósito A</SelectItem>
-                                <SelectItem value="Depósito B">Depósito B</SelectItem>
-                                <SelectItem value="Sucursal Centro">Sucursal Centro</SelectItem>
-                                <SelectItem value="Sucursal Norte">Sucursal Norte</SelectItem>
+                            <SelectLabel>Facturado</SelectLabel>
+                            <SelectItem value="all">Todos</SelectItem>
+                            <SelectItem value="true">Sí</SelectItem>
+                            <SelectItem value="false">No</SelectItem>
                             </SelectGroup>
                         </SelectContent>
-                    </Select> */}
+                    </Select>
                 </div>
             </div>
 
@@ -112,7 +132,7 @@ export function DataTable<TData, TValue>({
                         <TableRow key={headerGroup.id}>
                         {headerGroup.headers.map((header) => {
                             return (
-                            <TableHead key={header.id}>
+                            <TableHead className="px-4" key={header.id}>
                                 {header.isPlaceholder
                                 ? null
                                 : flexRender(
@@ -135,7 +155,7 @@ export function DataTable<TData, TValue>({
 
                             {/* Filas Tabla */}
                             {row.getVisibleCells().map((cell) => (
-                            <TableCell key={cell.id} className="px-6">
+                            <TableCell key={cell.id} className="px-4">
                                 {flexRender(cell.column.columnDef.cell, cell.getContext())}
                             </TableCell>
                             ))}
