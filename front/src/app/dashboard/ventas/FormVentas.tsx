@@ -137,15 +137,23 @@ function FormVentas({
   // Estado para la opción de facturación - habilitaciones y recargos de la facturacionStore
   const { habilitarExtras } = useFacturacionStore();  
   const [tipoFacturacion, setTipoFacturacion] = useState("factura");
-  const { recargoActivo, recargoTransferencia } = useFacturacionStore();
 
-  const tieneRecargo = recargoActivo && (metodoPago === "transferencia" || metodoPago === "bancario");
+  const {
+    recargoTransferenciaActivo,
+    recargoTransferencia,
+    recargoBancarioActivo,
+    recargoBancario,
+  } = useFacturacionStore();
 
-  const totalConRecargo = tieneRecargo
-    ? totalConDescuento + (totalConDescuento * recargoTransferencia / 100)
-    : totalConDescuento;
+  let totalConRecargo = totalConDescuento;
 
-  
+  if (metodoPago === "transferencia" && recargoTransferenciaActivo) {
+    totalConRecargo += (totalConDescuento * recargoTransferencia) / 100;
+  } else if (metodoPago === "bancario" && recargoBancarioActivo) {
+    totalConRecargo += (totalConDescuento * recargoBancario) / 100;
+  }
+
+
 
   /* Hooks */ /* -------------------------------------------------------------- */
 
@@ -361,9 +369,9 @@ function FormVentas({
           case "efectivo":
             return montoPagado;
           case "transferencia":
-            return "Transferencia";
+            return "TRANSFERENCIA";
           case "bancario":
-            return "Bancario";
+            return "BANCARIO";
           default:
             return "Otro";
         }
@@ -407,7 +415,7 @@ function FormVentas({
             // Payload para el comprobante a imprimir
             const req = {
               formato: "pdf", // o "ticket"
-              tipo: tipoFacturacion.toLowerCase(),
+              tipo: tipoFacturacion.toLowerCase(),                                  
               emisor: {
                 cuit: "30XXXXXXXXX", // CUIT del negocio
                 razon_social: "Empresa Demo Swing",
@@ -975,9 +983,15 @@ function FormVentas({
           <p className="text-2xl font-bold text-green-900">
             <span className="font-semibold">Total con descuento:</span> ${totalConDescuento}
           </p>
-          {tieneRecargo && (
+          {metodoPago === "transferencia" && recargoTransferenciaActivo && (
             <p className="text-xl text-red-500">
-              <span className="font-semibold">Recargo por método de pago:</span> {recargoTransferencia}% (${(totalConDescuento * recargoTransferencia / 100).toFixed(2)})
+              <span className="font-semibold">Recargo por Transferencia:</span> {recargoTransferencia}% (${(totalConDescuento * recargoTransferencia / 100).toFixed(2)})
+            </p>
+          )}
+
+          {metodoPago === "bancario" && recargoBancarioActivo && (
+            <p className="text-xl text-red-500">
+              <span className="font-semibold">Recargo por Bancario:</span> {recargoBancario}% (${(totalConDescuento * recargoBancario / 100).toFixed(2)})
             </p>
           )}
           <p className="text-2xl font-bold text-green-900">
