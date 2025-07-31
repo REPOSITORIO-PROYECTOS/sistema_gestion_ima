@@ -309,26 +309,31 @@ function FormVentas({
       return;
     }
 
-    // Sin identificar el cliente
-    if (!clienteSeleccionado) {
-      toast.error("❌ Debe seleccionar un cliente.");
+    // Sin identificar el cliente registrado
+    if (
+      tipoClienteSeleccionado.id === "1" &&
+      !clienteSeleccionado
+    ) {
+      toast.error("❌ Debe seleccionar un cliente registrado.");
       setIsLoading(false);
       return;
     }
 
-    // Sin el CUIT del consumidor final que esta registrandose en la sesion
+    // Si es Cliente Final y el total supera 200.000, se requiere CUIT manual
     if (
-      clienteSeleccionado.nombre_razon_social.toLowerCase().includes("consumidor final") &&
+      tipoClienteSeleccionado.id === "0" &&
+      totalVenta > 200000 &&
       cuitManual.trim() === ""
     ) {
-      toast.error("❌ Debe ingresar un CUIT para el Consumidor Final.");
+      toast.error("❌ Para montos mayores a $200.000, debe ingresar un CUIT.");
       setIsLoading(false);
       return;
     }
 
     // El CUIT argentino debe tener si o si 11 digitos:
     if (
-      clienteSeleccionado.nombre_razon_social.toLowerCase().includes("consumidor final") &&
+      tipoClienteSeleccionado.id === "0" &&
+      totalVenta > 200000 &&
       !/^\d{11}$/.test(cuitManual.trim())
     ) {
       toast.error("❌ El CUIT debe tener 11 dígitos numéricos.");
@@ -339,20 +344,20 @@ function FormVentas({
     // Payload de Venta
     const ventaPayload = {
       id_cliente:
-        // Si el cliente no esta registrado manda 999, si sí, entonces manda el id de ese cliente
+        // Si el cliente no esta registrado manda 8, si sí, entonces manda el id de ese cliente
         tipoClienteSeleccionado.id === "0"
-          ? 999                                     
-          : clienteSeleccionado?.id ?? 999,               
+          ? 100                                     
+          : clienteSeleccionado?.id ?? 100,               
       metodo_pago: metodoPago.toUpperCase(),
       total_venta: totalVenta,
       paga_con: (() => {
         switch (metodoPago) {
           case "efectivo":
             return montoPagado;
-          case "billeteras":
-            return "Billeteras";
-          case "banco":
-            return "Banco";
+          case "transferencia":
+            return "Transferencia";
+          case "bancario":
+            return "Bancario";
           default:
             return "Otro";
         }
@@ -383,7 +388,7 @@ function FormVentas({
         },
         body: JSON.stringify(ventaPayload)
       });
-
+                  console.log(ventaPayload)
       if (response.ok) {
 
         const data = await response.json();
@@ -446,6 +451,7 @@ function FormVentas({
               },
               body: JSON.stringify(req)
             });
+            console.log(req)
 
             if (!response.ok) {
               const error = await response.json();
@@ -470,7 +476,8 @@ function FormVentas({
             console.error("❌ Error al generar comprobante:", error);
             toast.error("❌ Error al generar comprobante");
           }
-        };
+        };        
+
         await generarComprobante();
 
       } else {
@@ -526,14 +533,22 @@ function FormVentas({
             </Select>
 
             {/* Si es Cliente Final, input para registrar su CUIT */}
-            {tipoClienteSeleccionado.id === "0" && (         
-              <Input
-                type="text"
-                placeholder="Ingresar CUIT del cliente - sin espacios ni puntos"
-                value={cuitManual}
-                onChange={(e) => setCuitManual(e.target.value)}
-                className="mt-1 text-black w-full"
-              />
+            {tipoClienteSeleccionado.id === "0" && (
+              <>
+                <Input
+                  type="text"
+                  placeholder="Ingresar CUIT del cliente - sin espacios ni puntos"
+                  value={cuitManual}
+                  onChange={(e) => setCuitManual(e.target.value)}
+                  className="mt-1 text-black w-full"
+                />
+                
+                {totalVenta > 200000 && (
+                  <p className="text-sm text-red-600 font-semibold mt-1">
+                    ⚠️ Para ventas mayores a $200.000 el CUIT es obligatorio.
+                  </p>
+                )}
+              </>
             )}
 
             {/* Si el tipo de cliente es con CUIT... */}
@@ -759,8 +774,8 @@ function FormVentas({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="efectivo">Efectivo</SelectItem>
-                <SelectItem value="billeteras">Billeteras</SelectItem>
-                <SelectItem value="banco">Banco</SelectItem>
+                <SelectItem value="transferencia">Transferencia</SelectItem>
+                <SelectItem value="bancario">Bancario</SelectItem>
               </SelectContent>
             </Select>
           </div>
