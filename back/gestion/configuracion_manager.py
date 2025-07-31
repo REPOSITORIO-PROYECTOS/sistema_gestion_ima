@@ -63,3 +63,13 @@ def guardar_archivo_configuracion(db: Session, id_empresa: int, file: UploadFile
     db.commit()
     db.refresh(config_db)
     return config_db
+
+def actualizar_configuracion_parcial(db: Session, id_empresa: int, data: ConfiguracionUpdate) -> ConfiguracionEmpresa:
+    config_db = obtener_configuracion_por_id_empresa(db, id_empresa)
+    update_data = data.model_dump(exclude_unset=True) # Solo los campos que envía el frontend
+    for key, value in update_data.items():
+        setattr(config_db, key, value) # Actualiza el campo dinámicamente
+    db.add(config_db)
+    db.commit()
+    db.refresh(config_db)
+    return config_db

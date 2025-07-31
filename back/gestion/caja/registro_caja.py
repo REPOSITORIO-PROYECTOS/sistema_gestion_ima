@@ -1,7 +1,6 @@
 # back/gestion/caja/registro_caja.py
 
 from datetime import datetime
-from mysql.connector import Error
 from sqlmodel import Session, select
 from typing import List, Tuple, Dict, Any
 from datetime import datetime
@@ -9,9 +8,7 @@ from back.gestion.caja.cliente_publico import obtener_cliente_por_id
 # Importa todos tus modelos. Asegúrate de que las rutas sean correctas.
 from back.modelos import Usuario, Venta, VentaDetalle, Articulo, CajaMovimiento, Tercero, CajaSesion, ConfiguracionEmpresa
 from back.schemas.caja_schemas import ArticuloVendido, RegistrarVentaRequest, TipoMovimiento
-from back.utils.mysql_handler import get_db_connection
 from back.utils.tablas_handler import TablasHandler
-from back.gestion.facturacion_afip import generar_factura_para_venta
 
 caller = TablasHandler()
 #ACA TENGO QUE REGISTRAR CUANDO ENTRA Y CUANDO SALE PLATA, MODIFICA LA TABLA MOVIMIENTOS
@@ -46,29 +43,34 @@ def registrar_venta_y_movimiento_caja(
     # --- 2. LÓGICA DE RECARGO DINÁMICO ---
     total_final_con_recargo = total_venta
     monto_recargo = 0.0
-    concepto_recargo = ""
     metodo_pago_upper = metodo_pago.upper()
 
+    # PASO A: Buscamos la configuración específica de la empresa del usuario actual.
+    print(f"Buscando configuración para la Empresa ID: {usuario_actual.id_empresa}...")
     config_empresa = db.get(ConfiguracionEmpresa, usuario_actual.id_empresa)
     if not config_empresa:
-        raise RuntimeError("No se encontró la configuración para la empresa.")
-
-    porcentaje_recargo = 0.0
-    if metodo_pago_upper == "TRANSFERENCIA":
-        porcentaje_recargo = config_empresa.recargo_transferencia
-        concepto_recargo = config_empresa.concepto_recargo_transferencia
-    elif metodo_pago_upper == "BANCARIO":
-        porcentaje_recargo = config_empresa.recargo_banco
-        concepto_recargo = config_empresa.concepto_recargo_banco
+        # Si no hay configuración, no aplicamos recargos. Podríamos lanzar un error si fuera un requisito estricto.
+        print(f"ADVERTENCIA: No se encontró configuración para la empresa ID {usuario_actual.id_empresa}.")
+        porcentaje_recargo = 0.0
+    else:
+        # PASO B: Decidimos qué recargo leer de la base de datos basándonos en el método de pago.
+        porcentaje_recargo = 0.0
+        if metodo_pago_upper == "TRANSFERENCIA":
+            # Leemos el valor que esta empresa específica tiene en su fila de la tabla 'configuracion_empresa'.
+            porcentaje_recargo = config_empresa.recargo_transferencia
+        elif metodo_pago_upper == "BANCARIO":
+            # Leemos el otro valor dinámico de la base de datos.
+            porcentaje_recargo = config_empresa.recargo_banco
     
-    if porcentaje_recargo > 0:
+    # PASO C: Calculamos el recargo solo si el porcentaje obtenido de la base de datos es mayor a cero.
+    if porcentaje_recargo > 0 and total_venta > 0:
         monto_recargo = total_venta * (porcentaje_recargo / 100.0)
         total_final_con_recargo = total_venta + monto_recargo
-        print(f"Recargo del {porcentaje_recargo}% aplicado. Monto: {monto_recargo:.2f}. Total final: {total_final_con_recargo:.2f}")
-
-    # --- 3. CREACIÓN DE OBJETOS PARA LA BASE DE DATOS ---
+        print(f"Recargo DINÁMICO del {porcentaje_recargo}% aplicado. Monto a distribuir: {monto_recargo:.2f}")
+        
+    # --- 3. CREACIÓN DE LA VENTA PRINCIPAL ---
     nueva_venta = Venta(
-        total=total_final_con_recargo, # <-- Usamos el total CON recargo
+        total=total_final_con_recargo, # El total de la Venta SÍ incluye el recargo
         id_cliente=id_cliente,
         id_usuario=usuario_actual.id,
         id_caja_sesion=id_sesion_caja,
@@ -79,38 +81,43 @@ def registrar_venta_y_movimiento_caja(
 
     for item in articulos_vendidos:
         articulo_a_actualizar = db.get(Articulo, item.id_articulo)
+        
+        precio_original_subtotal = item.precio_unitario * item.cantidad
+        precio_unitario_final = item.precio_unitario # Por defecto, el precio no cambia
+        
+        if monto_recargo > 0 and total_venta > 0:
+            # Calculamos la proporción (el "peso") que este ítem tiene en la venta original
+            proporcion_del_item = precio_original_subtotal / total_venta
+            # A este ítem le corresponde esa misma proporción del recargo total
+            recargo_para_este_item = monto_recargo * proporcion_del_item
+            # Distribuimos el recargo del ítem en su precio unitario
+            # Verificamos que la cantidad no sea cero para evitar divisiones por cero
+            if item.cantidad > 0:
+                precio_unitario_final = item.precio_unitario + (recargo_para_este_item / item.cantidad)
+
         detalle = VentaDetalle(
             id_venta=nueva_venta.id,
             id_articulo=item.id_articulo,
             cantidad=item.cantidad,
-            precio_unitario=item.precio_unitario
+            precio_unitario=precio_unitario_final # <-- ¡Guardamos el precio unitario CON el recargo distribuido!
         )
         db.add(detalle)
+        
         articulo_a_actualizar.stock_actual -= item.cantidad
         db.add(articulo_a_actualizar)
 
+    # --- 5. CREACIÓN DEL MOVIMIENTO DE CAJA ÚNICO ---
+    # YA NO SE CREA el movimiento de INGRESO para el recargo.
     movimiento_principal = CajaMovimiento(
         tipo=TipoMovimiento.VENTA.value,
         concepto=f"Venta ID: {nueva_venta.id}",
-        monto=total_final_con_recargo, # <-- Usamos el total CON recargo
+        monto=total_final_con_recargo, # El movimiento de caja es por el total final
         metodo_pago=metodo_pago,
         id_caja_sesion=id_sesion_caja,
         id_usuario=usuario_actual.id,
         id_venta=nueva_venta.id,
     )
     db.add(movimiento_principal)
-
-    if monto_recargo > 0:
-        movimiento_recargo = CajaMovimiento(
-            tipo=TipoMovimiento.INGRESO.value,
-            concepto=concepto_recargo,
-            monto=monto_recargo,
-            metodo_pago=metodo_pago,
-            id_caja_sesion=id_sesion_caja,
-            id_usuario=usuario_actual.id,
-            id_venta=nueva_venta.id
-        )
-        db.add(movimiento_recargo)
         
     db.flush()
 
@@ -129,7 +136,7 @@ def registrar_venta_y_movimiento_caja(
                     "razon_social": cliente_sheets_data.get("Nombre de Contacto", "N/A"),
                     "Tipo_movimiento": "venta",
                     "descripcion": f"Venta de {len(articulos_vendidos)} artículos",
-                    "monto": total_venta,
+                    "monto": total_final_con_recargo,
                 }
                 if not caller.registrar_movimiento(datos_para_sheets):
                     print("⚠️ [DRIVE] La función registrar_movimiento devolvió False.")
