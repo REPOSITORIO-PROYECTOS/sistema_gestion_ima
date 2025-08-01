@@ -138,3 +138,16 @@ def api_eliminar_codigo(
     if not eliminado:
         raise HTTPException(status_code=404, detail=f"Código '{codigo}' no encontrado.")
     return RespuestaGenerica(status="success", message=f"Código '{codigo}' eliminado.")
+
+@router.get("/codigos/buscar/{codigo}", response_model=ArticuloReadConCodigos, summary="Obtener artículo por código de barras")
+def api_buscar_articulo_por_codigo(
+    codigo: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Busca un artículo por su código de barras.
+    """
+    articulo = articulos_manager.obtener_articulo_por_codigo(db, codigo)
+    if not articulo:
+        raise HTTPException(status_code=404, detail=f"Artículo con código '{codigo}' no encontrado.")
+    return articulo
