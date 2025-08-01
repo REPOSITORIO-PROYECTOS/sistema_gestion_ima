@@ -9,7 +9,6 @@ from typing import Dict, List, Union
 from requests import Session
 from back.utils.tablas_handler import TablasHandler
 
-caller = TablasHandler()
 
 def obtener_cliente_por_cuit(db: Session,id_empresa: int, cuit_cliente: str = None) -> Union[str, List[str]]:
     """
