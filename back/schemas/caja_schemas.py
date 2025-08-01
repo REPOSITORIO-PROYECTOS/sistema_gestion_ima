@@ -5,7 +5,8 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
-
+# --- AÑADE ESTA LÍNEA AQUÍ ---
+print("\n\n<<<<<<<<<<<<< CARGANDO EL ARCHIVO caja_schemas.py CORRECTO (VERSION CON OPTIONAL) >>>>>>>>>>>>>\n\n")
 # --- Enum para Tipo de Movimiento ---
 class TipoMovimiento(str, Enum):
     VENTA = "VENTA"
