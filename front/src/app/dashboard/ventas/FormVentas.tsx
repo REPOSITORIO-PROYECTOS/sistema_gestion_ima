@@ -34,14 +34,20 @@ import { ChevronsUpDown } from "lucide-react";
 import { useFacturacionStore } from "@/lib/facturacionStore";
 import { useAuthStore } from "@/lib/authStore"
 
+// Esta interfaz es para el producto del codigo de barras
 interface Producto {
-  tipo: string;
+  id: number;
+  descripcion: string;
+  precio_venta: number;
+  stock_actual: number;
+  codigos: { codigo: string }[];
   cantidad: number;
   precioTotal: number;
   descuentoAplicado: boolean;
   porcentajeDescuento: number;
 }
 
+// Esta interfaz es para los productos de la BDD de cada empresa
 interface ProductoAPI {
   id: number;
   descripcion: string;
@@ -82,9 +88,6 @@ function FormVentas({
   productosVendidos: { tipo: string; cantidad: number; precioTotal: number }[]
 }) {
 
-  const [barcode, setBarcode] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-
   /* Estados */
 
   // Listado de productos - GET 
@@ -105,7 +108,9 @@ function FormVentas({
     stock_actual: number;
   } | null>(null);
 
+  // Stores
   const token = useAuthStore((state) => state.token);
+  const { formatoComprobante } = useFacturacionStore();
 
   // Listado de Clientes - GET
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -126,7 +131,6 @@ function FormVentas({
   const totalConDescuento = Math.round(totalVenta * (1 - descuentoSobreTotal / 100));
 
   // Input de Busqueda para Productos
-  /* const [searchProducto, setSearchProducto] = useState(""); */
   const [open, setOpen] = useState(false);
 
   // Sección Facturación 
@@ -167,50 +171,12 @@ function FormVentas({
     totalConRecargo += (totalConDescuento * recargoBancario) / 100;
   }
 
-  const { formatoComprobante } = useFacturacionStore();
+  // Código de Barras
+  const [codigo, setCodigoEscaneado] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
 
   /* Hooks */ /* -------------------------------------------------------------- */
-
-  /* Lógica Código de Barras */
-  // Enfocar el input automáticamente cuando el componente se monta
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-
-      if (!barcode) return;
-
-      try {
-
-        const res = await fetch(`https://sistema-ima.sistemataup.online/api/productos/barcode/${barcode}`);
-        if (!res.ok) throw new Error('Producto no encontrado');
-
-        const data = await res.json();
-
-        const producto: Producto = {
-          tipo: data.tipo,
-          cantidad: 1,
-          precioTotal: data.precio,
-          descuentoAplicado: false,
-          porcentajeDescuento: 0,
-        };
-
-        onAgregarProducto(producto);
-        toast.success(`Producto agregado: ${data.tipo}`);
-
-      } catch (error) {
-        console.error(error);
-        toast.error(`Producto no encontrado: ${barcode}`);
-      } finally {
-        setBarcode('');
-        inputRef.current?.focus();
-      }
-    }
-  };
 
   // Producto seleccionado * cantidad = total
   const getPrecioProducto = (producto: {
@@ -293,6 +259,69 @@ function FormVentas({
   }
 
   /* Endpoints */ /* -------------------------------------------------------------- */
+
+  /* Lógica Código de Barras */
+  // Enfocar el input automáticamente cuando el componente se monta
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+
+    if (e.key === 'Enter') {
+      e.preventDefault();
+
+      if (!codigo) return;
+
+      try {
+
+        const res = await fetch(`https://sistema-ima.sistemataup.online/api/articulos/codigos/buscar/${codigo}`,
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (!res.ok) throw new Error('Producto no encontrado');
+        console.log(res)
+        const data = await res.json();
+        
+        const producto: Producto = {
+          id: data.id,
+          descripcion: data.descripcion,
+          precio_venta: data.precio_venta,
+          stock_actual: data.stock_actual,
+          codigos: data.codigos,
+          cantidad: 1,
+          precioTotal: data.precio_venta,
+          descuentoAplicado: false,
+          porcentajeDescuento: 0,
+        };
+
+        console.log(producto)
+        
+        onAgregarProducto({
+          tipo: data.descripcion,
+          cantidad: 1,
+          precioTotal: data.precio_venta,
+          descuentoAplicado: false,
+          porcentajeDescuento: 0,
+        });
+        
+        toast.success(`Producto agregado: ${data.tipo}`);
+
+      } catch (error) {
+        console.error(error);
+        toast.error(`Producto no encontrado: ${codigo}`);
+
+      } finally {
+        setCodigoEscaneado('');
+        inputRef.current?.focus();
+      }
+    }
+  };
 
   // GET Clientes - trae todos los clientes inscriptos
   useEffect(() => {
@@ -754,8 +783,8 @@ function FormVentas({
           <Input
             ref={inputRef}
             type="text"
-            value={barcode}
-            onChange={(e) => setBarcode(e.target.value)}
+            value={codigo}
+            onChange={(e) => setCodigoEscaneado(e.target.value)}
             onKeyDown={handleKeyDown}
             className="border w-full md:max-w-2/3"
             autoFocus
