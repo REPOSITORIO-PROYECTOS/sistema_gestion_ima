@@ -60,18 +60,19 @@ def startup_event():
 
 # --- Inclusión de Routers ---
 # Aquí es donde conectamos los archivos de endpoints a la aplicación principal.
-app.include_router(blueprints.caja_router.router)
-app.include_router(blueprints.admin_router.router)
-app.include_router(blueprints.auth_router.router)
-app.include_router(blueprints.articulos_router.router)
-app.include_router(blueprints.actualizacion_masiva_router.router)
-app.include_router(blueprints.clientes_router.router)
-app.include_router(blueprints.usuarios_router.router)
-app.include_router(blueprints.importaciones_router.router)
-app.include_router(blueprints.proveedores_router.router)
-app.include_router(blueprints.configuracion_router.router)
-app.include_router(blueprints.empresa_router.router)
-app.include_router(blueprints.comprobantes_router.router)
+app.include_router(blueprints.caja_router.router, prefix="/caja", tags=["Caja"])
+app.include_router(blueprints.admin_router.router, prefix="/admin", tags=["Admin"])
+app.include_router(blueprints.auth_router.router, prefix="/auth", tags=["Autenticación"])
+app.include_router(blueprints.articulos_router.router, prefix="/articulos", tags=["Artículos"])
+app.include_router(blueprints.actualizacion_masiva_router.router, prefix="/masiva", tags=["Actualización Masiva"])
+app.include_router(blueprints.clientes_router.router, prefix="/clientes", tags=["Clientes"])
+app.include_router(blueprints.usuarios_router.router, prefix="/usuarios", tags=["Usuarios"])
+app.include_router(blueprints.importaciones_router.router, prefix="/importaciones", tags=["Importaciones"])
+app.include_router(blueprints.proveedores_router.router, prefix="/proveedores", tags=["Proveedores"])
+app.include_router(blueprints.configuracion_router.router, prefix="/configuracion", tags=["Configuración"])
+app.include_router(blueprints.empresa_router.router, prefix="/empresa", tags=["Empresa"])
+app.include_router(blueprints.comprobantes_router.router, prefix="/comprobantes", tags=["Comprobantes"])
+
 
 
 # --- Endpoint Raíz ---
