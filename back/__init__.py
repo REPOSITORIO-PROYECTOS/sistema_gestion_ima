@@ -5,15 +5,15 @@
 # Añade este print para estar 100% seguros de que se está ejecutando
 print("<<<<< INICIALIZANDO EL PAQUETE 'blueprints' >>>>>")
 
-from . import admin_router
-from . import articulos_router
-from . import auth_router
-from . import actualizacion_masiva_router
-from . import clientes_router
-from . import configuracion_router
-from . import empresa_router
-from . import importaciones_router
-from . import proveedores_router
-from . import comprobantes_router
-from . import caja_router   # <-- LA LÍNEA CLAVE QUE FALTABA
-from . import usuarios_router
+from back import admin_router
+from back import articulos_router
+from back import auth_router
+from back import actualizacion_masiva_router
+from back import clientes_router
+from back import configuracion_router
+from back import empresa_router
+from back import importaciones_router
+from back import proveedores_router
+from back import comprobantes_router
+from back import caja_router   # <-- LA LÍNEA CLAVE QUE FALTABA
+from back import usuarios_router
