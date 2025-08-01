@@ -242,7 +242,7 @@ def get_todos_los_movimientos(
     """
     Endpoint maestro para el tablero de contabilidad.
     """
-    movimientos = consultas_caja.obtener_todos_los_movimientos_de_caja_sql_puro(
+    movimientos = consultas_caja.obtener_todos_los_movimientos_de_caja(
         db=db,
         usuario_actual=current_user
     )
