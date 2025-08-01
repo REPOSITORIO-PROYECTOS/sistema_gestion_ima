@@ -2,6 +2,7 @@
 # VERSIÓN CORREGIDA Y UNIFICADA
 
 import logging
+from sqlalchemy import text
 from sqlmodel import Session, select
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import aliased, selectinload  
@@ -87,30 +88,77 @@ def obtener_arqueos_de_caja(id_empresa,db: Session, usuario_actual: Usuario) -> 
         # Relanzamos la excepción para que el router devuelva un 500, pero con el log ya escrito.
         raise e
     
-def obtener_todos_los_movimientos_de_caja(db: Session, usuario_actual: Usuario) -> List[CajaMovimiento]:
+def obtener_todos_los_movimientos_de_caja(db: Session, usuario_actual: Usuario) -> List[Dict]:
     """
-    Función maestra actualizada. Obtiene TODOS los movimientos de caja de la empresa
-    del usuario actual (ingresos, egresos, ventas) y carga eficientemente
-    la información de la venta y el cliente asociado cuando corresponde.
-    Es la fuente de datos para el tablero de contabilidad/libro mayor de caja.
+    Obtiene todos los movimientos de caja usando una consulta SQL pura para asegurar
+    que todos los datos, incluyendo el 'tipo_comprobante_solicitado', se carguen.
     """
-    print(f"Buscando todos los movimientos de caja para la empresa ID: {usuario_actual.id_empresa}")
-    
-    # 1. Creamos la consulta base.
-    query = select(CajaMovimiento)
+    print(f"Buscando todos los movimientos con SQL puro para la empresa ID: {usuario_actual.id_empresa}")
 
-    # 2. **FILTRO DE SEGURIDAD OBLIGATORIO (MULTI-EMPRESA)**
-    query = query.join(CajaSesion).join(Usuario, CajaSesion.id_usuario_apertura == Usuario.id)\
-                 .where(CajaSesion.id_empresa == usuario_actual.id_empresa)
-    # 3. Cargamos las relaciones necesarias de forma eficiente.
-    query = query.options(
-        selectinload(CajaMovimiento.venta).selectinload(Venta.cliente)
-    )
+    query_sql = text("""
+        SELECT
+            cm.id AS movimiento_id,
+            cm.timestamp AS movimiento_timestamp,
+            cm.tipo AS movimiento_tipo,
+            cm.concepto AS movimiento_concepto,
+            cm.monto AS movimiento_monto,
+            cm.metodo_pago AS movimiento_metodo_pago,
+            v.id AS venta_id,
+            v.facturada AS venta_facturada,
+            v.datos_factura AS venta_datos_factura,
+            v.tipo_comprobante_solicitado AS venta_tipo_comprobante,
+            cli.id AS cliente_id,
+            cli.nombre_razon_social AS cliente_nombre
+        FROM
+            caja_movimientos AS cm
+        JOIN
+            caja_sesiones AS cs ON cm.id_caja_sesion = cs.id
+        LEFT JOIN
+            ventas AS v ON cm.id_venta = v.id
+        LEFT JOIN
+            terceros AS cli ON v.id_cliente = cli.id
+        WHERE
+            cs.id_empresa = :id_empresa_actual
+        ORDER BY
+            cm.timestamp DESC;
+    """)
 
-    # 4. Ordenamos los resultados por fecha, lo más reciente primero.
-    query = query.order_by(CajaMovimiento.timestamp.desc())
+    # Ejecutamos la consulta. .mappings() devuelve los resultados como diccionarios.
+    resultados_crudos = db.exec(query_sql, {"id_empresa_actual": usuario_actual.id_empresa}).mappings().all()
 
-    # 5. Ejecutamos la consulta final.
-    resultados = db.exec(query).all()
-    print(f"Se encontraron {len(resultados)} movimientos en total para la empresa.")
-    return resultados
+    # Ahora, procesamos los resultados crudos para construir la estructura que FastAPI espera
+    movimientos_procesados = []
+    for row in resultados_crudos:
+        movimiento_dict = {
+            "id": row["movimiento_id"],
+            "timestamp": row["movimiento_timestamp"],
+            "tipo": row["movimiento_tipo"],
+            "concepto": row["movimiento_concepto"],
+            "monto": row["movimiento_monto"],
+            "metodo_pago": row["movimiento_metodo_pago"],
+            "venta": None  # Por defecto no hay venta
+        }
+
+        # Si el movimiento tiene una venta asociada (venta_id no es NULL)
+        if row["venta_id"]:
+            venta_dict = {
+                "id": row["venta_id"],
+                "facturada": row["venta_facturada"],
+                "datos_factura": row["venta_datos_factura"],
+                "tipo_comprobante_solicitado": row["venta_tipo_comprobante"], # ¡Aquí está!
+                "cliente": None # Por defecto no hay cliente
+            }
+
+            # Si la venta tiene un cliente asociado
+            if row["cliente_id"]:
+                venta_dict["cliente"] = {
+                    "id": row["cliente_id"],
+                    "nombre_razon_social": row["cliente_nombre"]
+                }
+            
+            movimiento_dict["venta"] = venta_dict
+        
+        movimientos_procesados.append(movimiento_dict)
+
+    print(f"Se procesaron {len(movimientos_procesados)} movimientos con SQL puro.")
+    return movimientos_procesados
