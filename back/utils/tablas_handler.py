@@ -132,9 +132,7 @@ class TablasHandler:
         try:
             sheet = self.client.open_by_key(self.google_sheet_id)
             worksheet = sheet.worksheet("stock")
-            print("LLEGUE HASTA LINEA 135")
             datos_stock = worksheet.get_all_records()
-            print("LLEGUE HASTA LINEA 137")
             columna_id = "id producto"
             columna_stock = "cantidad"
 
