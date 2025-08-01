@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Factura Venta N° {{ data.transaccion.id if data.transaccion.id else '' }}</title>
+    <style>
+        body { font-family: Helvetica, Arial, sans-serif; font-size: 12px; }
+        .container { width: 180mm; margin: auto; }
+        .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #000; padding-bottom: 10px; }
+        .header .empresa { font-size: 16px; font-weight: bold; }
+        .header .comprobante { text-align: right; border: 2px solid #000; padding: 5px; }
+        .header .comprobante h1 { margin: 0; font-size: 24px; }
+        .cliente { border: 1px solid #ccc; padding: 10px; margin-top: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .text-right { text-align: right; }
+        .total { font-size: 14px; font-weight: bold; }
+        .afip-data { text-align: center; margin-top: 30px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <div class="empresa">{{ data.emisor.razon_social }}</div>
+                <div>{{ data.emisor.domicilio }}</div>
+                <div>Condición IVA: {{ data.emisor.condicion_iva }}</div>
+                <div>CUIT: {{ data.emisor.cuit }}</div>
+            </div>
+            <div class="comprobante">
+                <h1>FACTURA</h1>
+                <div><strong>{{ afip.tipo_factura if afip else 'X' }}</strong></div>
+                <div>N°: <strong>{{ '%04d'|format(data.emisor.punto_venta) }}-{{ '%08d'|format(afip.numero_comprobante if afip else 0) }}</strong></div>
+                <div>Fecha: <strong>{{ afip.fecha_comprobante if afip else 'S/F' }}</strong></div>
+            </div>
+        </div>
+        <div class="cliente">
+            <strong>Cliente:</strong> {{ data.receptor.nombre_razon_social }}<br>
+            <strong>CUIT/DNI:</strong> {{ data.receptor.cuit_o_dni }}<br>
+            <strong>Condición IVA:</strong> {{ data.receptor.condicion_iva }}<br>
+            <strong>Dirección:</strong> {{ data.receptor.domicilio }}
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Cantidad</th>
+                    <th>Descripción</th>
+                    <th class="text-right">Precio Unit.</th>
+                    <th class="text-right">Subtotal</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in data.transaccion.items %}
+                <tr>
+                    <td>{{ item.cantidad }}</td>
+                    <td>{{ item.descripcion }}</td>
+                    <td class="text-right">${{ "%.2f"|format(item.precio_unitario) }}</td>
+                    <td class="text-right">${{ "%.2f"|format(item.subtotal) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="3" class="text-right total">TOTAL</td>
+                    <td class="text-right total">${{ "%.2f"|format(data.transaccion.total) }}</td>
+                </tr>
+            </tfoot>
+        </table>
+        {% if afip %}
+        <div class="afip-data">
+            <img src="{{ afip.barcode_url }}" alt="Código de Barras AFIP" />
+            <p><strong>CAE:</strong> {{ afip.cae }} | <strong>Fecha Vto. CAE:</strong> {{ afip.vencimiento_cae }}</p>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

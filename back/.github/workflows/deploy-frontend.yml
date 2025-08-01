@@ -1,0 +1,33 @@
+name: Deploy Frontend (Next.js)
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'front/**'
+      - '.github/workflows/deploy-frontend.yml'
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Frontend
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+            cd ${{ secrets.PROJECT_PATH }}
+            git fetch --all
+            git reset --hard origin/main
+
+            echo "🚀 Deploying Next.js Frontend..."
+            cd front
+            rm -rf .next/
+            npm install
+            npm run build
+            # Usamos la ruta absoluta al ecosistema y la ruta absoluta a pm2
+            $HOME/.nvm/versions/node/$(nvm version)/bin/pm2 reload ${{ secrets.PROJECT_PATH }}/ecosystem.config.js --only gestion-ima-front
+            echo "✅ Frontend Deployed!"

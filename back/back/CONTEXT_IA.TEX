@@ -1,0 +1,227 @@
+Documento de Traspaso y Contexto del Proyecto: Sistema de Gestión IMA
+Fecha de Estado: 18 de Julio de 2025
+1. Objetivo General y Arquitectura Acordada
+El objetivo es desarrollar el backend para un sistema de gestión multiusuario con una API RESTful. La arquitectura fundamental sobre la que hemos trabajado es la siguiente:
+Fuente Única de Verdad (Single Source of Truth): Una base de datos SQL (MySQL) es la única autoridad final sobre los datos. Todas las operaciones críticas (ventas, stock, usuarios) se validan y confirman primero en SQL.
+Backend: Construido con FastAPI y SQLModel (que es una capa sobre SQLAlchemy y Pydantic).
+API Modular: La API está organizada en "Blueprints" o Routers (caja_router, articulos_router, admin_router, etc.), cada uno manejando un dominio de negocio específico.
+Capas de Lógica Claras: Hemos establecido una estricta separación de responsabilidades:
+back/api/blueprints/ (Capa de Presentación): Routers que definen los endpoints. Su única tarea es recibir peticiones HTTP, validarlas con schemas, llamar a la lógica de negocio y formatear las respuestas.
+back/gestion/ (Capa de Lógica de Negocio): Módulos de Python (managers) que contienen la lógica de negocio real. Estas funciones interactúan con la base de datos a través de SQLModel y no saben nada sobre HTTP.
+back/schemas/ (Capa de Contratos de Datos): Modelos Pydantic que definen la estructura de los datos que viajan a través de la API (peticiones y respuestas JSON).
+back/modelos.py (Capa de Acceso a Datos): Modelos SQLModel que definen la estructura de las tablas en la base de datos SQL.
+Reportes Desacoplados (En Pausa): Se acordó que la lógica de reportes a Google Sheets sería una capa separada (back/reportes/). Sin embargo, su desarrollo e integración están en pausa para priorizar la funcionalidad del núcleo del backend.
+2. Estado del Sistema de Seguridad (El Foco Principal de Nuestro Trabajo)
+Hemos implementado un sistema de seguridad robusto y basado en roles.
+Modelos de Datos: Se utilizan los modelos Usuario y Rol de modelos.py, que tienen una relación de muchos a uno.
+Autenticación (back/security.py y back/gestion/auth_manager.py):
+Se utiliza un flujo estándar de OAuth2 con Tokens Bearer JWT.
+Existe un endpoint POST /auth/token que recibe username y password, los valida contra la base de datos (usando contraseñas hasheadas con bcrypt), y devuelve un access_token.
+El token contiene el username como sub (subject).
+Autorización (back/security.py):
+La función principal es obtener_usuario_actual. Esta dependencia, en cada petición a un endpoint protegido, valida el token JWT y, crucialmente, consulta la base de datos SQL para obtener el objeto Usuario completo y su Rol en tiempo real. Esto elimina la vulnerabilidad de usar roles obsoletos almacenados en el token.
+Hemos creado una "factoría de dependencias" es_rol(roles_requeridos) que genera "guardianes" de seguridad. Estos guardianes se usan para proteger routers o endpoints específicos (ej: Depends(es_admin)).
+Los roles básicos ("Admin", "Cajero", "Gerente", "Soporte") se han creado manualmente en la base de datos.
+Estado Actual: La seguridad del núcleo está completa y funcional. El sistema puede autenticar usuarios y autorizar el acceso a endpoints basado en el rol actual del usuario en la base de datos.
+3. Estado de los Módulos de la Aplicación
+Gestión de Caja (caja_router.py, gestion/caja/):
+Lógica Refactorizada: La lógica de negocio para apertura_cierre y registro_venta está completamente migrada a SQLModel y sigue un patrón de transacciones atómicas.
+Funcionalidad Avanzada: Soporta múltiples cajas abiertas simultáneamente (una por usuario) y un proceso de cierre de caja "a ciegas".
+Endpoints Seguros: El caja_router.py ha sido refactorizado para usar la seguridad por roles. Obtiene el usuario del token y lo usa para realizar operaciones dinámicas (ej: cerrar la caja del usuario actual).
+Lógica Heredada: La función registrar_ingreso_egreso todavía utiliza una conexión manual a MySQL (mysql-connector), pero el router ha sido adaptado para poder llamarla de forma segura. Su refactorización completa es una tarea técnica pendiente.
+Gestión de Clientes (clientes_router.py, gestion/contabilidad/clientes_contabilidad/):
+CRUD Funcional: Se ha creado un conjunto completo de endpoints CRUD (POST, GET, PATCH, DELETE) para la gestión de clientes (modelo Tercero).
+Validaciones Fiscales (AFIP): Los schemas (cliente_schemas.py) y la lógica de negocio (manager.py) incluyen validaciones para cumplir con los requisitos de facturación de AFIP (ej: CUIT condicionalmente obligatorio, validación de unicidad de CUIT).
+Seguridad Pendiente: Los endpoints de clientes están funcionales pero actualmente no tienen aplicada ninguna dependencia de seguridad (es una tarea pendiente fácil de añadir).
+Panel de Administración (admin_router.py, gestion/admin/):
+Gestión de Usuarios y Roles: Se ha creado un conjunto de endpoints (/admin/usuarios, /admin/roles) que permite a un usuario con rol "Admin" crear nuevos usuarios, listar todos los usuarios y cambiarles el rol. También puede listar los roles disponibles en el sistema.
+Seguridad Implementada: Todo el admin_router.py está protegido por la dependencia Depends(es_admin).
+Boletas y Facturación (ventas_router.py, etc.):
+Enfoque Definido: Se ha diseñado la lógica para un endpoint GET /ventas/{id_venta}/boleta. La estrategia es que el backend devuelva un JSON completo y estructurado con todos los datos de la venta, y que el frontend sea responsable de renderizarlo (ya sea en un PDF o en formato de ticket para impresora térmica).
+Estado: La lógica de negocio (ventas_manager.py) y el router (ventas_router.py) para esta funcionalidad han sido creados y están listos, funcionando con la estructura actual de la base de datos (sin soporte para facturación fiscal oficial).
+4. Problemas Recientes y Estado de Depuración
+El último gran obstáculo fue una serie de errores de arranque (502 Bad Gateway) causados por:
+Errores de Importación y Nombres: Inconsistencias en los nombres de las funciones de seguridad (get_current_user vs. obtener_usuario_actual) y rutas de importación incorrectas. Esto ha sido solucionado estandarizando todos los routers.
+Incompatibilidad de Librerías: Se detectó un error AttributeError: module 'bcrypt' has no attribute '__about__', causado por una incompatibilidad entre passlib y bcrypt. La solución recomendada (y pendiente de confirmación de implementación) es reinstalar passlib con pip install "passlib[bcrypt]==1.7.4".
+Problema de Frontend (Race Condition): Se diagnosticó que el frontend redirigía al usuario antes de que el store de estado (Zustand) se actualizara con los datos del usuario después del login, causando que el ProtectedRoute fallara. La solución se propuso del lado del frontend, haciendo que el componente de ruta protegida espere la "hidratación" del store.
+5. Siguientes Pasos Pendientes / Hoja de Ruta
+Confirmar la solución del problema de bcrypt: Ejecutar la reinstalación de la librería en el servidor.
+Confirmar la solución del "race condition" en el frontend.
+Añadir seguridad a los endpoints que faltan: clientes_router.py es el principal candidato.
+Refactorizar la lógica heredada: Específicamente, la función registrar_ingreso_egreso en registro_caja.py para que use SQLModel.
+Implementar la migración de la base de datos (usando Alembic) para añadir los campos de facturación fiscal a la tabla Venta y la lógica para la facturación diferida.
+
+
+
+Documento de Contexto y Estado Actual del Proyecto: Sistema de Gestión IMA
+Fecha de Estado: 23 de Julio de 2025 (Actualización sobre el traspaso del 18 de Julio)
+1. Resumen Ejecutivo
+El proyecto consiste en el desarrollo del backend para un sistema de gestión multi-usuario. Partimos de una base de código con una arquitectura definida pero con áreas de lógica heredada. Nuestro trabajo se ha centrado en refactorizar, modernizar y estabilizar el núcleo de la aplicación, migrando la lógica a SQLModel (ORM), robusteciendo la seguridad y depurando problemas críticos de despliegue. Adicionalmente, se ha desarrollado un prototipo de testing aislado para reportes, lo que ha implicado una depuración intensiva de la configuración del servidor (Nginx) y de las políticas de CORS.
+2. Arquitectura Fundamental (Confirmada y Estable)
+La arquitectura base del traspaso se ha mantenido y reforzado. Es la "ley" sobre la que opera todo el sistema:
+Fuente Única de Verdad: Base de datos MySQL. Todas las operaciones críticas se validan y persisten aquí.
+Backend: FastAPI con SQLModel (SQLAlchemy + Pydantic).
+Capas de Lógica Estrictas:
+back/api/blueprints/ (Routers): Capa de presentación. Maneja peticiones y respuestas HTTP. No contiene lógica de negocio.
+back/gestion/ (Managers): Capa de lógica de negocio. Interactúa con la base de datos a través del ORM. No sabe nada de HTTP.
+back/schemas/ (Schemas): Contratos de datos (Pydantic) para validación.
+back/modelos.py (Modelos): Definición de las tablas de la base de datos (SQLModel).
+3. Evolución y Mejoras Clave Implementadas
+Desde el traspaso inicial, hemos realizado las siguientes mejoras estructurales:
+Refactorización Completa del Modelo de Datos (modelos.py):
+Se implementaron relaciones bidireccionales (back_populates) en todos los modelos. Esto hace que el código en los managers sea mucho más limpio y potente, permitiendo una navegación natural entre objetos (ej. usuario.ventas_realizadas).
+Se enriqueció el modelo Articulo para soportar futuras funcionalidades: múltiples códigos, unidades de compra/venta, cálculo automático de precios, etc.
+Modernización de la Lógica de Negocio (Managers):
+Se ha migrado lógica crítica que usaba conexiones manuales (mysql-connector) a una implementación 100% ORM con SQLModel. El ejemplo más claro es el módulo de apertura_cierre.py, que fue completamente refactorizado para trabajar con la Session de la base de datos y objetos Usuario, soportando ahora una caja abierta por usuario.
+La lógica de negocio ahora maneja errores lanzando excepciones (ej. ValueError), en lugar de devolver diccionarios de estado ({"status": "error"}), dejando el manejo de respuestas HTTP exclusivamente al router.
+4. Estado Actual de los Módulos
+Seguridad (security.py, auth_manager.py):
+Estado: Estable y robusto.
+Lógica: Usa JWT con OAuth2. La función clave obtener_usuario_actual valida el token y siempre consulta la base de datos en tiempo real para obtener el usuario y su rol, lo que es muy seguro.
+Problemas Resueltos: Se solucionó un error crítico AttributeError al validar usuarios inexistentes y se confirmó la solución al problema de incompatibilidad de passlib[bcrypt]. El endpoint /token ahora valida que un usuario esté activo y tenga rol antes de emitir un token.
+Gestión de Caja (caja_router.py, apertura_cierre.py):
+Estado: Funcional y refactorizado.
+Lógica: La apertura, cierre y consulta de estado ya no usan mysql-connector. La lógica ahora soporta una caja abierta por cada usuario simultáneamente.
+Problemas Resueltos: Se solucionó un error 422 Unprocessable Entity al sincronizar los schemas de Pydantic con las respuestas del router, asegurando que el response_model coincida con lo que la lógica de negocio devuelve (objetos CajaSesion completos).
+Gestión de Usuarios (admin_router.py, admin_manager.py):
+Estado: Funcional y organizado.
+Lógica: Se unificó toda la lógica de gestión de usuarios en un único admin_manager.py. Se implementaron endpoints seguros para crear usuarios y para la eliminación lógica (desactivación), previniendo la corrupción de datos.
+Problemas Resueltos: Se solucionó un ImportError que impedía el arranque del servidor debido a una estructura de archivos desorganizada en la capa de gestion.
+Gestión de Artículos:
+Estado: Estructuralmente listo, lógica de negocio pendiente.
+Lógica: El modelo Articulo está preparado para soportar hasta 3 códigos de barras (a través de una tabla ArticuloCodigo) y para el cálculo automático de precios. Se ha diseñado la lógica en el manager para estas funcionalidades.
+Problemas Resueltos: Se depuró un error 404 Not Found causado por una discrepancia entre la URL llamada por el frontend (/api/productos) y la URL real del endpoint (/api/articulos/obtener_todos).
+5. El Prototipo de Testing (Foco Principal de Depuración Reciente)
+Se ha creado un servidor de prototipo aislado y autocontenido para reportes especiales.
+Propósito: Servir datos a un frontend en Netlify sin afectar la API principal.
+Fuente de Datos: Inicialmente se pensó en Google Sheets, luego en archivos CSV, y la versión final implementada es un lector de la base de datos SQL que escribe en una hoja de Google Sheets de testing con un formato específico.
+Seguridad: Utiliza un sistema simple y efectivo de API Key en la cabecera (x-api-key), no JWT.
+El Gran Problema de Despliegue (Resuelto): La mayor parte de la depuración reciente se centró en un error de CORS persistente. El diagnóstico final fue:
+El dominio sistema-ima.sistemataup.online estaba apuntando al frontend en Netlify, no al backend, causando un 404 inicial.
+Una vez corregido el DNS, el problema se trasladó a la configuración del proxy inverso (Nginx).
+Se determinó que la mejor solución era que la API del prototipo manejara su propia ruta (/prototipo) y que Nginx simplemente redirigiera el tráfico a esa sub-ruta sin modificarla.
+El script final del prototipo ahora incluye el CORSMiddleware para permitir explícitamente el origen de Netlify y un APIRouter con el prefijo /prototipo.
+6. Tareas Pendientes y Próximos Pasos
+Validación del Frontend: La tarea más inmediata es que el equipo de frontend actualice las URLs que consume de la API principal para que coincidan con las rutas correctas (ej. /api/articulos/obtener_todos).
+Completar Lógica de Artículos: Implementar en el frontend los endpoints ya creados en el backend para gestionar los múltiples códigos de barras.
+Refactorizar Lógica Heredada: Módulos como registro_caja.py todavía usan mysql-connector para algunas operaciones y deben ser migrados a SQLModel para una consistencia total.
+Implementar Nuevas Funcionalidades: Desarrollar la lógica de negocio y los endpoints para las funcionalidades avanzadas ya diseñadas, como la actualización masiva de precios y la creación de combos de productos.
+
+
+Documento de Contexto y Estado del Proyecto: Sistema de Gestión IMA
+Fecha de Estado: 25 de Julio de 2025
+1. Resumen Ejecutivo
+El proyecto consiste en el desarrollo y refactorización del backend para un sistema de gestión multi-tenant (multi-empresa). Partimos de una base de código funcional pero con áreas de "lógica heredada" (conexiones directas a MySQL) y problemas críticos de entorno que impedían su funcionamiento (502 Bad Gateway). Nuestro trabajo se ha centrado en estabilizar la aplicación, modernizar la arquitectura para que sea 100% consistente con SQLModel (ORM), y diseñar soluciones escalables y seguras para funcionalidades complejas como la generación de comprobantes fiscales y la importación masiva de datos. La arquitectura ahora está preparada para dar servicio a múltiples empresas, tratando los datos de cada una como una entidad aislada y segura.
+2. Arquitectura Fundamental (Confirmada y Estable)
+Esta es la "ley" sobre la que opera todo el sistema. Cualquier nuevo desarrollo debe respetarla.
+Fuente Única de Verdad: Base de datos MySQL.
+Backend: FastAPI con SQLModel (la capa que une SQLAlchemy y Pydantic).
+Capas de Lógica Estrictas:
+back/api/blueprints/ (Routers): Capa de presentación. Define los endpoints, valida los datos de entrada/salida con Schemas y llama a la lógica de negocio. No contiene lógica de negocio.
+back/gestion/ (Managers): Capa de lógica de negocio. Contiene las funciones de Python que interactúan con la base de datos a través del ORM (SQLModel). Es agnóstica a HTTP.
+back/schemas/ (Schemas): Contratos de datos (Pydantic) que definen la estructura de los JSON que viajan a través de la API.
+back/modelos.py (Modelos): Definición de las tablas de la base de datos como clases de Python (SQLModel), incluyendo sus relaciones.
+3. Problemas Críticos Resueltos (La Estabilización)
+502 Bad Gateway al Arrancar:
+Diagnóstico: ImportError: cannot import name 'ventas_router'. El archivo main.py intentaba importar un router que no existía o no estaba correctamente expuesto, causando un crash inmediato en la aplicación.
+Solución: Se corrigieron las importaciones en main.py para que solo incluyeran los routers existentes, permitiendo que la aplicación arrancara.
+Fallo Total de Autenticación (AttributeError en bcrypt):
+Diagnóstico: Una incompatibilidad de versiones entre las librerías passlib y bcrypt causaba un crash cada vez que se intentaba verificar o hashear una contraseña. Esto rompía el login (/auth/token) y, en consecuencia, todos los endpoints protegidos.
+Solución: Se ejecutó el comando pip install --force-reinstall "passlib[bcrypt]==1.7.4" en el entorno virtual del servidor y se reinició la aplicación.
+Desincronización Frontend/Backend:
+Diagnóstico: El frontend enviaba datos en formatos o con cabeceras que el backend no esperaba (ej: x-admin-token en vez de Authorization: Bearer <token>, id_rol cuando se esperaba nombre_rol, form-urlencoded vs json).
+Solución: Se ha estandarizado la comunicación. Todos los endpoints protegidos ahora esperan Authorization: Bearer <token>, y los schemas del backend se han ajustado para coincidir con los datos que envía el frontend.
+4. Estado Actual de los Módulos y Decisiones de Diseño
+Modelo de Datos Multi-Empresa:
+Decisión: El sistema debe soportar múltiples empresas. Se ha rediseñado el modelos.py.
+Implementación: Se crearon los modelos Empresa y ConfiguracionEmpresa. Los modelos clave como Usuario, Articulo, Categoria y Marca ahora están vinculados a una Empresa a través de un id_empresa. Esto garantiza el aislamiento de datos (data tenancy).
+Pendiente: Refactorizar toda la capa de gestion (managers) para que las consultas siempre filtren por el id_empresa del usuario autenticado.
+Gestión de Caja:
+Estado: Completamente refactorizada a SQLModel.
+Funcionalidad: Soporta apertura, cierre, ingresos y egresos de forma transaccionalmente segura. Se añadió una lógica de "Admin Override" que permite a un administrador o gerente cerrar la caja abierta de cualquier usuario.
+Gestión de Usuarios y Configuración:
+admin_manager.py: Contiene la lógica para que un admin gestione a otros usuarios (crear, activar/desactivar, cambiar rol/nombre/contraseña).
+usuarios_router.py (/users/me): Contiene los endpoints para que un usuario gestione su propia cuenta (cambiar su contraseña, ver sus datos).
+configuracion_manager.py: Se ha creado la lógica para gestionar la configuración específica de cada empresa (nombre, logo, datos fiscales), almacenada en la nueva tabla ConfiguracionEmpresa.
+Generación de Comprobantes (Boletas):
+Decisión: El backend es el único responsable de generar los documentos para garantizar consistencia y seguridad.
+Arquitectura: Se ha diseñado un sistema stateless multi-empresa.
+Endpoint: POST /comprobantes/generar.
+Flujo: El frontend envía un JSON complejo que contiene toda la información: datos del emisor, del receptor y de la transacción. El backend no depende de su propia base de datos para generar el comprobante.
+Flexibilidad: El JSON de entrada especifica el formato (pdf o ticket) y el tipo (factura, remito, presupuesto, recibo). El backend selecciona la plantilla HTML+CSS adecuada y la renderiza como PDF.
+Facturación AFIP:
+Decisión: La lógica de comunicación con AFIP está encapsulada en su propio módulo (facturacion_afip.py).
+Integración: El "orquestador" de comprobantes (generador_comprobantes.py) llama a este módulo "especialista" únicamente cuando se solicita tipo="factura".
+Importación de Listas de Proveedores (Actualización Masiva):
+Decisión: Se debe permitir la actualización de costos y precios a partir de archivos Excel de proveedores, cada uno con su propio formato.
+Arquitectura: Se ha diseñado un sistema de Plantillas de Mapeo.
+Flujo:
+Configuración: Un admin define una plantilla para un proveedor, mapeando las columnas del Excel (ej: "PRECIO LISTA") a los campos de la base de datos (ej: precio_costo). Esto se guarda en la tabla PlantillaProveedor.
+Pre-visualización: Un usuario sube un Excel. El backend usa la plantilla para leerlo y devuelve un informe de los cambios que se harían, sin aplicarlos (/preview/{id_proveedor}).
+Confirmación: Se debe implementar un futuro endpoint que reciba la confirmación y aplique los cambios en la base de datos.
+Bóveda de Secretos (Credenciales AFIP):
+Decisión: Las credenciales de AFIP de cada empresa son demasiado sensibles para estar en la base de datos principal, incluso encriptadas.
+Arquitectura Final: Se ha diseñado la creación de un microservicio "Bóveda" independiente.
+Flujo: La API principal, cuando necesite facturar, hará una llamada HTTP interna y segura a este microservicio, solicitando las credenciales para un CUIT específico. El microservicio las desencriptará en memoria y las devolverá. Esto proporciona el máximo nivel de aislamiento y seguridad.
+5. Próximos Pasos Fundamentales
+Implementar el Microservicio Bóveda: Construir la pequeña API FastAPI para la gestión de secretos.
+Refactorizar los Managers para Multi-Tenancy: Modificar todas las consultas (artículos, clientes, etc.) para que siempre incluyan el filtro where(Modelo.id_empresa == current_user.id_empresa).
+Construir el Frontend para las nuevas funcionalidades:
+Panel de configuración de la empresa.
+Sistema de configuración de plantillas de proveedores.
+Interfaz para el flujo de importación/pre-visualización/confirmación de listas de precios.
+Implementar el endpoint de confirmación para la actualización masiva de precios.
+
+Documento de Contexto y Estado del Proyecto: Sistema de Gestión IMA
+Fecha de Estado: 25 de Julio de 2025
+1. Resumen Ejecutivo y Misión del Proyecto
+El proyecto es el backend de un Sistema de Gestión (ERP) multi-tenant (multi-empresa), construido con FastAPI y SQLModel, y un frontend en Next.js. La misión inicial fue estabilizar una base de código existente que sufría de problemas críticos de arranque (502 Bad Gateway) y fallos de autenticación. La misión ha evolucionado hacia la refactorización completa a una arquitectura ORM consistente, la implementación de un modelo de datos multi-empresa seguro y aislado, y el diseño de soluciones escalables para funcionalidades complejas como la facturación fiscal (AFIP) y la importación de datos. El objetivo final es un sistema robusto, seguro y mantenible, capaz de dar servicio a múltiples empresas clientes.
+2. Arquitectura Fundamental del Backend (Reglas Inquebrantables)
+Cualquier nuevo desarrollo debe adherirse estrictamente a esta arquitectura para mantener la consistencia y calidad del código.
+ORM Exclusivo: Se ha tomado la decisión de abandonar por completo el uso de mysql-connector. Toda la interacción con la base de datos se realiza a través de SQLModel y su sistema de Session. Esto garantiza seguridad (prevención de Inyección SQL), mantenibilidad y transacciones atómicas.
+Capas de Lógica Estrictas:
+back/modelos.py: Define las tablas de la DB como clases de Python. Es la única fuente de la verdad sobre la estructura de los datos.
+back/schemas/: Define los "contratos de datos" (DTOs) con Pydantic. Valida toda la información que entra y sale de la API.
+back/gestion/ (Managers): Contiene toda la lógica de negocio. Estas funciones reciben la Session de la base de datos y los schemas de Pydantic, y devuelven objetos de los modelos. No saben nada de HTTP.
+back/api/blueprints/ (Routers): La capa más externa. Define las rutas HTTP, maneja las dependencias de seguridad, llama a las funciones de los "managers" y gestiona las respuestas y errores HTTP.
+3. Modelo de Datos Multi-Empresa
+Esta es la decisión de arquitectura más importante que hemos tomado.
+Nuevos Modelos Centrales: Se crearon los modelos Empresa y ConfiguracionEmpresa.
+Aislamiento de Datos (Data Tenancy): Los modelos clave (Usuario, Articulo, Categoria, Marca, y eventualmente Venta, Compra, Tercero) deben tener una clave foránea id_empresa.
+Regla de Oro para las Consultas: Toda consulta en la capa de gestion (managers) debe filtrar obligatoriamente por el id_empresa del usuario que realiza la acción. Esto previene que los datos de una empresa se filtren a otra.
+4. Sistema de Seguridad y Bóveda de Secretos
+Autenticación: Flujo estándar OAuth2 con Tokens JWT. El endpoint /auth/token valida las credenciales y emite un access_token.
+Autorización: Se utiliza una factoría de dependencias es_rol(["rol_requerido"]) que protege los routers o endpoints. La función principal obtener_usuario_actual valida el token y siempre consulta la DB en tiempo real para obtener el usuario, su rol y su empresa.
+Bóveda de Secretos (Decisión Final): Las credenciales sensibles (certificados y claves de AFIP) NO se guardan en la base de datos principal. Se ha diseñado la arquitectura de un microservicio "Bóveda" independiente.
+Funcionamiento: La API principal, cuando necesita facturar, hace una llamada HTTP interna al microservicio Bóveda, solicitando las credenciales para un CUIT de empresa específico. La Bóveda las desencripta en memoria y las devuelve. Esto proporciona el máximo nivel de seguridad y aislamiento.
+5. Funcionalidades Clave Diseñadas
+Generación de Comprobantes (Facturas, Remitos, etc.):
+Arquitectura: Es un sistema "stateless" (sin estado).
+Endpoint: POST /comprobantes/generar.
+Flujo: El frontend es responsable de enviar un JSON completo con toda la información: datos del emisor, del receptor y de la transacción. El backend actúa como un procesador bajo demanda.
+Flexibilidad: El payload especifica el formato (pdf o ticket) y el tipo (factura, remito, etc.). El backend selecciona la plantilla HTML+CSS adecuada y la convierte a PDF con WeasyPrint.
+Integración AFIP: La lógica está encapsulada en facturacion_afip.py. El generador de comprobantes solo la llama cuando tipo="factura".
+Importación Masiva de Listas de Precios:
+Objetivo: Permitir la actualización de costos y precios a partir de archivos Excel de proveedores, cada uno con su propio formato.
+Arquitectura: Sistema de Plantillas de Mapeo.
+Flujo de 3 Pasos:
+Configuración: Un super-administrador define una plantilla para un proveedor, mapeando las columnas del Excel a los campos de la base de datos (guardado en el modelo PlantillaProveedor).
+Pre-visualización: El usuario sube un Excel. El backend lo lee usando la plantilla y devuelve un informe de los cambios sin aplicarlos.
+Confirmación: Un futuro endpoint recibirá la confirmación y ejecutará la actualización masiva.
+6. Arquitectura del Frontend (Next.js)
+Framework: Next.js con App Router.
+Estado Global: Zustand (useAuthStore). Crítico: El store guarda el objeto usuario completo después del login, incluyendo usuario.rol y usuario.empresa. Esto es fundamental para la renderización condicional y las llamadas a la API.
+Estructura de Rutas:
+Páginas Públicas/Landing: Deben vivir en una sección separada (ej: app/(landing)/) para optimizar el rendimiento y el SEO.
+Aplicación Privada: Vive dentro de un Grupo de Rutas app/(dashboard)/. Un archivo layout.tsx en la raíz de este grupo actúa como el guardián principal, verificando la autenticación del usuario.
+Paneles Ocultos: Se crean como sub-rutas dentro del grupo protegido (ej: app/(dashboard)/super-admin/empresas/page.tsx), y se les añade un segundo guardián a nivel de página o de layout anidado para verificar el rol ("Admin", "Soporte").
+7. Problemas Históricos Resueltos (Contexto de Depuración)
+502 Bad Gateway: La causa raíz eran errores de arranque (ImportError) en main.py por referencias a routers o schemas inexistentes o con nombres incorrectos. La solución fue verificar y corregir todas las importaciones.
+Fallos de Autenticación: La causa raíz era una incompatibilidad de versiones de passlib y bcrypt. La solución fue forzar la reinstalación de una versión compatible (pip install --force-reinstall "passlib[bcrypt]==1.7.4").
+Fechas y Horas: El backend guarda todo en UTC. El frontend es el único responsable de convertir y formatear las fechas a la zona horaria local del usuario.
+8. Rol y Tono del Asistente
+Actuar como un arquitecto de software senior y mentor.
+Priorizar la seguridad, escalabilidad y mantenibilidad en todas las soluciones.
+Explicar el "porqué" de las decisiones de arquitectura, no solo el "cómo".
+Proporcionar código completo, limpio y profesional que siga la arquitectura establecida.
+Ser estructurado, claro y didáctico.
