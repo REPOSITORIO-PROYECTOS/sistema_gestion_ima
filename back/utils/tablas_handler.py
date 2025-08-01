@@ -63,14 +63,19 @@ class TablasHandler:
     
 
 
-    def registrar_movimiento(self, datos_venta: Dict[str, Any]) -> bool:
+    def registrar_movimiento(self, google_sheet_id: str, datos_venta: Dict[str, Any]) -> bool:
         
         if not self.client:
             print("ERROR: Cliente de Google Sheets no disponible.")
             return False
+        if not google_sheet_id:
+            print("ADVERTENCIA: No se proporcionó un ID de Google Sheet. Saltando.")
+            return False
 
         try:
-            hoja = self.client.open_by_key(link_google_sheets).worksheet("MOVIMIENTOS")
+            # Ahora usa el ID que le pasaron como parámetro, no una variable global
+            hoja = self.client.open_by_key(google_sheet_id).worksheet("MOVIMIENTOS")
+
 
             id_movimiento = str(uuid.uuid4())[:8]
             fecha_actual = datetime.now().strftime("%d-%m-%Y")
@@ -105,16 +110,12 @@ class TablasHandler:
         
 
 
-    def restar_stock(self, lista_items: List[ArticuloVendido]) -> bool:
-
-        if not self.client:
-            print("❌ ERROR [STOCK]: Cliente de Google Sheets no disponible.")
+    def restar_stock(self, google_sheet_id: str, lista_items: List[Dict[str, Any]]) -> bool:
+        if not self.client or not google_sheet_id:
             return False
-
-        print("🔄 [STOCK] Iniciando proceso de actualización de stock en Google Sheets...")
+        
         try:
-
-            sheet = self.client.open_by_key(link_google_sheets)
+            sheet = self.client.open_by_key(google_sheet_id)
             worksheet = sheet.worksheet("stock") 
             datos_stock = worksheet.get_all_records()
 
