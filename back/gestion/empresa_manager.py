@@ -99,5 +99,5 @@ def obtener_todas_las_empresas(db: Session, incluir_inactivas: bool = False) -> 
     statement = select(Empresa).order_by(Empresa.nombre_legal)
     if not incluir_inactivas:
         # Filtramos usando tu campo
-        statement = statement.where(Empresa.activa == True) # <-- USAMOS TU CAMPO
+        statement = statement.where(Empresa.activo == True) # <-- USAMOS TU CAMPO
     return db.exec(statement).all()
