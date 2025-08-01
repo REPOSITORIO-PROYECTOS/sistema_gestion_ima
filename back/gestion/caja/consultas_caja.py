@@ -113,4 +113,5 @@ def obtener_todos_los_movimientos_de_caja(db: Session, usuario_actual: Usuario) 
     # 5. Ejecutamos la consulta final.
     resultados = db.exec(query).all()
     print(f"Se encontraron {len(resultados)} movimientos en total para la empresa.")
+    print(resultados)
     return resultados
