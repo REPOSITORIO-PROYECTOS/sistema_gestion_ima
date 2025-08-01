@@ -20,6 +20,7 @@ export interface MovimientoAPI {
   venta?: {
     facturada: boolean;
   };
+  tipo_comprobante: "comprobante" | "remito" | "presupuesto" | "factura";
 }
 
 export const columns: ColumnDef<MovimientoAPI>[] = [
@@ -79,6 +80,18 @@ export const columns: ColumnDef<MovimientoAPI>[] = [
     },
   },
   {
+    accessorKey: "tipo_comprobante_solicitado",
+    header: "Tipo Comprobante",
+    cell: ({ row }) => {
+      const value = row.getValue("tipo_comprobante_solicitado") as string;
+      return (
+        <Badge variant="secondary" className="ml-4">
+          {value}
+        </Badge>
+      );
+    },
+  },
+  {
     accessorKey: "concepto",
     header: "Concepto",
   },
@@ -126,5 +139,5 @@ export const columns: ColumnDef<MovimientoAPI>[] = [
         </Badge>
       );
     },
-  }
+  },
 ];

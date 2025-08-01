@@ -5,7 +5,7 @@ import { DataTable } from "./data-table";
 import { columns, ProductoAPI } from "./columns";
 import { useAuthStore } from "@/lib/authStore";
 
-export default function Page() {
+export default function StockPage() {
     
   const [productos, setProductos] = useState<ProductoAPI[]>([]);
   const [loading, setLoading] = useState(true);
