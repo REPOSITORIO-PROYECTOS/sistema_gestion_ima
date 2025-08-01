@@ -98,7 +98,9 @@ def api_registrar_venta(
             total_venta=req.total_venta,
             metodo_pago=req.metodo_pago.upper(),
             articulos_vendidos=req.articulos_vendidos,
-            id_cliente=req.id_cliente
+            id_cliente=req.id_cliente,
+            pago_separado=req.pago_separado,
+            detalles_pago_separado=req.detalles_pago_separado
         )
         db.commit()
         db.refresh(venta_creada)

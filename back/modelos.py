@@ -277,6 +277,8 @@ class Venta(SQLModel, table=True):
     id_cliente: Optional[int] = Field(default=None, foreign_key="terceros.id")
     id_usuario: int = Field(foreign_key="usuarios.id")
     id_caja_sesion: int = Field(foreign_key="caja_sesiones.id")
+    pago_separado: Optional[bool] = None
+    detalles_pago_separado: Optional[str] = None
     cliente: Optional[Tercero] = Relationship(back_populates="ventas_recibidas")
     usuario: Usuario = Relationship(back_populates="ventas_realizadas")
     caja_sesion: CajaSesion = Relationship(back_populates="ventas")

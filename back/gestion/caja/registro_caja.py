@@ -25,7 +25,9 @@ def registrar_venta_y_movimiento_caja(
     total_venta: float, # Este es el total de los productos ANTES de recargos
     metodo_pago: str,
     articulos_vendidos: List[ArticuloVendido],
-    id_cliente: int = None
+    id_cliente: int = None,
+    pago_separado:bool = None,
+    detalles_pago_separado: str = None,
 ) -> Tuple[Venta, CajaMovimiento]:
     """
     Registra una Venta, aplica recargos dinámicos según la configuración
@@ -75,7 +77,9 @@ def registrar_venta_y_movimiento_caja(
         id_cliente=id_cliente,
         id_usuario=usuario_actual.id,
         id_caja_sesion=id_sesion_caja,
-        id_empresa=usuario_actual.id_empresa
+        id_empresa=usuario_actual.id_empresa,
+        pago_separado=pago_separado,
+        detalles_pago_separado=detalles_pago_separado
     )
     db.add(nueva_venta)
     db.flush()

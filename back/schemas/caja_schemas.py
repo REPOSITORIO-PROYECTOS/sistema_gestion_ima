@@ -38,6 +38,8 @@ class RegistrarVentaRequest(BaseModel):
     articulos_vendidos: List[ArticuloVendido]
     quiere_factura: bool = False
     tipo_comprobante_solicitado: Optional[str] = None
+    pago_separado: Optional[bool] = None
+    detalles_pago_separado: Optional[str] = None
 
 class CajaMovimientoResponse(BaseModel):
     id: int
