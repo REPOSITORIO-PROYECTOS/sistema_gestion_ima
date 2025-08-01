@@ -147,7 +147,7 @@ def api_buscar_articulo_por_codigo(
     """
     Busca un artículo por su código de barras.
     """
-    articulo = articulos_manager.obtener_articulo_por_codigo(db, codigo)
+    articulo = articulos_manager.buscar_articulo_por_codigo(db, codigo)
     if not articulo:
         raise HTTPException(status_code=404, detail=f"Artículo con código '{codigo}' no encontrado.")
     return articulo
