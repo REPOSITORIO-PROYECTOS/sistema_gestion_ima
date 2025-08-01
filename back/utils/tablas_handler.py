@@ -9,7 +9,7 @@ from datetime import datetime
 from back.config import (
     GOOGLE_SHEET_ID, GOOGLE_SERVICE_ACCOUNT_FILE,
 )
-from back.modelos import google_sheet_id
+from back.modelos import link_google_sheets
 
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.file']
 gspread_client: Optional[gspread.Client] = None
@@ -48,7 +48,7 @@ class TablasHandler:
         print("Intentando cargar/recargar datos de Clientes...")
         if self.client:
             try:
-                sheet = self.client.open_by_key(google_sheet_id)
+                sheet = self.client.open_by_key(link_google_sheets)
                 worksheet = sheet.worksheet("clientes") # <-- ¿Existe una hoja llamada "clientes"?
                 datos_clientes = worksheet.get_all_records()
                 return datos_clientes
@@ -70,7 +70,7 @@ class TablasHandler:
             return False
 
         try:
-            hoja = self.client.open_by_key(google_sheet_id).worksheet("MOVIMIENTOS")
+            hoja = self.client.open_by_key(link_google_sheets).worksheet("MOVIMIENTOS")
 
             id_movimiento = str(uuid.uuid4())[:8]
             fecha_actual = datetime.now().strftime("%d-%m-%Y")
@@ -114,7 +114,7 @@ class TablasHandler:
         print("🔄 [STOCK] Iniciando proceso de actualización de stock en Google Sheets...")
         try:
 
-            sheet = self.client.open_by_key(google_sheet_id)
+            sheet = self.client.open_by_key(link_google_sheets)
             worksheet = sheet.worksheet("stock") 
             datos_stock = worksheet.get_all_records()
 
@@ -182,7 +182,7 @@ class TablasHandler:
         print("Intentando cargar/recargar datos de Artículos...")
         if self.client:
             try:
-                sheet = self.client.open_by_key(google_sheet_id)
+                sheet = self.client.open_by_key(link_google_sheets)
                 worksheet = sheet.worksheet("stock") # Apunta a la hoja "stock"
                 return worksheet.get_all_records()
             except gspread.exceptions.WorksheetNotFound:
