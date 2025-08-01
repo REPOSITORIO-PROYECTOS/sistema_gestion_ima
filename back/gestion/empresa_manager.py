@@ -67,8 +67,37 @@ def obtener_empresa_por_id(db: Session, id_empresa: int) -> Optional[Empresa]:
     """
     return db.get(Empresa, id_empresa)
 
-def obtener_todas_las_empresas(db: Session) -> List[Empresa]:
+def desactivar_o_reactivar_empresa(db: Session, id_empresa: int, activar: bool) -> Empresa:
     """
-    Devuelve una lista de todas las empresas registradas en el sistema.
+    Desactiva o reactiva una empresa cambiando su estado.
     """
-    return db.exec(select(Empresa).order_by(Empresa.nombre_legal)).all()
+    empresa = db.get(Empresa, id_empresa)
+    if not empresa:
+        raise ValueError(f"No se encontró una empresa con el ID {id_empresa}.")
+
+    # Lógica usando tu campo 'estado_activo' (o como se llame)
+    if empresa.estado_activo == activar:
+        estado_actual = "activa" if activar else "inactiva"
+        print(f"La empresa ya se encuentra {estado_actual}. No se realizan cambios.")
+        return empresa
+
+    empresa.estado_activo = activar # <-- USAMOS TU CAMPO
+    
+    try:
+        db.add(empresa)
+        db.commit()
+        db.refresh(empresa)
+        return empresa
+    except Exception as e:
+        db.rollback()
+        raise RuntimeError(f"Error de base de datos: {e}")
+
+def obtener_todas_las_empresas(db: Session, incluir_inactivas: bool = False) -> List[Empresa]:
+    """
+    Devuelve una lista de empresas.
+    """
+    statement = select(Empresa).order_by(Empresa.nombre_legal)
+    if not incluir_inactivas:
+        # Filtramos usando tu campo
+        statement = statement.where(Empresa.estado_activo == True) # <-- USAMOS TU CAMPO
+    return db.exec(statement).all()
