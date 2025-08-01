@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 
 # --- Módulos del Proyecto ---
 from back.database import get_db
-from back.schemas.movimientos_schemas_2 import MovimientoContableResponse2
 from back.security import es_cajero, obtener_usuario_actual
 from back.modelos import Usuario, Tercero, Venta, CajaMovimiento
 
@@ -230,10 +229,10 @@ def get_lista_de_arqueos(
         raise HTTPException(status_code=500, detail="Ocurrió un error al generar el informe de arqueos.")
     
 
-router.get(
-    "/movimientos/todos",
+@router.get(
+    "/movimientos/todos", # Una ruta clara
     summary="Obtiene el 'Libro Mayor' de todos los movimientos de caja de la empresa",
-    #response_model=List[MovimientoContableResponse2],
+    response_model=List[MovimientoContableResponse],
     tags=["Caja - Supervisión"]
 )
 def get_todos_los_movimientos(
@@ -241,33 +240,13 @@ def get_todos_los_movimientos(
     current_user: Usuario = Depends(obtener_usuario_actual)
 ):
     """
-    Endpoint maestro para el tablero de contabilidad.
+    Endpoint maestro para el tablero de contabilidad. Devuelve una lista completa
+    de ingresos, egresos y ventas, con el estado de facturación incluido.
     """
+    # Llamamos a nuestra nueva y potente función de consulta
+    id_empresa = current_user.id_empresa
     movimientos = consultas_caja.obtener_todos_los_movimientos_de_caja(
         db=db,
         usuario_actual=current_user
     )
-
-    # --- INICIO DE LA DEPURACIÓN FINAL ---
-    print("\n\n######################################################")
-    print("###      INICIANDO PRUEBA DE VALIDACIÓN MANUAL     ###")
-    print("######################################################\n")
-    if movimientos:
-        # Tomamos el primer movimiento de la lista para la prueba
-        primer_movimiento_dict = movimientos[0]
-        try:
-            print(">>> INTENTANDO VALIDAR EL PRIMER MOVIMIENTO CON EL SCHEMA IMPORTADO...")
-            # Validamos el primer diccionario contra el schema que importamos en este archivo
-            validated_obj = MovimientoContableResponse.model_validate(primer_movimiento_dict)
-            print("✅✅✅ VALIDACIÓN MANUAL EXITOSA. El schema importado es CORRECTO.")
-            print("     Datos validados:", validated_obj.model_dump_json(indent=2))
-        except Exception as e:
-            print("❌❌❌ ERROR EN LA VALIDACIÓN MANUAL. El schema importado es INCORRECTO.")
-            print("     Detalle del error:", e)
-    else:
-        print("--- No hay movimientos para probar la validación manual.")
-    
-    print("\n### FIN DE LA PRUEBA. Ahora se lo pasamos a FastAPI... ###\n")
-    # --- FIN DE LA DEPURACIÓN ---
-
     return movimientos
