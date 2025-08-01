@@ -5,7 +5,7 @@ import * as Switch from '@radix-ui/react-switch';
 import { useThemeStore } from '@/lib/themeStore'
 import { Input } from "@/components/ui/input";
 import Image from "next/image"
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import {
   Select,
   SelectContent,
@@ -13,9 +13,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAuthStore } from '@/lib/authStore';
 
 export default function GestionNegocio() {
 
+  const token = useAuthStore((state) => state.token);
   const { setNavbarColor, setLogoUrl, navbarColor, logoUrl } = useThemeStore()
   const {
     habilitarExtras,
@@ -32,8 +34,96 @@ export default function GestionNegocio() {
     setFormatoComprobante
   } = useFacturacionStore();
 
-  const formatosDisponibles = ["PDF", "Ticket"]; // escalable a mas formatos..
+  const formatosDisponibles = ["PDF", "Ticket"];  // escalable a mas formatos..
 
+  /* Negocio */
+
+  // GET Recargos transferencia y banco
+  useEffect(() => {
+    if (!token) return;
+
+    const fetchRecargos = async () => {
+      try {
+        const [resTransferencia, resBancario] = await Promise.all([
+          fetch("https://sistema-ima.sistemataup.online/api/configuracion/mi-empresa/recargo/transferencia", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch("https://sistema-ima.sistemataup.online/api/configuracion/mi-empresa/recargo/banco", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
+
+        const dataTransferencia = await resTransferencia.json();
+        const dataBancario = await resBancario.json();
+
+        setRecargoTransferencia(dataTransferencia.porcentaje || 0);
+        setRecargoBancario(dataBancario.porcentaje || 0);
+
+      } catch (error) {
+        console.error("Error al obtener recargos:", error);
+      }
+    };
+
+    fetchRecargos();
+  }, [token, setRecargoBancario, setRecargoTransferencia]);
+
+  // PATCH Recargos transferencia
+  const actualizarRecargoTransferencia = async () => {
+    try {
+      const res = await fetch(
+        "https://sistema-ima.sistemataup.online/api/configuracion/mi-empresa/recargo/transferencia",
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            porcentaje: recargoTransferencia,
+            concepto: "Actualización recargo transferencia" 
+          }),
+        }
+      );
+
+      if (!res.ok) throw new Error("Error en el PATCH");
+
+      alert("Recargo por transferencia actualizado correctamente");
+    } catch (error) {
+      console.error(error);
+      alert("Error al actualizar el recargo por transferencia");
+    }
+  };
+
+  // PATCH Recargos banco
+  const actualizarRecargoBancario = async () => {
+    try {
+      const res = await fetch(
+        "https://sistema-ima.sistemataup.online/api/configuracion/mi-empresa/recargo/banco",
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            porcentaje: recargoBancario,
+            concepto: "Actualización recargo bancario"
+          }),
+        }
+      );
+
+      if (!res.ok) throw new Error("Error en el PATCH");
+
+      alert("Recargo por banco actualizado correctamente");
+    } catch (error) {
+      console.error(error);
+      alert("Error al actualizar el recargo por banco");
+    }
+  };
+
+
+
+  /* UI */
   // Handler para cambiar el LOGO de la empresa
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -121,10 +211,10 @@ export default function GestionNegocio() {
       {/* Header para método de pago y recargos*/}
       <div className="space-y-2">
         <h2 className="text-xl font-bold text-green-950">Recargos asociados a métodos de pago.</h2>
-        <p className="text-muted-foreground">Desde acá podes asignar recargos a las opciones de transferencia o pago bancario.</p>
+        <p className="text-muted-foreground">Desde acá podes asignar recargos a las opciones de transferencia o pago bancario. El valor que ves es el recargo actual, podes reemplazarlo y setear uno nuevo.</p>
       </div>
 
-      {/* Toggle de Recargo Transferencia */}
+      {/* Recargo por Transferencia */}
       <div className="flex flex-col gap-2">
         <div className="flex flex-col sm:flex-row items-center gap-4">
           <Switch.Root
@@ -159,9 +249,17 @@ export default function GestionNegocio() {
           }}
           className="w-1/3 mt-2"
         />
+
+        <button
+          onClick={actualizarRecargoTransferencia}
+          disabled={!recargoTransferenciaActivo}
+          className="bg-green-900 text-white px-4 py-1 rounded mt-2 w-1/3 disabled:opacity-50"
+        >
+          Guardar recargo transferencia
+        </button>
       </div>
 
-      {/* Toggle de Recargo Bancario */}
+      {/* Recargo por Bancario */}
       <div className="flex flex-col gap-2">
         <div className="flex flex-col sm:flex-row items-center gap-4">
           <Switch.Root
@@ -196,6 +294,14 @@ export default function GestionNegocio() {
           }}
           className="w-1/3 mt-2"
         />
+
+        <button
+          onClick={actualizarRecargoBancario}
+          disabled={!recargoBancarioActivo}
+          className="bg-green-900 text-white px-4 py-1 rounded mt-2 w-1/3 disabled:opacity-50"
+        >
+          Guardar recargo bancario
+        </button>
       </div>
 
       <hr className="h-0.25 my-4" />  {/* --------------------------------------------------------------- */}
