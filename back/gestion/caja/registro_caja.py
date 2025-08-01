@@ -139,7 +139,7 @@ def registrar_venta_y_movimiento_caja(
                     "descripcion": f"Venta de {len(articulos_vendidos)} artículos",
                     "monto": total_final_con_recargo,
                 }
-                caller = TablasHandler(id_empresa=usuario_actual.id_empresa, db=session)
+                caller = TablasHandler(id_empresa=usuario_actual.id_empresa, db=db)
                 if not caller.registrar_movimiento(datos_para_sheets):
                     print("⚠️ [DRIVE] La función registrar_movimiento devolvió False.")
                 if not caller.restar_stock(articulos_vendidos):
@@ -219,7 +219,7 @@ def registrar_ingreso_egreso(
                     "monto": monto,
             }
 
-            caller = TablasHandler(usuario_actual.id_empresa, db=session)
+            caller = TablasHandler(usuario_actual.id_empresa, db=db)
             if not caller.registrar_movimiento(datos_para_sheets):
                 print("⚠️ [DRIVE] La función registrar_movimiento devolvió False.")
            
