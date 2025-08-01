@@ -35,7 +35,23 @@ def obtener_mi_configuracion(
     current_user: Usuario = Depends(obtener_usuario_actual)
 ):
     """Obtiene la configuración completa de la empresa del usuario autenticado."""
+    
+    # --- VERIFICACIÓN DE SEGURIDAD AÑADIDA ---
+    if not current_user.id_empresa:
+        raise HTTPException(
+            status_code=404, # Usamos 404 porque la "configuración de su empresa" no se encuentra
+            detail="El usuario actual no está asociado a ninguna empresa."
+        )
+    
+    # Esta línea ahora es segura porque sabemos que current_user.id_empresa no es None
     config = configuracion_manager.obtener_configuracion_empresa(db, current_user.id_empresa)
+    
+    if not config:
+        raise HTTPException(
+            status_code=404,
+            detail="No se encontró un registro de configuración para la empresa de este usuario."
+        )
+        
     return config
 
 
@@ -85,22 +101,20 @@ async def subir_icono_empresa(
     
     return RespuestaGenerica(status="ok", message=f"Icono subido correctamente. Ruta: {public_path}")
 
-@router.patch(
-    "/mi-empresa", # <-- RUTA CORREGIDA: Genérica y segura
-    response_model=ConfiguracionResponse,
-    dependencies=[Depends(verificar_permiso_admin)] # <-- SEGURIDAD AÑADIDA
-)
+@router.patch("/mi-empresa", response_model=ConfiguracionResponse)
 def actualizar_mi_configuracion(
-    data: ConfiguracionUpdate, # <-- El frontend envía aquí {"recargo_transferencia": 12.5}
+    data: ConfiguracionUpdate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(obtener_usuario_actual) # <-- SEGURIDAD AÑADIDA
+    current_user: Usuario = Depends(obtener_usuario_actual)
 ):
-    """
-    Actualiza parcialmente la configuración de la propia empresa del usuario.
-    Sirve para cambiar el nombre, el color, o los recargos por transferencia.
-    """
+    """Actualiza parcialmente la configuración de la propia empresa del usuario."""
+    verificar_permiso_admin(current_user) # Reutilizamos tu función de verificación de rol
+
+    # --- VERIFICACIÓN DE SEGURIDAD AÑADIDA ---
+    if not current_user.id_empresa:
+        raise HTTPException(status_code=404, detail="El usuario actual no está asociado a ninguna empresa.")
+
     try:
-        # La función del manager es llamada de forma segura con el id_empresa del usuario
         config_actualizada = configuracion_manager.actualizar_configuracion_parcial(
             db=db,
             id_empresa=current_user.id_empresa,
@@ -108,21 +122,20 @@ def actualizar_mi_configuracion(
         )
         return config_actualizada
     except ValueError as e:
-        # MANEJO DE ERRORES AÑADIDO
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error interno: {e}")
     
-@router.get(
-    "/mi-empresa/recargo/transferencia",
-    response_model=RecargoData,
-    summary="Obtiene el recargo actual por Transferencia"
-)
+@router.get("/mi-empresa/recargo/transferencia", response_model=RecargoData)
 def get_recargo_transferencia(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(obtener_usuario_actual)
 ):
     """Obtiene el recargo por transferencia de la empresa del usuario autenticado."""
+    # --- VERIFICACIÓN DE SEGURIDAD AÑADIDA ---
+    if not current_user.id_empresa:
+        raise HTTPException(status_code=404, detail="El usuario actual no está asociado a ninguna empresa.")
+
     try:
         return configuracion_manager.obtener_recargo_por_tipo(db, current_user.id_empresa, "transferencia")
     except ValueError as e:
