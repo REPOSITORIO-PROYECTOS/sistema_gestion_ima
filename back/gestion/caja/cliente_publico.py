@@ -6,7 +6,7 @@
 
 from typing import Dict, List, Union
 
-from requests import Session
+from requests import Session, session
 from back.utils.tablas_handler import TablasHandler
 
 
@@ -18,7 +18,7 @@ def obtener_cliente_por_cuit(db: Session,id_empresa: int, cuit_cliente: str = No
     if not cuit_cliente:
         return "Público General"
 
-    caller = TablasHandler(id_empresa=id_empresa,db=db)
+    caller = TablasHandler(id_empresa=id_empresa, db=session)
     datos_clientes = caller.cargar_clientes()
 
     resultados = []
@@ -44,7 +44,7 @@ def obtener_cliente_por_id(db: Session,id_empresa: int, id_cliente: str = None) 
     if not id_cliente:
         return "Público General"
 
-    caller = TablasHandler(id_empresa=id_empresa,db=db)
+    caller = TablasHandler(id_empresa=id_empresa, db=session)
     datos_clientes = caller.cargar_clientes()
 
     for cliente in datos_clientes:

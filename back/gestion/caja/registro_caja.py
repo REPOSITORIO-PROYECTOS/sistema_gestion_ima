@@ -1,6 +1,7 @@
 # back/gestion/caja/registro_caja.py
 
 from datetime import datetime
+from requests import session
 from sqlmodel import Session, select
 from typing import List, Tuple, Dict, Any
 from datetime import datetime
@@ -138,7 +139,7 @@ def registrar_venta_y_movimiento_caja(
                     "descripcion": f"Venta de {len(articulos_vendidos)} artículos",
                     "monto": total_final_con_recargo,
                 }
-                caller = TablasHandler(db,usuario_actual.id_empresa)
+                caller = TablasHandler(id_empresa=usuario_actual.id_empresa, db=session)
                 if not caller.registrar_movimiento(datos_para_sheets):
                     print("⚠️ [DRIVE] La función registrar_movimiento devolvió False.")
                 if not caller.restar_stock(articulos_vendidos):
@@ -218,8 +219,7 @@ def registrar_ingreso_egreso(
                     "monto": monto,
             }
 
-            caller = TablasHandler(db,usuario_actual.id_empresa)
-
+            caller = TablasHandler(usuario_actual.id_empresa, db=session)
             if not caller.registrar_movimiento(datos_para_sheets):
                 print("⚠️ [DRIVE] La función registrar_movimiento devolvió False.")
            

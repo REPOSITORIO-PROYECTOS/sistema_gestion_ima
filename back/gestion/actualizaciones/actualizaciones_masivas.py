@@ -1,6 +1,7 @@
 # /home/sgi_user/proyectos/sistema_gestion_ima/back/gestion/actualizaciones_masivas.py
 
 from fastapi import HTTPException
+from requests import session
 from sqlmodel import Session, select
 from typing import Dict, List, Any
 import re
@@ -33,7 +34,7 @@ def sincronizar_clientes_desde_sheets(db: Session, id_empresa_actual: int) -> Di
     
     link_de_la_empresa = config_empresa.link_google_sheets
 
-    handler = TablasHandler(db=db,google_sheet_id=link_de_la_empresa)
+    handler = TablasHandler(id_empresa=id_empresa_actual, db=session)
     print("Obteniendo datos de clientes desde Google Sheets...")
     clientes_sheets = handler.cargar_clientes()
     print("Obteniendo datos de clientes desde la base de datos...")
@@ -129,9 +130,7 @@ def sincronizar_articulos_desde_sheets(db: Session, id_empresa_actual: int) -> D
         print("error falta algo")
         return
     
-    link_de_la_empresa = config_empresa.link_google_sheets
-
-    handler = TablasHandler(db=db,google_sheet_id=link_de_la_empresa)
+    handler = TablasHandler(id_empresa=id_empresa_actual, db=session)
     
     print("Obteniendo datos de Google Sheets...")
     articulos_sheets = handler.cargar_articulos() # Asumo que esta función existe y funciona
