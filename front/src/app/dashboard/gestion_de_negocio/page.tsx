@@ -5,7 +5,7 @@ import * as Switch from '@radix-ui/react-switch';
 import { useThemeStore } from '@/lib/themeStore'
 import { Input } from "@/components/ui/input";
 import Image from "next/image"
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import {
   Select,
   SelectContent,
@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuthStore } from '@/lib/authStore';
+import { toast } from 'sonner';
 
 export default function GestionNegocio() {
 
@@ -37,7 +38,6 @@ export default function GestionNegocio() {
   const formatosDisponibles = ["PDF", "Ticket"];  // escalable a mas formatos..
 
   /* Negocio */
-
   // GET Recargos transferencia y banco
   useEffect(() => {
     if (!token) return;
@@ -122,28 +122,56 @@ export default function GestionNegocio() {
   };
 
 
-
   /* UI */
+  // Subir LOGO al Back para personalización
+  const subirArchivo = async (file: File) => {
+    const endpoint = "https://sistema-ima.sistemataup.online/api/configuracion/upload-logo";
+
+    const formData = new FormData();
+    formData.append("archivo", file);
+
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`, // sin Content-Type
+      },
+      body: formData,
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || "Error al subir el archivo");
+
+    return data;
+  };
+
   // Handler para cambiar el LOGO de la empresa
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    const allowedTypes = ["image/png", "image/jpeg", "image/webp"]
+    const allowedTypes = ["image/png", "image/jpeg", "image/webp"];
     if (!allowedTypes.includes(file.type)) {
-      alert("Formato no permitido. Solo .png, .jpg, .webp")
-      return
+      toast.error("Formato no permitido. Solo .png, .jpg, .webp");
+      return;
     }
 
-    const reader = new FileReader()
-    reader.onload = () => {
-      const dataUrl = reader.result as string
-      setLogoUrl(dataUrl) // guarda el base64 como URL
-    }
-    reader.readAsDataURL(file)
-  }
+    try {
+      const { message } = await subirArchivo(file);
+      console.log(message);
 
-  const fileInputRef = useRef<HTMLInputElement>(null)
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        setLogoUrl(dataUrl);
+      };
+      reader.readAsDataURL(file);
+
+      toast.success("Logo subido correctamente.");
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al subir el logo");
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6 p-2">
@@ -211,7 +239,7 @@ export default function GestionNegocio() {
       {/* Header para método de pago y recargos*/}
       <div className="space-y-2">
         <h2 className="text-xl font-bold text-green-950">Recargos asociados a métodos de pago.</h2>
-        <p className="text-muted-foreground">Desde acá podes asignar recargos a las opciones de transferencia o pago bancario. El valor que ves es el recargo actual, podes reemplazarlo y setear uno nuevo.</p>
+        <p className="text-muted-foreground md:max-w-1/2">Desde acá podes asignar recargos a las opciones de transferencia o pago bancario. El valor que ves es el recargo actual, podes reemplazarlo y setear uno nuevo.</p>
       </div>
 
       {/* Recargo por Transferencia */}
@@ -333,7 +361,7 @@ export default function GestionNegocio() {
           
         </div>
 
-        {/* Switch de Imagen */}
+        {/* LOGO */}
         <div className="flex flex-col items-start gap-4 mb-6">
           <label className="text-md font-semibold mb-1">Logo actual:</label>
           <div className="flex flex-col sm:flex-row items-center gap-4">
@@ -342,7 +370,6 @@ export default function GestionNegocio() {
               type="file"
               accept=".png,.jpg,.jpeg,.webp"
               onChange={handleFileChange}
-              ref={fileInputRef}
               className="max-w-sm"
             />
           </div>
