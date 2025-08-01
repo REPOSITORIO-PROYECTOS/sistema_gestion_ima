@@ -6,9 +6,7 @@ from typing import List, Dict, Any, Optional, Tuple
 import uuid
 from datetime import datetime
 # Importar las VARIABLES PYTHON definidas en config.py
-from back.config import (
-    GOOGLE_SHEET_ID, GOOGLE_SERVICE_ACCOUNT_FILE,
-)
+from back.config import  GOOGLE_SERVICE_ACCOUNT_FILE
 from back.modelos import link_google_sheets
 
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.file']
