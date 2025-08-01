@@ -2,7 +2,7 @@
 
 import os
 import shutil
-from fastapi import UploadFile
+from fastapi import UploadFile, HTTPException, status
 from sqlmodel import Session
 from back.modelos import ConfiguracionEmpresa, Usuario
 from back.schemas.configuracion_schemas import ConfiguracionUpdate, RecargoData, RecargoUpdate
@@ -118,3 +118,50 @@ def actualizar_recargo_por_tipo(db: Session, id_empresa: int, tipo: str, data: R
     
     # Devolvemos los datos actualizados usando la otra función para no repetir código
     return obtener_recargo_por_tipo(db, id_empresa, tipo)
+
+def actualizar_ruta_archivo(db: Session, id_empresa: int, tipo_archivo: str, ruta_publica: str) -> ConfiguracionEmpresa:
+    """
+    Actualiza la ruta del logo o del icono de la empresa en la base de datos.
+    
+    Args:
+        db: La sesión de la base de datos.
+        id_empresa: El ID de la empresa a modificar.
+        tipo_archivo: Una cadena, debe ser "logo" o "icono".
+        ruta_publica: La ruta donde el archivo es accesible públicamente (ej: /static/logos/nombre_archivo.png).
+    """
+    print(f"Actualizando ruta para '{tipo_archivo}' de la empresa {id_empresa} a: {ruta_publica}")
+    
+    # Usamos nuestra función auxiliar para asegurarnos de que la configuración exista.
+    config_db = obtener_configuracion_empresa(db, id_empresa)
+
+    if tipo_archivo == "logo":
+        config_db.ruta_logo = ruta_publica
+    elif tipo_archivo == "icono":
+        config_db.ruta_icono = ruta_publica
+    else:
+        # Es importante validar para no intentar modificar campos que no existen.
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"El tipo de archivo '{tipo_archivo}' no es válido. Debe ser 'logo' o 'icono'."
+        )
+
+    db.add(config_db)
+    db.commit()
+    db.refresh(config_db)
+
+    print(f"Ruta actualizada correctamente en la base de datos.")
+    return config_db
+
+def obtener_configuracion_empresa(db: Session, id_empresa: int) -> ConfiguracionEmpresa:
+    """
+    Obtiene la configuración de una empresa. Si no existe, la crea con valores por defecto.
+    Esto asegura que siempre podamos trabajar con un objeto de configuración.
+    """
+    config = db.get(ConfiguracionEmpresa, id_empresa)
+    if not config:
+        print(f"No se encontró configuración para la empresa ID {id_empresa}. Creando una nueva.")
+        config = ConfiguracionEmpresa(id_empresa=id_empresa)
+        db.add(config)
+        db.commit()
+        db.refresh(config)
+    return config
