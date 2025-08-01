@@ -132,8 +132,9 @@ class TablasHandler:
         try:
             sheet = self.client.open_by_key(self.google_sheet_id)
             worksheet = sheet.worksheet("stock")
+            print("LLEGUE HASTA LINEA 135")
             datos_stock = worksheet.get_all_records()
-
+            print("LLEGUE HASTA LINEA 137")
             columna_id = "id producto"
             columna_stock = "cantidad"
 
@@ -179,7 +180,7 @@ class TablasHandler:
             print("✅ [STOCK] Stock actualizado correctamente en Google Sheets.")
             return True
 
-        except gspread.exceptions.WorksheetNotFound:
+        except gspread.WorksheetNotFound:
             print("❌ ERROR [STOCK]: Hoja 'stock' no encontrada en el documento.")
             return False
         except Exception as e:
