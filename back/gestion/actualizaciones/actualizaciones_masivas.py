@@ -71,7 +71,8 @@ def sincronizar_clientes_desde_sheets(db: Session, id_empresa_actual: int) -> Di
                 "direccion": cliente_sheet.get("direccion", "").strip(),
                 "notas": cliente_sheet.get("observaciones", "").strip(),
                 "cuit": cuit_limpio, # <-- USAMOS EL CUIT YA VALIDADO
-                "condicion_iva": cliente_sheet.get("Tipo de Cliente", "").strip() or "Consumidor Final"
+                "condicion_iva": cliente_sheet.get("Tipo de Cliente", "").strip() or "Consumidor Final",
+                "id_empresa": id_empresa_actual,
             }
 
             if cliente_existente:
@@ -165,6 +166,7 @@ def sincronizar_articulos_desde_sheets(db: Session, id_empresa_actual: int) -> D
                 "venta_negocio": limpiar_precio(articulo_sheet.get("precio negocio", 0)),
                 "stock_actual": limpiar_precio(articulo_sheet.get("cantidad", 0)),
                 "activo": str(articulo_sheet.get("Activo", "TRUE")).upper() == "TRUE",
+                "id_empresa" : id_empresa_actual,
                 # Puedes añadir más campos del sheet aquí si los tienes
                 # Ejemplo: "precio_costo": limpiar_precio(articulo_sheet.get("Costo", 0)),
             }
