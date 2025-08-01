@@ -1,14 +1,11 @@
 # back/main.py
-
-from back.api.blueprints import admin_router, articulos_router, auth_router,actualizacion_masiva_router,clientes_router, configuracion_router, empresa_router, importaciones_router, proveedores_router, comprobantes_router
+from back.api import blueprints
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 
 # Importamos los routers que acabamos de crear
-from back.api.blueprints import caja_router
-from back.api.blueprints import usuarios_router
 
 
 # Importamos la configuración para la conexión inicial y CORS
@@ -63,18 +60,18 @@ def startup_event():
 
 # --- Inclusión de Routers ---
 # Aquí es donde conectamos los archivos de endpoints a la aplicación principal.
-app.include_router(caja_router.router)
-app.include_router(admin_router.router)
-app.include_router(auth_router.router)
-app.include_router(articulos_router.router)
-app.include_router(actualizacion_masiva_router.router)
-app.include_router(clientes_router.router)
-app.include_router(usuarios_router.router)
-app.include_router(importaciones_router.router)
-app.include_router(proveedores_router.router)
-app.include_router(configuracion_router.router)
-app.include_router(empresa_router.router)  # Asegúrate de importar el router de empresas
-app.include_router(comprobantes_router.router)
+app.include_router(blueprints.caja_router.router)
+app.include_router(blueprints.admin_router.router)
+app.include_router(blueprints.auth_router.router)
+app.include_router(blueprints.articulos_router.router)
+app.include_router(blueprints.actualizacion_masiva_router.router)
+app.include_router(blueprints.clientes_router.router)
+app.include_router(blueprints.usuarios_router.router)
+app.include_router(blueprints.importaciones_router.router)
+app.include_router(blueprints.proveedores_router.router)
+app.include_router(blueprints.configuracion_router.router)
+app.include_router(blueprints.empresa_router.router)
+app.include_router(blueprints.comprobantes_router.router)
 
 
 # --- Endpoint Raíz ---
