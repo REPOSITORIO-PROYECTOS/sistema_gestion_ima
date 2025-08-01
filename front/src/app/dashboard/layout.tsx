@@ -40,7 +40,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
 
       {/* Copyright */}
       <footer className="text-center text-md text-gray-500 p-4">
-        © 2019-{new Date().getFullYear()} Jugos Swing.
+        © 2019-{new Date().getFullYear()} IMA Consultoría.
       </footer>
 
     </ProtectedRoute>
