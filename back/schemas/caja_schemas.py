@@ -137,23 +137,31 @@ class _InfoVentaAnidada(BaseModel):
     id: int
     facturada: bool
     datos_factura: Optional[Dict[str, Any]] = None
+    
+    # ¡AÑADIDO AQUÍ!
+    tipo_comprobante_solicitado: Optional[str] = None 
+    
     cliente: Optional[_InfoClienteAnidado] = None
 
+
+# --- SCHEMA PRINCIPAL CORREGIDO ---
+# Quitamos 'tipo_comprobante_solicitado' de aquí.
 class MovimientoContableResponse(BaseModel):
     """
     El schema principal de respuesta para cada fila del 'Libro Mayor de Caja'.
-    Representa un movimiento (ingreso, egreso o venta) con toda la información
-    relevante para el frontend.
     """
-    # --- Datos del Movimiento (siempre presentes) ---
+    # --- Datos del Movimiento ---
     id: int
-    timestamp: datetime # Usamos 'timestamp' para coincidir con tu modelo 'CajaMovimiento'
+    timestamp: datetime
     tipo: str
     concepto: str
     monto: float
-    metodo_pago: Optional[str] = None # Hacemos opcional para cubrir todos los casos
-    tipo_comprobante_solicitado: Optional[str] = None
-    # --- Datos Anidados de la Venta (solo si el movimiento es de tipo 'VENTA') ---
+    metodo_pago: Optional[str] = None
+    
+    # ¡QUITADO DE AQUÍ!
+    # tipo_comprobante_solicitado: Optional[str] = None 
+    
+    # --- Datos Anidados de la Venta ---
     venta: Optional[_InfoVentaAnidada] = None
 
     class Config:
