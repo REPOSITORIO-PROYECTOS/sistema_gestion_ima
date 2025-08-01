@@ -42,9 +42,9 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
   columns,
   data,
 }: DataTableProps<TData, TValue>) {
-
-    const [sorting, setSorting] = useState<SortingState>([])
-    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+    
+    const [sorting, setSorting] = useState<SortingState>([]);
+    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
     const [facturadoFilter, setFacturadoFilter] = useState("all");
     const [rowSelection, setRowSelection] = useState({});
 
@@ -56,17 +56,34 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
         enableRowSelection: (row) => {
-            const tipo = row.original.tipo;
-            const facturada = row.original.venta?.facturada;
-            return !(tipo === "EGRESO" || facturada === true);
+        const tipo = row.original.tipo;
+        const facturada = row.original.venta?.facturada;
+        const tipoComprobante = row.original.tipo_comprobante;
+
+        // No permitir selección si es EGRESO o ya facturada
+        if (tipo === "EGRESO" || facturada === true) return false;
+
+        // Si no hay ninguna fila seleccionada, permitir cualquiera
+        const selectedKeys = Object.keys(rowSelection);
+        if (selectedKeys.length === 0) return true;
+
+        // Buscar la primera fila seleccionada
+        const selectedRow = data.find((item) =>
+            selectedKeys.includes(item.id.toString())
+        );
+
+        if (!selectedRow) return true;
+
+        // Permitir solo si el tipo_comprobante es igual
+        return tipoComprobante === selectedRow.tipo_comprobante;
         },
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
         onRowSelectionChange: setRowSelection,
         state: {
-            sorting,
-            columnFilters,
-            rowSelection,
+        sorting,
+        columnFilters,
+        rowSelection,
         },
     });
 

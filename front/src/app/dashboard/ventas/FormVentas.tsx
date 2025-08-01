@@ -448,18 +448,7 @@ function FormVentas({
           : clienteSeleccionado?.id ?? 100,               
       metodo_pago: metodoPago.toUpperCase(),
       total_venta: totalVenta,
-      paga_con: (() => {
-        switch (metodoPago) {
-          case "efectivo":
-            return montoPagado;
-          case "transferencia":
-            return montoPagado;
-          case "bancario":
-            return montoPagado;
-          default:
-            return "Otro";
-        }
-      })(),
+      paga_con: montoPagado,
       pago_separado: pagoDividido,
       detalles_pago_separado: detallePagoDividido,
       tipo_comprobante_solicitado: tipoFacturacion.toLowerCase(),
@@ -476,8 +465,6 @@ function FormVentas({
         };
       })
     };
-
-    console.log(ventaPayload)
 
     // GENERAR COMPROBANTE - Endpoint que se encarga de imprimir el ticket o comprobante de la venta realizada
     try {

@@ -54,14 +54,7 @@ export const columns: ColumnDef<ProductoAPI>[] = [
       return <div className="font-medium">{stock}</div>;
     },
   },
-  /* {
-    id: "actions",
-    cell: ({ row }) => {
-      const producto = row.original;
-
-      return (
-        
-      );
-    },
-  }, */
+  /* 
+  NECESITAMOS CODIGO DE BARRAS PARA MOSTRAR:
+  */
 ];
