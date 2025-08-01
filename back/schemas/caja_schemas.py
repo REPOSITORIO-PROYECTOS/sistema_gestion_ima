@@ -137,6 +137,7 @@ class _InfoVentaAnidada(BaseModel):
     id: int
     facturada: bool
     datos_factura: Optional[Dict[str, Any]] = None
+    tipo_comprobante_solicitado: Optional[str] = None
     cliente: Optional[_InfoClienteAnidado] = None
 
 class MovimientoContableResponse(BaseModel):
@@ -152,7 +153,7 @@ class MovimientoContableResponse(BaseModel):
     concepto: str
     monto: float
     metodo_pago: Optional[str] = None # Hacemos opcional para cubrir todos los casos
-    tipo_comprobante_solicitado: Optional[str] = None
+    
     # --- Datos Anidados de la Venta (solo si el movimiento es de tipo 'VENTA') ---
     venta: Optional[_InfoVentaAnidada] = None
 
