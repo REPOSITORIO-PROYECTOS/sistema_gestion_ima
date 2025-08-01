@@ -3,6 +3,7 @@
 
 from sqlmodel import Session, select
 from typing import List, Optional
+from sqlalchemy.orm import selectinload
 
 # --- Modelos de la Base de Datos ---
 from back.modelos import Articulo, ArticuloCodigo
@@ -39,114 +40,92 @@ def _recalcular_precio_venta(articulo: Articulo):
 
 def obtener_articulo_por_id(id_empresa: int, db: Session, articulo_id: int) -> Optional[Articulo]:
     """
-    Obtiene un artículo específico por su ID usando el ORM.
-    Devuelve el objeto Articulo o None si no se encuentra.
+    CORREGIDO: Obtiene un artículo específico por su ID, asegurando que pertenezca a la empresa.
+    """
+    statement = select(Articulo).where(Articulo.id == articulo_id, Articulo.id_empresa == id_empresa)
+    return db.exec(statement).first() # Usamos .first() para obtener solo uno.
+
+def buscar_articulo_por_codigo(db: Session, id_empresa_actual: int, codigo: str) -> Optional[Articulo]:
+    """
+    Busca un artículo por su código de barras, asegurando que pertenezca a la empresa del usuario.
+    Pre-carga eficientemente todos los demás códigos de barras asociados al artículo encontrado.
     """
     statement = (
-            select(Articulo)
-            .where(Articulo.id_empresa == id_empresa)
+        select(Articulo)
+        .join(ArticuloCodigo)
+        .where(
+            ArticuloCodigo.codigo == codigo,
+            Articulo.id_empresa == id_empresa_actual,
+            Articulo.activo == True
+        )
+        .options(selectinload(Articulo.codigos))
+    )
+    return db.exec(statement).first()
+
+def obtener_todos_los_articulos(db: Session, id_empresa_actual: int, skip: int = 0, limit: int = 100) -> List[Articulo]:
+    """
+    Obtiene una lista paginada de artículos, pre-cargando eficientemente sus códigos de barras.
+    """
+    statement = (
+        select(Articulo)
+        .where(Articulo.id_empresa == id_empresa_actual)
+        .order_by(Articulo.descripcion)
+        .offset(skip)
+        .limit(limit)
+        .options(selectinload(Articulo.codigos))
     )
     return db.exec(statement).all()
-
-def obtener_todos_los_articulos(id_empresa,db: Session, skip: int = 0, limit: int = 100) -> List[Articulo]:
-    """
-    Obtiene una lista paginada de todos los artículos usando el ORM.
-    """
-    statement = (
-            select(Articulo)
-            .where(Articulo.id_empresa == id_empresa)
-            .order_by(Articulo.descripcion)
-            .offset(skip)
-            .limit(limit)
-            .distinct()
-        )
-    return db.exec(statement).all()
-
-def obtener_articulo_por_codigo_barras(db: Session, codigo_barras: str) -> Optional[Articulo]:
-    """
-    Busca un artículo a través de CUALQUIERA de sus códigos de barras en la tabla 'ArticuloCodigo'.
-    Devuelve el objeto Articulo completo si lo encuentra y está activo.
-    """
-    statement = select(ArticuloCodigo).where(ArticuloCodigo.codigo == codigo_barras)
-    resultado_codigo = db.exec(statement).first()
-    
-    if resultado_codigo and resultado_codigo.articulo and resultado_codigo.articulo.activo:
-        return resultado_codigo.articulo
-    
-    return None
 
 # ===================================================================
 # === OPERACIONES DE ESCRITURA (CREATE, UPDATE, DELETE)
 # ===================================================================
 def crear_articulo(id_empresa: int, db: Session, articulo_data: ArticuloCreate) -> Articulo:
     """
-    Crea un nuevo artículo en la base de datos a partir de datos validados por un schema.
-    Lanza una excepción ValueError si ya existe un código duplicado.
+    CORREGIDO: Crea un nuevo artículo. La validación de código duplicado ahora es por empresa.
     """
     if articulo_data.codigo_interno:
-        statement = select(Articulo).where(Articulo.codigo_interno == articulo_data.codigo_interno)
+        statement = select(Articulo).where(
+            Articulo.codigo_interno == articulo_data.codigo_interno,
+            Articulo.id_empresa == id_empresa # <-- Seguridad añadida
+        )
         if db.exec(statement).first():
-            raise ValueError(f"El código interno '{articulo_data.codigo_interno}' ya está en uso.")
+            raise ValueError(f"El código interno '{articulo_data.codigo_interno}' ya está en uso en tu empresa.")
 
-    # Creamos el artículo con los datos del schema + la empresa
-    db_articulo = Articulo(**articulo_data.dict(), id_empresa=id_empresa)
-    
-    # Recalculamos el precio de venta automáticamente antes de guardarlo
+    db_articulo = Articulo.from_orm(articulo_data, {"id_empresa": id_empresa})
     _recalcular_precio_venta(db_articulo)
-    
     db.add(db_articulo)
     db.commit()
     db.refresh(db_articulo)
-    
     return db_articulo
-
 
 def actualizar_articulo(id_empresa: int, db: Session, articulo_id: int, articulo_data: ArticuloUpdate) -> Optional[Articulo]:
     """
     Actualiza un artículo existente de una empresa específica.
-    Solo modifica los campos que se proporcionan en el schema.
-    Recalcula el precio de venta si es necesario.
     """
-    # Consultamos el artículo solo si pertenece a la empresa
-    stmt = select(Articulo).where(
-        Articulo.id == articulo_id,
-        Articulo.id_empresa == id_empresa
-    )
+    stmt = select(Articulo).where(Articulo.id == articulo_id, Articulo.id_empresa == id_empresa)
     db_articulo = db.exec(stmt).first()
-
     if not db_articulo:
         return None
-
-    # Actualizamos los campos recibidos en el schema
     update_data = articulo_data.dict(exclude_unset=True)
     for key, value in update_data.items():
         setattr(db_articulo, key, value)
-
-    # Recalculamos el precio
     _recalcular_precio_venta(db_articulo)
-
     db.add(db_articulo)
     db.commit()
     db.refresh(db_articulo)
-
     return db_articulo
 
-
-def eliminar_articulo(db: Session, articulo_id: int) -> Optional[Articulo]:
+def eliminar_articulo(db: Session, id_empresa_actual: int, articulo_id: int) -> Optional[Articulo]:
     """
-    Realiza una "eliminación lógica" de un artículo, marcándolo como inactivo.
-    Devuelve el artículo actualizado o None si no se encontró.
+    Realiza una "eliminación lógica" de un artículo, asegurando que pertenezca a la empresa.
     """
-    db_articulo = db.get(Articulo, articulo_id)
+    db_articulo = db.exec(select(Articulo).where(Articulo.id == articulo_id, Articulo.id_empresa == id_empresa_actual)).first()
     if not db_articulo:
         return None
-
     db_articulo.activo = False
-    
     db.add(db_articulo)
     db.commit()
     db.refresh(db_articulo)
-    
     return db_articulo
 
 # ===================================================================

@@ -1,7 +1,7 @@
 # back/schemas/articulo_schemas.py
 
 from pydantic import BaseModel, Field
-from typing import Optional, Any
+from typing import Optional, Any, List
 
 class ArticuloBase(BaseModel):
     """Schema base con los campos comunes de un artículo."""
@@ -32,3 +32,32 @@ class ArticuloResponse(ArticuloBase):
 
     class Config:
         from_attributes = True # Permite que Pydantic lea datos desde objetos de DB
+        
+class ArticuloCodigoRead(BaseModel):
+    codigo: str
+
+    class Config:
+        from_attributes = True
+        
+class ArticuloRead(ArticuloBase):
+    """Schema para devolver un artículo en una respuesta. NO incluye los códigos."""
+    id: int
+    codigo_interno: Optional[str]
+    stock_actual: float
+    activo: bool
+
+    class Config:
+        from_attributes = True 
+
+class ArticuloReadConCodigos(ArticuloRead):
+    """
+    ¡EL SCHEMA CLAVE PARA LA NUEVA FUNCIONALIDAD!
+    Hereda todo de ArticuloRead y le AÑADE el campo que nos faltaba.
+    """
+    codigos: List[ArticuloCodigoRead] = []
+    
+class CodigoBarrasCreate(BaseModel):
+    id_articulo: int
+    codigo: str
+
+
