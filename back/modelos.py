@@ -5,7 +5,7 @@ from typing import Dict, List, Optional
 from sqlmodel import Field, Relationship, SQLModel, JSON, Column
 from sqlalchemy import UniqueConstraint
 from sqlmodel import Column  # Importante
-from sqlalchemy import String  # Importante
+from sqlalchemy import String,JSON   # Importante
 # ===================================================================
 # === MODELOS DE ENTIDADES PRINCIPALES
 # ===================================================================
@@ -282,7 +282,7 @@ class Venta(SQLModel, table=True):
     detalles_pago_separado: Optional[str] = None
     tipo_comprobante_solicitado: Optional[str] = Field(
         default=None, 
-        sa_column=Column("tipo_comprobante_solicitado", String)
+        sa_column=Column(String(255)) # Longitud 255
     )
     cliente: Optional[Tercero] = Relationship(back_populates="ventas_recibidas")
     usuario: Usuario = Relationship(back_populates="ventas_realizadas")
