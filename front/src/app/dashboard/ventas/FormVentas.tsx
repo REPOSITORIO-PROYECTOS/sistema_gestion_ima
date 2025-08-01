@@ -453,15 +453,17 @@ function FormVentas({
           case "efectivo":
             return montoPagado;
           case "transferencia":
-            return "TRANSFERENCIA";
+            return montoPagado;
           case "bancario":
-            return "BANCARIO";
+            return montoPagado;
           default:
             return "Otro";
         }
       })(),
+      pago_separado: pagoDividido,
+      detalles_pago_separado: detallePagoDividido,
       tipo_comprobante_solicitado: tipoFacturacion.toLowerCase(),
-      quiere_factura: tipoFacturacion === "factura",   // si marca factura en tipoFacturacion true, si no false
+      quiere_factura: tipoFacturacion === "factura",              // si marca factura en tipoFacturacion true, si no false
       articulos_vendidos: productosVendidos.map((p) => {
         const productoReal = productos.find(prod => prod.nombre === p.tipo);
         return {
@@ -474,6 +476,8 @@ function FormVentas({
         };
       })
     };
+
+    console.log(ventaPayload)
 
     // GENERAR COMPROBANTE - Endpoint que se encarga de imprimir el ticket o comprobante de la venta realizada
     try {
