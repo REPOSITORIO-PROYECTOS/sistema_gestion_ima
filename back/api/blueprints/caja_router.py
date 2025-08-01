@@ -233,7 +233,7 @@ def get_lista_de_arqueos(
 router.get(
     "/movimientos/todos",
     summary="Obtiene el 'Libro Mayor' de todos los movimientos de caja de la empresa",
-    response_model=List[MovimientoContableResponse2],
+    #response_model=List[MovimientoContableResponse2],
     tags=["Caja - Supervisión"]
 )
 def get_todos_los_movimientos(
