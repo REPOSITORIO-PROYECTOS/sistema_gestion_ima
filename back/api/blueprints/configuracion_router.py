@@ -44,16 +44,13 @@ def obtener_mi_configuracion(
         )
     
     # Esta línea ahora es segura porque sabemos que current_user.id_empresa no es None
-    config = configuracion_manager.obtener_configuracion_empresa(db, current_user.id_empresa)
-    
+    config = configuracion_manager.obtener_configuracion_por_id_empresa(db, current_user.id_empresa)
     if not config:
         raise HTTPException(
             status_code=404,
             detail="No se encontró un registro de configuración para la empresa de este usuario."
         )
-        
     return config
-
 
 @router.post("/upload-logo", response_model=RespuestaGenerica)
 async def subir_logo_empresa(
