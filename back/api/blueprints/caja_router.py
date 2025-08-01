@@ -100,7 +100,8 @@ def api_registrar_venta(
             articulos_vendidos=req.articulos_vendidos,
             id_cliente=req.id_cliente,
             pago_separado=req.pago_separado,
-            detalles_pago_separado=req.detalles_pago_separado
+            detalles_pago_separado=req.detalles_pago_separado,
+            tipo_comprobante_solicitado = req.tipo_comprobante_solicitado
         )
         db.commit()
         db.refresh(venta_creada)
@@ -227,6 +228,7 @@ def get_lista_de_arqueos(
         # Si la capa de negocio lanza un error, lo convertimos en un 500.
         raise HTTPException(status_code=500, detail="Ocurrió un error al generar el informe de arqueos.")
     
+
 @router.get(
     "/movimientos/todos", # Una ruta clara
     summary="Obtiene el 'Libro Mayor' de todos los movimientos de caja de la empresa",

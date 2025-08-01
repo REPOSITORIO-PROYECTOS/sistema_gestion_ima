@@ -152,7 +152,7 @@ class MovimientoContableResponse(BaseModel):
     concepto: str
     monto: float
     metodo_pago: Optional[str] = None # Hacemos opcional para cubrir todos los casos
-    
+    tipo_comprobante: Optional[str] = None
     # --- Datos Anidados de la Venta (solo si el movimiento es de tipo 'VENTA') ---
     venta: Optional[_InfoVentaAnidada] = None
 

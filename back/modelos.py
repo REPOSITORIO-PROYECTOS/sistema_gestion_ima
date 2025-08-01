@@ -279,6 +279,7 @@ class Venta(SQLModel, table=True):
     id_caja_sesion: int = Field(foreign_key="caja_sesiones.id")
     pago_separado: Optional[bool] = None
     detalles_pago_separado: Optional[str] = None
+    tipo_comprobante_solicitado: Optional[str] = None
     cliente: Optional[Tercero] = Relationship(back_populates="ventas_recibidas")
     usuario: Usuario = Relationship(back_populates="ventas_realizadas")
     caja_sesion: CajaSesion = Relationship(back_populates="ventas")
