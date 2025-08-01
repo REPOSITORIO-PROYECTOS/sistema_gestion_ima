@@ -75,13 +75,13 @@ def desactivar_o_reactivar_empresa(db: Session, id_empresa: int, activar: bool) 
     if not empresa:
         raise ValueError(f"No se encontró una empresa con el ID {id_empresa}.")
 
-    # Lógica usando tu campo 'estado_activo' (o como se llame)
-    if empresa.estado_activo == activar:
+    # Lógica usando tu campo 'activo' (o como se llame)
+    if  empresa.activo == activar:
         estado_actual = "activa" if activar else "inactiva"
         print(f"La empresa ya se encuentra {estado_actual}. No se realizan cambios.")
         return empresa
 
-    empresa.estado_activo = activar # <-- USAMOS TU CAMPO
+    empresa.activo = activar # <-- USAMOS TU CAMPO
     
     try:
         db.add(empresa)
@@ -99,5 +99,5 @@ def obtener_todas_las_empresas(db: Session, incluir_inactivas: bool = False) -> 
     statement = select(Empresa).order_by(Empresa.nombre_legal)
     if not incluir_inactivas:
         # Filtramos usando tu campo
-        statement = statement.where(Empresa.estado_activo == True) # <-- USAMOS TU CAMPO
+        statement = statement.where(Empresa.activo == True) # <-- USAMOS TU CAMPO
     return db.exec(statement).all()
