@@ -15,7 +15,7 @@ interface Empresa {
   nombre_legal: string;
   nombre_fantasia: string;
   cuit: string;
-  activo: boolean;
+  activa: boolean;
 }
 
 // Esta es una página estática, no necesita 'params'

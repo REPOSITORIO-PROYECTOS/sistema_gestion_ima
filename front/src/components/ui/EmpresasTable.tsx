@@ -9,7 +9,7 @@ interface Empresa {
   nombre_legal: string;
   nombre_fantasia: string;
   cuit: string;
-  activo: boolean;
+  activa: boolean;
 }
 
 interface Props {
@@ -24,7 +24,7 @@ export function EmpresasTable({ empresas, onConfigurarClick, onActionSuccess }: 
 
   const handleToggleStatus = async (empresa: Empresa) => {
     if (!token) return;
-    const accion = empresa.activo ? "desactivar" : "reactivar";
+    const accion = empresa.activa ? "desactivar" : "reactivar";
     if (confirm(`¿Seguro que quieres ${accion} la empresa "${empresa.nombre_legal}"?`)) {
       setLoadingActionId(empresa.id);
       try {
@@ -62,15 +62,15 @@ export function EmpresasTable({ empresas, onConfigurarClick, onActionSuccess }: 
             <tr><td colSpan={4} className="p-6 text-center text-muted-foreground">No hay empresas creadas.</td></tr>
           ) : (
             empresas.map((empresa) => (
-              <tr key={empresa.id} className={`border-b last:border-0 ${!empresa.activo ? 'bg-red-50/50 text-muted-foreground' : 'hover:bg-muted/25'}`}>
+              <tr key={empresa.id} className={`border-b last:border-0 ${!empresa.activa ? 'bg-red-50/50 text-muted-foreground' : 'hover:bg-muted/25'}`}>
                 <td className="p-3">
                   <div className="font-medium">{empresa.nombre_legal}</div>
                   <div className="text-xs">{empresa.nombre_fantasia}</div>
                 </td>
                 <td className="p-3">{empresa.cuit}</td>
                 <td className="p-3 text-center">
-                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${empresa.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    {empresa.activo ? 'Activa' : 'Inactiva'}
+                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${empresa.activa ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    {empresa.activa ? 'Activa' : 'Inactiva'}
                   </span>
                 </td>
                 <td className="p-3 text-right space-x-2">
@@ -78,12 +78,12 @@ export function EmpresasTable({ empresas, onConfigurarClick, onActionSuccess }: 
                     Configurar
                   </Button>
                   <Button
-                    variant={empresa.activo ? "destructive" : "secondary"}
+                    variant={empresa.activa ? "destructive" : "secondary"}
                     size="sm"
                     onClick={() => handleToggleStatus(empresa)}
                     disabled={loadingActionId === empresa.id}
                   >
-                    {loadingActionId === empresa.id ? 'Cargando...' : (empresa.activo ? "Desactivar" : "Reactivar")}
+                    {loadingActionId === empresa.id ? 'Cargando...' : (empresa.activa ? "Desactivar" : "Reactivar")}
                   </Button>
                 </td>
               </tr>
