@@ -81,6 +81,7 @@ export function DataTable<TData, TValue>({
             if (!response.ok) throw new Error("Fallo en la respuesta del servidor");
 
             toast.success("Artículos sincronizados ✅");
+            
         } catch (error) {
             console.error("Error al sincronizar artículos:", error);
             toast.error("Error al sincronizar artículos ❌");
