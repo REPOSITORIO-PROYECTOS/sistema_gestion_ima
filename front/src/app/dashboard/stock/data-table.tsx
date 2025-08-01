@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { toast } from "sonner";
+import { useAuthStore } from "@/lib/authStore"
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
@@ -45,7 +46,7 @@ export function DataTable<TData, TValue>({
 
     const [sorting, setSorting] = useState<SortingState>([])
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-    /* const [currentStatus, setCurrentStatus] = useState("all") */
+    const token = useAuthStore((state) => state.token);
 
     const table = useReactTable({
         data,
@@ -72,6 +73,7 @@ export function DataTable<TData, TValue>({
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({}),
             });
