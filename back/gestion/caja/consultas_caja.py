@@ -124,7 +124,10 @@ def obtener_todos_los_movimientos_de_caja(db: Session, usuario_actual: Usuario) 
     """)
 
     # Ejecutamos la consulta. .mappings() devuelve los resultados como diccionarios.
-    resultados_crudos = db.exec(query_sql, {"id_empresa_actual": usuario_actual.id_empresa}).mappings().all()
+    resultados_crudos = db.exec(
+        query_sql,
+        params={"id_empresa_actual": usuario_actual.id_empresa}
+    ).mappings().all()
 
     # Ahora, procesamos los resultados crudos para construir la estructura que FastAPI espera
     movimientos_procesados = []
