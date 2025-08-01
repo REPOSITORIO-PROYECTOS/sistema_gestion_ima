@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 
 # --- Módulos del Proyecto ---
 from back.database import get_db
+from back.schemas.movimientos_schemas_2 import MovimientoContableResponse2
 from back.security import es_cajero, obtener_usuario_actual
 from back.modelos import Usuario, Tercero, Venta, CajaMovimiento
 
@@ -232,7 +233,7 @@ def get_lista_de_arqueos(
 router.get(
     "/movimientos/todos",
     summary="Obtiene el 'Libro Mayor' de todos los movimientos de caja de la empresa",
-    #response_model=List[MovimientoContableResponse],
+    response_model=List[MovimientoContableResponse2],
     tags=["Caja - Supervisión"]
 )
 def get_todos_los_movimientos(
