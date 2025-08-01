@@ -1,10 +1,11 @@
 # /home/sgi_user/proyectos/sistema_gestion_ima/back/gestion/actualizaciones_masivas.py
 
+from fastapi import HTTPException
 from sqlmodel import Session, select
 from typing import Dict, List, Any
 import re
 
-from back.modelos import Tercero, Articulo
+from back.modelos import ConfiguracionEmpresa, Tercero, Articulo
 from back.utils.tablas_handler import TablasHandler
 
 # Función auxiliar para limpiar los precios
@@ -19,12 +20,20 @@ def limpiar_precio(valor_texto: str) -> float:
         return 0.0
 
 # ----- LÓGICA PARA CLIENTES -----
-def sincronizar_clientes_desde_sheets(db: Session) -> Dict[str, int]:
+def sincronizar_clientes_desde_sheets(db: Session, id_empresa_actual: int) -> Dict[str, int]:
     """
     Sincroniza clientes en MODO DEPURACIÓN: guarda cada cliente uno por uno
     para identificar la fila exacta que causa el error.
     """
-    handler = TablasHandler()
+    config_empresa = db.get(ConfiguracionEmpresa, id_empresa_actual)
+
+    if not config_empresa or not config_empresa.link_google_sheets:
+        print("error falta algo")
+        return
+    
+    link_de_la_empresa = config_empresa.link_google_sheets
+
+    handler = TablasHandler(db=db,google_sheet_id=link_de_la_empresa)
     print("Obteniendo datos de clientes desde Google Sheets...")
     clientes_sheets = handler.cargar_clientes()
     print("Obteniendo datos de clientes desde la base de datos...")
@@ -109,12 +118,20 @@ def sincronizar_clientes_desde_sheets(db: Session) -> Dict[str, int]:
     return resumen
 
 # ----- LÓGICA PARA ARTÍCULOS -----
-def sincronizar_articulos_desde_sheets(db: Session) -> Dict[str, int]:
+def sincronizar_articulos_desde_sheets(db: Session, id_empresa_actual: int) -> Dict[str, int]:
     """
     Sincroniza los artículos desde la hoja 'stock' de Google Sheets a la tabla 'articulos',
     adaptado al nuevo modelo de datos.
     """
-    handler = TablasHandler()
+    config_empresa = db.get(ConfiguracionEmpresa, id_empresa_actual)
+
+    if not config_empresa or not config_empresa.link_google_sheets:
+        print("error falta algo")
+        return
+    
+    link_de_la_empresa = config_empresa.link_google_sheets
+
+    handler = TablasHandler(db=db,google_sheet_id=link_de_la_empresa)
     
     print("Obteniendo datos de Google Sheets...")
     articulos_sheets = handler.cargar_articulos() # Asumo que esta función existe y funciona

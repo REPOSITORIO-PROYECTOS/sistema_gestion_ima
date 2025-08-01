@@ -10,7 +10,7 @@ from back.modelos import Usuario, Venta, VentaDetalle, Articulo, CajaMovimiento,
 from back.schemas.caja_schemas import ArticuloVendido, RegistrarVentaRequest, TipoMovimiento
 from back.utils.tablas_handler import TablasHandler
 
-caller = TablasHandler()
+
 #ACA TENGO QUE REGISTRAR CUANDO ENTRA Y CUANDO SALE PLATA, MODIFICA LA TABLA MOVIMIENTOS
 
 # =============================================================================
@@ -126,7 +126,7 @@ def registrar_venta_y_movimiento_caja(
     # El router la convertirá en una tarea en segundo plano.
     try:
             print("[DRIVE] Intentando registrar movimiento en Google Sheets...")
-            cliente_sheets_data = obtener_cliente_por_id(id_cliente) # Asumo que esta función devuelve un dict
+            cliente_sheets_data = obtener_cliente_por_id(db,usuario_actual.id_empresa,id_cliente) # Asumo que esta función devuelve un dict
 
             if cliente_sheets_data:
                 datos_para_sheets = {
@@ -138,6 +138,7 @@ def registrar_venta_y_movimiento_caja(
                     "descripcion": f"Venta de {len(articulos_vendidos)} artículos",
                     "monto": total_final_con_recargo,
                 }
+                caller = TablasHandler(db,usuario_actual.id_empresa)
                 if not caller.registrar_movimiento(datos_para_sheets):
                     print("⚠️ [DRIVE] La función registrar_movimiento devolvió False.")
                 if not caller.restar_stock(articulos_vendidos):
@@ -168,6 +169,7 @@ def calcular_vuelto(total_a_pagar: float, monto_recibido: float):
 
 def registrar_ingreso_egreso(
     db: Session,
+    usuario_actual: Usuario,
     id_sesion_caja: int,
     concepto: str,
     monto: float,
@@ -216,6 +218,8 @@ def registrar_ingreso_egreso(
                     "monto": monto,
             }
 
+            caller = TablasHandler(db,usuario_actual.id_empresa)
+
             if not caller.registrar_movimiento(datos_para_sheets):
                 print("⚠️ [DRIVE] La función registrar_movimiento devolvió False.")
            
@@ -225,10 +229,8 @@ def registrar_ingreso_egreso(
         except Exception as e_sheets:
             print(f"❌ [DRIVE] Ocurrió un error al intentar registrar en Google Sheets: {e_sheets}")
         
-
-
-
         return nuevo_movimiento
+    
     except Exception as e:
         print(f"   -> ERROR de BD al registrar el movimiento: {e}")
         db.rollback()

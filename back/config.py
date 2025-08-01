@@ -30,12 +30,6 @@ DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_NAME = os.getenv("DB_NAME")
 # ===================================
 # --- Variables de Conexión ---
-GOOGLE_SHEET_ID = os.getenv('GOOGLE_SHEET_ID')
-GOOGLE_SERVICE_ACCOUNT_FILE = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', "credencial_IA.json") # Default simple
-
-# --- Nombres de Variables Python para las Hojas ---
-# Leemos de .env usando las claves (SHEET_NAME_ENV_...)
-# Si la clave no está en .env, se usa el valor string default que es el nombre deseado de la hoja.
 
 # Configuración y Administración
 CONFIGURACION_GLOBAL_SHEET = os.getenv('SHEET_NAME_CONFIGURACION_GLOBAL', 'ConfiguracionGlobal')
@@ -76,8 +70,7 @@ COMPRAS_DETALLE_SHEET = os.getenv('SHEET_NAME_COMPRAS_DETALLE', 'ComprasDetalle'
 ADMIN_TOKEN_DURATION_SECONDS = int(os.getenv('ADMIN_TOKEN_DURATION_SECONDS', 8 * 60 * 60))
 
 # --- Verificaciones Críticas ---
-if not GOOGLE_SHEET_ID:
-    raise ValueError("CRÍTICO: GOOGLE_SHEET_ID no está configurado en .env.")
+
 if not GOOGLE_SERVICE_ACCOUNT_FILE:
      raise ValueError("CRÍTICO: GOOGLE_SERVICE_ACCOUNT_FILE no está configurado en .env.")
 

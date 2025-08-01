@@ -61,8 +61,8 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int) -> Di
     link_de_la_empresa = config_empresa.link_google_sheets
 
     # 2. LEER DATOS DEL GOOGLE SHEET
-    handler = TablasHandler()
-    articulos_del_sheet = handler.cargar_articulos(google_sheet_id=link_de_la_empresa)
+    handler = TablasHandler(google_sheet_id=link_de_la_empresa)
+    articulos_del_sheet = handler.cargar_articulos()
 
     if not articulos_del_sheet:
         return {"mensaje": "Sincronización finalizada. No se encontraron artículos en el Google Sheet.", "creados": 0, "actualizados": 0, "errores": 0}
