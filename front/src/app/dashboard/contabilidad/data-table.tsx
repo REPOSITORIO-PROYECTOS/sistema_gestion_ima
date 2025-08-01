@@ -68,7 +68,7 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
             columnFilters,
             rowSelection,
         },
-        });
+    });
 
     return (
 

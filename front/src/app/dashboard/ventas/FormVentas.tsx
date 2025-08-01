@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -30,10 +30,17 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
 import { ChevronsUpDown } from "lucide-react";
 import { useFacturacionStore } from "@/lib/facturacionStore";
 import { useAuthStore } from "@/lib/authStore"
+
+interface Producto {
+  tipo: string;
+  cantidad: number;
+  precioTotal: number;
+  descuentoAplicado: boolean;
+  porcentajeDescuento: number;
+}
 
 interface ProductoAPI {
   id: number;
@@ -74,6 +81,9 @@ function FormVentas({
   totalVenta: number,
   productosVendidos: { tipo: string; cantidad: number; precioTotal: number }[]
 }) {
+
+  const [barcode, setBarcode] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
 
   /* Estados */
 
@@ -128,6 +138,10 @@ function FormVentas({
   const [vuelto, setVuelto] = useState<number>(0);
   const [inputEfectivo, setInputEfectivo] = useState(""); 
 
+  // Si el pago realizado se hizo en distintos metodos (efec, transfe, credito)
+  const [pagoDividido, setPagoDividido] = useState(false);
+  const [detallePagoDividido, setDetallePagoDividido] = useState("");
+
   // Estado para las observaciones de la venta
   const [observaciones, setObservaciones] = useState("")
 
@@ -157,6 +171,46 @@ function FormVentas({
 
 
   /* Hooks */ /* -------------------------------------------------------------- */
+
+  /* Lógica Código de Barras */
+  // Enfocar el input automáticamente cuando el componente se monta
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+
+      if (!barcode) return;
+
+      try {
+
+        const res = await fetch(`https://sistema-ima.sistemataup.online/api/productos/barcode/${barcode}`);
+        if (!res.ok) throw new Error('Producto no encontrado');
+
+        const data = await res.json();
+
+        const producto: Producto = {
+          tipo: data.tipo,
+          cantidad: 1,
+          precioTotal: data.precio,
+          descuentoAplicado: false,
+          porcentajeDescuento: 0,
+        };
+
+        onAgregarProducto(producto);
+        toast.success(`Producto agregado: ${data.tipo}`);
+
+      } catch (error) {
+        console.error(error);
+        toast.error(`Producto no encontrado: ${barcode}`);
+      } finally {
+        setBarcode('');
+        inputRef.current?.focus();
+      }
+    }
+  };
 
   // Producto seleccionado * cantidad = total
   const getPrecioProducto = (producto: {
@@ -694,6 +748,20 @@ function FormVentas({
           )}
         </div>
 
+        {/* Código de Barras */}
+        <div className="w-full flex flex-col md:flex-row gap-4 items-start md:items-center">
+          <Label className="text-2xl font-semibold text-green-900 text-left">Código de Barras</Label>
+          <Input
+            ref={inputRef}
+            type="text"
+            value={barcode}
+            onChange={(e) => setBarcode(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="border w-full md:max-w-2/3"
+            autoFocus
+          />
+        </div>
+
         {/* Seleccionar cantidad de un Producto - limitada por Stock*/}
         <div className="flex flex-col gap-4 items-start justify-between md:flex-row">
           <Label className="text-2xl font-semibold text-green-900">Cantidad</Label>
@@ -840,6 +908,31 @@ function FormVentas({
                 />
               </div>
             </div>
+          )}
+        </div>
+
+        {/* Pago Dividido */}
+        <div className="flex flex-col gap-2 mt-1">
+          <div className="flex items-center space-x-2">
+            <input
+              id="pagoDividido"
+              type="checkbox"
+              checked={pagoDividido}
+              onChange={(e) => setPagoDividido(e.target.checked)}
+              className="h-5 w-5 text-green-700 border-gray-300 rounded focus:ring-green-600 cursor-pointer"
+            />
+            <Label htmlFor="pagoDividido" className="text-green-950 text-md font-medium">
+              ¿Paga de dos o mas formas?
+            </Label>
+          </div>
+
+          {pagoDividido && (
+            <Input
+              placeholder="Detalle del pago (ej: mitad efectivo, mitad transferencia)"
+              value={detallePagoDividido}
+              onChange={(e) => setDetallePagoDividido(e.target.value)}
+              className="mt-2 text-black"
+            />
           )}
         </div>
         <span className="block w-full h-0.5 bg-green-900"></span>

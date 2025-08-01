@@ -18,7 +18,8 @@ export default function ContabilidadPage() {
       try {
         const res = await fetch("https://sistema-ima.sistemataup.online/api/caja/movimientos/todos", {
           headers: {
-            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
         });
 
