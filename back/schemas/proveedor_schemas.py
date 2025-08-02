@@ -22,7 +22,7 @@ class ProveedorRead(ProveedorBase):
     activo: bool
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # === Schemas para la Asociación Artículo-Proveedor ===
 class ArticuloProveedorLink(BaseModel):
@@ -50,4 +50,4 @@ class PlantillaMapeoRead(PlantillaMapeoBase):
     id_proveedor: int
     
     class Config:
-        orm_mode = True
+        from_attributes = True

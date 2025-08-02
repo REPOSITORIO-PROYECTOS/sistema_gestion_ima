@@ -59,7 +59,7 @@ class VentaDetalleResponse(VentaItemBase):
     id: int # El ID del registro VentaDetalle en la base de datos
 
     class Config:
-        orm_mode = True # Permite que Pydantic lea desde un objeto ORM (SQLModel)
+        from_attributes = True # Permite que Pydantic lea desde un objeto ORM (SQLModel)
 
 class VentaResponse(BaseModel):
     """
@@ -76,4 +76,4 @@ class VentaResponse(BaseModel):
     items: List[VentaDetalleResponse]
 
     class Config:
-        orm_mode = True # Permite que Pydantic lea desde un objeto ORM (SQLModel)   
+        from_attributes = True # Permite que Pydantic lea desde un objeto ORM (SQLModel)   

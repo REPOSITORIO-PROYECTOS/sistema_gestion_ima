@@ -86,6 +86,33 @@ def registrar_venta_y_movimiento_caja(
     db.add(nueva_venta)
     db.flush()
 
+    # ===================================================================
+    # === INICIO DE LA LÓGICA CONDICIONAL DE CONTROL (EL "GUARDIÁN") ===
+    # ===================================================================
+    
+    afectar_stock = False
+    afectar_caja = False
+    
+    tipo_lower = tipo_comprobante_solicitado.lower()
+
+    if tipo_lower in ["factura", "recibo", "comprobante interno", "ticket"]:
+        print("   -> DECISIÓN: Afectar STOCK y CAJA.")
+        afectar_stock = True
+        afectar_caja = True
+    elif tipo_lower == "remito":
+        print("   -> DECISIÓN: Afectar SÓLO STOCK.")
+        afectar_stock = True
+        afectar_caja = False
+    elif tipo_lower == "presupuesto":
+        print("   -> DECISIÓN: NO afectar ni Stock ni Caja.")
+        afectar_stock = False
+        afectar_caja = False
+    else:
+        # Si no se reconoce el tipo, por seguridad, no hacemos nada.
+        # Podríamos lanzar un error si quisiéramos ser más estrictos.
+        print(f"   -> ADVERTENCIA: Tipo '{tipo_comprobante_solicitado}' no reconocido para lógica de stock/caja.")
+
+    
     for item in articulos_vendidos:
         articulo_a_actualizar = db.get(Articulo, item.id_articulo)
         
@@ -109,52 +136,57 @@ def registrar_venta_y_movimiento_caja(
             precio_unitario=precio_unitario_final # <-- ¡Guardamos el precio unitario CON el recargo distribuido!
         )
         db.add(detalle)
-        
-        articulo_a_actualizar.stock_actual -= item.cantidad
-        db.add(articulo_a_actualizar)
+        if afectar_stock:
+            articulo_a_actualizar = db.get(Articulo, item.id_articulo)
+            if articulo_a_actualizar:
+                print(f"      -> Descontando {item.cantidad} de stock para '{articulo_a_actualizar.descripcion}'")
+                articulo_a_actualizar.stock_actual -= item.cantidad
+                db.add(articulo_a_actualizar)
 
-    # --- 5. CREACIÓN DEL MOVIMIENTO DE CAJA ÚNICO ---
-    # YA NO SE CREA el movimiento de INGRESO para el recargo.
-    movimiento_principal = CajaMovimiento(
-        tipo=TipoMovimiento.VENTA.value,
-        concepto=f"Venta ID: {nueva_venta.id}",
-        monto=total_final_con_recargo, # El movimiento de caja es por el total final
-        metodo_pago=metodo_pago,
-        id_caja_sesion=id_sesion_caja,
-        id_usuario=usuario_actual.id,
-        id_venta=nueva_venta.id,
-    )
-    db.add(movimiento_principal)
+    movimiento_principal = None # Inicializamos como None
+    if afectar_caja:
+        print("   -> Registrando movimiento en caja...")
+        movimiento_principal = CajaMovimiento(
+            tipo=TipoMovimiento.VENTA.value,
+            concepto=f"Venta ({tipo_comprobante_solicitado}) ID: {nueva_venta.id}",
+            monto=total_final_con_recargo,
+            metodo_pago=metodo_pago,
+            id_caja_sesion=id_sesion_caja,
+            id_usuario=usuario_actual.id,
+            id_venta=nueva_venta.id,
+        )
+        db.add(movimiento_principal)
         
     db.flush()
 
     # --- 4. SINCRONIZACIÓN CON GOOGLE SHEETS (TU LÓGICA ORIGINAL) ---
     # Esta parte ahora se ejecuta DENTRO de la misma función, antes del commit.
     # El router la convertirá en una tarea en segundo plano.
-    try:
-            print("[DRIVE] Intentando registrar movimiento en Google Sheets...")
-            cliente_sheets_data = obtener_cliente_por_id(db,usuario_actual.id_empresa,id_cliente) # Asumo que esta función devuelve un dict
+    if afectar_stock or afectar_caja:
+        try:
+                print("[DRIVE] Intentando registrar movimiento en Google Sheets...")
+                cliente_sheets_data = obtener_cliente_por_id(db,usuario_actual.id_empresa,id_cliente) # Asumo que esta función devuelve un dict
 
-            if cliente_sheets_data:
-                datos_para_sheets = {
-                    "id_cliente": id_cliente,
-                    "cliente": cliente_sheets_data.get("nombre-usuario", "No encontrado"),
-                    "cuit": cliente_sheets_data.get("CUIT-CUIL", "N/A"),
-                    "razon_social": cliente_sheets_data.get("Nombre de Contacto", "N/A"),
-                    "Tipo_movimiento": "venta",
-                    "descripcion": f"Venta de {len(articulos_vendidos)} artículos",
-                    "monto": total_final_con_recargo,
-                }
-                caller = TablasHandler(id_empresa=usuario_actual.id_empresa, db=db)
-                if not caller.registrar_movimiento(datos_para_sheets):
-                    print("⚠️ [DRIVE] La función registrar_movimiento devolvió False.")
-                if not caller.restar_stock(articulos_vendidos):
-                    print("⚠️ [DRIVE] Ocurrió un error al intentar actualizar el stock en Google Sheets.")
-            else:
-                print(f"⚠️ [DRIVE] No se pudo encontrar el cliente con ID {id_cliente}. No se registrará el movimiento en Drive.")
+                if cliente_sheets_data:
+                    datos_para_sheets = {
+                        "id_cliente": id_cliente,
+                        "cliente": cliente_sheets_data.get("nombre-usuario", "No encontrado"),
+                        "cuit": cliente_sheets_data.get("CUIT-CUIL", "N/A"),
+                        "razon_social": cliente_sheets_data.get("Nombre de Contacto", "N/A"),
+                        "Tipo_movimiento": "venta",
+                        "descripcion": f"Venta de {len(articulos_vendidos)} artículos",
+                        "monto": total_final_con_recargo,
+                    }
+                    caller = TablasHandler(id_empresa=usuario_actual.id_empresa, db=db)
+                    if not caller.registrar_movimiento(datos_para_sheets):
+                        print("⚠️ [DRIVE] La función registrar_movimiento devolvió False.")
+                    if not caller.restar_stock(articulos_vendidos):
+                        print("⚠️ [DRIVE] Ocurrió un error al intentar actualizar el stock en Google Sheets.")
+                else:
+                    print(f"⚠️ [DRIVE] No se pudo encontrar el cliente con ID {id_cliente}. No se registrará el movimiento en Drive.")
 
-    except Exception as e_sheets:
-        print(f"❌ [DRIVE] Ocurrió un error al intentar registrar en Google Sheets: {e_sheets}")
+        except Exception as e_sheets:
+            print(f"❌ [DRIVE] Ocurrió un error al intentar registrar en Google Sheets: {e_sheets}")
 
     return nueva_venta, movimiento_principal
 
