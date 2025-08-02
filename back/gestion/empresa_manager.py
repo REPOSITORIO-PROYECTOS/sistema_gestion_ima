@@ -42,8 +42,11 @@ def crear_empresa(db: Session, empresa_data: EmpresaCreate) -> Empresa:
     
     # 4. Crear su configuración por defecto asociada
     # El modelo ConfiguracionEmpresa espera un objeto Empresa para la relación
-    configuracion_por_defecto = ConfiguracionEmpresa(empresa=nueva_empresa)
-    
+    configuracion_por_defecto = ConfiguracionEmpresa(
+        empresa=nueva_empresa,
+        # Si el dato viene en la petición, lo usamos; si no, será None.
+        id_google_sheets=empresa_data.id_google_sheets 
+    )    
     try:
         db.add(nueva_empresa)
         db.add(configuracion_por_defecto)

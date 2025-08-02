@@ -1,6 +1,6 @@
 # back/schemas/empresa_schemas.py
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from typing import Optional
 
 class EmpresaCreate(BaseModel):
@@ -8,6 +8,13 @@ class EmpresaCreate(BaseModel):
     nombre_legal: str
     nombre_fantasia: Optional[str] = None
     cuit: str = Field(..., min_length=11, max_length=11)
+    id_google_sheets: Optional[str] = None
+
+    @validator('cuit')
+    def limpiar_cuit(cls, v):
+        if v:
+            return ''.join(filter(str.isdigit, v))
+        return v
 
 class EmpresaResponse(BaseModel):
     """Schema para devolver los datos de una empresa."""
@@ -16,6 +23,7 @@ class EmpresaResponse(BaseModel):
     nombre_fantasia: Optional[str] = None
     cuit: str
     activa: bool
+    id_google_sheets: Optional[str] = None
 
     class Config:
         from_attributes = True

@@ -3,13 +3,15 @@
 import * as React from "react";
 import { useAuthStore } from "@/lib/authStore";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 // Importamos los componentes hijos que construirán la interfaz
-import { EmpresasTable } from "@/components/ui/EmpresasTable";
-import { CreateEmpresaModal } from "@/components/ui/CreateEmpresaModal";
-import { ConfiguracionForm } from "@/components/ui/ConfiguracionForm";
+// Asegúrate de que estas rutas de importación sean correctas para tu proyecto
+import { EmpresasTable } from "./EmpresasTable";
+import { CreateEmpresaModal } from "./CreateEmpresaModal";
+import { ConfiguracionForm } from "@/components/ConfiguracionForm"; // Asumo que está en la misma carpeta
 
-// Definimos la 'forma' de un objeto Empresa aquí para claridad
+// Definimos el tipo de dato para una Empresa, que será usado en todo el componente
 interface Empresa {
   id: number;
   nombre_legal: string;
@@ -18,14 +20,12 @@ interface Empresa {
   activa: boolean;
 }
 
-// Esta es una página estática, no necesita 'params'
 export default function GestionEmpresasPage() {
-  const token = useAuthStore((state) => state.token);
+  const { token } = useAuthStore(); // Es más idiomático destructurar el token
 
   // --- Estados Principales ---
   const [empresas, setEmpresas] = React.useState<Empresa[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = React.useState(false);
   
   // --- Estado Clave: Guarda el ID de la empresa seleccionada para configurar ---
@@ -35,34 +35,43 @@ export default function GestionEmpresasPage() {
   const fetchEmpresas = React.useCallback(async () => {
     if (!token) return;
     setLoading(true);
-    setError(null);
     try {
       const res = await fetch("https://sistema-ima.sistemataup.online/api/empresas/admin/lista", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error("No se pudo obtener la lista de empresas. Verifique sus permisos de administrador.");
-      const data = await res.json();
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.detail || "No se pudo obtener la lista de empresas.");
+      }
+      const data = await res.json() as Empresa[]; // Aserción de tipo para seguridad
       setEmpresas(data);
     } catch (err) {
-      if (err instanceof Error) setError(err.message);
+      if (err instanceof Error) {
+        toast.error("Error al cargar empresas", { description: err.message });
+      }
     } finally {
       setLoading(false);
     }
   }, [token]);
 
-  // Se ejecuta al cargar la página
+  // Se ejecuta al cargar la página y cada vez que la función fetchEmpresas se actualiza
   React.useEffect(() => {
     fetchEmpresas();
   }, [fetchEmpresas]);
 
   // --- Funciones de Manejo de Eventos ---
   const handleActionSuccess = () => {
-    fetchEmpresas(); // Recarga la lista
+    fetchEmpresas(); // Recarga la lista de empresas tras una acción exitosa
   };
 
-  const empresaSeleccionada = selectedEmpresaId
-    ? empresas.find(e => e.id === selectedEmpresaId)
-    : null;
+  // Memoizamos el cálculo de la empresa seleccionada para optimizar el rendimiento.
+  // Solo se recalculará si cambia el ID seleccionado o la lista de empresas.
+  const empresaSeleccionada = React.useMemo(() => 
+    selectedEmpresaId
+      ? empresas.find(e => e.id === selectedEmpresaId)
+      : null,
+    [selectedEmpresaId, empresas]
+  );
 
   return (
     <div className="p-4 md:p-6 space-y-8">
@@ -71,15 +80,14 @@ export default function GestionEmpresasPage() {
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-2xl font-bold">Panel de Administración de Empresas</h1>
-            <p className="text-muted-foreground">Crea, visualiza y gestiona las empresas clientes.</p>
+            <p className="text-muted-foreground">Crea, visualiza y gestiona las empresas clientes del sistema.</p>
           </div>
           <Button onClick={() => setIsCreateModalOpen(true)}>Crear Nueva Empresa</Button>
         </div>
 
-        {loading && <p className="text-center p-8">Cargando empresas...</p>}
-        {error && <p className="text-red-500 bg-red-100 p-3 rounded-md">Error: {error}</p>}
+        {loading && <p className="text-center p-8 text-muted-foreground">Cargando empresas...</p>}
         
-        {!loading && !error && (
+        {!loading && (
           <EmpresasTable
             empresas={empresas}
             onConfigurarClick={(empresaId) => setSelectedEmpresaId(empresaId)}
@@ -88,7 +96,7 @@ export default function GestionEmpresasPage() {
         )}
       </div>
 
-      {/* --- SECCIÓN 2: FORMULARIO DE CONFIGURACIÓN --- */}
+      {/* --- SECCIÓN 2: FORMULARIO DE CONFIGURACIÓN (CONDICIONAL) --- */}
       {selectedEmpresaId && (
         <div className="border-t pt-8">
           <div className="flex justify-between items-center mb-6">
@@ -103,13 +111,13 @@ export default function GestionEmpresasPage() {
         </div>
       )}
 
-      {/* --- MODAL DE CREACIÓN (siempre presente pero visible condicionalmente) --- */}
+      {/* --- MODAL DE CREACIÓN (CONTROLADO POR ESTADO) --- */}
       <CreateEmpresaModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onSuccess={() => {
           handleActionSuccess();
-          setIsCreateModalOpen(false);
+          setIsCreateModalOpen(false); // Cierra el modal tras el éxito
         }}
       />
     </div>

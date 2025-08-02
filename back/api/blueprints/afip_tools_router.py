@@ -1,55 +1,53 @@
 # back/api/blueprints/afip_tools_router.py
 
-from fastapi import APIRouter, Depends, HTTPException, Body
-from starlette.responses import Response
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import Response
 
-from back.security import es_admin
-from pydantic import BaseModel
-import back.gestion.afip_tools_manager as manager
+# Importamos las dependencias y la lógica de negocio
+from back.security import es_rol
+from back.gestion import afip_tools_manager
+from back.schemas.afip_tools_schemas import CsrRequest, CertificadoRequest
 
 router = APIRouter(
-    prefix="/afip-tools",
+    prefix="/api/afip-tools",
     tags=["Herramientas AFIP"],
-    dependencies=[Depends(es_admin)]
+    dependencies=[Depends(es_rol("admin"))]  # Solo accesible por administradores
 )
 
-class GenerarCSRRequest(BaseModel):
-    cuit: str
-    razon_social: str
-
-@router.post("/generar-csr", summary="Generar Clave Privada y CSR")
-def api_generar_csr(req: GenerarCSRRequest):
+@router.post("/generar-csr")
+def api_generar_csr(req: CsrRequest):
     """
-    Genera un par de claves y una Solicitud de Firma de Certificado (CSR).
-    Devuelve el CSR para que el usuario lo descargue. La clave privada se
-    guarda temporalmente en el servidor.
+    Genera una clave privada (guardada temporalmente en archivo) y devuelve
+    una solicitud de firma de certificado (.csr) para descargar.
     """
     try:
-        _, csr_pem = manager.generar_claves_y_csr(req.cuit, req.razon_social)
-        
-        return Response(
-            content=csr_pem,
-            media_type="application/x-pem-file",
-            headers={"Content-Disposition": f'attachment; filename="{req.cuit}.csr"'}
+        # Llama a la función refactorizada que usa archivos
+        csr_content = afip_tools_manager.generar_csr_y_guardar_clave_temporal(
+            cuit_empresa=req.cuit,
+            razon_social=req.razon_social
         )
+        return Response(content=csr_content, media_type="application/x-pem-file")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al generar el CSR: {e}")
+        raise HTTPException(status_code=500, detail=f"Error al generar CSR: {e}")
 
-@router.post("/subir-certificado", summary="Subir certificado y guardar en la Bóveda")
-def api_subir_certificado(cuit: str = Body(...), certificado_pem: str = Body(...)):
+@router.post("/subir-certificado")
+def api_subir_certificado(req: CertificadoRequest):
     """
-    Recibe el certificado (.crt) de AFIP, lo une con la clave privada
-    temporal y guarda ambos en la bóveda de secretos.
+    Recibe el certificado firmado y lo envía junto con la clave privada
+    temporal al microservicio de Bóveda.
     """
-    # Esta es una simulación. Aquí iría la lógica completa.
-    clave_privada_temp = manager.TEMP_KEY_STORAGE.pop(cuit, None)
-    if not clave_privada_temp:
-        raise HTTPException(status_code=404, detail="No se encontró una clave privada pendiente para este CUIT. Vuelva a generar el CSR.")
-
-    # manager.guardar_credenciales_en_boveda(cuit, certificado_pem, clave_privada_temp)
-    
-    print(f"SIMULACIÓN: Credenciales para {cuit} guardadas en la bóveda.")
-    print(f"Certificado: {certificado_pem[:30]}...")
-    print(f"Clave Privada: {clave_privada_temp[:30]}...")
-
-    return {"message": f"Certificado para la empresa {cuit} procesado y guardado de forma segura."}
+    try:
+        # Llama a la función que usa el ClienteBoveda
+        resultado = afip_tools_manager.enviar_credenciales_a_boveda(
+            cuit=req.cuit,
+            certificado_pem=req.certificado_pem
+        )
+        return resultado
+    except ValueError as e: # Captura errores de negocio (clave no encontrada, CUIT duplicado)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except PermissionError as e: # Captura errores de autenticación con la bóveda
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Error de autenticación con el servicio de bóveda: {e}")
+    except ConnectionError as e: # Captura errores de conexión a la bóveda
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"El servicio de bóveda no está disponible: {e}")
+    except Exception as e: # Captura cualquier otro error inesperado
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error inesperado: {e}")
