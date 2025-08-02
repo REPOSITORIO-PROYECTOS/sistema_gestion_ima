@@ -10,20 +10,22 @@ TipoComprobante = Literal["factura", "remito", "presupuesto", "recibo"]
 # --- Estructuras de Datos ---
 
 class EmisorData(BaseModel):
+    """
+    Contiene los DATOS PÚBLICOS del emisor. 
+    Los secretos (certificado, clave) se obtienen de la bóveda y NO viajan aquí.
+    """
     cuit: str
-    razon_social: str
-    domicilio: str
+    # Los siguientes campos ahora son requeridos, ya que la BBDD los provee.
+    razon_social: Optional[str] = None # Hacemos opcionales por si la BDD no los tiene
+    domicilio: Optional[str] = None
     punto_venta: int
-    condicion_iva: str # Ej: "Monotributo", "Responsable Inscripto"
-    # Las credenciales ahora viajan en cada petición
-    afip_certificado: Optional[str] = None
-    afip_clave_privada: Optional[str] = None
+    condicion_iva: Optional[str] = None
 
 class ReceptorData(BaseModel):
-    nombre_razon_social: str
-    cuit_o_dni: str
-    domicilio: str
-    condicion_iva: str # Ej: "Consumidor Final", "Responsable Inscripto"
+    nombre_razon_social: Optional[str] = None # Hacemos opcional para "Consumidor Final" genérico
+    cuit_o_dni: Optional[str] = None
+    domicilio: Optional[str] = None
+    condicion_iva: Optional[str] = None
 
 class ItemData(BaseModel):
     cantidad: float

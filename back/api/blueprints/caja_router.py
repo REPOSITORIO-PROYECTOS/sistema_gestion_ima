@@ -2,14 +2,14 @@
 
 from sqlite3.dbapi2 import Timestamp
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from sqlmodel import Session
+from sqlmodel import Session, select
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 
 # --- Módulos del Proyecto ---
 from back.database import get_db
 from back.security import es_cajero, obtener_usuario_actual
-from back.modelos import Usuario, Tercero, Venta, CajaMovimiento
+from back.modelos import ConfiguracionEmpresa, Empresa, Usuario, Tercero, Venta, CajaMovimiento
 
 # Especialistas de la capa de gestión
 from back.gestion.caja import apertura_cierre, registro_caja, consultas_caja
@@ -21,7 +21,7 @@ from back.schemas.caja_schemas import (
     RegistrarVentaRequest, InformeCajasResponse, RespuestaGenerica,
     MovimientoSimpleRequest, TipoMovimiento, MovimientoContableResponse 
 )
-from back.schemas.comprobante_schemas import TransaccionData, ReceptorData, ItemData
+from back.schemas.comprobante_schemas import EmisorData, TransaccionData, ReceptorData, ItemData
 
 router = APIRouter(
     prefix="/caja",
@@ -63,22 +63,25 @@ def api_cerrar_caja(req: CerrarCajaRequest, db: Session = Depends(get_db), curre
 # === ENDPOINTS DE OPERACIONES REFACTORIZADOS ===
 # =================================================================
 
+# back/routers/ventas_router.py (o donde esté tu endpoint)
+
+
+
 @router.post("/ventas/registrar", response_model=RespuestaGenerica, tags=["Caja - Operaciones"])
 def api_registrar_venta(
     req: RegistrarVentaRequest,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(obtener_usuario_actual)
 ):
     """
-    Orquesta el proceso completo de registro de una venta: DB, AFIP y Sheets.
+    Orquesta el proceso completo de registro de una venta: DB, AFIP.
     Maneja descuentos y calcula el vuelto si es necesario.
     """
     sesion_activa = apertura_cierre.obtener_caja_abierta_por_usuario(db, current_user)
     if not sesion_activa:
         raise HTTPException(status_code=400, detail="Operación denegada: El usuario no tiene una caja abierta.")
 
-    # --- Lógica de Vuelto y Descuentos ---
+    # --- Lógica de Vuelto (sin cambios) ---
     vuelto = None
     if req.paga_con:
         try:
@@ -86,10 +89,7 @@ def api_registrar_venta(
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
     
-    # El `total_venta` que llega ya debería tener los descuentos aplicados por el frontend.
-    # La lógica de negocio `registrar_venta` guarda este total final.
-
-    # --- PASO 1: TRANSACCIÓN CRÍTICA CON LA BASE DE DATOS ---
+    # --- PASO 1: TRANSACCIÓN CRÍTICA CON LA BASE DE DATOS (sin cambios) ---
     try:
         venta_creada, _ = registro_caja.registrar_venta_y_movimiento_caja(
             db=db,
@@ -110,19 +110,54 @@ def api_registrar_venta(
         raise HTTPException(status_code=409, detail=f"Conflicto de negocio: {e}")
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {e}")
+        raise HTTPException(status_code=500, detail="Error interno al registrar la venta.")
 
     # --- PASO 2: INTEGRACIÓN CON AFIP Y ACTUALIZACIÓN DE LA VENTA ---
     resultado_afip: Dict[str, Any] = {"estado": "NO_SOLICITADA"}
     if req.quiere_factura:
         try:
+            # === INICIO DE LA LÓGICA DE FACTURACIÓN CORREGIDA ===
+            
+            id_empresa_actual = current_user.id_empresa
+            if not id_empresa_actual:
+                 raise RuntimeError("El usuario actual no tiene una empresa asignada.")
+
+            # Consultar los datos del EMISOR
+            empresa_db = db.get(Empresa, id_empresa_actual)
+            statement = select(ConfiguracionEmpresa).where(ConfiguracionEmpresa.id_empresa == id_empresa_actual)
+            config_empresa_db = db.exec(statement).first()
+
+            if not empresa_db or not empresa_db.cuit:
+                raise ValueError(f"No se encontraron datos de empresa o CUIT para la empresa ID: {id_empresa_actual}")
+            if not config_empresa_db or not config_empresa_db.afip_punto_venta_predeterminado:
+                raise ValueError(f"No se encontró un punto de venta predeterminado para la empresa ID: {id_empresa_actual}")
+            
+            # Consultar los datos del RECEPTOR
             cliente_db = db.get(Tercero, req.id_cliente) if req.id_cliente else None
             
-            # Mapeamos los datos para el especialista de AFIP
-            venta_data_schema = TransaccionData(total=venta_creada.total, items=[ItemData.model_validate(art) for art in req.articulos_vendidos])
-            cliente_data_schema = ReceptorData.model_validate(cliente_db) if cliente_db else None
+            # Mapear datos a Schemas Pydantic (¡AHORA CON TODOS LOS CAMPOS!)
+            venta_data_schema = TransaccionData.model_validate(venta_creada, from_attributes=True)
+            
+            # Usar model_validate para manejar el caso de que cliente_db sea None
+            cliente_data_schema = ReceptorData.model_validate(cliente_db, from_attributes=True) if cliente_db else None
+            
+            # Construir el schema del emisor con TODOS los datos recuperados
+            emisor_data_schema = EmisorData(
+                cuit=empresa_db.cuit,
+                razon_social=empresa_db.nombre_legal,
+                domicilio=config_empresa_db.direccion_negocio,
+                punto_venta=config_empresa_db.afip_punto_venta_predeterminado,
+                condicion_iva=config_empresa_db.afip_condicion_iva
+            )
 
-            factura_generada = generar_factura_para_venta(venta_data=venta_data_schema, cliente_data=cliente_data_schema)
+            # Llamar al especialista de facturación
+            factura_generada = generar_factura_para_venta(
+                venta_data=venta_data_schema, 
+                cliente_data=cliente_data_schema,
+                emisor_data=emisor_data_schema
+            )
+            
+            # === FIN DE LA LÓGICA DE FACTURACIÓN CORREGIDA ===
             
             venta_creada.facturada = True
             venta_creada.datos_factura = factura_generada
@@ -134,10 +169,7 @@ def api_registrar_venta(
         except (ValueError, RuntimeError) as e:
             resultado_afip = {"estado": "FALLIDO", "error": str(e)}
 
-    # --- PASO 3: INTEGRACIÓN CON GOOGLE SHEETS (SEGUNDO PLANO) ---
-    
-
-    # --- PASO 4: RESPUESTA FINAL AL CLIENTE ---
+    # --- RESPUESTA FINAL (sin cambios) ---
     return RespuestaGenerica(
         status="success",
         message="Venta registrada.",
@@ -155,13 +187,13 @@ def api_registrar_ingreso(req: MovimientoSimpleRequest, background_tasks: Backgr
         raise HTTPException(status_code=400, detail="Operación denegada: El usuario no tiene una caja abierta.")
     
     try:
-        movimiento_creado = registro_caja.registrar_movimiento_simple(
+        movimiento_creado = registro_caja.registrar_ingreso_egreso(
             db=db, usuario_actual=current_user, id_sesion_caja=sesion_activa.id,
             monto=req.monto, concepto=req.concepto, tipo=TipoMovimiento.INGRESO,
             metodo_pago=req.metodo_pago if req.metodo_pago else "EFECTIVO"
         )
         db.commit()
-        background_tasks.add_task(registro_caja.sincronizar_movimiento_simple_con_sheets, movimiento=movimiento_creado)
+        
         return RespuestaGenerica(status="success", message=f"Ingreso registrado con éxito. ID: {movimiento_creado.id}", data={"id_movimiento": movimiento_creado.id})
     except ValueError as e:
         db.rollback()
