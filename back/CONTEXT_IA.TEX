@@ -225,3 +225,133 @@ Priorizar la seguridad, escalabilidad y mantenibilidad en todas las soluciones.
 Explicar el "porqué" de las decisiones de arquitectura, no solo el "cómo".
 Proporcionar código completo, limpio y profesional que siga la arquitectura establecida.
 Ser estructurado, claro y didáctico.
+
+
+Documento de Contexto para el Desarrollo del Ciclo de Vida de Ventas
+Fecha de Estado: 25 de Julio de 2025
+Misión: Refactorizar el módulo de ventas para que deje de ser un simple registro de transacciones y se convierta en un sistema de gestión del ciclo de vida de los documentos de venta. El objetivo es implementar un flujo de trabajo tipo "máquina de estados" que refleje los distintos "peldaños" de una operación comercial: Presupuesto, Remito, Comprobante Interno (Venta Completada) y Factura Fiscal (AFIP).
+1. El Problema a Resolver: La Lógica de Negocio y sus Reglas
+El cliente ha definido que los diferentes tipos de "comprobantes" no son documentos independientes, sino estados evolutivos de una misma transacción de venta. Cada estado tiene reglas de negocio únicas:
+Presupuesto:
+Función: Cotización formal.
+Reglas:
+NO afecta el stock.
+NO afecta la caja.
+Tiene una fecha de vencimiento.
+Muestra precios.
+Remito:
+Función: Comprobante de entrega de mercadería.
+Reglas:
+SÍ afecta el stock (lo descuenta).
+NO afecta la caja.
+NO debe mostrar precios.
+Comprobante (Venta Completada):
+Función: "Factura interna" no fiscal. Registra el ingreso de dinero.
+Reglas:
+SÍ afecta la caja (registra el/los CajaMovimiento).
+SÍ afecta el stock, a menos que ya haya sido afectado por un remito previo.
+Muestra precios.
+Factura (AFIP):
+Función: El escalón final. Obtiene validez fiscal.
+Reglas:
+NO afecta el stock ni la caja (eso ya ocurrió en pasos anteriores).
+Requiere comunicación con el servicio externo de AFIP.
+El documento final debe incluir datos fiscales (CAE, Vencimiento, etc.).
+2. La Arquitectura de Solución Propuesta
+Para implementar este flujo, hemos diseñado una arquitectura basada en una "Máquina de Estados" centrada en el modelo Venta.
+Modificación del Modelo Venta (modelos.py):
+Se debe añadir un campo estado: str (ej: "PRESUPUESTO", "REMITIDO", "COMPLETADA", "FACTURADA") para rastrear el "peldaño" actual.
+Se deben añadir campos adicionales para soportar los estados, como fecha_vencimiento_presupuesto, cae_afip, etc.
+Separación de la Lógica de Negocio (El "Manager"):
+Se creará un nuevo manager, back/gestion/ventas_ciclo_de_vida_manager.py, dedicado exclusivamente a esta lógica.
+NO habrá una única función monolítica registrar_venta. En su lugar, habrá una función por cada acción (transición de estado):
+crear_presupuesto(...): Crea una Venta en estado PRESUPUESTO.
+generar_remito_para_venta(...): Transiciona una Venta a REMITIDO y descuenta stock.
+completar_venta(...): Transiciona una Venta a COMPLETADA y registra el pago en caja.
+facturar_venta_afip(...): Transiciona una Venta a FACTURADA y se comunica con AFIP.
+Cada una de estas funciones debe contener validaciones de estado. Por ejemplo, facturar_venta_afip solo debe funcionar si el estado actual es COMPLETADA.
+Endpoints Específicos por Acción (El "Router"):
+Se creará un nuevo router, back/api/blueprints/ventas_ciclo_de_vida_router.py, que expondrá estas acciones al frontend.
+Los endpoints serán verbos de acción, no sustantivos. Por ejemplo:
+POST /ventas/ciclo/presupuesto (para crear)
+POST /ventas/ciclo/{id_venta}/generar-remito (para transicionar)
+POST /ventas/ciclo/{id_venta}/completar
+POST /ventas/ciclo/{id_venta}/facturar
+Impacto en la Generación de Comprobantes:
+El generador de PDFs (generador_comprobantes.py) no necesita cambios lógicos, pero sí las plantillas HTML.
+La plantilla presupuesto.html debe mostrar la fecha_vencimiento.
+La plantilla remito.html NO debe mostrar la columna de precios.
+La plantilla factura.html debe mostrar los datos de cae_afip, etc.
+La decisión de qué plantilla usar seguirá viniendo del frontend a través del parámetro ?tipo=.
+3. Contexto Adicional del Proyecto (Relevante para esta Tarea)
+Arquitectura General: El asistente debe recordar y adherirse a la arquitectura de capas (Modelos, Schemas, Managers, Routers).
+Multi-Empresa: Toda la lógica a implementar debe ser consciente del multi-tenant. Cada consulta y modificación en el nuevo "manager" debe filtrar por id_empresa para garantizar el aislamiento de datos.
+Seguridad: Los nuevos endpoints deben estar protegidos por roles (Depends(es_cajero), Depends(es_admin)), según corresponda a la acción.
+Facturación AFIP: La función facturar_venta_afip actuará como un "orquestador", llamando al "especialista" ya existente (facturacion_afip.py) para manejar la comunicación externa.
+4. Tareas Inmediatas para el Asistente de IA
+Finalizar el diseño del modelo Venta en modelos.py con todos los campos necesarios.
+Escribir el código completo para el nuevo manager ventas_ciclo_de_vida_manager.py, implementando la lógica y las validaciones de estado para cada una de las cuatro funciones.
+Escribir el código completo para el nuevo router ventas_ciclo_de_vida_router.py, definiendo los endpoints y conectándolos con las funciones del manager.
+Crear los Schemas necesarios en un nuevo archivo venta_schemas.py para las peticiones (ej: VentaCreate, PagosRequest).
+Proporcionar las modificaciones necesarias para las plantillas HTML (presupuesto.html, remito.html) para que reflejen las nuevas reglas de negocio.
+
+Documento de Contexto y Traspaso: Sistema de Gestión IMA
+Fecha de Estado: 25 de Julio de 2025
+1. Misión y Resumen Ejecutivo
+El proyecto es un Sistema de Gestión (ERP) multi-tenant (multi-empresa) con un backend en FastAPI/SQLModel y un frontend en Next.js. La misión es evolucionar desde una base de código funcional pero inconsistente hacia una arquitectura de software como servicio (SaaS) robusta, segura y escalable.
+El trabajo realizado se ha centrado en tres pilares:
+Estabilización: Solución de problemas críticos de entorno (502 Bad Gateway) y de librerías (bcrypt) que impedían el funcionamiento de la aplicación.
+Modernización y Consistencia: Refactorización total de la lógica de acceso a datos para usar exclusivamente el ORM SQLModel, eliminando conexiones directas a MySQL (mysql-connector) y garantizando transacciones atómicas.
+Diseño de Arquitectura Avanzada: Implementación de un modelo de datos multi-empresa, diseño de un sistema de generación de comprobantes "stateless", y planificación de funcionalidades complejas como la facturación fiscal y la importación masiva de datos.
+2. Arquitectura Fundamental del Backend (Reglas Inquebrantables)
+Cualquier nuevo desarrollo debe adherirse a estos principios:
+ORM Exclusivo (SQLModel): Toda interacción con la base de datos se realiza a través de SQLModel y su Session. No se debe usar mysql-connector ni escribir SQL crudo.
+Capas de Lógica Estrictas:
+modelos.py: Define las tablas de la DB como clases de Python. Es la única fuente de la verdad sobre la estructura de datos.
+schemas/: Define los "contratos de datos" (DTOs) con Pydantic. Valida toda la información que entra y sale de la API.
+gestion/ (Managers): Contiene la lógica de negocio. Recibe la Session de la DB y schemas, y devuelve objetos de los modelos. Es agnóstico a HTTP.
+api/blueprints/ (Routers): Define las rutas HTTP, maneja la seguridad, llama a los "managers" y formatea las respuestas/errores HTTP.
+3. Decisiones de Arquitectura Clave (El "Cómo" y el "Porqué")
+Decisión: El sistema debe soportar múltiples empresas clientes de forma segura y aislada.
+Implementación:
+Se han creado los modelos Empresa y ConfiguracionEmpresa.
+Los modelos clave (Usuario, Articulo, Categoria, Marca, Tercero, Venta) deben tener una clave foránea id_empresa.
+Regla de Oro: Toda consulta en los "managers" debe filtrar por el id_empresa del usuario autenticado para garantizar el aislamiento de datos.
+Decisión: Los comprobantes (presupuesto, remito, factura) no son documentos independientes, sino estados evolutivos de una Venta.
+Implementación:
+El modelo Venta tiene un campo estado que puede ser PRESUPUESTO, REMITIDO, COMPLETADA, o FACTURADA.
+La lógica de negocio está en ventas_ciclo_de_vida_manager.py, con una función para cada transición de estado (crear_presupuesto, generar_remito_para_venta, etc.).
+Cada función aplica reglas de negocio específicas: generar_remito descuenta stock pero no afecta caja; completar_venta afecta caja; facturar_venta llama a AFIP.
+Las plantillas HTML/PDF (remito.html, presupuesto.html) se adaptan a estas reglas (ej: el remito no muestra precios).
+Decisión: El backend genera todos los documentos para asegurar consistencia. La lógica de negocio debe ser "stateless" para soportar el modelo multi-empresa.
+Implementación:
+Endpoint: POST /comprobantes/generar.
+Flujo: El frontend envía un JSON completo con todos los datos (emisor, receptor, transacción). El backend no necesita consultar su propia DB para generar el comprobante.
+AFIP: La lógica de facturación está encapsulada en facturacion_afip.py. El generador de comprobantes solo lo llama cuando el tipo solicitado es "factura".
+Decisión: Las credenciales de AFIP son demasiado sensibles para la DB principal.
+Arquitectura: Se ha diseñado un microservicio "Bóveda" independiente.
+Flujo: La API principal, al necesitar facturar, hará una llamada HTTP interna a la Bóveda, solicitando las credenciales para un CUIT. La Bóveda las desencripta en memoria y las devuelve.
+Decisión: El sistema debe poder importar listas de precios en Excel de diferentes proveedores, cada uno con su propio formato de columnas.
+Arquitectura: Sistema de Plantillas de Mapeo.
+Flujo:
+Configuración: Un super-admin mapea las columnas del Excel de un proveedor a los campos de la DB (PlantillaProveedor).
+Pre-visualización: El usuario sube un Excel. El backend lo lee usando la plantilla y devuelve un informe de los cambios sin aplicarlos.
+Confirmación: Un endpoint final recibe la confirmación y ejecuta la actualización masiva.
+4. Arquitectura del Frontend (Next.js)
+Estado Global: Zustand (useAuthStore). Crítico: El store debe guardar el objeto usuario completo, incluyendo usuario.rol y usuario.empresa con su configuración.
+Estructura de Rutas:
+Aplicación Privada: Vive dentro de un Grupo de Rutas app/(dashboard)/. Un layout.tsx en la raíz de este grupo gestiona la autenticación.
+Paneles Ocultos (Super-Admin): Se crean como sub-rutas protegidas por un guardián de rol adicional (ej: app/(dashboard)/super-admin/empresas/page.tsx).
+5. Contexto Histórico y Soluciones Implementadas
+502 Bad Gateway: Solucionado corrigiendo errores de ImportError en main.py y schemas.
+Fallos de Autenticación: Solucionado forzando la reinstalación de passlib[bcrypt]==1.7.4.
+Fechas y Horas: Decisión firme: el backend siempre guarda y envía fechas en UTC. El frontend es siempre responsable de convertirlas a la zona horaria local del usuario para su visualización.
+Refactorización: Módulos como caja y admin han sido completamente migrados a SQLModel.
+6. Rol del Asistente y Tareas Pendientes
+Rol: Actuar como arquitecto de software senior, priorizando la seguridad, escalabilidad y consistencia con la arquitectura definida. Explicar siempre el "porqué" de las decisiones.
+Tareas Inmediatas Críticas:
+Implementar el ventas_ciclo_de_vida_manager.py con la lógica de la máquina de estados.
+Modificar el modelo Venta y aplicar la migración de base de datos.
+Crear el router ventas_ciclo_de_vida_router.py y los schemas necesarios.
+Refactorizar todos los "managers" restantes para que sus consultas filtren por id_empresa.
+Construir el Microservicio Bóveda.

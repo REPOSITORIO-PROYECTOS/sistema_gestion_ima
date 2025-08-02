@@ -1,7 +1,9 @@
 # back/api/blueprints/comprobantes_router.py
 # VERSIÓN FINAL, LIMPIA Y COMPLETA
 
-from fastapi import APIRouter, Depends, HTTPException
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from starlette.responses import Response
 from sqlmodel import Session # <-- 1. IMPORTACIÓN AÑADIDA
 
@@ -14,6 +16,8 @@ from back.modelos import Usuario # <-- 2. IMPORTACIÓN AÑADIDA
 # Especialistas de la capa de Gestión
 from back.gestion.reportes.generador_comprobantes import generar_comprobante_stateless
 from back.gestion import facturacion_lotes_manager # <-- Importamos el módulo completo
+from back.schemas.venta_ciclo_de_vida_schemas import VentaResponse # Reutilizamos el schema de respuesta
+from back.gestion.reportes.ciclo_vida_comp import agrupar_comprobantes_en_uno_nuevo
 
 # Schemas necesarios para este router
 from back.schemas.comprobante_schemas import (
@@ -22,15 +26,18 @@ from back.schemas.comprobante_schemas import (
     FacturarLoteResponse
 )
 
+# --- Schema para el Payload de Entrada ---
+class AgruparRequest(BaseModel):
+    ids_comprobantes: List[int]
+    nuevo_tipo_comprobante: str # Ej: "Factura A"
+
 router = APIRouter(
     prefix="/comprobantes",
     tags=["Generación de Comprobantes"],
     # dependencies=[Depends(obtener_usuario_actual)] # Puedes proteger todo el router si quieres
 )
 
-@router.post(
-    "/generar",
-    summary="Generar un comprobante (factura, remito, etc.) on-demand",
+@router.post("/generar", summary="Generar un comprobante (factura, remito, etc.) on-demand",
     responses={
         200: {"content": {"application/pdf": {}}, "description": "El archivo PDF del comprobante."},
         404: {"description": "Plantilla no encontrada."},
@@ -65,11 +72,8 @@ def api_generar_comprobante(req: GenerarComprobanteRequest):
         raise HTTPException(status_code=500, detail="Error interno al generar el comprobante.")
     
 
-@router.post(
-    "/facturar-lote",
-    summary="Factura un lote de ventas no facturadas a un único cliente",
-    response_model=FacturarLoteResponse
-)
+@router.post("/facturar-lote", summary="Factura un lote de ventas no facturadas a un único cliente",
+response_model=FacturarLoteResponse)
 def api_facturar_lote_de_ventas(
     req: FacturarLoteRequest,
     db: Session = Depends(get_db),
@@ -105,3 +109,29 @@ def api_facturar_lote_de_ventas(
         # Para cualquier otro error inesperado, revertimos y devolvemos 500
         db.rollback()
         raise HTTPException(status_code=500, detail="Ocurrió un error interno inesperado al facturar el lote.")
+
+@router.post("/agrupar", response_model=VentaResponse, summary="Agrupa múltiples comprobantes en uno solo nuevo")
+def endpoint_agrupar_comprobantes(
+    payload: AgruparRequest,
+    db: Session = Depends(get_db),
+    usuario_actual: Usuario = Depends(obtener_usuario_actual)
+):
+    """
+    Toma una lista de IDs de comprobantes existentes (ej: Remitos),
+    consolida todos sus ítems en un nuevo comprobante único (ej: una Factura),
+    y anula los comprobantes originales.
+
+    Esta operación es atómica: o todo tiene éxito o todo se revierte.
+    """
+    comprobante_final = agrupar_comprobantes_en_uno_nuevo(
+        db=db,
+        usuario=usuario_actual,
+        ids_a_agrupar=payload.ids_comprobantes,
+        nuevo_tipo_comprobante=payload.nuevo_tipo_comprobante
+    )
+    
+    # El commit final se hace aquí para asegurar la atomicidad
+    db.commit()
+    db.refresh(comprobante_final)
+    
+    return comprobante_final

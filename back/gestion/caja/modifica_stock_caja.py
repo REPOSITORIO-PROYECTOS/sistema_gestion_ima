@@ -36,4 +36,4 @@ def actualizar_stock_por_venta_y_detalle(id_movimiento_venta: int, articulos_ven
 
     except (Error, ValueError) as e:
         print(f"[STOCK_MANAGER] ERROR: {e}")
-        raise e # Relanzamos la excepción para que la transacción principal haga rollback
+        raise e # Relanzamos la excepción para que la transacción principal haga rollback 
