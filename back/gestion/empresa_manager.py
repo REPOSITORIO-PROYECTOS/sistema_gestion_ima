@@ -40,7 +40,7 @@ def crear_empresa_y_primer_admin(db: Session, data: EmpresaCreate) -> Empresa:
         
         configuracion_inicial = ConfiguracionEmpresa(
             empresa=nueva_empresa,
-            id_google_sheets=data.id_google_sheets
+            link_google_sheets=data.link_google_sheets
         )
         db.add(configuracion_inicial)
         
