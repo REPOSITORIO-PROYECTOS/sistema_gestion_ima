@@ -7,7 +7,10 @@ from typing import List
 from back.database import get_db
 from back.security import es_admin
 import back.gestion.empresa_manager as empresa_manager
+import back.gestion.configuracion_manager as configuracion_manager 
+
 from back.schemas.empresa_schemas import EmpresaCreate, EmpresaResponse
+from back.schemas.configuracion_schemas import ConfiguracionResponse, ConfiguracionUpdate
 
 router = APIRouter(
     prefix="/empresas",
@@ -66,3 +69,41 @@ def api_obtener_empresas(db: Session = Depends(get_db)):
             admin_username="" # Este campo no tiene sentido en una lista de empresas
         ))
     return respuesta
+
+@router.get("/admin/{id_empresa}/configuracion", response_model=ConfiguracionResponse)
+def api_obtener_configuracion_de_empresa(
+    id_empresa: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Obtiene la configuración completa de una empresa específica por su ID.
+    Este es el endpoint que tu formulario de configuración necesita para cargar los datos.
+    """
+    try:
+        # Reutilizamos la lógica que ya existe en el configuracion_manager
+        config = configuracion_manager.obtener_configuracion_empresa(db, id_empresa)
+        return config
+    except ValueError as e:
+        # Si el manager lanza un error (ej: empresa sin config), lo convertimos en 404
+        raise HTTPException(status_code=404, detail=str(e))
+
+@router.patch("/admin/{id_empresa}/configuracion", response_model=ConfiguracionResponse)
+def api_actualizar_configuracion_de_empresa(
+    id_empresa: int,
+    data: ConfiguracionUpdate,
+    db: Session = Depends(get_db)
+):
+    """
+    Actualiza parcialmente la configuración de una empresa específica.
+    Este es el endpoint que tu formulario de configuración necesita para guardar los cambios.
+    """
+    try:
+        # Reutilizamos la lógica de actualización que ya existe
+        config_actualizada = configuracion_manager.actualizar_configuracion_parcial(
+            db=db,
+            id_empresa=id_empresa,
+            data=data
+        )
+        return config_actualizada
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
