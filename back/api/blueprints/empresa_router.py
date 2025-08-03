@@ -34,7 +34,7 @@ def api_crear_empresa(req: EmpresaCreate, db: Session = Depends(get_db)):
             cuit=nueva_empresa.cuit,
             activa=nueva_empresa.activa,
             # Accedemos al dato de configuración a través de la relación
-            id_google_sheets=nueva_empresa.configuracion.link_sheets, 
+            link_google_sheets=nueva_empresa.configuracion.link_google_sheets,
             # Tomamos el nombre de usuario de la petición original
             admin_username=req.admin_username 
         )
@@ -62,7 +62,7 @@ def api_obtener_empresas(db: Session = Depends(get_db)):
             cuit=emp.cuit,
             activa=emp.activa,
             # Para la lista, podemos omitir campos detallados o poner placeholders
-            id_google_sheets=emp.configuracion.link_sheets if emp.configuracion else None,
+            link_google_sheets=emp.configuracion.link_google_sheets if emp.configuracion else None,
             admin_username="" # Este campo no tiene sentido en una lista de empresas
         ))
     return respuesta
