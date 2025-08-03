@@ -14,9 +14,10 @@ from back.schemas.admin_schemas import UsuarioCreate
 # === LÓGICA DE GESTIÓN DE USUARIOS
 # ===================================================================
 
-def crear_usuario(db: Session, usuario_data: UsuarioCreate) -> Usuario:
+def crear_usuario(db: Session, usuario_data: UsuarioCreate, commit_transaction: bool = True) -> Usuario:
     """
-    Crea un nuevo usuario, hasheando su contraseña y validando el rol por ID.
+    Crea un nuevo usuario. Si commit_transaction es False, solo añade a la
+    sesión sin hacer commit, permitiendo que otra función gestione la transacción.
     """
     # 1. Verificar si el nombre de usuario ya existe
     if db.exec(select(Usuario).where(Usuario.nombre_usuario == usuario_data.nombre_usuario)).first():
@@ -34,14 +35,17 @@ def crear_usuario(db: Session, usuario_data: UsuarioCreate) -> Usuario:
     nuevo_usuario = Usuario(
         nombre_usuario=usuario_data.nombre_usuario,
         password_hash=password_hasheada,
-        id_rol=usuario_data.id_rol,  # Usamos directamente el ID recibido
+        id_rol=usuario_data.id_rol,
         id_empresa=usuario_data.id_empresa
     )
     
-    # 5. Guardar en la base de datos
+    # 5. Añadir a la sesión
     db.add(nuevo_usuario)
-    db.commit()
-    db.refresh(nuevo_usuario)
+    
+    # 6. Commit condicional
+    if commit_transaction:
+        db.commit()
+        db.refresh(nuevo_usuario)
     
     return nuevo_usuario
 

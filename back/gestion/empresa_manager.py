@@ -1,106 +1,89 @@
 # back/gestion/empresa_manager.py
-# Lógica de negocio para la gestión de Empresas (clientes del sistema)
 
 from sqlmodel import Session, select
-from typing import Optional, List
+from typing import List
 
-# --- Módulos del Proyecto ---
-from back.modelos import Empresa, ConfiguracionEmpresa
-from back.schemas.empresa_schemas import EmpresaCreate # Asumimos que este schema existe
+from back.modelos import Empresa, ConfiguracionEmpresa, Usuario, Rol
+from back.schemas.empresa_schemas import EmpresaCreate
+from back.schemas.admin_schemas import UsuarioCreate # <-- ¡IMPORTANTE! Importamos el schema que usa admin_manager
 
-# ===================================================================
-# === LÓGICA DE GESTIÓN DE EMPRESAS
-# ===================================================================
+# --- ¡COLABORACIÓN ENTRE MANAGERS! ---
+# Importamos el manager de administración para reutilizar su lógica
+import back.gestion.admin.admin_manager as admin_manager
 
-def crear_empresa(db: Session, empresa_data: EmpresaCreate) -> Empresa:
+def crear_empresa_y_primer_admin(db: Session, data: EmpresaCreate) -> Empresa:
     """
-    Crea una nueva empresa en el sistema.
-    Verifica que el CUIT y el nombre legal no estén ya en uso.
-    Automáticamente crea un registro de configuración por defecto para la nueva empresa.
+    Crea una nueva Empresa y su primer Usuario Administrador en una única
+    transacción atómica. REUTILIZA la lógica de `admin_manager.crear_usuario`.
     """
-    print(f"\n--- [TRACE: CREAR EMPRESA] ---")
-    print(f"1. Solicitud para crear empresa con CUIT: {empresa_data.cuit}")
+    print(f"\n--- [TRACE: CREAR EMPRESA Y ADMIN (Reutilizando Lógica)] ---")
+    print(f"1. Solicitud para CUIT: {data.cuit}, Admin: {data.admin_username}")
 
-    # 1. Verificar que el CUIT no esté duplicado
-    statement_cuit = select(Empresa).where(Empresa.cuit == empresa_data.cuit)
-    if db.exec(statement_cuit).first():
-        raise ValueError(f"El CUIT '{empresa_data.cuit}' ya está registrado en el sistema.")
-
-    # 2. Verificar que el nombre legal no esté duplicado
-    statement_nombre = select(Empresa).where(Empresa.nombre_legal == empresa_data.nombre_legal)
-    if db.exec(statement_nombre).first():
-        raise ValueError(f"El nombre legal '{empresa_data.nombre_legal}' ya está registrado.")
+    # --- INICIO DE LA TRANSACCIÓN ---
+    # 1. Validaciones de unicidad (CUIT, Nombre Legal)
+    if db.exec(select(Empresa).where(Empresa.cuit == data.cuit)).first():
+        raise ValueError(f"El CUIT '{data.cuit}' ya está registrado.")
+    if db.exec(select(Empresa).where(Empresa.nombre_legal == data.nombre_legal)).first():
+        raise ValueError(f"El nombre legal '{data.nombre_legal}' ya está registrado.")
     
-    print("2. Validaciones de unicidad superadas.")
+    # El admin_manager ya valida la unicidad del username, no necesitamos repetirlo.
+    print("2. Validaciones de empresa superadas.")
 
-    # 3. Crear la nueva empresa
-    nueva_empresa = Empresa(
-        nombre_legal=empresa_data.nombre_legal,
-        nombre_fantasia=empresa_data.nombre_fantasia,
-        cuit=empresa_data.cuit
-    )
-    
-    # 4. Crear su configuración por defecto asociada
-    # El modelo ConfiguracionEmpresa espera un objeto Empresa para la relación
-    configuracion_por_defecto = ConfiguracionEmpresa(
-        empresa=nueva_empresa,
-        # Si el dato viene en la petición, lo usamos; si no, será None.
-        id_google_sheets=empresa_data.id_google_sheets 
-    )    
     try:
+        # 3. Crear la Empresa y su Configuración (sin commit todavía)
+        nueva_empresa = Empresa(
+            nombre_legal=data.nombre_legal,
+            nombre_fantasia=data.nombre_fantasia,
+            cuit=data.cuit
+        )
         db.add(nueva_empresa)
-        db.add(configuracion_por_defecto)
-        print("3. Intentando registrar la nueva empresa y su configuración en la base de datos...")
+        
+        configuracion_inicial = ConfiguracionEmpresa(
+            empresa=nueva_empresa,
+            id_google_sheets=data.id_google_sheets
+        )
+        db.add(configuracion_inicial)
+        
+        # Hacemos un "flush" para que nueva_empresa obtenga un ID provisional
+        # que podamos usar para el nuevo usuario, sin cerrar la transacción.
+        print("3. Pre-registrando empresa para obtener su ID...")
+        db.flush()
+
+        # 4. Preparar los datos para llamar al `admin_manager.crear_usuario`
+        # Asumimos que el rol para el admin de una empresa es "Gerente" (o el que corresponda)
+        rol_gerente = db.exec(select(Rol).where(Rol.nombre == "Gerente")).first()
+        if not rol_gerente:
+            raise RuntimeError("El rol 'Gerente' no se encuentra en la base de datos.")
+
+        datos_nuevo_usuario = UsuarioCreate(
+            nombre_usuario=data.admin_username,
+            password=data.admin_password,
+            id_rol=rol_gerente.id,
+            id_empresa=nueva_empresa.id # <-- ¡Le pasamos el ID de la empresa recién creada!
+        )
+        
+        # 5. Llamar a la función existente para crear el usuario
+        print(f"4. Reutilizando 'admin_manager.crear_usuario' para el usuario '{data.admin_username}'...")
+        admin_manager.crear_usuario(db, datos_nuevo_usuario, commit_transaction=False)
+        
+        # 6. Si todo ha ido bien, hacemos el commit final
+        print("5. Todas las operaciones exitosas. Realizando commit final...")
         db.commit()
         db.refresh(nueva_empresa)
-        print(f"   -> ¡ÉXITO! Empresa registrada con ID: {nueva_empresa.id}")
+        print(f"   -> ¡ÉXITO! Empresa ID: {nueva_empresa.id} y su admin han sido creados atómicamente.")
         
     except Exception as e:
-        print(f"   -> ERROR de BD al registrar la empresa: {e}")
-        db.rollback()
-        raise RuntimeError(f"Error de base de datos al registrar la empresa: {e}")
+        print(f"   -> ERROR durante la transacción: {e}")
+        db.rollback() # ¡CRÍTICO! Si algo falla, se revierte todo.
+        # Re-lanzamos el error para que el router lo capture.
+        raise e
 
     print("--- [FIN TRACE] ---\n")
     return nueva_empresa
 
-
-def obtener_empresa_por_id(db: Session, id_empresa: int) -> Optional[Empresa]:
-    """
-    Obtiene una empresa específica por su ID.
-    """
-    return db.get(Empresa, id_empresa)
-
-def desactivar_o_reactivar_empresa(db: Session, id_empresa: int, activar: bool) -> Empresa:
-    """
-    Desactiva o reactiva una empresa cambiando su estado.
-    """
-    empresa = db.get(Empresa, id_empresa)
-    if not empresa:
-        raise ValueError(f"No se encontró una empresa con el ID {id_empresa}.")
-
-    # Lógica usando tu campo 'activo' (o como se llame)
-    if  empresa.activa == activar:
-        estado_actual = "activa" if activar else "inactiva"
-        print(f"La empresa ya se encuentra {estado_actual}. No se realizan cambios.")
-        return empresa
-    
-    empresa.activo = activar # <-- USAMOS TU CAMPO
-    
-    try:
-        db.add(empresa)
-        db.commit()
-        db.refresh(empresa)
-        return empresa
-    except Exception as e:
-        db.rollback()
-        raise RuntimeError(f"Error de base de datos: {e}")
-
 def obtener_todas_las_empresas(db: Session, incluir_inactivas: bool = False) -> List[Empresa]:
-    """
-    Devuelve una lista de empresas.
-    """
+    """ Devuelve una lista de empresas. """
     statement = select(Empresa).order_by(Empresa.nombre_legal)
     if not incluir_inactivas:
-        # Filtramos usando tu campo
-        statement = statement.where(Empresa.activa == True) # <-- USAMOS TU CAMPO
+        statement = statement.where(Empresa.activa == True)
     return db.exec(statement).all()

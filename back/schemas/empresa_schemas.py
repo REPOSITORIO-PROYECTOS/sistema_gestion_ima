@@ -9,6 +9,8 @@ class EmpresaCreate(BaseModel):
     nombre_fantasia: Optional[str] = None
     cuit: str = Field(..., min_length=11, max_length=11)
     id_google_sheets: Optional[str] = None
+    admin_username: str
+    admin_password: str
 
     @validator('cuit')
     def limpiar_cuit(cls, v):
@@ -24,6 +26,7 @@ class EmpresaResponse(BaseModel):
     cuit: str
     activa: bool
     id_google_sheets: Optional[str] = None
-
+    admin_username: str
+    
     class Config:
         from_attributes = True
