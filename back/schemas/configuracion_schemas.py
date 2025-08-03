@@ -15,7 +15,7 @@ class ConfiguracionUpdate(BaseModel):
     direccion_negocio: Optional[str] = None
     telefono_negocio: Optional[str] = None
     mail_negocio: Optional[str] = None
-    link_sheets: Optional[str] = None
+    link_google_sheets: Optional[str] = None
 
 class ConfiguracionResponse(BaseModel):
     """Schema completo para devolver la configuración de una empresa."""
@@ -29,7 +29,7 @@ class ConfiguracionResponse(BaseModel):
     direccion_negocio: Optional[str]
     telefono_negocio: Optional[str]
     mail_negocio: Optional[str]
-    link_sheets: Optional[str]
+    link_google_sheets: Optional[str]
 
     class Config:
         from_attributes = True

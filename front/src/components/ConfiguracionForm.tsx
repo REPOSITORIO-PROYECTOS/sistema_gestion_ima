@@ -19,7 +19,7 @@ const formSchema = z.object({
   mail_negocio: z.string().email("Debe ser un email válido.").optional().or(z.literal("")).nullable(),
   cuit: z.string().length(11, "CUIT debe tener 11 dígitos.").optional().nullable(),
   punto_venta: z.string().min(1, "Requerido.").max(5, "Máximo 5 dígitos.").optional().nullable(),
-  id_google_sheets: z.string().optional().nullable(),
+  link_google_sheets: z.string().optional().nullable(),
 });
 
 // Inferimos el tipo para los valores del formulario, esto nos da 100% de seguridad de tipos
@@ -101,7 +101,7 @@ export function ConfiguracionForm({ empresaId }: Props) {
                 <FormField control={form.control} name="punto_venta" render={({ field }) => (
                     <FormItem><FormLabel>Punto de Venta</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                 )} />
-                <FormField control={form.control} name="id_google_sheets" render={({ field }) => (
+                <FormField control={form.control} name="link_google_sheets" render={({ field }) => (
                     <FormItem>
                         <FormLabel>ID Hoja de Google Sheets (Opcional)</FormLabel>
                         <FormControl><Input {...field} value={field.value ?? ''} placeholder="ID de la hoja para reportes..." /></FormControl>

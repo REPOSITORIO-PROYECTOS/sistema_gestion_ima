@@ -51,7 +51,7 @@ const formSchema = z.object({
     "Monotributista",
     "Exento",
   ], { required_error: "La condición fiscal es requerida." }),
-  link_sheets: z.string().optional(),
+  link_google_sheets: z.string().optional(),
   
   // --- Datos Primer Administrador ---
   admin_username: z.string().min(4, "El nombre de usuario debe tener al menos 4 caracteres."),
@@ -85,7 +85,7 @@ export function CreateEmpresaModal({ isOpen, onClose, onSuccess }: Props) {
       mail_negocio: "",
       afip_punto_venta_predeterminado: undefined,
       afip_condicion_iva: "Responsable Inscripto",
-      link_sheets: "",
+      link_google_sheets: "",
       admin_username: "",
       admin_password: "",
       admin_password_confirm: "",
@@ -166,7 +166,7 @@ export function CreateEmpresaModal({ isOpen, onClose, onSuccess }: Props) {
                 <FormMessage />
               </FormItem>
             )} />
-            <FormField control={form.control} name="link_sheets" render={({ field }) => (
+            <FormField control={form.control} name="link_google_sheets" render={({ field }) => (
               <FormItem>
                 <FormLabel>ID de Hoja de Google Sheets (Opcional)</FormLabel>
                 <FormControl><Input {...field} /></FormControl>
