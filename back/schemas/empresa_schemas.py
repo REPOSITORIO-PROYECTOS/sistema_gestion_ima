@@ -8,7 +8,7 @@ class EmpresaCreate(BaseModel):
     nombre_legal: str
     nombre_fantasia: Optional[str] = None
     cuit: str = Field(..., min_length=11, max_length=11)
-    id_google_sheets: Optional[str] = None
+    link_google_sheets: Optional[str] = None
     admin_username: str
     admin_password: str
 
@@ -25,7 +25,7 @@ class EmpresaResponse(BaseModel):
     nombre_fantasia: Optional[str] = None
     cuit: str
     activa: bool
-    id_google_sheets: Optional[str] = None
+    link_google_sheets: Optional[str] = None
     admin_username: str
     
     class Config:
