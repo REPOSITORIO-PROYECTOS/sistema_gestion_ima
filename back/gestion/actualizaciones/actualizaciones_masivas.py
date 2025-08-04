@@ -10,21 +10,10 @@ from back.modelos import ArticuloCodigo, ConfiguracionEmpresa, Tercero, Articulo
 from back.utils.tablas_handler import TablasHandler
 
 # Función auxiliar para limpiar los precios
-def limpiar_precio(valor_texto: str) -> float:
-    if isinstance(valor_texto, (int, float)):
-        return float(valor_texto)
-    try:
-        # Elimina el símbolo '$', espacios, y usa el punto como separador de miles
-        valor_limpio = re.sub(r'[$\s.]', '', str(valor_texto)).replace(',', '.')
-        return float(valor_limpio)
-    except (ValueError, TypeError):
-        return 0.0
-
-# ----- LÓGICA PARA CLIENTES -----
 def sincronizar_clientes_desde_sheets(db: Session, id_empresa_actual: int) -> Dict[str, int]:
     """
-    Sincroniza clientes desde Google Sheets, adaptado para un entorno multi-empresa.
-    Utiliza un 'código externo' para la sincronización en lugar del ID de la base de datos.
+    Sincroniza clientes desde Google Sheets de forma robusta, emparejando registros
+    existentes sin 'codigo_interno' a través de su CUIT para actualizarlos.
     """
     config_empresa = db.get(ConfiguracionEmpresa, id_empresa_actual)
     if not config_empresa or not config_empresa.link_google_sheets:
@@ -39,80 +28,98 @@ def sincronizar_clientes_desde_sheets(db: Session, id_empresa_actual: int) -> Di
         print("Advertencia: No se pudieron cargar datos de Google Sheets o la hoja está vacía.")
         return {"creados": 0, "actualizados": 0, "errores": 0, "sin_cambios": 0}
 
-    # --- CAMBIO CLAVE 1: Filtrar clientes por la empresa actual ---
-    print("Obteniendo datos de clientes de la base de datos (solo empresa actual)...")
-    clientes_db_objetos = db.exec(
-        select(Tercero).where(Tercero.es_cliente == True, Tercero.id_empresa == id_empresa_actual)
+    # --- CAMBIO CLAVE 1: Cargar TODOS los 'Tercero' de la empresa ---
+    # Necesitamos cargar tanto clientes como proveedores para tener una visión completa
+    # y poder usar el CUIT como un puente fiable.
+    print("Obteniendo todos los Terceros de la base de datos (solo empresa actual)...")
+    terceros_db_objetos = db.exec(
+        select(Tercero).where(Tercero.id_empresa == id_empresa_actual)
     ).all()
 
-    # --- CAMBIO CLAVE 2: Usar 'codigo_externo' como clave del diccionario ---
-    # Esto asegura que comparamos con el ID de la hoja, no con el ID de la BD.
-    clientes_db_dict = {
-        cliente.codigo_interno: cliente 
-        for cliente in clientes_db_objetos if cliente.codigo_interno
+    # --- CAMBIO CLAVE 2: Crear MÚLTIPLES diccionarios para búsqueda flexible ---
+    terceros_por_codigo_interno = {
+        tercero.codigo_interno: tercero 
+        for tercero in terceros_db_objetos if tercero.codigo_interno
+    }
+    terceros_por_cuit = {
+        tercero.cuit: tercero 
+        for tercero in terceros_db_objetos if tercero.cuit
     }
     
     resumen = {"creados": 0, "actualizados": 0, "sin_cambios": 0, "errores": 0}
 
     for cliente_sheet in clientes_sheets:
         try:
-            # --- CAMBIO CLAVE 3: La clave de sincronización ahora es el 'codigo_externo' ---
             codigo_interno_sheet = str(cliente_sheet.get("id-cliente", "")).strip()
             if not codigo_interno_sheet:
-                print(f"Advertencia: Fila en Google Sheets sin 'id-cliente', omitida. Datos: {cliente_sheet}")
                 resumen["errores"] += 1
                 continue
 
-            cliente_existente = clientes_db_dict.get(codigo_interno_sheet)
-            cuit_raw = str(cliente_sheet.get("CUIT-CUIL", "")).strip()
+            cuit_sheet = str(cliente_sheet.get("CUIT-CUIL", "")).strip() or None
+
+            # --- CAMBIO CLAVE 3: Lógica de emparejamiento inteligente ---
+            tercero_existente = None
+            
+            # Prioridad 1: Buscar por 'codigo_interno'. Es la forma más directa.
+            if codigo_interno_sheet in terceros_por_codigo_interno:
+                tercero_existente = terceros_por_codigo_interno[codigo_interno_sheet]
+            
+            # Prioridad 2: Si no se encontró y hay CUIT, buscar por CUIT.
+            elif cuit_sheet and cuit_sheet in terceros_por_cuit:
+                candidato_por_cuit = terceros_por_cuit[cuit_sheet]
+                # ¡Crucial! Solo lo consideramos un 'match' si su codigo_interno está vacío.
+                if not candidato_por_cuit.codigo_interno:
+                    print(f"Match encontrado por CUIT ({cuit_sheet}) para cliente de hoja '{codigo_interno_sheet}'. Vinculando...")
+                    tercero_existente = candidato_por_cuit
+                else:
+                    # Conflicto: El CUIT ya está vinculado a OTRO código interno.
+                    print(f"Advertencia de conflicto: CUIT {cuit_sheet} ya está asignado al código interno {candidato_por_cuit.codigo_interno}.")
             
             datos_limpios = {
-                "codigo_interno": codigo_interno_sheet, # <-- Guardamos el ID de la hoja aquí
+                "codigo_interno": codigo_interno_sheet,
                 "nombre_razon_social": str(cliente_sheet.get("nombre-usuario", f"Cliente #{codigo_interno_sheet}")).strip(),
                 "telefono": str(cliente_sheet.get("whatsapp", "")).strip(),
                 "email": str(cliente_sheet.get("mail", "")).strip() or None,
                 "direccion": str(cliente_sheet.get("direccion", "")).strip(),
                 "notas": str(cliente_sheet.get("observaciones", "")).strip(),
-                "cuit": cuit_raw if cuit_raw else None,
+                "cuit": cuit_sheet,
                 "condicion_iva": str(cliente_sheet.get("Tipo de Cliente", "")).strip() or "Consumidor Final",
                 "id_empresa": id_empresa_actual,
-                "es_cliente": True, # Nos aseguramos de que se marque como cliente
-                "activo": True, # Por defecto, los clientes sincronizados están activos
+                "es_cliente": True,
             }
 
-            if cliente_existente:
+            if tercero_existente:
                 # --- ACTUALIZAR ---
                 cambios_detectados = False
                 for campo, valor_nuevo in datos_limpios.items():
-                    valor_viejo = getattr(cliente_existente, campo)
-                    if valor_nuevo is not None and str(valor_viejo) != str(valor_nuevo):
-                        setattr(cliente_existente, campo, valor_nuevo)
+                    valor_viejo = getattr(tercero_existente, campo)
+                    # La condición `valor_nuevo is not None` puede ser problemática si quieres vaciar un campo.
+                    # Es mejor comparar directamente los strings.
+                    if str(valor_viejo or '') != str(valor_nuevo or ''):
+                        setattr(tercero_existente, campo, valor_nuevo)
                         cambios_detectados = True
                 
                 if cambios_detectados:
-                    print(f"Actualizando cliente con código externo: {codigo_interno_sheet}")
-                    db.add(cliente_existente)
+                    print(f"Actualizando tercero con código interno: {codigo_interno_sheet}")
+                    db.add(tercero_existente)
                     resumen["actualizados"] += 1
                 else:
                     resumen["sin_cambios"] += 1
             else:
                 # --- CREAR ---
-                print(f"Creando nuevo cliente con código externo: {codigo_interno_sheet}")
-                # --- CAMBIO CLAVE 4: NO asignamos el 'id'. Dejamos que la BD lo genere. ---
+                print(f"Creando nuevo cliente con código interno: {codigo_interno_sheet}")
+                datos_limpios['activo'] = True # Solo al crear se establece como activo por defecto
+                
                 nuevo_cliente = Tercero(**datos_limpios)
                 db.add(nuevo_cliente)
                 resumen["creados"] += 1
 
         except Exception as e:
-            codigo_interno_info = cliente_sheet.get('id-cliente', 'SIN ID')
-            print(f"Error fatal procesando la fila del sheet con id-cliente '{codigo_interno_info}'. Detalle: {e}")
-            print(f"Datos de la fila problemática: {cliente_sheet}")
+            codigo_info = cliente_sheet.get('id-cliente', 'SIN ID')
+            print(f"Error fatal procesando la fila del sheet con id-cliente '{codigo_info}'. Detalle: {e}")
             resumen["errores"] += 1
-            # Omitimos esta fila pero no rompemos toda la transacción
             continue
             
-    # --- CAMBIO CLAVE 5: Restaurar el commit transaccional único ---
-    # Esto asegura que o todos los cambios se guardan, o ninguno lo hace.
     try:
         db.commit()
         print("Sincronización de clientes completada.")
@@ -121,7 +128,6 @@ def sincronizar_clientes_desde_sheets(db: Session, id_empresa_actual: int) -> Di
         db.rollback()
         
     return resumen
-
 # ----- LÓGICA PARA ARTÍCULOS -----
 
 def sincronizar_articulos_desde_sheets(db: Session, id_empresa_actual: int) -> Dict[str, int]:
