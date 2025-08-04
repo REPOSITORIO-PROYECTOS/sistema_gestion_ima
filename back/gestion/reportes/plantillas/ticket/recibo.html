@@ -5,24 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Recibo de Pago</title>
     <style>
-        body { font-family: 'Courier New', Courier, monospace; font-size: 12px; margin: 0; padding: 0; }
-        .ticket { width: 47mm; padding: 1mm; }
+        /* Estilos optimizados para impresoras de 58mm/47mm */
+        body { 
+            font-family: 'Courier New', Courier, monospace; 
+            font-size: 10px; /* Reducimos la fuente base para que quepa todo */
+            margin: 0; 
+            padding: 0; 
+        }
+        .ticket { 
+            /* Dejamos 1mm de margen a cada lado para evitar cortes */
+            width: 45mm; 
+            padding: 1mm; 
+        }
         .header { text-align: center; }
-        .header h1 { margin: 0; font-size: 16px; }
-        p { margin: 5px 0; }
-        hr { border: none; border-top: 1px dashed black; margin: 5px 0; }
+        .header h1 { margin: 0; font-size: 14px; word-wrap: break-word; }
+        .header h2 { margin: 4px 0; font-size: 12px; }
+        p { margin: 3px 0; }
+        hr { border: none; border-top: 1px dashed black; margin: 4px 0; }
         
-        /* --- ESTILOS PARA EL DETALLE DE ÍTEMS --- */
-        .item-list { margin: 10px 0; }
-        .item-header { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 5px; }
+        .item-list { margin: 8px 0; }
+        .item-header { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 4px; }
         .item { display: flex; justify-content: space-between; }
-        .item .description { width: 70%; text-align: left; word-wrap: break-word; }
-        .item .price { width: 30%; text-align: right; }
-        .item-detail { font-size: 10px; color: #555; padding-left: 5px; }
-        /* ------------------------------------ */
-
-        .total { font-weight: bold; font-size: 14px; text-align: right; margin-top: 10px; }
-        .footer { text-align: center; margin-top: 15px; }
+        .item .description { width: 65%; text-align: left; word-wrap: break-word; }
+        .item .price { width: 35%; text-align: right; }
+        .item-detail { font-size: 9px; color: #555; padding-left: 4px; }
+        
+        .totals-section { margin-top: 8px; }
+        .total { font-weight: bold; font-size: 13px; text-align: right; margin-top: 8px; }
+        .footer { text-align: center; margin-top: 12px; }
+        .disclaimer { font-weight: bold; text-align: center; margin-top: 15px; }
     </style>
 </head>
 <body>
@@ -37,38 +48,52 @@
         <p>Fecha: {{ fecha_emision|date }}</p>
         <p>Recibimos de: {{ data.receptor.nombre_razon_social }}</p>
         
-        <!-- ======================================================= -->
-        <!-- SECCIÓN DE DETALLE DE ÍTEMS (AÑADIDA Y CORREGIDA) -->
-        <!-- ======================================================= -->
         <hr>
         <div class="item-list">
             <div class="item-header">
-                <span>Descripción</span>
-                <span>Subtotal</span>
+                <span>Desc.</span> <!-- Abreviado para ahorrar espacio -->
+                <span>Subt.</span> <!-- Abreviado para ahorrar espacio -->
             </div>
-            <!-- 
-                Bucle 'for' de Jinja2: recorre cada 'item' en la lista 
-                que viene del payload en 'data.transaccion.items'.
-            -->
             {% for item in data.transaccion.items %}
                 <div class="item">
                     <span class="description">{{ item.descripcion }}</span>
                     <span class="price">${{ "%.2f"|format(item.subtotal) }}</span>
                 </div>
-                <!-- Detalle de cantidad y precio unitario -->
                 <div class="item item-detail">
                     <span class="description">{{ item.cantidad }} x ${{ "%.2f"|format(item.precio_unitario) }}</span>
                 </div>
             {% endfor %}
         </div>
-        <hr>
-        
-        <!-- Total de la transacción -->
-        <p class="total">IMPORTE TOTAL: ${{ "%.2f"|format(data.transaccion.total) }}</p>
         
         <!-- ======================================================= -->
-        <p class="disclaimer">COMPROBANTE NO VÁLIDO COMO FACTURA</p>
+        <!-- SECCIÓN DE TOTALES CORREGIDA Y ACTUALIZADA -->
+        <!-- ======================================================= -->
+        <div class="totals-section">
+            <hr>
+            <!-- 1. Calculamos y mostramos el Subtotal -->
+            {% set subtotal = data.transaccion.items | sum(attribute='subtotal') %}
+            <div class="item">
+                <p>SUBTOTAL:</p>
+                <p>${{ "%.2f"|format(subtotal) }}</p>
+            </div>
+
+            <!-- 2. Mostramos el Descuento SÓLO si es mayor a cero -->
+            {% if data.transaccion.descuento_general > 0 %}
+                <div class="item">
+                    <p>Descuento:</p>
+                    <p>- ${{ "%.2f"|format(data.transaccion.descuento_general) }}</p>
+                </div>
+            {% endif %}
+
+            <!-- 3. Mostramos el Total final -->
+            <p class="total">TOTAL A PAGAR: ${{ "%.2f"|format(data.transaccion.total) }}</p>
+        </div>
+        <!-- ======================================================= -->
+        
         <p>En concepto de: {{ data.transaccion.observaciones or 'Venta/Servicio' }}</p>
+        
+        <p class="disclaimer">COMPROBANTE NO VÁLIDO COMO FACTURA</p>
+        
         <p class="footer">....................</p>
         <p class="footer">Firma y Aclaración</p>
     </div>
