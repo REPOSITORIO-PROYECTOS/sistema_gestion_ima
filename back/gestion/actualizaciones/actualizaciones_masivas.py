@@ -48,8 +48,8 @@ def sincronizar_clientes_desde_sheets(db: Session, id_empresa_actual: int) -> Di
     # --- CAMBIO CLAVE 2: Usar 'codigo_externo' como clave del diccionario ---
     # Esto asegura que comparamos con el ID de la hoja, no con el ID de la BD.
     clientes_db_dict = {
-        cliente.codigo_externo: cliente 
-        for cliente in clientes_db_objetos if cliente.codigo_externo
+        cliente.codigo_interno: cliente 
+        for cliente in clientes_db_objetos if cliente.codigo_interno
     }
     
     resumen = {"creados": 0, "actualizados": 0, "sin_cambios": 0, "errores": 0}
@@ -57,18 +57,18 @@ def sincronizar_clientes_desde_sheets(db: Session, id_empresa_actual: int) -> Di
     for cliente_sheet in clientes_sheets:
         try:
             # --- CAMBIO CLAVE 3: La clave de sincronización ahora es el 'codigo_externo' ---
-            codigo_externo_sheet = str(cliente_sheet.get("id-cliente", "")).strip()
-            if not codigo_externo_sheet:
+            codigo_interno_sheet = str(cliente_sheet.get("id-cliente", "")).strip()
+            if not codigo_interno_sheet:
                 print(f"Advertencia: Fila en Google Sheets sin 'id-cliente', omitida. Datos: {cliente_sheet}")
                 resumen["errores"] += 1
                 continue
 
-            cliente_existente = clientes_db_dict.get(codigo_externo_sheet)
+            cliente_existente = clientes_db_dict.get(codigo_interno_sheet)
             cuit_raw = str(cliente_sheet.get("CUIT-CUIL", "")).strip()
             
             datos_limpios = {
-                "codigo_interno": codigo_externo_sheet, # <-- Guardamos el ID de la hoja aquí
-                "nombre_razon_social": str(cliente_sheet.get("nombre-usuario", f"Cliente #{codigo_externo_sheet}")).strip(),
+                "codigo_interno": codigo_interno_sheet, # <-- Guardamos el ID de la hoja aquí
+                "nombre_razon_social": str(cliente_sheet.get("nombre-usuario", f"Cliente #{codigo_interno_sheet}")).strip(),
                 "telefono": str(cliente_sheet.get("whatsapp", "")).strip(),
                 "email": str(cliente_sheet.get("mail", "")).strip() or None,
                 "direccion": str(cliente_sheet.get("direccion", "")).strip(),
@@ -90,22 +90,22 @@ def sincronizar_clientes_desde_sheets(db: Session, id_empresa_actual: int) -> Di
                         cambios_detectados = True
                 
                 if cambios_detectados:
-                    print(f"Actualizando cliente con código externo: {codigo_externo_sheet}")
+                    print(f"Actualizando cliente con código externo: {codigo_interno_sheet}")
                     db.add(cliente_existente)
                     resumen["actualizados"] += 1
                 else:
                     resumen["sin_cambios"] += 1
             else:
                 # --- CREAR ---
-                print(f"Creando nuevo cliente con código externo: {codigo_externo_sheet}")
+                print(f"Creando nuevo cliente con código externo: {codigo_interno_sheet}")
                 # --- CAMBIO CLAVE 4: NO asignamos el 'id'. Dejamos que la BD lo genere. ---
                 nuevo_cliente = Tercero(**datos_limpios)
                 db.add(nuevo_cliente)
                 resumen["creados"] += 1
 
         except Exception as e:
-            codigo_externo_info = cliente_sheet.get('id-cliente', 'SIN ID')
-            print(f"Error fatal procesando la fila del sheet con id-cliente '{codigo_externo_info}'. Detalle: {e}")
+            codigo_interno_info = cliente_sheet.get('id-cliente', 'SIN ID')
+            print(f"Error fatal procesando la fila del sheet con id-cliente '{codigo_interno_info}'. Detalle: {e}")
             print(f"Datos de la fila problemática: {cliente_sheet}")
             resumen["errores"] += 1
             # Omitimos esta fila pero no rompemos toda la transacción
