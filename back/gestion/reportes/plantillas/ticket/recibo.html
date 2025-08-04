@@ -10,8 +10,18 @@
         .header { text-align: center; }
         .header h1 { margin: 0; font-size: 16px; }
         p { margin: 5px 0; }
-        hr { border: none; border-top: 1px dashed black; }
-        .total { font-weight: bold; font-size: 14px; text-align: center; margin: 10px 0; }
+        hr { border: none; border-top: 1px dashed black; margin: 5px 0; }
+        
+        /* --- ESTILOS PARA EL DETALLE DE ÍTEMS --- */
+        .item-list { margin: 10px 0; }
+        .item-header { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 5px; }
+        .item { display: flex; justify-content: space-between; }
+        .item .description { width: 70%; text-align: left; word-wrap: break-word; }
+        .item .price { width: 30%; text-align: right; }
+        .item-detail { font-size: 10px; color: #555; padding-left: 5px; }
+        /* ------------------------------------ */
+
+        .total { font-weight: bold; font-size: 14px; text-align: right; margin-top: 10px; }
         .footer { text-align: center; margin-top: 15px; }
     </style>
 </head>
@@ -26,8 +36,39 @@
         </div>
         <p>Fecha: {{ fecha_emision|date }}</p>
         <p>Recibimos de: {{ data.receptor.nombre_razon_social }}</p>
-        <p class="total">IMPORTE: ${{ "%.2f"|format(data.transaccion.total) }}</p>
-        <p>En concepto de: Venta/Servicio.</p>
+        
+        <!-- ======================================================= -->
+        <!-- SECCIÓN DE DETALLE DE ÍTEMS (AÑADIDA Y CORREGIDA) -->
+        <!-- ======================================================= -->
+        <hr>
+        <div class="item-list">
+            <div class="item-header">
+                <span>Descripción</span>
+                <span>Subtotal</span>
+            </div>
+            <!-- 
+                Bucle 'for' de Jinja2: recorre cada 'item' en la lista 
+                que viene del payload en 'data.transaccion.items'.
+            -->
+            {% for item in data.transaccion.items %}
+                <div class="item">
+                    <span class="description">{{ item.descripcion }}</span>
+                    <span class="price">${{ "%.2f"|format(item.subtotal) }}</span>
+                </div>
+                <!-- Detalle de cantidad y precio unitario -->
+                <div class="item item-detail">
+                    <span class="description">{{ item.cantidad }} x ${{ "%.2f"|format(item.precio_unitario) }}</span>
+                </div>
+            {% endfor %}
+        </div>
+        <hr>
+        
+        <!-- Total de la transacción -->
+        <p class="total">IMPORTE TOTAL: ${{ "%.2f"|format(data.transaccion.total) }}</p>
+        
+        <!-- ======================================================= -->
+        
+        <p>En concepto de: {{ data.transaccion.observaciones or 'Venta/Servicio' }}</p>
         <p class="footer">....................</p>
         <p class="footer">Firma y Aclaración</p>
     </div>
