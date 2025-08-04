@@ -19,10 +19,14 @@ export default function StockPage() {
             "Authorization": `Bearer ${token}`,
           },
         });
+
         const data: ProductoAPI[] = await res.json();
         setProductos(data);
+        console.log(data)
+
       } catch (err) {
         console.error("❌ Error al obtener productos:", err);
+
       } finally {
         setLoading(false);
       }

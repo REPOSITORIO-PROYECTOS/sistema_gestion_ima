@@ -10,6 +10,7 @@ export interface ProductoAPI {
   precio_venta: number;
   venta_negocio: number;
   stock_actual: number;
+  codigo_interno: string;
 }
 
 export const columns: ColumnDef<ProductoAPI>[] = [
@@ -54,7 +55,13 @@ export const columns: ColumnDef<ProductoAPI>[] = [
       return <div className="font-medium">{stock}</div>;
     },
   },
-  /* 
-  NECESITAMOS CODIGO DE BARRAS PARA MOSTRAR:
-  */
+  {
+    accessorKey: "codigo_interno",
+    header: "Código de Barras",
+    cell: ({ row }) => {
+      const codigo = row.getValue("codigo_interno") as string;
+      return <div className="font-mono text-sm">{codigo}</div>;
+    }
+  }
+
 ];

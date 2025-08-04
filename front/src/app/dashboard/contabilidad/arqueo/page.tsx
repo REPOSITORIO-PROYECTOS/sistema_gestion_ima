@@ -15,6 +15,7 @@ export default function ArqueoCajaPage() {
 
   // GET Arqueos
   useEffect(() => {
+
     if (!token) return;
 
     const fetchData = async () => {
@@ -24,6 +25,7 @@ export default function ArqueoCajaPage() {
             Authorization: `Bearer ${token}`,
           },
         });
+
 
         if (!res.ok) throw new Error("Error al obtener los arqueos");
 
@@ -36,9 +38,11 @@ export default function ArqueoCajaPage() {
         ];
 
         setData(combinados);
+
       } catch (err) {
         console.error(err);
         setError("No se pudo obtener la lista de arqueos");
+        
       } finally {
         setLoading(false);
       }
