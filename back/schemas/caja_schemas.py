@@ -24,6 +24,9 @@ class AbrirCajaRequest(BaseModel):
 
 class CerrarCajaRequest(BaseModel):
     saldo_final_declarado: float = Field(..., ge=0)
+    saldo_final_transferecias: float
+    saldo_final_bancario: float
+    saldo_final_efectivo: float
 
 class ArticuloVendido(BaseModel):
     id_articulo: int
@@ -112,6 +115,11 @@ class ArqueoCerradoResponse(BaseModel):
     saldo_final_calculado: float | None
     diferencia: float | None
     estado: str
+    saldo_final_declarado: float = Field(..., ge=0)
+    saldo_final_transferecias: float
+    saldo_final_bancario: float
+    saldo_final_efectivo: float
+
 
 class InformeCajasResponse(BaseModel):
     cajas_abiertas: List[CajaAbiertaResponse]

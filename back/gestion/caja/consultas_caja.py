@@ -57,7 +57,11 @@ def obtener_arqueos_de_caja(id_empresa,db: Session, usuario_actual: Usuario) -> 
                 "saldo_final_declarado": sesion.saldo_final_declarado,
                 "saldo_final_calculado": sesion.saldo_final_calculado,
                 "diferencia": sesion.diferencia,
-                "estado": sesion.estado
+                "estado": sesion.estado,
+                "saldo_final_transferecias": sesion.saldo_final_transferecias,
+                "saldo_final_bancario": sesion.saldo_final_bancario,
+                "saldo_final_efectivo": sesion.saldo_final_efectivo,
+
             })
 
         # --- CONSULTA 2: CAJAS ACTUALMENTE ABIERTAS ---
