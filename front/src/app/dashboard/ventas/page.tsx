@@ -84,6 +84,10 @@ function DashboardVenta() {
     setProductos((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const limpiarResumen = () => {
+    setProductos([]);
+  };
+
 
   return (
     <ProtectedRoute allowedRoles={["Admin", "Cajero"]}>
@@ -182,6 +186,7 @@ function DashboardVenta() {
               onAgregarProducto={handleAgregarProducto}
               totalVenta={totalVenta}
               productosVendidos={productos}
+              onLimpiarResumen={limpiarResumen}
             />
           ) : (
             <div className="flex justify-center items-center w-full p-8 bg-yellow-100 border border-yellow-300 rounded-lg text-yellow-800 font-semibold text-xl">

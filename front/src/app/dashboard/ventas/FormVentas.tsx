@@ -75,7 +75,8 @@ const tipoCliente = [
 function FormVentas({
   onAgregarProducto,    /* Agrega productos al resumen (componente padre) */
   totalVenta,           /* Valor total de todos los productos - costo total del pedido */
-  productosVendidos     /* Lista con todos los productos vendidos y su cantidad */
+  productosVendidos,     /* Lista con todos los productos vendidos y su cantidad */
+  onLimpiarResumen
 }: {
     onAgregarProducto: (prod: {
     tipo: string;
@@ -86,6 +87,7 @@ function FormVentas({
   }) => void
   totalVenta: number,
   productosVendidos: { tipo: string; cantidad: number; precioTotal: number }[]
+  onLimpiarResumen: () => void;
 }) {
 
   /* Estados */
@@ -217,6 +219,30 @@ function FormVentas({
     });
 
     setCantidad(1);
+  };
+
+  // Funcion para resetear los inputs post venta
+  const resetFormularioVenta = () => {
+
+    onLimpiarResumen();
+    setMetodoPago("efectivo");
+    setMontoPagado(0);
+    setPagoDividido(false);
+    setDetallePagoDividido("");
+    setTipoFacturacion("ticket");
+    setClienteSeleccionado(null);
+    setTipoClienteSeleccionado({ id: "0", nombre: "Consumidor Final" });
+    setCuitManual("");
+    setDescuentoSobreTotal(0);
+    setObservaciones("");
+    setCantidad(1);
+    setDescuento(0);
+    setBusquedaCliente("");
+    setOpenCliente(false);
+    setInputEfectivo("");
+    setVuelto(0);
+    setOpen(false);
+    setCodigoEscaneado("");
   };
 
   // Effect para mostrar la calculadora de vuelto si es pago con efectivo
@@ -570,6 +596,7 @@ function FormVentas({
         };        
 
         await generarComprobante();
+        resetFormularioVenta();
 
       } else {
 
@@ -766,21 +793,7 @@ function FormVentas({
               </Popover>
             </div>
           )}
-        </div>
-
-        {/* Código de Barras */}
-        <div className="w-full flex flex-col md:flex-row gap-4 items-start md:items-center">
-          <Label className="text-2xl font-semibold text-green-900 text-left">Código de Barras</Label>
-          <Input
-            ref={inputRef}
-            type="text"
-            value={codigo}
-            onChange={(e) => setCodigoEscaneado(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="border w-full md:max-w-2/3"
-            autoFocus
-          />
-        </div>
+        </div>       
 
         {/* Seleccionar cantidad de un Producto - limitada por Stock*/}
         <div className="flex flex-col gap-4 items-start justify-between md:flex-row">
@@ -810,6 +823,20 @@ function FormVentas({
               setCantidad(Math.min(parsed, max));
             }}
             className="w-full md:max-w-2/3 text-black"
+          />
+        </div>
+        
+        {/* Código de Barras */}
+        <div className="w-full flex flex-col md:flex-row gap-4 items-start md:items-center">
+          <Label className="text-2xl font-semibold text-green-900 text-left">Código de Barras</Label>
+          <Input
+            ref={inputRef}
+            type="text"
+            value={codigo}
+            onChange={(e) => setCodigoEscaneado(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="border w-full md:max-w-2/3"
+            autoFocus
           />
         </div>
         <span className="block w-full h-0.5 bg-green-900"></span>
