@@ -86,7 +86,7 @@
             {% endif %}
 
             <!-- 3. Mostramos el Total final -->
-            <p class="total">TOTAL A PAGAR: ${{ "%.2f"|format(data.transaccion.total) }}</p>
+            <p class="total">TOTAL A PAGAR: {{|format(data.transaccion.total) }}</p>
         </div>
         <!-- ======================================================= -->
         
