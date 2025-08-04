@@ -67,7 +67,7 @@ def sincronizar_clientes_desde_sheets(db: Session, id_empresa_actual: int) -> Di
             cuit_raw = str(cliente_sheet.get("CUIT-CUIL", "")).strip()
             
             datos_limpios = {
-                "codigo_externo": codigo_externo_sheet, # <-- Guardamos el ID de la hoja aquí
+                "codigo_interno": codigo_externo_sheet, # <-- Guardamos el ID de la hoja aquí
                 "nombre_razon_social": str(cliente_sheet.get("nombre-usuario", f"Cliente #{codigo_externo_sheet}")).strip(),
                 "telefono": str(cliente_sheet.get("whatsapp", "")).strip(),
                 "email": str(cliente_sheet.get("mail", "")).strip() or None,
