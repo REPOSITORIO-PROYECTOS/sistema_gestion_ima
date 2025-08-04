@@ -104,8 +104,7 @@ def obtener_todos_los_movimientos_de_caja(db: Session, usuario_actual: Usuario) 
     query = select(CajaMovimiento)
 
     # 2. **FILTRO DE SEGURIDAD OBLIGATORIO (MULTI-EMPRESA)**
-    query = query.join(CajaSesion).join(Usuario, CajaSesion.id_usuario_apertura == Usuario.id)\
-                 .where(CajaSesion.id_empresa == usuario_actual.id_empresa)
+    query = query.join(CajaSesion).where(CajaSesion.id_empresa == usuario_actual.id_empresa)
     # 3. Cargamos las relaciones necesarias de forma eficiente.
     query = query.options(
         selectinload(CajaMovimiento.venta).selectinload(Venta.cliente)
