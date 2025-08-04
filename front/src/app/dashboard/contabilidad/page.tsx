@@ -42,6 +42,8 @@ export default function ContabilidadPage() {
       const json = await res.json();
       setData(json); // Actualizamos el estado con los datos recibidos.
 
+      console.log(json)
+
     } catch (err) {
       console.error("Error al obtener los datos:", err);
       // Aquí podrías añadir una notificación al usuario (ej. con toast.error).

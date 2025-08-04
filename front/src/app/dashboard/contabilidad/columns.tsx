@@ -18,7 +18,14 @@ export interface MovimientoAPI {
   fecha_hora: string;
   facturado: boolean;
   venta?: {
+    id: number;
     facturada: boolean;
+    datos_factura: string | null;
+    tipo_comprobante_solicitado: string;
+    cliente: {
+      id: number;
+      nombre_razon_social: string;
+    };
   };
   tipo_comprobante: "comprobante" | "remito" | "presupuesto" | "factura";
 }
@@ -80,13 +87,36 @@ export const columns: ColumnDef<MovimientoAPI>[] = [
     },
   },
   {
-    accessorKey: "tipo_comprobante_solicitado",
+  accessorFn: (row) => row.venta?.tipo_comprobante_solicitado ?? "—",
+    id: "tipo_comprobante_solicitado",
     header: "Tipo Comprobante",
     cell: ({ row }) => {
       const value = row.getValue("tipo_comprobante_solicitado") as string;
       return (
         <Badge variant="secondary" className="ml-4">
           {value}
+        </Badge>
+      );
+    },
+  },
+  {
+    accessorFn: row => row.venta?.facturada, 
+    id: "facturado",
+    header: "Facturado",
+    filterFn: (row, id, value) => {
+      const rowValue = row.getValue(id);
+      if (value === "true") return rowValue === true;
+      if (value === "false") return rowValue === false;
+      return true;
+    },
+    cell: ({ row }) => {
+      const value = row.getValue("facturado") as boolean;
+      const badgeClass = value ? "ml-6 bg-green-600 text-white" : "ml-6 bg-red-600 text-white";
+      const label = value ? "Sí" : "No";
+
+      return (
+        <Badge className={badgeClass} variant="default">
+          {label}
         </Badge>
       );
     },
@@ -116,28 +146,6 @@ export const columns: ColumnDef<MovimientoAPI>[] = [
     cell: ({ row }) => {
       const fecha = new Date(row.getValue("fecha_hora") as string);
       return fecha.toLocaleString("es-AR");
-    },
-  },
-  {
-    accessorFn: row => row.venta?.facturada, 
-    id: "facturado",
-    header: "Facturado",
-    filterFn: (row, id, value) => {
-      const rowValue = row.getValue(id);
-      if (value === "true") return rowValue === true;
-      if (value === "false") return rowValue === false;
-      return true;
-    },
-    cell: ({ row }) => {
-      const value = row.getValue("facturado") as boolean;
-      const badgeClass = value ? "ml-6 bg-green-600 text-white" : "ml-6 bg-red-600 text-white";
-      const label = value ? "Sí" : "No";
-
-      return (
-        <Badge className={badgeClass} variant="default">
-          {label}
-        </Badge>
-      );
     },
   },
 ];
