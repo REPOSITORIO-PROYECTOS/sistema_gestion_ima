@@ -71,7 +71,6 @@ def obtener_todos_los_articulos(db: Session, id_empresa_actual: int, skip: int =
         .where(Articulo.id_empresa == id_empresa_actual)
         .order_by(Articulo.descripcion)
         .offset(skip)
-        .limit(limit)
         .options(selectinload(Articulo.codigos))
     )
     return db.exec(statement).all()
