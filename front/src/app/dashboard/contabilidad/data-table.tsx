@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -33,7 +32,6 @@ import {
 } from "@/components/ui/select"
 import { MovimientoAPI } from "./columns";
 import { toast } from "sonner";
-// import { on } from "events"; // <-- CORRECCIÓN: Eliminada esta importación que no se usa.
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
@@ -118,17 +116,27 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
         enableRowSelection: (row) => {
             const tipo = row.original.tipo;
             const facturada = row.original.venta?.facturada;
-            const tipoComprobante = row.original.tipo_comprobante;
+            const tipoSolicitado = row.original.venta?.tipo_comprobante_solicitado;
 
+            // No permitir selección de EGRESO o facturada
             if (tipo === "EGRESO" || facturada === true) return false;
 
             const selectedKeys = Object.keys(rowSelection);
             if (selectedKeys.length === 0) return true;
 
-            const primeraFilaSeleccionada = data.find(item => selectedKeys.includes(String(item.id)));
-            if (!primeraFilaSeleccionada) return true;
-            
-            return tipoComprobante === primeraFilaSeleccionada.tipo_comprobante;
+            // Obtener la primera fila seleccionada
+            const primeraSeleccionada = data.find((item) =>
+                selectedKeys.includes(String(item.id))
+            );
+            if (!primeraSeleccionada) return true;
+
+            const tipoSolicitadoBase = primeraSeleccionada.venta?.tipo_comprobante_solicitado;
+
+            // Si no hay tipo solicitado base, permitimos libre selección
+            if (!tipoSolicitadoBase) return true;
+
+            // Solo permitir si coincide el tipo_comprobante_solicitado
+            return tipoSolicitado === tipoSolicitadoBase;
         },
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
@@ -146,15 +154,33 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
 
                 <div className="flex flex-col-reverse md:flex-row justify-between items-center gap-2 w-full">
 
+                    {/* Selectores y Filtrados */}
                     <div className="flex flex-col md:flex-row w-full md:w-auto gap-4">
-                        <Input
-                            placeholder="Filtrar por tipo"
-                            value={(table.getColumn("tipo")?.getFilterValue() as string) ?? ""}
-                            onChange={(event) =>
-                                table.getColumn("tipo")?.setFilterValue(event.target.value)
-                            }
-                            className="w-full md:w-auto"
-                        />
+
+                        {/* Elegir por tipo de movimiento */}
+                        <Select
+                            value={(table.getColumn("tipo")?.getFilterValue() as string) ?? "all"}
+                            onValueChange={(value) => {
+                                table.getColumn("tipo")?.setFilterValue(value === "all" ? undefined : value);
+                            }}
+                            >
+                            <SelectTrigger className="w-full md:w-[180px] cursor-pointer">
+                                <SelectValue placeholder="Tipo de Movimiento" />
+                            </SelectTrigger>
+
+                            <SelectContent>
+                                <SelectGroup>
+                                <SelectLabel>Tipo de Movimiento</SelectLabel>
+                                <SelectItem value="all">Movimientos</SelectItem>
+                                <SelectItem value="APERTURA">APERTURA</SelectItem>
+                                <SelectItem value="CIERRE">CIERRE</SelectItem>
+                                <SelectItem value="VENTA">VENTA</SelectItem>
+                                <SelectItem value="EGRESO">EGRESO</SelectItem>
+                                </SelectGroup>
+                            </SelectContent>
+                        </Select>
+
+                        {/* Si esta facturado o no el movimiento.. */}
                         <Select
                             value={facturadoFilter}
                             onValueChange={(value) => {
@@ -169,19 +195,19 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectGroup>
-                                    <SelectLabel>Facturado</SelectLabel>
-                                    <SelectItem value="all">Todos</SelectItem>
-                                    <SelectItem value="true">Sí</SelectItem>
-                                    <SelectItem value="false">No</SelectItem>
+                                    <SelectLabel>Movimientos Facturados</SelectLabel>
+                                    <SelectItem value="all">Facturados S/N</SelectItem>
+                                    <SelectItem value="true">Facturados</SelectItem>
+                                    <SelectItem value="false">No Facturados</SelectItem>
                                 </SelectGroup>
                             </SelectContent>
                         </Select>
                     </div>
             
-                    {/* --- CORRECCIÓN: Botones de acción agrupados --- */}
-                    <div className="flex w-full md:w-auto gap-2">
+                    {/* --- Botones de Facturación --- */}
+                    <div className="flex flex-col md:flex-row w-1/2 gap-4 px-4">
                         <Button
-                            className="w-full"
+                            className="w-1/2"
                             variant="outline"
                             onClick={() => console.log("Lógica para facturar lote")}
                             disabled={!table.getIsSomeRowsSelected() || isLoading}
@@ -189,7 +215,7 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
                             Facturar Lote ({table.getFilteredSelectedRowModel().rows.length})
                         </Button>
                         <Button
-                            className="w-full"
+                            className="w-1/2"
                             variant="default"
                             disabled={!table.getIsSomeRowsSelected() || isLoading}
                             onClick={handleAgrupar} 
