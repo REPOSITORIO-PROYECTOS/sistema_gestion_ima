@@ -119,6 +119,7 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
       });
 
       const abrirData = await abrirRes.json();
+
       if (!abrirRes.ok) {
         return toast.error(`⛔ ${abrirData.detail || "No se pudo abrir la caja."}`);
       }
@@ -130,6 +131,7 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
     } catch (err) {
       console.error("Error abriendo caja:", err);
       toast.error("Ocurrió un error al abrir la caja.");
+
     } finally {
       setIsLoading(false);
       document.getElementById("close-caja-modal")?.click();
@@ -166,6 +168,7 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
       });
 
       const validarData = await validarRes.json();
+      
       if (!validarRes.ok) {
         return toast.error(`⛔ ${validarData.detail || "Llave incorrecta."}`);
       }
@@ -185,6 +188,7 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
       });
 
       const cerrarData = await cerrarRes.json();
+
       if (!cerrarRes.ok) {
         return toast.error(`⛔ ${cerrarData.detail || "Error al cerrar la caja"}`);
       }
@@ -195,7 +199,6 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
       setNombreUsuario("");
       setSaldoFinalDeclarado("");
       setLlave("");
-
 
     } catch (error) {
       console.error("Error al cerrar caja:", error);

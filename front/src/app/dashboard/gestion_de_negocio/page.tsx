@@ -178,9 +178,10 @@ export default function GestionNegocio() {
 
       {/* Header */}
       <div className="space-y-2">
-        <h2 className="text-3xl font-bold text-green-950">Gestión de Negocio</h2>
+        <h2 className="text-2xl font-bold text-green-950">Gestión de Negocio</h2>
         <p className="text-muted-foreground">Administrá los usuarios de tu aplicación.</p>
       </div>
+      {/* <ConfiguracionForm empresaId={selectedEmpresaId} /> */}
 
       <hr className="h-0.25 my-4" />  {/* --------------------------------------------------------------- */}
 

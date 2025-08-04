@@ -16,6 +16,7 @@ export default function EditUserForm({
   user: Usuario;
   onUpdated?: () => void;
 }) {
+
   const token = useAuthStore((state) => state.token);
   const [roles, setRoles] = useState<Role[]>([]);
   const [selectedRoleId, setSelectedRoleId] = useState<number>(user.rol.id);
@@ -37,8 +38,10 @@ export default function EditUserForm({
             },
           }
         );
+
         const data = await res.json();
         setRoles(Array.isArray(data) ? data : data.roles || []);
+
       } catch (e) {
         console.error("Error al obtener roles:", e);
       }
@@ -64,12 +67,12 @@ export default function EditUserForm({
       );
 
       if (!res.ok) throw new Error("Error al desactivar");
-      alert("✅ Usuario desactivado.");
+      toast.success("✅ Usuario desactivado.");
       onUpdated?.();
 
     } catch (e) {
 
-      alert("❌ No se pudo desactivar el usuario.");
+      toast.error("❌ No se pudo desactivar el usuario.");
       console.log(e);
 
     } finally {
@@ -80,6 +83,7 @@ export default function EditUserForm({
 
   /* PATCH Para activar usuario */
   const activarUsuario = async () => {
+
     if (!token || !confirm("¿Seguro que querés activar este usuario?")) return;
     setLoading(true);
 
@@ -95,12 +99,13 @@ export default function EditUserForm({
       );
 
       if (!res.ok) throw new Error("Error al activar");
-      alert("✅ Usuario activado.");
+      toast.success("✅ Usuario activado.");
       onUpdated?.();
 
     } catch (e) {
-      alert("❌ No se pudo activar el usuario.");
+      toast.error("❌ No se pudo activar el usuario.");
       console.log(e);
+
     } finally {
       setLoading(false);
     }
