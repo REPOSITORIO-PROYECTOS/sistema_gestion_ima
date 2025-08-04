@@ -242,7 +242,7 @@ def api_registrar_egreso(
     except (ValueError, RuntimeError) as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.post()
+
 
 # =================================================================
 # === ENDPOINT DE SUPERVISIÓN (SIN CAMBIOS) ===
