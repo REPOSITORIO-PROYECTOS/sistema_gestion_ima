@@ -115,3 +115,76 @@ def obtener_todos_los_movimientos_de_caja(db: Session, usuario_actual: Usuario) 
     print(f"Se encontraron {len(resultados)} movimientos en total para la empresa.")
     print(resultados)
     return resultados
+
+def obtener_datos_para_ticket_cierre_detallado(db: Session, id_sesion: int, usuario_actual: Usuario) -> dict:
+    """
+    Recopila TODOS los datos necesarios para generar un ticket de cierre de lote
+    con el desglose de ingresos y egresos.
+    """
+    print(f"\n--- [TRACE: PREPARAR DATOS TICKET CIERRE] ---")
+    print(f"Buscando datos para Sesión ID: {id_sesion}")
+
+    # 1. Obtener la sesión de caja y sus relaciones importantes (usuarios, empresa)
+    declaracion = (
+        select(CajaSesion)
+        .options(
+            selectinload(CajaSesion.usuario_apertura).selectinload(Usuario.empresa),
+            selectinload(CajaSesion.usuario_cierre)
+        )
+        .where(CajaSesion.id == id_sesion)
+    )
+    sesion = db.exec(declaracion).first()
+
+    if not sesion:
+        raise ValueError("La sesión de caja no fue encontrada.")
+    
+    # 2. Seguridad: Validar que la sesión pertenece a la empresa del usuario que pide el ticket
+    if sesion.usuario_apertura.id_empresa != usuario_actual.id_empresa:
+        raise PermissionError("No tiene permiso para acceder a esta sesión de caja.")
+
+    if sesion.estado != "CERRADA":
+        raise ValueError("Solo se pueden generar tickets para cajas ya cerradas.")
+    
+    print("Sesión encontrada y validada.")
+
+    # 3. Obtener todos los movimientos de esa sesión
+    movimientos = db.exec(
+        select(CajaMovimiento)
+        .where(CajaMovimiento.id_caja_sesion == id_sesion)
+        .order_by(CajaMovimiento.timestamp.asc())
+    ).all()
+
+    # 4. Procesar los datos y crear los desgloses
+    total_ventas = sum(m.monto for m in movimientos if m.tipo == 'VENTA')
+    
+    desglose_ingresos = [
+        {"concepto": m.concepto, "monto": m.monto} 
+        for m in movimientos if m.tipo == 'INGRESO'
+    ]
+    total_ingresos = sum(ingreso['monto'] for ingreso in desglose_ingresos)
+    
+    desglose_egresos = [
+        {"concepto": m.concepto, "monto": m.monto} 
+        for m in movimientos if m.tipo == 'EGRESO'
+    ]
+    total_egresos = sum(egreso['monto'] for egreso in desglose_egresos)
+    
+    print(f"Movimientos procesados: {len(desglose_ingresos)} ingresos, {len(desglose_egresos)} egresos.")
+
+    # 5. Construir el diccionario final que se pasará a la plantilla HTML
+    datos_ticket = {
+        "sesion": sesion,
+        "usuario_apertura": sesion.usuario_apertura.nombre_usuario,
+        "usuario_cierre": sesion.usuario_cierre.nombre_usuario if sesion.usuario_cierre else "N/A",
+        "empresa": sesion.usuario_apertura.empresa,
+        "totales": {
+            "ventas": total_ventas,
+            "ingresos": total_ingresos,
+            "egresos": total_egresos,
+        },
+        "desglose_ingresos": desglose_ingresos,
+        "desglose_egresos": desglose_egresos
+    }
+    
+    print("--- [FIN TRACE] ---\n")
+    return datos_ticket

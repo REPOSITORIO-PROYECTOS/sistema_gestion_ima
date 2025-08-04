@@ -1,0 +1,82 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+    <title>Cierre de Lote Detallado</title>
+    <style>
+        body { font-family: 'Courier New', Courier, monospace; font-size: 11px; margin: 0; padding: 0; }
+        .ticket { width: 56mm; padding: 1mm; }
+        .header, .footer { text-align: center; }
+        h1 { margin: 0; font-size: 14px; text-transform: uppercase; }
+        h2 { margin: 5px 0; font-size: 13px; border-top: 1px dashed black; border-bottom: 1px dashed black; padding: 4px 0; }
+        p { margin: 3px 0; }
+        hr { border: none; border-top: 1px dashed black; margin: 4px 0; }
+        .item { display: flex; justify-content: space-between; }
+        .item .concepto { width: 65%; text-align: left; word-wrap: break-word; }
+        .item .monto { width: 35%; text-align: right; }
+        .total-line { font-weight: bold; }
+        .section-title { font-weight: bold; margin-top: 10px; margin-bottom: 5px; text-align: center; }
+        .footer { text-align: center; }
+        .final-message { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="ticket">
+        <div class="header">
+            <h1>{{ datos.empresa.nombre_fantasia or datos.empresa.nombre_legal }}</h1>
+            <p>CUIT: {{ datos.empresa.cuit }}</p>
+            <h2>CIERRE DE LOTE (Z)</h2>
+            <p>Sesión ID: {{ datos.sesion.id }}</p>
+        </div>
+        <hr>
+        <p><b>Fecha Impresión:</b> {{ fecha_emision|date }}</p>
+        <p><b>Apertura:</b> {{ datos.sesion.fecha_apertura|date }} por {{ datos.usuario_apertura }}</p>
+        <p><b>Cierre:</b> {{ datos.sesion.fecha_cierre|date }} por {{ datos.usuario_cierre }}</p>
+        <hr>
+        
+        <p class="section-title">ARQUEO DE CAJA</p>
+        <div class="item"><p>Saldo Inicial:</p> <p>${{ "%.2f"|format(datos.sesion.saldo_inicial) }}</p></div>
+        <div class="item"><p>(+) Total Ventas:</p> <p>${{ "%.2f"|format(datos.totales.ventas) }}</p></div>
+        <div class="item"><p>(+) Ingresos Varios:</p> <p>${{ "%.2f"|format(datos.totales.ingresos) }}</p></div>
+        <div class="item"><p>(-) Egresos Varios:</p> <p>${{ "%.2f"|format(datos.totales.egresos) }}</p></div>
+        <hr>
+        <div class="item total-line"><p>SALDO CALCULADO:</p> <p>${{ "%.2f"|format(datos.sesion.saldo_final_calculado) }}</p></div>
+        <div class="item"><p>SALDO DECLARADO:</p> <p>${{ "%.2f"|format(datos.sesion.saldo_final_declarado) }}</p></div>
+        <hr>
+        <div class="item total-line"><p>DIFERENCIA:</p> <p>${{ "%.2f"|format(datos.sesion.diferencia) }}</p></div>
+        
+        <!-- ======================================================= -->
+        <!-- DESGLOSE DE INGRESOS (AÑADIDO) -->
+        <!-- ======================================================= -->
+        {% if datos.desglose_ingresos %}
+            <p class="section-title">DETALLE DE INGRESOS</p>
+            <hr>
+            {% for ingreso in datos.desglose_ingresos %}
+                <div class="item">
+                    <p class="concepto">{{ ingreso.concepto[:20] }}:</p>
+                    <p class="monto">${{ "%.2f"|format(ingreso.monto) }}</p>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- ======================================================= -->
+        <!-- DESGLOSE DE EGRESOS (AÑADIDO) -->
+        <!-- ======================================================= -->
+        {% if datos.desglose_egresos %}
+            <p class="section-title">DETALLE DE EGRESOS</p>
+            <hr>
+            {% for egreso in datos.desglose_egresos %}
+                <div class="item">
+                    <p class="concepto">{{ egreso.concepto[:20] }}:</p> <!-- Cortamos el concepto para que no desborde -->
+                    <p class="monto">${{ "%.2f"|format(egreso.monto) }}</p>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <hr>
+        <p class="footer" style="margin-top: 20px;">Fin del reporte de cierre.</p>
+    </div>
+</body>
+</html>

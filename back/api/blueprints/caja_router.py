@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlmodel import Session, select
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
+from starlette.responses import Response
 
 # --- Módulos del Proyecto ---
 from back.database import get_db
@@ -14,12 +15,13 @@ from back.modelos import ConfiguracionEmpresa, Empresa, Usuario, Tercero, Venta,
 # Especialistas de la capa de gestión
 from back.gestion.caja import apertura_cierre, registro_caja, consultas_caja
 from back.gestion.facturacion_afip import generar_factura_para_venta
+from back.gestion.reportes import generador_comprobantes
 
 # Schemas necesarios para este router
 from back.schemas.caja_schemas import (
     AbrirCajaRequest, CajaMovimientoResponse, CerrarCajaRequest, EstadoCajaResponse,
     RegistrarVentaRequest, InformeCajasResponse, RespuestaGenerica,
-    MovimientoSimpleRequest, TipoMovimiento, MovimientoContableResponse 
+    MovimientoSimpleRequest, TipoMovimiento, MovimientoContableResponse, consultas_caja
 )
 from back.schemas.comprobante_schemas import EmisorData, TransaccionData, ReceptorData, ItemData
 
@@ -239,7 +241,9 @@ def api_registrar_egreso(
 
     except (ValueError, RuntimeError) as e:
         raise HTTPException(status_code=400, detail=str(e))
-    
+
+
+
 # =================================================================
 # === ENDPOINT DE SUPERVISIÓN (SIN CAMBIOS) ===
 # =================================================================
@@ -282,3 +286,52 @@ def get_todos_los_movimientos(
         usuario_actual=current_user
     )
     return movimientos
+
+
+@router.get(
+    "/sesion/{id_sesion}/ticket-cierre-detallado",
+    summary="Generar PDF del Cierre de Lote Detallado"
+)
+def api_generar_ticket_cierre_detallado(
+    id_sesion: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(obtener_usuario_actual)
+):
+    """
+    Genera y devuelve en formato PDF un ticket de cierre de lote para una sesión
+    de caja específica, incluyendo el desglose detallado de todos los
+    ingresos y egresos.
+    """
+
+    try:
+        # 1. LLAMA AL MANAGER PARA OBTENER LOS DATOS
+        # Llama a la función que ya creamos en 'consultas_caja.py'.
+        # Esta función hace todo el trabajo de base de datos y seguridad.
+        datos_para_plantilla = consultas_caja.obtener_datos_para_ticket_cierre_detallado(
+            db=db, 
+            id_sesion=id_sesion, 
+            usuario_actual=current_user
+        )
+        
+        # 2. LLAMA AL GENERADOR DE PDFS
+        # Le pasa los datos a una función en tu generador de comprobantes
+        # que sabe cómo usar la plantilla HTML 'cierre_lote_detallado.html'.
+        pdf_bytes = generador_comprobantes.generar_ticket_cierre_pdf(datos_para_plantilla)
+        
+        # 3. DEVUELVE EL ARCHIVO PDF
+        # Crea una respuesta HTTP con el contenido del PDF y las cabeceras correctas.
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            # 'inline' le dice al navegador que intente abrir el PDF en una nueva pestaña.
+            # 'attachment' le diría que lo descargue directamente.
+            headers={"Content-Disposition": f'inline; filename="cierre_detallado_{id_sesion}.pdf"'}
+        )
+        
+    except (ValueError, PermissionError) as e:
+        # Captura errores de negocio (ej: sesión no encontrada, no pertenece a la empresa).
+        # Devuelve 404 para no dar información sensible.
+        raise HTTPException(status_code=404, detail=str(e))
+    except RuntimeError as e:
+        # Captura errores internos (ej: fallo al renderizar la plantilla).
+        raise HTTPException(status_code=500, detail=f"Error interno al generar el ticket: {e}")

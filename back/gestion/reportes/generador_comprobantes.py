@@ -94,3 +94,4 @@ def generar_comprobante_stateless(data: GenerarComprobanteRequest) -> bytes:
     print("--- [FIN TRACE] ---\n")
     
     return pdf_bytes
+
