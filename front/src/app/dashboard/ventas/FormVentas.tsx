@@ -158,6 +158,7 @@ function FormVentas({
   const { habilitarExtras } = useFacturacionStore();  
   const [tipoFacturacion, setTipoFacturacion] = useState("factura");
 
+  // Recargos seteados desde gestión empresa traídos a la caja para aplicar
   const {
     recargoTransferenciaActivo,
     recargoTransferencia,
@@ -165,8 +166,8 @@ function FormVentas({
     recargoBancario,
   } = useFacturacionStore();
 
+  // Seccion del calculo del recargo
   let totalConRecargo = totalConDescuento;
-
   if (metodoPago === "transferencia" && recargoTransferenciaActivo) {
     totalConRecargo += (totalConDescuento * recargoTransferencia) / 100;
   } else if (metodoPago === "bancario" && recargoBancarioActivo) {
@@ -595,14 +596,18 @@ function FormVentas({
           }
         };        
 
+        // Cuando se emite el comprobante exitosamente se limpia el form y vuelve al inicio
         await generarComprobante();
         resetFormularioVenta();
+        window.scrollTo({ top: 20, behavior: "smooth" });
+        /* inputRef.current?.focus(); */
 
       } else {
 
         const error = await response.json();
         toast.error("❌ Error al registrar venta: " + error.detail);
       }
+    
     } catch (error) {
 
       console.error("Detalles del error:", error);
@@ -737,6 +742,20 @@ function FormVentas({
         </div>
         <span className="block w-full h-0.5 bg-green-900"></span>
 
+        {/* Código de Barras */}
+        <div className="w-full flex flex-col md:flex-row gap-4 items-start md:items-center">
+          <Label className="text-2xl font-semibold text-green-900 text-left">Código de Barras</Label>
+          <Input
+            ref={inputRef}
+            type="text"
+            value={codigo}
+            onChange={(e) => setCodigoEscaneado(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="border w-full md:max-w-2/3"
+            autoFocus
+          />
+        </div>
+
         {/* Dropdown de Productos */}
         <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
           <Label className="text-2xl font-semibold text-green-900">Producto</Label>
@@ -823,20 +842,6 @@ function FormVentas({
               setCantidad(Math.min(parsed, max));
             }}
             className="w-full md:max-w-2/3 text-black"
-          />
-        </div>
-        
-        {/* Código de Barras */}
-        <div className="w-full flex flex-col md:flex-row gap-4 items-start md:items-center">
-          <Label className="text-2xl font-semibold text-green-900 text-left">Código de Barras</Label>
-          <Input
-            ref={inputRef}
-            type="text"
-            value={codigo}
-            onChange={(e) => setCodigoEscaneado(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="border w-full md:max-w-2/3"
-            autoFocus
           />
         </div>
         <span className="block w-full h-0.5 bg-green-900"></span>
