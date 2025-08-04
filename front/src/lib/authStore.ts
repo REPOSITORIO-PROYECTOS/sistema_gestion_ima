@@ -3,11 +3,12 @@ import { persist } from 'zustand/middleware'
 
 export interface Usuario {
   id: number
-  nombre_usuario: string        // atento a que no rompa nada esto..
+  nombre_usuario: string        
   apellido: string
   email: string
   rol: Role
   activo: boolean;
+  id_empresa: number;
 }
 
 // Tipos de usuario

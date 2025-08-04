@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/select";
 import { useAuthStore } from '@/lib/authStore';
 import { toast } from 'sonner';
+import { ConfiguracionForm } from "@/components/ConfiguracionForm";
+
 
 export default function GestionNegocio() {
 
@@ -34,10 +36,9 @@ export default function GestionNegocio() {
     formatoComprobante, 
     setFormatoComprobante
   } = useFacturacionStore();
-
   const formatosDisponibles = ["PDF", "Ticket"];  // escalable a mas formatos..
 
-  /* Negocio */
+  /* Manejo de Negocio y Ventas */
   // GET Recargos transferencia y banco
   useEffect(() => {
     if (!token) return;
@@ -121,6 +122,9 @@ export default function GestionNegocio() {
     }
   };
 
+  /* Edición y manejo de empresas */
+  const usuario = useAuthStore((state) => state.usuario);
+  const empresaId = usuario?.id_empresa;
 
   /* UI */
   // Subir LOGO al Back para personalización
@@ -174,14 +178,13 @@ export default function GestionNegocio() {
   };
 
   return (
+    
     <div className="flex flex-col gap-6 p-2">
 
-      {/* Header */}
-      <div className="space-y-2">
-        <h2 className="text-2xl font-bold text-green-950">Gestión de Negocio</h2>
-        <p className="text-muted-foreground">Administrá los usuarios de tu aplicación.</p>
-      </div>
-      {/* <ConfiguracionForm empresaId={selectedEmpresaId} /> */}
+      {/* Gestión de datos de empresa */}
+      {empresaId && (
+        <ConfiguracionForm empresaId={empresaId} />
+      )}
 
       <hr className="h-0.25 my-4" />  {/* --------------------------------------------------------------- */}
 
