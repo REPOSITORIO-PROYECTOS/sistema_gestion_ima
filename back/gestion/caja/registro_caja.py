@@ -144,18 +144,17 @@ def registrar_venta_y_movimiento_caja(
                 db.add(articulo_a_actualizar)
 
     movimiento_principal = None # Inicializamos como None
-    if afectar_caja:
-        print("   -> Registrando movimiento en caja...")
-        movimiento_principal = CajaMovimiento(
-            tipo=TipoMovimiento.VENTA.value,
-            concepto=f"Venta ({tipo_comprobante_solicitado}) ID: {nueva_venta.id}",
-            monto=total_final_con_recargo,
-            metodo_pago=metodo_pago,
-            id_caja_sesion=id_sesion_caja,
-            id_usuario=usuario_actual.id,
-            id_venta=nueva_venta.id,
-        )
-        db.add(movimiento_principal)
+    print("   -> Registrando movimiento en caja...")
+    movimiento_principal = CajaMovimiento(
+        tipo=TipoMovimiento.VENTA.value,
+        concepto=f"Venta ({tipo_comprobante_solicitado}) ID: {nueva_venta.id}",
+        monto=total_final_con_recargo,
+        metodo_pago=metodo_pago,
+        id_caja_sesion=id_sesion_caja,
+        id_usuario=usuario_actual.id,
+        id_venta=nueva_venta.id,
+    )
+    db.add(movimiento_principal)
         
     db.flush()
 
