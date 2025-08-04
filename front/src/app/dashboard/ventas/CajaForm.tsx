@@ -26,12 +26,17 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [fechaActual, setFechaActual] = useState("");
   const [horaActual, setHoraActual] = useState("");
-  
+
   /* Estados de la caja */
   // Monto inicial con el que se abre la caja
   const [saldoInicial, setSaldoInicial] = useState("");
   // Monto final al cerrar la caja
   const [saldoFinalDeclarado, setSaldoFinalDeclarado] = useState("");
+
+  // Discriminamos los 3 tipos de saldo para saldoFinalDeclarado
+  const [saldoFinalTransferencias, setSaldoFinalTransferencias] = useState("");
+  const [saldoFinalBancario, setSaldoFinalBancario] = useState("");
+  const [saldoFinalEfectivo, setSaldoFinalEfectivo] = useState("");
 
   // Soluciona problema de input de nombre de usuario vacio 
   useEffect(() => {
@@ -58,6 +63,17 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
       .replace(/[^\d.]/g, ""); // Quitamos todo menos números y punto decimal
     return parseFloat(limpio) || 0;
   }
+
+  // Calcula el saldo final para el cierre de caja contando los 3 inputs
+  useEffect(() => {
+    const transf = limpiarMoneda(saldoFinalTransferencias);
+    const bancario = limpiarMoneda(saldoFinalBancario);
+    const efectivo = limpiarMoneda(saldoFinalEfectivo);
+
+    const sumaTotal = transf + bancario + efectivo;
+    setSaldoFinalDeclarado(formatearMoneda(sumaTotal.toString()));
+  }, [saldoFinalTransferencias, saldoFinalBancario, saldoFinalEfectivo]);
+
 
   // Abrir Caja
   const handleSubmit = async (e: React.FormEvent) => {
@@ -143,8 +159,18 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
 
     e.preventDefault();
 
-    if (!nombreUsuario.trim() || !saldoFinalDeclarado.trim() || !llave.trim()) {
+    // Validaciones
+    if (!nombreUsuario.trim() || !llave.trim()) {
       toast.error("Por favor, completá todos los campos.");
+      return;
+    }
+
+    if (
+      limpiarMoneda(saldoFinalTransferencias) < 0 ||
+      limpiarMoneda(saldoFinalBancario) < 0 ||
+      limpiarMoneda(saldoFinalEfectivo) < 0
+    ) {
+      toast.error("Los montos no pueden ser negativos.");
       return;
     }
 
@@ -173,7 +199,12 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
         return toast.error(`⛔ ${validarData.detail || "Llave incorrecta."}`);
       }
 
+      
+      const efectivo = limpiarMoneda(saldoFinalEfectivo);
+      const transferencias = limpiarMoneda(saldoFinalTransferencias);
+      const bancario = limpiarMoneda(saldoFinalBancario);
       const saldoFinalLimpio = limpiarMoneda(saldoFinalDeclarado);
+      /* const total = efectivo + transferencias + bancario; */
 
       // Si la llave es válida, cerramos la caja
       const cerrarRes = await fetch("https://sistema-ima.sistemataup.online/api/caja/cerrar", {
@@ -184,6 +215,9 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
         },
         body: JSON.stringify({
           saldo_final_declarado: saldoFinalLimpio,
+          saldo_final_efectivo: efectivo,
+          saldo_final_transferencias: transferencias,
+          saldo_final_bancario: bancario,
         }),
       });
 
@@ -211,14 +245,14 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
   };
 
   // Fecha y hora en vivo
-  useState(() => {
+  useEffect(() => {
     const now = new Date();
     setFechaActual(now.toLocaleDateString("es-AR"));
     setHoraActual(now.toLocaleTimeString("es-AR", {
       hour: "2-digit",
       minute: "2-digit",
     }));
-  });
+  }, []);
 
   return (
     <>
@@ -226,30 +260,63 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
 
         <div className="grid gap-6 py-4">
 
-          {/* Input Nombre */}
+          {/* Input Montos Iniciales y Finales */}
+          {/* Montos Inicial y Finales (Transferencias, Bancario, Efectivo) */}
+          {!cajaAbierta ? (
+            <div className="flex items-center justify-between gap-4">
+              <Label className="text-right text-md md:text-lg">Monto Inicial</Label>
+              <Input
+                type="text"
+                value={saldoInicial}
+                onChange={(e) => setSaldoInicial(formatearMoneda(e.target.value))}
+                placeholder="$0"
+                className="w-full max-w-3/5"
+              />
+            </div>
+          ) : (
+            <>
+              <Label className="text-right text-md md:text-xl">Saldos Finales:</Label>
+              <div className="flex items-center justify-between gap-4">
+                <Label className="text-right text-md md:text-lg">Efectivo</Label>
+                <Input
+                  type="text"
+                  value={saldoFinalEfectivo}
+                  onChange={(e) => setSaldoFinalEfectivo(formatearMoneda(e.target.value))}
+                  placeholder="$0"
+                  className="w-full max-w-3/5"
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-4">
+                <Label className="text-right text-md md:text-lg">Transferencias</Label>
+                <Input
+                  type="text"
+                  value={saldoFinalTransferencias}
+                  onChange={(e) => setSaldoFinalTransferencias(formatearMoneda(e.target.value))}
+                  placeholder="$0"
+                  className="w-full max-w-3/5"
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-4">
+                <Label className="text-right text-md md:text-lg">Bancario</Label>
+                <Input
+                  type="text"
+                  value={saldoFinalBancario}
+                  onChange={(e) => setSaldoFinalBancario(formatearMoneda(e.target.value))}
+                  placeholder="$0"
+                  className="w-full max-w-3/5"
+                />
+              </div>
+            </>
+          )}     
+          <span className="block w-full h-0.5 bg-green-900"></span>
+
+          {/* {/* Input Nombre}
           <div className="flex items-center justify-between gap-4">
             <Label className="text-right text-md md:text-lg">Nombre</Label>
             <Input value={nombreUsuario} onChange={(e) => setNombreUsuario(e.target.value)} placeholder="Nombre de Usuario" className="w-full max-w-3/5" />
-          </div>
-
-          {/* Input Montos Iniciales y Finales */}
-          <div className="flex items-center justify-between gap-4">
-            <Label className="text-right text-md md:text-lg">
-              {cajaAbierta ? "Monto de Cierre" : "Monto Inicial"}
-            </Label>
-            <Input
-              type="text"
-              value={cajaAbierta ? saldoFinalDeclarado : saldoInicial}
-              onChange={(e) => {
-                const formateado = formatearMoneda(e.target.value);
-                return cajaAbierta
-                  ? setSaldoFinalDeclarado(formateado)
-                  : setSaldoInicial(formateado);
-              }}
-              placeholder="$0"
-              className="w-full max-w-3/5"
-            />
-          </div>
+          </div> */}
 
           {/* Input Llave Maestra */}
           <div className="flex items-center justify-between gap-4">

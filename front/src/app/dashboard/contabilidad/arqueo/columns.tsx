@@ -16,6 +16,9 @@ export type ArqueoCaja = {
   saldo_final_calculado: number | null;
   diferencia: number | null;
   estado: "ABIERTA" | "CERRADA";
+  saldo_final_efectivo: number | null;
+  saldo_final_transferencias: number | null;
+  saldo_final_bancario: number | null;
 };
 
 export const columns: ColumnDef<ArqueoCaja>[] = [
@@ -106,6 +109,30 @@ export const columns: ColumnDef<ArqueoCaja>[] = [
           {formato}
         </span>
       );
+    },
+  },
+  {
+    accessorKey: "saldo_final_efectivo",
+    header: "Efectivo",
+    cell: ({ row }) => {
+      const valor = row.getValue("saldo_final_efectivo") as number | null;
+      return formatCurrency(valor);
+    },
+  },
+  {
+    accessorKey: "saldo_final_transferencias",
+    header: "Transferencias",
+    cell: ({ row }) => {
+      const valor = row.getValue("saldo_final_transferencias") as number | null;
+      return formatCurrency(valor);
+    },
+  },
+  {
+    accessorKey: "saldo_final_bancario",
+    header: "Bancario",
+    cell: ({ row }) => {
+      const valor = row.getValue("saldo_final_bancario") as number | null;
+      return formatCurrency(valor);
     },
   },
 ];
