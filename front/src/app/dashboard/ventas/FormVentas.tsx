@@ -442,7 +442,7 @@ function FormVentas({
     // Payload de Venta
     const ventaPayload = {
       id_cliente:
-        // Si el cliente no esta registrado manda 8, si sí, entonces manda el id de ese cliente
+        // Si el cliente no esta registrado manda 100, si sí, entonces manda el id de ese cliente
         tipoClienteSeleccionado.id === "0"
           ? 100                                     
           : clienteSeleccionado?.id ?? 100,               
@@ -477,7 +477,7 @@ function FormVentas({
         },
         body: JSON.stringify(ventaPayload)
       });
-                  console.log(ventaPayload)
+      /* console.log(ventaPayload) */
       if (response.ok) {
 
         const data = await response.json();
@@ -492,13 +492,13 @@ function FormVentas({
               formato: formatoComprobante.toLowerCase(),          // por ahora, "pdf" o "ticket" desde facturacionStore
               tipo: tipoFacturacion.toLowerCase(),                                  
               emisor: {
-                cuit: "30XXXXXXXXX",                  // CUIT de la empresa emisora - todo esto es dinamico
-                razon_social: "Empresa Demo Swing",   // nombre de la empresa emisora
-                domicilio: "Av. Siempre Viva 123",    // dom de la empresa emisora
-                punto_venta: 1,
+                cuit: "20-36423774-0",                          // CUIT de la empresa emisora - todo esto es dinamico
+                razon_social: "MONTSERRAT FRONTINO RODRIGO",    // nombre de la empresa emisora
+                domicilio: "Manuel Dorrego Nte., J5400 Rivadavia, San Juan",              // dom de la empresa emisora
+                punto_venta: 10,
                 condicion_iva: "Responsable Inscripto",
-                afip_certificado: "BASE64_ENCODED_CERT", // opcional
-                afip_clave_privada: "BASE64_ENCODED_KEY"  // opcional
+                afip_certificado: "BASE64_ENCODED_CERT",    // opcional
+                afip_clave_privada: "BASE64_ENCODED_KEY"    // opcional
               },
               receptor: {
                 nombre_razon_social:
