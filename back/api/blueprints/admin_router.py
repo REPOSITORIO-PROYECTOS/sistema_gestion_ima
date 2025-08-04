@@ -16,7 +16,7 @@ from back.schemas.caja_schemas import RespuestaGenerica
 router = APIRouter(
     prefix="/admin",
     tags=["Panel de Administración"],
-    dependencies=[Depends(es_admin), Depends(es_cajero)] # <-- ¡SEGURIDAD ACTIVADA!
+    dependencies=[Depends(es_admin)] # <-- ¡SEGURIDAD ACTIVADA!
 )
 
 # ===================================================================
