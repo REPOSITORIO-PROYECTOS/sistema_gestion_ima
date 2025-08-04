@@ -12,12 +12,10 @@ from back.utils.tablas_handler import TablasHandler
 # Función auxiliar para limpiar los precios
 def sincronizar_clientes_desde_sheets(db: Session, id_empresa_actual: int) -> Dict[str, int]:
     """
-    Sincroniza clientes desde Google Sheets de forma robusta, emparejando registros
-    existentes sin 'codigo_interno' a través de su CUIT para actualizarlos.
+    Sincroniza clientes, con depuración mejorada para la lógica de emparejamiento.
     """
     config_empresa = db.get(ConfiguracionEmpresa, id_empresa_actual)
     if not config_empresa or not config_empresa.link_google_sheets:
-        print(f"Error: Falta configuración de Google Sheets para la empresa ID {id_empresa_actual}.")
         return {"creados": 0, "actualizados": 0, "errores": 0, "sin_cambios": 0}
 
     handler = TablasHandler(id_empresa=id_empresa_actual, db=db)
@@ -25,18 +23,14 @@ def sincronizar_clientes_desde_sheets(db: Session, id_empresa_actual: int) -> Di
     print("Obteniendo datos de clientes desde Google Sheets...")
     clientes_sheets = handler.cargar_clientes()
     if not clientes_sheets:
-        print("Advertencia: No se pudieron cargar datos de Google Sheets o la hoja está vacía.")
         return {"creados": 0, "actualizados": 0, "errores": 0, "sin_cambios": 0}
 
-    # --- CAMBIO CLAVE 1: Cargar TODOS los 'Tercero' de la empresa ---
-    # Necesitamos cargar tanto clientes como proveedores para tener una visión completa
-    # y poder usar el CUIT como un puente fiable.
     print("Obteniendo todos los Terceros de la base de datos (solo empresa actual)...")
+    # Aseguramos que cargamos TODOS los terceros, sin importar si son clientes o no.
     terceros_db_objetos = db.exec(
         select(Tercero).where(Tercero.id_empresa == id_empresa_actual)
     ).all()
 
-    # --- CAMBIO CLAVE 2: Crear MÚLTIPLES diccionarios para búsqueda flexible ---
     terceros_por_codigo_interno = {
         tercero.codigo_interno: tercero 
         for tercero in terceros_db_objetos if tercero.codigo_interno
@@ -45,6 +39,9 @@ def sincronizar_clientes_desde_sheets(db: Session, id_empresa_actual: int) -> Di
         tercero.cuit: tercero 
         for tercero in terceros_db_objetos if tercero.cuit
     }
+    
+    # --- LOG DE DEPURACIÓN 1: Ver qué CUITs tenemos en la BD ---
+    print(f"DEBUG: CUITs cargados de la BD para la empresa {id_empresa_actual}: {list(terceros_por_cuit.keys())}")
     
     resumen = {"creados": 0, "actualizados": 0, "sin_cambios": 0, "errores": 0}
 
@@ -57,24 +54,23 @@ def sincronizar_clientes_desde_sheets(db: Session, id_empresa_actual: int) -> Di
 
             cuit_sheet = str(cliente_sheet.get("CUIT-CUIL", "")).strip() or None
 
-            # --- CAMBIO CLAVE 3: Lógica de emparejamiento inteligente ---
+            # --- LOG DE DEPURACIÓN 2: Ver los datos de la fila problemática ---
+            if codigo_interno_sheet == '8':
+                print(f"DEBUG: Procesando fila problemática. Código: '{codigo_interno_sheet}', CUIT: '{cuit_sheet}'")
+
             tercero_existente = None
             
-            # Prioridad 1: Buscar por 'codigo_interno'. Es la forma más directa.
+            # Lógica de emparejamiento
             if codigo_interno_sheet in terceros_por_codigo_interno:
                 tercero_existente = terceros_por_codigo_interno[codigo_interno_sheet]
-            
-            # Prioridad 2: Si no se encontró y hay CUIT, buscar por CUIT.
             elif cuit_sheet and cuit_sheet in terceros_por_cuit:
                 candidato_por_cuit = terceros_por_cuit[cuit_sheet]
-                # ¡Crucial! Solo lo consideramos un 'match' si su codigo_interno está vacío.
                 if not candidato_por_cuit.codigo_interno:
-                    print(f"Match encontrado por CUIT ({cuit_sheet}) para cliente de hoja '{codigo_interno_sheet}'. Vinculando...")
+                    print(f"DEBUG: Match por CUIT encontrado! Vinculando CUIT '{cuit_sheet}' al código interno '{codigo_interno_sheet}'.")
                     tercero_existente = candidato_por_cuit
                 else:
-                    # Conflicto: El CUIT ya está vinculado a OTRO código interno.
-                    print(f"Advertencia de conflicto: CUIT {cuit_sheet} ya está asignado al código interno {candidato_por_cuit.codigo_interno}.")
-            
+                    print(f"DEBUG: Conflicto de CUIT. CUIT de la hoja: '{cuit_sheet}', CUIT de la BD ya asociado al código: '{candidato_por_cuit.codigo_interno}'")
+
             datos_limpios = {
                 "codigo_interno": codigo_interno_sheet,
                 "nombre_razon_social": str(cliente_sheet.get("nombre-usuario", f"Cliente #{codigo_interno_sheet}")).strip(),
@@ -93,8 +89,6 @@ def sincronizar_clientes_desde_sheets(db: Session, id_empresa_actual: int) -> Di
                 cambios_detectados = False
                 for campo, valor_nuevo in datos_limpios.items():
                     valor_viejo = getattr(tercero_existente, campo)
-                    # La condición `valor_nuevo is not None` puede ser problemática si quieres vaciar un campo.
-                    # Es mejor comparar directamente los strings.
                     if str(valor_viejo or '') != str(valor_nuevo or ''):
                         setattr(tercero_existente, campo, valor_nuevo)
                         cambios_detectados = True
@@ -107,9 +101,12 @@ def sincronizar_clientes_desde_sheets(db: Session, id_empresa_actual: int) -> Di
                     resumen["sin_cambios"] += 1
             else:
                 # --- CREAR ---
-                print(f"Creando nuevo cliente con código interno: {codigo_interno_sheet}")
-                datos_limpios['activo'] = True # Solo al crear se establece como activo por defecto
+                # --- LOG DE DEPURACIÓN 3: Ver por qué se decide crear ---
+                if codigo_interno_sheet == '8':
+                    print(f"DEBUG: NO se encontró match para el código '{codigo_interno_sheet}' con CUIT '{cuit_sheet}'. Se procederá a crear.")
                 
+                print(f"Creando nuevo cliente con código interno: {codigo_interno_sheet}")
+                datos_limpios['activo'] = True
                 nuevo_cliente = Tercero(**datos_limpios)
                 db.add(nuevo_cliente)
                 resumen["creados"] += 1
