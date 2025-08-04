@@ -79,7 +79,7 @@ export function ConfiguracionForm({ empresaId }: Props) {
     <div className="space-y-12">
       {/* --- SECCIÓN 1: Formulario de Configuración General --- */}
       <div>
-        <h3 className="text-lg font-semibold border-b pb-2 mb-6">Configuración General</h3>
+        <h3 className="text-xl text-green-950 font-semibold border-b pb-2 mb-6">Configuración General del Negocio</h3>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <div className="space-y-4">
