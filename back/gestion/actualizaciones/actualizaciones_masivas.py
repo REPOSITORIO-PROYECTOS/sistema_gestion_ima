@@ -23,56 +23,61 @@ def limpiar_precio(valor_texto: str) -> float:
 # ----- LÓGICA PARA CLIENTES -----
 def sincronizar_clientes_desde_sheets(db: Session, id_empresa_actual: int) -> Dict[str, int]:
     """
-    Sincroniza clientes en MODO DEPURACIÓN: guarda cada cliente uno por uno
-    para identificar la fila exacta que causa el error.
+    Sincroniza clientes desde Google Sheets, adaptado para un entorno multi-empresa.
+    Utiliza un 'código externo' para la sincronización en lugar del ID de la base de datos.
     """
     config_empresa = db.get(ConfiguracionEmpresa, id_empresa_actual)
-
     if not config_empresa or not config_empresa.link_google_sheets:
-        print("error falta algo")
-        return
-    
-    link_de_la_empresa = config_empresa.link_google_sheets
+        print(f"Error: Falta configuración de Google Sheets para la empresa ID {id_empresa_actual}.")
+        return {"creados": 0, "actualizados": 0, "errores": 0, "sin_cambios": 0}
 
     handler = TablasHandler(id_empresa=id_empresa_actual, db=db)
+    
     print("Obteniendo datos de clientes desde Google Sheets...")
     clientes_sheets = handler.cargar_clientes()
-    print("Obteniendo datos de clientes desde la base de datos...")
-    clientes_db_objetos = db.exec(select(Tercero).where(Tercero.es_cliente == True)).all()
-
     if not clientes_sheets:
         print("Advertencia: No se pudieron cargar datos de Google Sheets o la hoja está vacía.")
-        return {"creados": 0, "actualizados": 0, "errores": 0, "sin_cambios": len(clientes_db_objetos)}
+        return {"creados": 0, "actualizados": 0, "errores": 0, "sin_cambios": 0}
 
-    clientes_db_dict = {str(cliente.id): cliente for cliente in clientes_db_objetos}
+    # --- CAMBIO CLAVE 1: Filtrar clientes por la empresa actual ---
+    print("Obteniendo datos de clientes de la base de datos (solo empresa actual)...")
+    clientes_db_objetos = db.exec(
+        select(Tercero).where(Tercero.es_cliente == True, Tercero.id_empresa == id_empresa_actual)
+    ).all()
+
+    # --- CAMBIO CLAVE 2: Usar 'codigo_externo' como clave del diccionario ---
+    # Esto asegura que comparamos con el ID de la hoja, no con el ID de la BD.
+    clientes_db_dict = {
+        cliente.codigo_externo: cliente 
+        for cliente in clientes_db_objetos if cliente.codigo_externo
+    }
+    
     resumen = {"creados": 0, "actualizados": 0, "sin_cambios": 0, "errores": 0}
 
-    # Iterar sobre los clientes de Google Sheets
     for cliente_sheet in clientes_sheets:
-        id_cliente_sheet_str = "" # Inicializamos para el bloque except
         try:
-            # --- LIMPIEZA Y VALIDACIÓN ---
-            id_cliente_sheet_str = str(cliente_sheet.get("id-cliente", "")).strip()
-            if not id_cliente_sheet_str:
-                print(f"Error: Fila en Google Sheets sin 'id-cliente'. Datos: {cliente_sheet}")
+            # --- CAMBIO CLAVE 3: La clave de sincronización ahora es el 'codigo_externo' ---
+            codigo_externo_sheet = str(cliente_sheet.get("id-cliente", "")).strip()
+            if not codigo_externo_sheet:
+                print(f"Advertencia: Fila en Google Sheets sin 'id-cliente', omitida. Datos: {cliente_sheet}")
                 resumen["errores"] += 1
                 continue
-            id_cliente_sheet_int = int(id_cliente_sheet_str)
 
-            # --- BÚSQUEDA Y LÓGICA ---
-            cliente_existente = clientes_db_dict.get(id_cliente_sheet_str)
+            cliente_existente = clientes_db_dict.get(codigo_externo_sheet)
             cuit_raw = str(cliente_sheet.get("CUIT-CUIL", "")).strip()
-            cuit_limpio = cuit_raw if cuit_raw else None # Convierte cadenas vacías a None
-
+            
             datos_limpios = {
-                "nombre_razon_social": cliente_sheet.get("nombre-usuario", f"Cliente #{id_cliente_sheet_str}").strip(),
+                "codigo_externo": codigo_externo_sheet, # <-- Guardamos el ID de la hoja aquí
+                "nombre_razon_social": str(cliente_sheet.get("nombre-usuario", f"Cliente #{codigo_externo_sheet}")).strip(),
                 "telefono": str(cliente_sheet.get("whatsapp", "")).strip(),
-                "email": cliente_sheet.get("mail", "").strip() or None,
-                "direccion": cliente_sheet.get("direccion", "").strip(),
-                "notas": cliente_sheet.get("observaciones", "").strip(),
-                "cuit": cuit_limpio, # <-- USAMOS EL CUIT YA VALIDADO
-                "condicion_iva": cliente_sheet.get("Tipo de Cliente", "").strip() or "Consumidor Final",
+                "email": str(cliente_sheet.get("mail", "")).strip() or None,
+                "direccion": str(cliente_sheet.get("direccion", "")).strip(),
+                "notas": str(cliente_sheet.get("observaciones", "")).strip(),
+                "cuit": cuit_raw if cuit_raw else None,
+                "condicion_iva": str(cliente_sheet.get("Tipo de Cliente", "")).strip() or "Consumidor Final",
                 "id_empresa": id_empresa_actual,
+                "es_cliente": True, # Nos aseguramos de que se marque como cliente
+                "activo": True, # Por defecto, los clientes sincronizados están activos
             }
 
             if cliente_existente:
@@ -85,38 +90,36 @@ def sincronizar_clientes_desde_sheets(db: Session, id_empresa_actual: int) -> Di
                         cambios_detectados = True
                 
                 if cambios_detectados:
-                    print(f"Actualizando cliente con ID: {id_cliente_sheet_str}")
+                    print(f"Actualizando cliente con código externo: {codigo_externo_sheet}")
                     db.add(cliente_existente)
                     resumen["actualizados"] += 1
                 else:
                     resumen["sin_cambios"] += 1
-            
             else:
                 # --- CREAR ---
-                print(f"Creando nuevo cliente con ID de Sheets: {id_cliente_sheet_str}")
-                nuevo_cliente = Tercero(
-                    id=id_cliente_sheet_int,
-                    es_cliente=True,
-                    activo=True,
-                    **datos_limpios
-                )
+                print(f"Creando nuevo cliente con código externo: {codigo_externo_sheet}")
+                # --- CAMBIO CLAVE 4: NO asignamos el 'id'. Dejamos que la BD lo genere. ---
+                nuevo_cliente = Tercero(**datos_limpios)
                 db.add(nuevo_cliente)
                 resumen["creados"] += 1
 
-            # <<<<<<< CAMBIO CLAVE: HACEMOS COMMIT DENTRO DEL BUCLE >>>>>>>
-            # Intentamos guardar los cambios para ESTE cliente específico.
-            db.commit()
-
         except Exception as e:
-            # Si algo falla, será para el cliente actual.
-            print(f"!!!!!!!! ERROR AL PROCESAR/GUARDAR CLIENTE ID {id_cliente_sheet_str} !!!!!!!!")
-            print(f"!!!!!!!! DETALLE DEL ERROR: {e} !!!!!!!!")
-            print(f"!!!!!!!! DATOS DE LA FILA: {cliente_sheet} !!!!!!!!")
+            codigo_externo_info = cliente_sheet.get('id-cliente', 'SIN ID')
+            print(f"Error fatal procesando la fila del sheet con id-cliente '{codigo_externo_info}'. Detalle: {e}")
+            print(f"Datos de la fila problemática: {cliente_sheet}")
             resumen["errores"] += 1
-            db.rollback() # Revertimos la operación fallida para este cliente.
-            continue # Y continuamos con el siguiente.
+            # Omitimos esta fila pero no rompemos toda la transacción
+            continue
             
-    print("Sincronización de clientes (modo depuración) completada.")
+    # --- CAMBIO CLAVE 5: Restaurar el commit transaccional único ---
+    # Esto asegura que o todos los cambios se guardan, o ninguno lo hace.
+    try:
+        db.commit()
+        print("Sincronización de clientes completada.")
+    except Exception as e:
+        print(f"ERROR FATAL DURANTE EL COMMIT: Se revirtió la transacción. Detalle: {e}")
+        db.rollback()
+        
     return resumen
 
 # ----- LÓGICA PARA ARTÍCULOS -----
