@@ -93,7 +93,9 @@ export function DataTable<TData, TValue>({
         <div>
 
             {/* Headers de la Tabla */}
-            <div className="flex flex-col md:flex-row justify-between items-center gap-2 pb-4">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 pb-4">
+
+                <h2 className="block sm:hidden text-start text-xl font-semibold text-green-950 my-4">Sección de Stock</h2>
 
                 {/* Input de Búsqueda por Producto */}
                 <Input
@@ -102,7 +104,17 @@ export function DataTable<TData, TValue>({
                     onChange={(event) =>
                         table.getColumn("descripcion")?.setFilterValue(event.target.value)
                     }
-                    className="w-full md:max-w-1/5"
+                    className="w-full md:max-w-1/6"
+                />
+
+                {/* Input de Búsqueda por Código de Barras */}
+                <Input
+                    placeholder="Filtrar por código de barras"
+                    value={(table.getColumn("codigo_interno")?.getFilterValue() as string) ?? ""}
+                    onChange={(event) =>
+                        table.getColumn("codigo_interno")?.setFilterValue(event.target.value)
+                    }
+                    className="w-full md:max-w-1/6"
                 />
 
                 {/* Botones para sincronización */}
@@ -110,7 +122,7 @@ export function DataTable<TData, TValue>({
                     <Button variant="outline" onClick={handleSyncArticulos}>Sincronizar Artículos</Button>
                 </div>
 
-                <div className="flex justify-center items-center w-full md:w-1/2 p-4 text-sm bg-yellow-100 border border-yellow-300 rounded-lg text-yellow-800">
+                <div className="flex justify-center items-center w-full md:w-1/3 p-4 text-sm bg-yellow-100 border border-yellow-300 rounded-lg text-yellow-800">
                     Para agregar nuevos productos dirigirse a la sección de contabilidad / proveedores.
                 </div>
 
