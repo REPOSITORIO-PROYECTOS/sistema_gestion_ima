@@ -81,7 +81,7 @@
             {% if data.transaccion.descuento_general > 0 %}
                 <div class="item">
                     <p>Descuento:</p>
-                    <p>- ${{ "%.2f"|format(data.transaccion.descuento_general) }}</p>
+                    <p>- ${{ "%.2f"|format(data.transaccion.descuento_general)}}%</p>
                 </div>
             {% endif %}
 
