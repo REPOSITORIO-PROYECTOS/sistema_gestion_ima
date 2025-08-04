@@ -21,7 +21,7 @@ from back.gestion.reportes import generador_comprobantes
 from back.schemas.caja_schemas import (
     AbrirCajaRequest, CajaMovimientoResponse, CerrarCajaRequest, EstadoCajaResponse,
     RegistrarVentaRequest, InformeCajasResponse, RespuestaGenerica,
-    MovimientoSimpleRequest, TipoMovimiento, MovimientoContableResponse, consultas_caja
+    MovimientoSimpleRequest, TipoMovimiento, MovimientoContableResponse
 )
 from back.schemas.comprobante_schemas import EmisorData, TransaccionData, ReceptorData, ItemData
 
@@ -242,7 +242,7 @@ def api_registrar_egreso(
     except (ValueError, RuntimeError) as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-
+@router.post()
 
 # =================================================================
 # === ENDPOINT DE SUPERVISIÓN (SIN CAMBIOS) ===

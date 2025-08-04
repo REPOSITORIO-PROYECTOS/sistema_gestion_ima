@@ -159,3 +159,29 @@ class MovimientoContableResponse(BaseModel):
 
     class Config:
         from_attributes = True # Para Pydantic v2 (reemplaza a orm_mode = True)
+
+class CajaAbiertaInfo(BaseModel):
+    id_sesion: int
+    fecha_apertura: datetime
+    usuario_apertura: str
+    saldo_inicial: float
+    estado: str
+
+# --- SCHEMA PARA UN ARQUEO CERRADO INDIVIDUAL ---
+class ArqueoCerradoInfo(BaseModel):
+    id_sesion: int
+    fecha_apertura: datetime
+    fecha_cierre: Optional[datetime]
+    usuario_apertura: str
+    usuario_cierre: str
+    saldo_inicial: float
+    saldo_final_declarado: Optional[float]
+    saldo_final_calculado: Optional[float]
+    diferencia: Optional[float]
+    estado: str
+
+# --- SCHEMA PRINCIPAL PARA LA RESPUESTA DEL ENDPOINT DE ARQUEOS ---
+# Este es el schema que tu router importará y usará como `response_model`.
+class InformeArqueosResponse(BaseModel):
+    cajas_abiertas: List[CajaAbiertaInfo]
+    arqueos_cerrados: List[ArqueoCerradoInfo]
