@@ -54,7 +54,7 @@ def api_abrir_caja(req: AbrirCajaRequest, db: Session = Depends(get_db), current
 @router.post("/cerrar", response_model=RespuestaGenerica)
 def api_cerrar_caja(req: CerrarCajaRequest, db: Session = Depends(get_db), current_user: Usuario = Depends(obtener_usuario_actual)):
     try:
-        sesion = apertura_cierre.cerrar_caja(db=db, usuario_cierre=current_user, saldo_final_declarado=req.saldo_final_declarado)
+        sesion = apertura_cierre.cerrar_caja(db=db, usuario_cierre=current_user, saldo_final_declarado=req.saldo_final_declarado,saldo_final_transferencias=req.saldo_final_transferencias,saldo_final_efectivo=req.saldo_final_efectivo,saldo_final_bancario = req.saldo_final_bancario)
         db.commit()
         return RespuestaGenerica(status="success", message=f"Caja cerrada con éxito. Sesión ID: {sesion.id}", data={"id_sesion": sesion.id})
     except ValueError as e:

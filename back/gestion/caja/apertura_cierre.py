@@ -65,7 +65,7 @@ def abrir_caja(db: Session, usuario_apertura: Usuario, saldo_inicial: float) -> 
     print("--- [FIN TRACE: ABRIR CAJA] ---\n")
     return nueva_sesion
 
-def cerrar_caja(db: Session, usuario_cierre: Usuario, saldo_final_declarado: float) -> CajaSesion:
+def cerrar_caja(db: Session, usuario_cierre: Usuario, saldo_final_declarado: float,saldo_final_transferencias: float,saldo_final_bancario: float,saldo_final_efectivo: float) -> CajaSesion:
     """Cierra la sesión de caja abierta del usuario que realiza la acción usando ORM."""
     print("\n--- [TRACE: CERRAR CAJA] ---")
     print(f"1. Solicitud de cierre para usuario: '{usuario_cierre.nombre_usuario}', Saldo Declarado: {saldo_final_declarado}")
@@ -99,6 +99,9 @@ def cerrar_caja(db: Session, usuario_cierre: Usuario, saldo_final_declarado: flo
     sesion_a_cerrar.fecha_cierre = datetime.utcnow()
     sesion_a_cerrar.id_usuario_cierre = usuario_cierre.id
     sesion_a_cerrar.saldo_final_declarado = saldo_final_declarado
+    sesion_a_cerrar.saldo_final_transferencias = saldo_final_transferencias
+    sesion_a_cerrar.saldo_final_bancario= saldo_final_bancario
+    sesion_a_cerrar.saldo_final_efectivo=saldo_final_efectivo
     sesion_a_cerrar.saldo_final_calculado = round(saldo_final_calculado, 2)
     sesion_a_cerrar.diferencia = round(diferencia, 2)
     
