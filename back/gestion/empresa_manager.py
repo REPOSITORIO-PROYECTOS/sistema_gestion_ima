@@ -50,15 +50,15 @@ def crear_empresa_y_primer_admin(db: Session, data: EmpresaCreate) -> Empresa:
         db.flush()
 
         # 4. Preparar los datos para llamar al `admin_manager.crear_usuario`
-        # Asumimos que el rol para el admin de una empresa es "Gerente" (o el que corresponda)
-        rol_gerente = db.exec(select(Rol).where(Rol.nombre == "Gerente")).first()
-        if not rol_gerente:
-            raise RuntimeError("El rol 'Gerente' no se encuentra en la base de datos.")
+        # Asumimos que el rol para el admin de una empresa es "Admin" (o el que corresponda)
+        rol_admin = db.exec(select(Rol).where(Rol.nombre == "Admin")).first()
+        if not rol_admin:
+            raise RuntimeError("El rol 'Admin' no se encuentra en la base de datos.")
 
         datos_nuevo_usuario = UsuarioCreate(
             nombre_usuario=data.admin_username,
             password=data.admin_password,
-            id_rol=rol_gerente.id,
+            id_rol=rol_admin.id,
             id_empresa=nueva_empresa.id # <-- ¡Le pasamos el ID de la empresa recién creada!
         )
         
