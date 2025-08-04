@@ -116,7 +116,7 @@ class ArqueoCerradoResponse(BaseModel):
     diferencia: float | None
     estado: str
     saldo_final_declarado: Optional[float] = Field(..., ge=0)
-    saldo_final_transferecias: Optional[float] = None
+    saldo_final_transferencias: Optional[float] = None
     saldo_final_bancario: Optional[float] = None
     saldo_final_efectivo: Optional[float] = None
 
