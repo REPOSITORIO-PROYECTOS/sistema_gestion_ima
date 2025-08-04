@@ -123,70 +123,85 @@ def sincronizar_clientes_desde_sheets(db: Session, id_empresa_actual: int) -> Di
 
 def sincronizar_articulos_desde_sheets(db: Session, id_empresa_actual: int) -> Dict[str, int]:
     """
-    Sincroniza los artículos y sus códigos de barras desde Google Sheets, adaptado
-    para un entorno multi-empresa seguro.
+    Sincroniza los artículos y sus códigos de barras desde Google Sheets a la base de datos,
+    implementando manejo de duplicados desde la hoja de origen y validaciones multi-empresa seguras.
     """
+    # 1. VERIFICAR CONFIGURACIÓN DE LA EMPRESA
     config_empresa = db.get(ConfiguracionEmpresa, id_empresa_actual)
-
     if not config_empresa or not config_empresa.link_google_sheets:
         print(f"Error: Falta configuración o link de Google Sheets para la empresa ID: {id_empresa_actual}.")
         return {"creados": 0, "actualizados": 0, "errores": 0, "sin_cambios": 0}
     
+    # 2. CARGAR DATOS CRUDOS DESDE GOOGLE SHEETS
     handler = TablasHandler(id_empresa=id_empresa_actual, db=db)
-    
     print("Obteniendo datos de Google Sheets...")
-    articulos_sheets = handler.cargar_articulos()
+    articulos_sheets_crudos = handler.cargar_articulos()
     
-    if not articulos_sheets:
+    if not articulos_sheets_crudos:
         print("Advertencia: No se pudieron cargar datos de Google Sheets o la hoja está vacía.")
         return {"creados": 0, "actualizados": 0, "errores": 0, "sin_cambios": 0}
 
+    # 3. PRE-PROCESAR DATOS DE SHEETS PARA ELIMINAR DUPLICADOS
+    # Esto evita errores de 'UNIQUE constraint' si un mismo 'codigo_interno' aparece varias veces.
+    print(f"Se encontraron {len(articulos_sheets_crudos)} filas en Google Sheets. Procesando duplicados...")
+    
+    articulos_sheets_unicos = {}
+    duplicados_omitidos = 0
+    for articulo_sheet in articulos_sheets_crudos:
+        codigo_interno = str(articulo_sheet.get("Código", "")).strip()
+        if not codigo_interno:
+            continue  # Ignoramos filas sin 'Código'
+
+        if codigo_interno in articulos_sheets_unicos:
+            duplicados_omitidos += 1
+        
+        # Al sobrescribir, nos quedamos con la última aparición del código en la hoja.
+        articulos_sheets_unicos[codigo_interno] = articulo_sheet
+        
+    articulos_sheets = list(articulos_sheets_unicos.values())
+    print(f"Procesando {len(articulos_sheets)} artículos únicos. Se omitieron {duplicados_omitidos} filas duplicadas.")
+
+    # 4. CARGAR DATOS EXISTENTES DE LA BASE DE DATOS PARA COMPARAR
     print("Obteniendo datos de la base de datos...")
-    # Esta parte ya era correcta: solo carga artículos de la empresa actual.
+    
+    # Cargar artículos existentes SOLO de la empresa actual.
     articulos_db_objetos = db.exec(select(Articulo).where(Articulo.id_empresa == id_empresa_actual)).all()
     articulos_db_dict = {articulo.codigo_interno: articulo for articulo in articulos_db_objetos if articulo.codigo_interno}
     
-    ## ================================================================ ##
-    ## CAMBIO CLAVE 1: Cargar códigos de barras con información de su   ##
-    ## artículo y empresa asociados para detectar conflictos.           ##
-    ## ================================================================ ##
+    # Cargar TODOS los códigos de barras de TODAS las empresas para detectar conflictos globales.
+    # Usamos selectinload para cargar eficientemente la info del artículo y su empresa.
     print("Obteniendo TODOS los códigos de barras de la base de datos...")
-    
-    # Usamos selectinload para cargar eficientemente el artículo relacionado
-    # y así poder acceder a su id_empresa sin hacer más consultas.
     query_codigos = select(ArticuloCodigo).options(selectinload(ArticuloCodigo.articulo))
     codigos_barras_db_objetos = db.exec(query_codigos).all()
-    
-    # El diccionario sigue siendo global, porque los códigos de barras son únicos globalmente.
     codigos_barras_db_dict = {cb.codigo: cb for cb in codigos_barras_db_objetos}
     
     resumen = {"creados": 0, "actualizados": 0, "sin_cambios": 0, "errores": 0}
 
+    # 5. BUCLE PRINCIPAL DE SINCRONIZACIÓN
     for articulo_sheet in articulos_sheets:
         try:
-            # La clave para buscar artículos es el 'codigo_interno', pero solo dentro
-            # del diccionario de la empresa actual, lo cual es correcto.
             codigo_interno = str(articulo_sheet.get("Código", "")).strip()
+            # Este 'continue' es redundante por el pre-procesamiento, pero es una buena salvaguarda.
             if not codigo_interno:
                 resumen["errores"] += 1
                 continue
 
             articulo_existente = articulos_db_dict.get(codigo_interno)
             
+            # Preparar datos limpios del artículo
             datos_limpios = {
                 "descripcion": articulo_sheet.get("nombre", "Sin Descripción").strip(),
                 "precio_venta": limpiar_precio(articulo_sheet.get("precio", 0)),
                 "venta_negocio": limpiar_precio(articulo_sheet.get("precio negocio", 0)),
                 "stock_actual": limpiar_precio(articulo_sheet.get("cantidad", 0)),
                 "activo": str(articulo_sheet.get("Activo", "TRUE")).upper() == "TRUE",
-                "id_empresa": id_empresa_actual, # Aseguramos siempre la empresa correcta
+                "id_empresa": id_empresa_actual,
             }
 
             articulo_actual_db = None
 
             if articulo_existente:
                 # --- ACTUALIZAR ARTÍCULO ---
-                # Esta lógica es segura porque articulo_existente solo puede provenir de la empresa actual.
                 cambios_detectados = False
                 for campo, valor_nuevo in datos_limpios.items():
                     if str(getattr(articulo_existente, campo)) != str(valor_nuevo):
@@ -203,58 +218,44 @@ def sincronizar_articulos_desde_sheets(db: Session, id_empresa_actual: int) -> D
                 articulo_actual_db = articulo_existente
             else:
                 # --- CREAR ARTÍCULO ---
-                # Esta lógica es segura, ya que el 'id_empresa' se pasa en datos_limpios.
                 print(f"Creando nuevo artículo '{codigo_interno}' para empresa {id_empresa_actual}")
                 nuevo_articulo = Articulo(codigo_interno=codigo_interno, **datos_limpios)
                 db.add(nuevo_articulo)
                 resumen["creados"] += 1
-                
                 articulo_actual_db = nuevo_articulo
 
-            ## ================================================================ ##
-            ## CAMBIO CLAVE 2: Nueva lógica de validación multi-empresa         ##
-            ## para los códigos de barras.                                      ##
-            ## ================================================================ ##
-            
+            # --- SINCRONIZAR CÓDIGO DE BARRAS (con validación multi-empresa) ---
             codigo_barras_sheet = str(articulo_sheet.get("Codigo de barras", "")).strip()
-
             if codigo_barras_sheet:
                 codigo_barras_existente_db = codigos_barras_db_dict.get(codigo_barras_sheet)
 
                 if not codigo_barras_existente_db:
-                    # CASO 1: El código de barras es totalmente nuevo. Se crea y asocia.
+                    # El código de barras es totalmente nuevo. Se crea y asocia.
                     print(f"--> Creando y asociando nuevo código de barras '{codigo_barras_sheet}' al artículo '{codigo_interno}'.")
-                    nuevo_codigo_barras = ArticuloCodigo(
-                        codigo=codigo_barras_sheet,
-                        articulo=articulo_actual_db
-                    )
+                    nuevo_codigo_barras = ArticuloCodigo(codigo=codigo_barras_sheet, articulo=articulo_actual_db)
                     db.add(nuevo_codigo_barras)
                     codigos_barras_db_dict[codigo_barras_sheet] = nuevo_codigo_barras
                 else:
-                    # CASO 2: El código de barras YA EXISTE en la base de datos.
+                    # El código de barras YA EXISTE en la BD. Hay que verificar a quién pertenece.
                     articulo_asociado = codigo_barras_existente_db.articulo
                     
                     if not articulo_asociado:
-                        # Caso raro: código de barras huérfano. Lo re-asociamos.
+                        # Código de barras huérfano, se puede re-asociar.
                         print(f"--> Re-asociando código de barras huérfano '{codigo_barras_sheet}' al artículo '{codigo_interno}'.")
                         codigo_barras_existente_db.articulo = articulo_actual_db
                         db.add(codigo_barras_existente_db)
-                    
                     elif articulo_asociado.id_empresa == id_empresa_actual:
-                        # El código de barras pertenece a un artículo de la MISMA empresa.
+                        # Pertenece a la misma empresa. Se puede mover entre productos.
                         if articulo_asociado.id != articulo_actual_db.id:
-                            # Se está moviendo el código de barras a otro producto DENTRO de la misma empresa.
                             print(f"--> Re-asociando código de barras '{codigo_barras_sheet}' al artículo '{codigo_interno}' (misma empresa).")
                             codigo_barras_existente_db.articulo = articulo_actual_db
                             db.add(codigo_barras_existente_db)
-                    
                     else:
-                        # ¡CONFLICTO! El código de barras ya está en uso por OTRA empresa.
+                        # ¡CONFLICTO! Pertenece a otra empresa. Se registra el error y se omite.
                         print(f"## ERROR DE CONFLICTO ##: El código de barras '{codigo_barras_sheet}' ya está asignado "
                               f"al artículo '{articulo_asociado.codigo_interno}' de la empresa ID {articulo_asociado.id_empresa}. "
                               f"No se puede asignar al artículo '{codigo_interno}' de la empresa {id_empresa_actual}.")
                         resumen["errores"] += 1
-                        # No hacemos nada con este código de barras, se omite.
 
         except Exception as e:
             print(f"Error procesando la fila del sheet: {articulo_sheet}. Detalle: {e}")
@@ -262,6 +263,7 @@ def sincronizar_articulos_desde_sheets(db: Session, id_empresa_actual: int) -> D
             db.rollback() 
             continue
             
+    # 6. COMMIT FINAL DE LA TRANSACCIÓN
     try:
         db.commit()
         print("Sincronización de artículos y códigos de barras completada.")
@@ -270,3 +272,5 @@ def sincronizar_articulos_desde_sheets(db: Session, id_empresa_actual: int) -> D
         db.rollback()
         
     return resumen
+            
+   
