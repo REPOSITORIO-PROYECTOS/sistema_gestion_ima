@@ -24,7 +24,7 @@
             <h2>RECIBO DE PAGO</h2>
             <hr>
         </div>
-        <p>Fecha: {{ "now"|date("%d/%m/%Y %H:%M") }}</p>
+        <p>Fecha: {{ fecha_emision|date }}</p>
         <p>Recibimos de: {{ data.receptor.nombre_razon_social }}</p>
         <p class="total">IMPORTE: ${{ "%.2f"|format(data.transaccion.total) }}</p>
         <p>En concepto de: Venta/Servicio.</p>
