@@ -25,30 +25,31 @@ def limpiar_precio(valor_texto: str) -> float:
 # Función auxiliar para limpiar los precios
 def sincronizar_clientes_desde_sheets(db: Session, id_empresa_actual: int) -> Dict[str, int]:
     """
-    Sincroniza clientes, usando la combinación (codigo_interno, id_empresa) como
-    clave única de negocio para crear o actualizar registros.
+    Sincroniza clientes desde Google Sheets.
+    Si un cliente con el mismo (codigo_interno, id_empresa) existe, lo actualiza.
+    Si no existe, lo crea.
     """
+    # 1. VERIFICAR CONFIGURACIÓN
     config_empresa = db.get(ConfiguracionEmpresa, id_empresa_actual)
     if not config_empresa or not config_empresa.link_google_sheets:
+        print(f"Error: Falta configuración de Google Sheets para la empresa ID {id_empresa_actual}.")
         return {"creados": 0, "actualizados": 0, "errores": 0, "sin_cambios": 0}
 
+    # 2. CARGAR DATOS DE GOOGLE SHEETS
     handler = TablasHandler(id_empresa=id_empresa_actual, db=db)
-    
     print("Obteniendo datos de clientes desde Google Sheets...")
     clientes_sheets = handler.cargar_clientes()
     if not clientes_sheets:
+        print("Advertencia: No se pudieron cargar datos de Google Sheets o la hoja está vacía.")
         return {"creados": 0, "actualizados": 0, "errores": 0, "sin_cambios": 0}
 
-    # --- CARGA DE DATOS DE LA BD ---
-    # Cargamos solo los clientes de la empresa actual
-    print("Obteniendo clientes existentes de la base de datos...")
+    # 3. CARGAR CLIENTES EXISTENTES DE LA EMPRESA ACTUAL EN UN DICCIONARIO
+    print("Obteniendo clientes existentes de la base de datos (solo empresa actual)...")
     clientes_db_objetos = db.exec(
         select(Tercero).where(Tercero.id_empresa == id_empresa_actual)
     ).all()
 
-    # --- CLAVE DE BÚSQUEDA: (codigo_interno, id_empresa) ---
-    # Creamos un diccionario usando 'codigo_interno' como clave.
-    # Esto funcionará para futuras sincronizaciones.
+    # La clave del diccionario será el 'codigo_interno', que corresponde al 'id-cliente' de la hoja.
     clientes_db_dict = {
         tercero.codigo_interno: tercero 
         for tercero in clientes_db_objetos if tercero.codigo_interno
@@ -56,20 +57,20 @@ def sincronizar_clientes_desde_sheets(db: Session, id_empresa_actual: int) -> Di
     
     resumen = {"creados": 0, "actualizados": 0, "sin_cambios": 0, "errores": 0}
 
+    # 4. ITERAR Y SINCRONIZAR
     for cliente_sheet in clientes_sheets:
         try:
-            # El "id-cliente" de la hoja es nuestro 'codigo_interno' de negocio
+            # El 'id-cliente' de la hoja es nuestra clave de negocio 'codigo_interno'
             codigo_interno_sheet = str(cliente_sheet.get("id-cliente", "")).strip()
             if not codigo_interno_sheet:
                 resumen["errores"] += 1
                 continue
 
-            # Buscamos el cliente en nuestro diccionario
+            # Buscamos el cliente en el diccionario que ya está filtrado por empresa
             cliente_existente = clientes_db_dict.get(codigo_interno_sheet)
             cuit_sheet = str(cliente_sheet.get("CUIT-CUIL", "")).strip() or None
 
-            # --- DICCIONARIO DE DATOS LIMPIOS ---
-            # Nos aseguramos de que coincida con el modelo Tercero
+            # Preparamos el conjunto de datos limpios que vienen del Excel
             datos_limpios = {
                 "codigo_interno": codigo_interno_sheet,
                 "nombre_razon_social": str(cliente_sheet.get("nombre-usuario", f"Cliente #{codigo_interno_sheet}")).strip(),
@@ -84,7 +85,7 @@ def sincronizar_clientes_desde_sheets(db: Session, id_empresa_actual: int) -> Di
             }
 
             if cliente_existente:
-                # --- ACTUALIZAR ---
+                # --- ACTUALIZAR CLIENTE EXISTENTE ---
                 cambios_detectados = False
                 for campo, valor_nuevo in datos_limpios.items():
                     valor_viejo = getattr(cliente_existente, campo)
@@ -99,28 +100,25 @@ def sincronizar_clientes_desde_sheets(db: Session, id_empresa_actual: int) -> Di
                 else:
                     resumen["sin_cambios"] += 1
             else:
-                # --- CREAR ---
+                # --- CREAR NUEVO CLIENTE ---
                 print(f"Creando nuevo cliente con código interno: {codigo_interno_sheet}")
                 
-                # --- ¡LA SOLUCIÓN! ---
-                # Añadimos los campos obligatorios que faltaban para la creación
+                # Añadimos los valores por defecto que el modelo necesita al crear
                 datos_limpios['activo'] = True
                 datos_limpios['es_proveedor'] = False
-               # datos_limpios['fecha_alta'] = datetime.now() # <-- ¡EL CAMPO QUE FALTABA!
+                # Asumimos que el modelo Tercero maneja 'fecha_alta' con un default_factory
                 
                 nuevo_cliente = Tercero(**datos_limpios)
                 db.add(nuevo_cliente)
                 resumen["creados"] += 1
-                
-                # Lo añadimos al diccionario para que las siguientes filas lo encuentren si hay duplicados
-                clientes_db_dict[codigo_interno_sheet] = nuevo_cliente
 
         except Exception as e:
             codigo_info = cliente_sheet.get('id-cliente', 'SIN ID')
-            print(f"Error fatal procesando la fila del sheet con id-cliente '{codigo_info}'. Detalle: {e}")
+            print(f"ERROR al procesar fila del sheet con id-cliente '{codigo_info}'. Detalle: {e}")
             resumen["errores"] += 1
             continue
             
+    # 5. COMMIT FINAL
     try:
         db.commit()
         print("Sincronización de clientes completada.")
