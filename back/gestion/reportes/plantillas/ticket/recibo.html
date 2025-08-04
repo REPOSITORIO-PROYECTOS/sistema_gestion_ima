@@ -5,14 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Recibo de Pago</title>
     <style>
-        body { font-family: 'Courier New', Courier, monospace; font-size: 12px; margin: 0; padding: 0; }
-        .ticket { width: 78mm; padding: 1mm; }
+        /* Estilos optimizados para impresoras de 58mm */
+        body { 
+            font-family: 'Courier New', Courier, monospace; 
+            font-size: 10px;
+            margin: 0; 
+            padding: 0; 
+        }
+        .ticket { 
+            width: 56mm; /* Dejamos 1mm de margen a cada lado para un rollo de 58mm */
+            padding: 1mm; 
+        }
         .header { text-align: center; }
-        .header h1 { margin: 0; font-size: 16px; }
-        p { margin: 5px 0; }
-        hr { border: none; border-top: 1px dashed black; }
-        .total { font-weight: bold; font-size: 14px; text-align: center; margin: 10px 0; }
-        .footer { text-align: center; margin-top: 15px; }
+        .header h1 { margin: 0; font-size: 14px; word-wrap: break-word; }
+        .header h2 { margin: 4px 0; font-size: 12px; }
+        p { margin: 3px 0; }
+        hr { border: none; border-top: 1px dashed black; margin: 4px 0; }
+        
+        .item-list { margin: 8px 0; }
+        .item-header { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 4px; }
+        .item { display: flex; justify-content: space-between; }
+        .item .description { width: 65%; text-align: left; word-wrap: break-word; }
+        .item .price { width: 35%; text-align: right; }
+        .item-detail { font-size: 9px; color: #555; padding-left: 4px; }
+        
+        .totals-section { margin-top: 8px; }
+        .highlight { font-weight: bold; } /* Clase para destacar el descuento */
+        .total { font-weight: bold; font-size: 13px; text-align: right; margin-top: 8px; }
+        .footer { text-align: center; margin-top: 12px; }
+        .disclaimer { font-weight: bold; text-align: center; margin-top: 15px; }
     </style>
 </head>
 <body>
@@ -24,10 +45,56 @@
             <h2>RECIBO DE PAGO</h2>
             <hr>
         </div>
-        <p>Fecha: {{ "now"|date("%d/%m/%Y %H:%M") }}</p>
+        <p>Fecha: {{ fecha_emision|date }}</p>
         <p>Recibimos de: {{ data.receptor.nombre_razon_social }}</p>
-        <p class="total">IMPORTE: ${{ "%.2f"|format(data.transaccion.total) }}</p>
-        <p>En concepto de: Venta/Servicio.</p>
+        
+        <hr>
+        <div class="item-list">
+            <div class="item-header">
+                <span>Desc.</span>
+                <span>Subt.</span>
+            </div>
+            {% for item in data.transaccion.items %}
+                <div class="item">
+                    <span class="description">{{ item.descripcion }}</span>
+                    <span class="price">${{ "%.2f"|format(item.subtotal) }}</span>
+                </div>
+                <div class="item item-detail">
+                    <span class="description">{{ item.cantidad }} x ${{ "%.2f"|format(item.precio_unitario) }}</span>
+                </div>
+            {% endfor %}
+        </div>
+        
+        <!-- ======================================================= -->
+        <!-- SECCIÓN DE TOTALES CORREGIDA Y ACTUALIZADA -->
+        <!-- ======================================================= -->
+        <div class="totals-section">
+            <hr>
+            <!-- 1. Calculamos y mostramos el Subtotal -->
+            {% set subtotal = data.transaccion.items | sum(attribute='subtotal') %}
+            <div class="item">
+                <p>SUBTOTAL:</p>
+                <p>${{ "%.2f"|format(subtotal) }}</p>
+            </div>
+
+            <!-- 2. Mostramos el Descuento en PORCENTAJE (SÓLO si es mayor a cero) -->
+            {% if data.transaccion.descuento_general > 0 %}
+                <div class="item highlight">
+                    <p>Descuento:</p>
+                    <!-- CORRECCIÓN: Mostramos el número y el símbolo '%' -->
+                    <p>{{ data.transaccion.descuento_general }}%</p>
+                </div>
+            {% endif %}
+
+            <!-- 3. Mostramos el Total final correctamente formateado -->
+            <p class="total">TOTAL A PAGAR: ${{ "%.2f"|format(data.transaccion.total) }}</p>
+        </div>
+        <!-- ======================================================= -->
+        
+        <p>En concepto de: {{ data.transaccion.observaciones or 'Venta/Servicio' }}</p>
+        
+        <p class="disclaimer">COMPROBANTE NO VÁLIDO COMO FACTURA</p>
+        
         <p class="footer">....................</p>
         <p class="footer">Firma y Aclaración</p>
     </div>

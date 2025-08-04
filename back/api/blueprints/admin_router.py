@@ -7,7 +7,7 @@ from typing import List
 
 # --- Módulos del Proyecto ---
 from back.database import get_db
-from back.security import es_admin, obtener_usuario_actual
+from back.security import es_admin,es_cajero, obtener_usuario_actual
 from back.modelos import Usuario
 import back.gestion.admin.admin_manager as admin_manager
 from back.schemas.admin_schemas import *

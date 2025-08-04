@@ -7,7 +7,7 @@
     <style>
         /* Estilos optimizados para 80mm de ancho */
         body { font-family: 'Courier New', Courier, monospace; font-size: 12px; margin: 0; padding: 0; }
-        .ticket { width: 78mm; padding: 1mm; }
+        .ticket { width: 47mm; padding: 1mm; }
         .header { text-align: center; }
         .header h1 { margin: 0; font-size: 16px; }
         p { margin: 2px 0; }
@@ -28,7 +28,7 @@
             <h2>REMITO</h2>
             <hr>
         </div>
-        <p>Fecha: {{ "now"|date("%d/%m/%Y %H:%M") }}</p>
+        <p>Fecha: {{ fecha_emision|date }}</p>
         <p>Cliente: {{ data.receptor.nombre_razon_social }}</p>
         <hr>
         <div class="item-row">
