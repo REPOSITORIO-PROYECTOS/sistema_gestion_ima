@@ -67,7 +67,7 @@ class TablasHandler:
         print("Intentando cargar/recargar datos de Clientes...")
         if self.client:
             try:
-                sheet = self.client.open_by_key(GOOGLE_SHEET_ID)
+                sheet = self.client.open_by_key(self.google_sheet_id)
                 worksheet = sheet.worksheet("clientes") # <-- ¿Existe una hoja llamada "clientes"?
                 datos_clientes = worksheet.get_all_records()
                 return datos_clientes
