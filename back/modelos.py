@@ -189,6 +189,9 @@ class CajaSesion(SQLModel, table=True):
     fecha_cierre: Optional[datetime] = None
     saldo_final_declarado: Optional[float]
     saldo_final_calculado: Optional[float]
+    saldo_final_transferecias: Optional[float]
+    saldo_final_bancario: Optional[float]
+    saldo_final_efectivo: Optional[float]
     diferencia: Optional[float]
     estado: str = Field(default="ABIERTA")
     id_usuario_apertura: int = Field(foreign_key="usuarios.id")

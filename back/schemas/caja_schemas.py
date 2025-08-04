@@ -177,6 +177,9 @@ class ArqueoCerradoInfo(BaseModel):
     saldo_inicial: float
     saldo_final_declarado: Optional[float]
     saldo_final_calculado: Optional[float]
+    saldo_final_efectivo: Optional[float]
+    saldo_final_transferencia: Optional[float]
+    saldo_final_bancario: Optional[float]
     diferencia: Optional[float]
     estado: str
 
