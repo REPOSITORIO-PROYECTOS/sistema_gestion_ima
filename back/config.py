@@ -87,7 +87,7 @@ FACTURACION_API_URL: str = os.getenv("FACTURACION_API_URL", "http://localhost:80
 #===========================FIN FACTURADOR=========================================
 
 URL_BOVEDA: str = os.getenv("BOVEDA_URL", "http://localhost:8000/boveda")
-API_KEY_INTERNA: str = os.getenv("API_KEY_INTERNA", "default_api_key")
+API_KEY_INTERNA: str = os.getenv("BOVEDA_API_KEY_INTERNA", "default_api_key")
 # ===== INICIO DE LA MODIFICACIÓN =====
 # Creamos una ruta absoluta al archivo de credenciales,
 # basándonos en la ubicación del propio archivo config.py
