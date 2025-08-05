@@ -71,8 +71,8 @@ def enviar_credenciales_a_boveda(cuit: str, certificado_pem: str) -> dict:
 
     # 3. Inicializar el cliente de la bóveda con la config que ya tienes lista
     cliente_boveda = ClienteBoveda(
-        base_url=config.BOVEDA_BASE_URL,
-        api_key=config.BOVEDA_API_KEY
+        base_url=config.URL_BOVEDA,
+        api_key=config.API_KEY_INTERNA
     )
 
     # 4. Usar el cliente para guardar el secreto en el microservicio.
