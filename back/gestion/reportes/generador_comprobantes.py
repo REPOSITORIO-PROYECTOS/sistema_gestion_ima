@@ -95,3 +95,38 @@ def generar_comprobante_stateless(data: GenerarComprobanteRequest) -> bytes:
     
     return pdf_bytes
 
+def generar_ticket_cierre_pdf(datos: dict) -> bytes:
+    """
+    Genera un PDF para el ticket de cierre de lote detallado.
+    """
+    print(f"\n--- [TRACE: GENERAR TICKET CIERRE] ---")
+    
+    try:
+        env = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
+        env.filters['date'] = format_datetime # Reutilizamos tu filtro de fecha
+        
+        # Apunta a la plantilla correcta
+        template = env.get_template("ticket/cierre_lote_detallado.html")
+        
+        # Añadimos la fecha de emisión al contexto aquí
+        contexto = {
+            "datos": datos,
+            "fecha_emision": datetime.now()
+        }
+        html_renderizado = template.render(contexto)
+        print("1. Plantilla 'cierre_lote_detallado.html' renderizada con éxito.")
+    except Exception as e:
+        # Imprime un error más detallado si la plantilla falla
+        print(f"ERROR DETALLADO DE JINJA2: {e}")
+        raise RuntimeError(f"Error al procesar la plantilla del ticket de cierre: {e}")
+
+    try:
+        # Forzamos el formato de 58mm
+        css_string = "@page { size: 58mm auto; margin: 2mm; }"
+        pdf_bytes = HTML(string=html_renderizado).write_pdf(stylesheets=[CSS(string=css_string)])
+        print(f"2. PDF de cierre generado. Tamaño: {len(pdf_bytes)} bytes.")
+    except Exception as e:
+        print(f"ERROR DETALLADO DE WEASYPRINT: {e}")
+        raise RuntimeError(f"Error al generar el PDF del ticket de cierre: {e}")
+        
+    return pdf_bytes
