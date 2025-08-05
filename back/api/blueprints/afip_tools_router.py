@@ -11,7 +11,7 @@ from back.schemas.afip_tools_schemas import CsrRequest, CertificadoRequest
 router = APIRouter(
     prefix="/api/afip-tools",
     tags=["Herramientas AFIP"],
-    dependencies=[Depends(es_rol(["admin"]))]  # Solo accesible por administradores
+    #dependencies=[Depends(es_rol(["admin"]))]  # Solo accesible por administradores
 )
 
 @router.post("/generar-csr")
