@@ -166,23 +166,32 @@ def registrar_venta_y_movimiento_caja(
                 print("[DRIVE] Intentando registrar movimiento en Google Sheets...")
                 cliente_sheets_data = obtener_cliente_por_id(db,usuario_actual.id_empresa,id_cliente) # Asumo que esta función devuelve un dict
 
+                nombre_cliente_para_sheets = "Público General"
+                cuit_cliente_para_sheets = "N/A"
+                razon_social_para_sheets = "N/A"
+
+                # Si cliente_sheets_data NO es None (es decir, encontramos un diccionario)
                 if cliente_sheets_data:
-                    datos_para_sheets = {
-                        "id_cliente": id_cliente,
-                        "cliente": cliente_sheets_data.get("nombre-usuario", "No encontrado"),
-                        "cuit": cliente_sheets_data.get("CUIT-CUIL", "N/A"),
-                        "razon_social": cliente_sheets_data.get("Nombre de Contacto", "N/A"),
-                        "Tipo_movimiento": "venta",
-                        "descripcion": f"Venta de {len(articulos_vendidos)} artículos",
-                        "monto": total_final_con_recargo,
-                    }
-                    caller = TablasHandler(id_empresa=usuario_actual.id_empresa, db=db)
-                    if not caller.registrar_movimiento(datos_para_sheets):
-                        print("⚠️ [DRIVE] La función registrar_movimiento devolvió False.")
-                    if not caller.restar_stock(articulos_vendidos):
-                        print("⚠️ [DRIVE] Ocurrió un error al intentar actualizar el stock en Google Sheets.")
-                else:
-                    print(f"⚠️ [DRIVE] No se pudo encontrar el cliente con ID {id_cliente}. No se registrará el movimiento en Drive.")
+                    nombre_cliente_para_sheets = cliente_sheets_data.get("nombre-usuario", "Cliente sin nombre")
+                    cuit_cliente_para_sheets = cliente_sheets_data.get("CUIT-CUIL", "N/A")
+                    razon_social_para_sheets = cliente_sheets_data.get("Nombre de Contacto", "N/A")
+
+                datos_para_sheets = {
+                    "id_cliente": id_cliente,
+                    "cliente": nombre_cliente_para_sheets,
+                    "cuit": cuit_cliente_para_sheets,
+                    "razon_social": razon_social_para_sheets,
+                    "Tipo_movimiento": "venta",
+                    "descripcion": f"Venta de {len(articulos_vendidos)} artículos",
+                    "monto": total_final_con_recargo,
+                }
+                
+                caller = TablasHandler(id_empresa=usuario_actual.id_empresa, db=db)
+                if not caller.registrar_movimiento(datos_para_sheets):
+                    print("⚠️ [DRIVE] La función registrar_movimiento devolvió False.")
+                if afectar_stock and not caller.restar_stock(articulos_vendidos): # Solo resta stock si afectar_stock es True
+                    print("⚠️ [DRIVE] Ocurrió un error al intentar actualizar el stock en Google Sheets.")
+                # --- FIN DE LA LÓGICA CORREGIDA ---
 
         except Exception as e_sheets:
             print(f"❌ [DRIVE] Ocurrió un error al intentar registrar en Google Sheets: {e_sheets}")
