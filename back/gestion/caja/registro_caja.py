@@ -179,26 +179,28 @@ def registrar_venta_y_movimiento_caja(
                     cuit_cliente_para_sheets = cliente_sheets_data.get("CUIT-CUIL", "N/A")
                     razon_social_para_sheets = cliente_sheets_data.get("Nombre de Contacto", "N/A")
 
-                datos_para_sheets = {
-                    "id_cliente": id_cliente,
-                    "cliente": nombre_cliente_para_sheets,
-                    "cuit": cuit_cliente_para_sheets,
-                    "razon_social": razon_social_para_sheets,
-                    "Tipo_movimiento": "venta",
-                    "descripcion": f"Venta de {len(articulos_vendidos)} artículos",
-                    "monto": total_final_con_recargo,
-                }
+                    datos_para_sheets = {
+                        "id_cliente": id_cliente,
+                        "cliente": nombre_cliente_para_sheets,
+                        "cuit": cuit_cliente_para_sheets,
+                        "razon_social": razon_social_para_sheets,
+                        "Tipo_movimiento": "venta",
+                        "descripcion": f"Venta de {len(articulos_vendidos)} artículos",
+                        "monto": total_final_con_recargo,
+                    }
                 
-                caller = TablasHandler(id_empresa=usuario_actual.id_empresa, db=db)
-                if not caller.registrar_movimiento(datos_para_sheets):
-                    print("⚠️ [DRIVE] La función registrar_movimiento devolvió False.")
-                if afectar_stock and not caller.restar_stock(articulos_vendidos): # Solo resta stock si afectar_stock es True
-                    print("⚠️ [DRIVE] Ocurrió un error al intentar actualizar el stock en Google Sheets.")
-                # --- FIN DE LA LÓGICA CORREGIDA ---
-
+                    caller = TablasHandler(id_empresa=usuario_actual.id_empresa, db=db)
+                    if not caller.registrar_movimiento(datos_para_sheets):
+                        print("⚠️ [DRIVE] La función registrar_movimiento devolvió False.")
+                    if afectar_stock and not caller.restar_stock(articulos_vendidos): # Solo resta stock si afectar_stock es True
+                        print("⚠️ [DRIVE] Ocurrió un error al intentar actualizar el stock en Google Sheets.")
+                    # --- FIN DE LA LÓGICA CORREGIDA ---
+                    print("ESTAMOS SALIENDO DE LA FUNCION REGISTRAR_VENTA_Y _MOVIMIENTO")
+                else:
+                    print(f"⚠️ [DRIVE] No se pudo encontrar el cliente con ID {id_cliente}. No se registrará el movimiento en Drive.")
         except Exception as e_sheets:
             print(f"❌ [DRIVE] Ocurrió un error al intentar registrar en Google Sheets: {e_sheets}")
-            return nueva_venta, movimiento_principal
+    return nueva_venta, movimiento_principal
 
 
 
