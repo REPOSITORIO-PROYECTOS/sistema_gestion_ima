@@ -1,6 +1,5 @@
 "use client"
 
-/* import Image from 'next/image' */
 import NavBar from '@/components/interface/NavBar'
 import ProtectedRoute from "@/components/ProtectedRoute"
 import { useAuthStore } from '@/lib/authStore'
@@ -17,7 +16,6 @@ const links: NavLink[] = [
   { name: "Ventas", href: "/dashboard/ventas", roles: ["Admin", "Cajero"] },
   { name: "Contabilidad", href: "/dashboard/contabilidad", roles: ["Admin", "Cajero"] },
   { name: "Stock", href: "/dashboard/stock", roles: ["Admin", "Cajero", "Gerente"] },
-  /* { name: "Carta", href: "/dashboard/carta", roles: [""] } */  // agregar en otra app
 ]
 
 function DashboardLayout({ children }: { children: React.ReactNode }) {

@@ -66,7 +66,7 @@ type Cliente = {
   activo: boolean;
 };
 
-// Dropdown tipo de cliente
+// Dropdown tipo de cliente - final o registrado
 const tipoCliente = [
   { id: "0", nombre: "Cliente Final" },
   { id: "1", nombre: "Cliente Registrado" },
@@ -469,10 +469,10 @@ function FormVentas({
     // Payload de Venta
     const ventaPayload = {
       id_cliente:
-        // Si el cliente no esta registrado manda 100, si sí, entonces manda el id de ese cliente
+        // Si el cliente no esta registrado (tipo "0") manda id=9, si sí, entonces manda el id de ese cliente
         tipoClienteSeleccionado.id === "0"
-          ? 100                                     
-          : clienteSeleccionado?.id ?? 100,               
+          ? 0                                     
+          : clienteSeleccionado?.id ?? 0,               
       metodo_pago: metodoPago.toUpperCase(),
       total_venta: totalVenta,
       paga_con: montoPagado,
@@ -874,8 +874,8 @@ function FormVentas({
         <span className="block w-full h-0.5 bg-green-900"></span>
 
         {/* Total de prod * cant */}
-        <div className="flex flex-row gap-4 justify-between items-start mt-4">
-          <Label className="text-2xl font-semibold text-green-900">Total</Label>
+        <div className="flex flex-col md:flex-row gap-4 justify-between items-start mt-4">
+          <Label className="text-2xl font-semibold text-green-900">Total Productos Seleccionados:</Label>
           <p className="text-2xl font-semibold text-green-900">
             ${productoConDescuento.toFixed(2)}
           </p>
