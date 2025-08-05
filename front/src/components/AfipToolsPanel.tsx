@@ -115,7 +115,7 @@ export function AfipToolsPanel({ empresaId }: AfipToolsPanelProps) {
     reader.onload = async () => {
       const certificatePEM = reader.result as string;
       try {
-        const res = await fetch("https://sistema-ima.sistemataup.online/api/afip-tools/subir-certificado", {
+        const res = await fetch("https://sistema-ima.sistemataup.online/api/api/afip-tools/subir-certificado", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({
