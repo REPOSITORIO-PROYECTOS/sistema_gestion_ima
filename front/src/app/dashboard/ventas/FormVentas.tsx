@@ -33,6 +33,8 @@ import {
 import { ChevronsUpDown } from "lucide-react";
 import { useFacturacionStore } from "@/lib/facturacionStore";
 import { useAuthStore } from "@/lib/authStore"
+import { useEmpresaStore } from '@/lib/empresaStore';
+
 
 // Esta interfaz es para el producto del codigo de barras
 interface Producto {
@@ -177,6 +179,10 @@ function FormVentas({
   // Código de Barras
   const [codigo, setCodigoEscaneado] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Store de empresas para facturación dinámica:
+  const empresa = useEmpresaStore((state) => state.empresa);
+
 
 
   /* Hooks */ /* -------------------------------------------------------------- */
@@ -496,6 +502,11 @@ function FormVentas({
     // GENERAR COMPROBANTE - Endpoint que se encarga de imprimir el ticket o comprobante de la venta realizada
     try {
 
+      if (!empresa) {
+        toast.error("No hay datos de la empresa, no se puede realizar la venta.");
+        return;
+      }
+
       const response = await fetch("https://sistema-ima.sistemataup.online/api/caja/ventas/registrar", {
         method: "POST",
         headers: {
@@ -504,7 +515,7 @@ function FormVentas({
         },
         body: JSON.stringify(ventaPayload)
       });
-      /* console.log(ventaPayload) */
+
       if (response.ok) {
 
         const data = await response.json();
@@ -516,16 +527,16 @@ function FormVentas({
 
             // Payload para el comprobante a imprimir
             const req = {
-              formato: formatoComprobante.toLowerCase(),          // por ahora, "pdf" o "ticket" desde facturacionStore
+              formato: formatoComprobante.toLowerCase(),         // por ahora, "pdf" o "ticket" desde facturacionStore
               tipo: tipoFacturacion.toLowerCase(),                                  
               emisor: {
-                cuit: "20-36423774-0",                          // CUIT de la empresa emisora - todo esto es dinamico
-                razon_social: "MONTSERRAT FRONTINO RODRIGO",    // nombre de la empresa emisora
-                domicilio: "Manuel Dorrego Nte., J5400 Rivadavia, San Juan",              // dom de la empresa emisora
-                punto_venta: 10,
-                condicion_iva: "Responsable Inscripto",
-                afip_certificado: "BASE64_ENCODED_CERT",    // opcional
-                afip_clave_privada: "BASE64_ENCODED_KEY"    // opcional
+                cuit: empresa?.cuit || "0",
+                razon_social: empresa?.nombre_negocio || "Nombre no disponible",
+                domicilio: empresa?.direccion_negocio || "Domicilio no disponible",
+                punto_venta: empresa?.afip_punto_venta_predeterminado || 1,
+                condicion_iva: empresa?.afip_condicion_iva || "Responsable Inscripto",
+                afip_certificado: "", 
+                afip_clave_privada: ""
               },
               receptor: {
                 nombre_razon_social:
