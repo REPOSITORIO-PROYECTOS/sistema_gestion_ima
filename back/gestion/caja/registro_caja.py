@@ -11,6 +11,7 @@ from back.modelos import Usuario, Venta, VentaDetalle, Articulo, CajaMovimiento,
 from back.schemas.caja_schemas import ArticuloVendido, RegistrarVentaRequest, TipoMovimiento
 from back.utils.tablas_handler import TablasHandler
 
+from back.gestion.contabilidad.clientes_contabilidad import manager as clientes_manager
 
 #ACA TENGO QUE REGISTRAR CUANDO ENTRA Y CUANDO SALE PLATA, MODIFICA LA TABLA MOVIMIENTOS
 
@@ -164,7 +165,8 @@ def registrar_venta_y_movimiento_caja(
     if afectar_stock or afectar_caja:
         try:
                 print("[DRIVE] Intentando registrar movimiento en Google Sheets...")
-                cliente_sheets_data = obtener_cliente_por_id(db,usuario_actual.id_empresa,id_cliente) # Asumo que esta función devuelve un dict
+                cliente = clientes_manager.obtener_cliente_por_id(usuario_actual.id_empresa,db, id_cliente)
+                cliente_sheets_data = obtener_cliente_por_id(db,id_empresa=usuario_actual.id_empresa,id_cliente=cliente.codigo_interno) # Asumo que esta función devuelve un dict
                 print("LA DATA DE CLIENTE_SHEETS_DATA ES   :  ")
                 print(cliente_sheets_data)
                 nombre_cliente_para_sheets = "Público General"
