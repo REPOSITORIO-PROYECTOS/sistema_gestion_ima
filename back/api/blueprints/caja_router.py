@@ -349,5 +349,6 @@ def api_obtener_estado_caja(
     Verifica si el usuario autenticado tiene una caja abierta y devuelve el estado.
     Este endpoint es clave para sincronizar el frontend al recargar la página.
     """
+    # ASEGÚRATE DE QUE ESTA LÍNEA LLAME A LA FUNCIÓN CON EL NOMBRE CORRECTO
     estado = consultas_caja.obtener_estado_caja_actual_usuario(db, current_user)
     return estado

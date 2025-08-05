@@ -209,3 +209,24 @@ def obtener_datos_para_ticket_cierre_detallado(db: Session, id_sesion: int, usua
     
     print("--- [FIN TRACE] ---\n")
     return datos_ticket
+
+def obtener_estado_caja_actual_usuario(db: Session, usuario_actual: Usuario) -> dict:
+    """
+    Verifica de forma rápida y eficiente si un usuario tiene una caja abierta
+    y devuelve su estado actual.
+    """
+    sesion_abierta = db.exec(
+        select(CajaSesion).where(
+            CajaSesion.id_usuario_apertura == usuario_actual.id,
+            CajaSesion.estado == "ABIERTA"
+        )
+    ).first()
+
+    if sesion_abierta:
+        return {
+            "caja_abierta": True,
+            "id_sesion": sesion_abierta.id,
+            "fecha_apertura": sesion_abierta.fecha_apertura
+        }
+    else:
+        return {"caja_abierta": False}
