@@ -1,11 +1,5 @@
-<<<<<<< HEAD
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
-=======
-// stores/cajaStore.ts
-import { create } from 'zustand';
 // Ya no necesitamos 'persist', lo eliminamos de las importaciones.
->>>>>>> a323bdb57d941a0391612dbb40ebfa7c2fa1a817
 
 // Definimos la 'forma' de la respuesta que esperamos de nuestro nuevo endpoint de verificación
 interface EstadoCajaAPI {
