@@ -418,8 +418,6 @@ function FormVentas({
     fetchProductos();
   }, [token]);
 
-  console.log("Empresa en submit:", empresa);
-
   // POST Ventas - Registra la venta completa
   const handleSubmit = async (e: React.FormEvent) => {
 
