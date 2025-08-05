@@ -165,7 +165,8 @@ def registrar_venta_y_movimiento_caja(
         try:
                 print("[DRIVE] Intentando registrar movimiento en Google Sheets...")
                 cliente_sheets_data = obtener_cliente_por_id(db,usuario_actual.id_empresa,id_cliente) # Asumo que esta función devuelve un dict
-
+                print("LA DATA DE CLIENTE_SHEETS_DATA ES   :  ")
+                print(cliente_sheets_data)
                 nombre_cliente_para_sheets = "Público General"
                 cuit_cliente_para_sheets = "N/A"
                 razon_social_para_sheets = "N/A"
