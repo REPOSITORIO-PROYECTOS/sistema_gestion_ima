@@ -78,7 +78,7 @@ export function AfipToolsPanel({ empresaId }: AfipToolsPanelProps) {
     toast.info("Generando solicitud de certificado...");
 
     try {
-      const res = await fetch("https://sistema-ima.sistemataup.online/api/afip-tools/generar-csr", {
+      const res = await fetch("https://sistema-ima.sistemataup.online/api/api/afip-tools/generar-csr", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
