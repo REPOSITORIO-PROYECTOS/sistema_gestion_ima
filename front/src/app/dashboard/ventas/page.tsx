@@ -21,6 +21,8 @@ import EgresoForm from "./EgresoForm";
 function DashboardVenta() {
 
   /* Estados de la Caja de Ventas */
+   const verificarEstadoCaja = useCajaStore(state => state.verificarEstadoCaja);
+  const token = useAuthStore((state) => state.token);
   const [productos, setProductos] = useState<{
     tipo: string;
     cantidad: number;
@@ -65,6 +67,12 @@ function DashboardVenta() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    if (token) {
+      console.log("Token detectado, verificando estado de la caja...");
+      verificarEstadoCaja(token);
+    }
+  }, [token, verificarEstadoCaja]);
   // Mapeamos el rol para mostrarlo legible
   const mostrarRol = () => {
     if (role?.nombre === "Admin") return "Administrador";
