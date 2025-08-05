@@ -30,7 +30,7 @@ class ConfiguracionResponse(BaseModel):
     telefono_negocio: Optional[str]
     mail_negocio: Optional[str]
     link_google_sheets: Optional[str]
-
+    cuit: Optional[int]
     class Config:
         from_attributes = True
         

@@ -7,8 +7,10 @@ import { useEffect, useState } from "react";
 import { useAuthStore } from "@/lib/authStore";
 import { toast } from "sonner";
 import { DialogClose } from "@/components/ui/dialog";
-import { Loader2 } from "lucide-react";
+import { Loader2, PrinterIcon } from "lucide-react";
 import { useCajaStore } from "@/lib/cajaStore";
+
+
 
 interface CajaFormProps {
   onAbrirCaja: () => void;
@@ -30,6 +32,7 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
   /* Estados de la caja */
   // Monto inicial con el que se abre la caja
   const [saldoInicial, setSaldoInicial] = useState("");
+  
   // Monto final al cerrar la caja
   const [saldoFinalDeclarado, setSaldoFinalDeclarado] = useState("");
 
@@ -154,65 +157,99 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
     }
   };
 
+const handleImprimirCierre = async (idSesionCerrada: number) => {
+    if (!token) {
+      toast.error("Token no encontrado. No se puede imprimir.");
+      return;
+    }
+    
+    toast.info("Generando ticket, por favor espere...");
+    console.log(`[DEBUG] Iniciando impresión para sesión ID: ${idSesionCerrada}`);
+
+    try {
+      const url = `https://sistema-ima.sistemataup.online/api/caja/sesion/${idSesionCerrada}/ticket-cierre-detallado`;
+      console.log(`[DEBUG] Llamando a la URL: ${url}`);
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      console.log(`[DEBUG] Respuesta recibida de la API. Estado: ${res.status}, Tipo de Contenido: ${res.headers.get('Content-Type')}`);
+
+      if (!res.ok) {
+        // Si el servidor envía un error, intentamos leerlo como JSON
+        const errorData = await res.json();
+        throw new Error(errorData.detail || `El servidor respondió con un error ${res.status}`);
+      }
+      
+      // Convertimos la respuesta en un 'blob' (un objeto tipo archivo)
+      const blob = await res.blob();
+      console.log(`[DEBUG] Blob recibido. Tamaño: ${blob.size} bytes, Tipo: ${blob.type}`);
+
+      // --- Verificaciones Clave ---
+      if (blob.size === 0) {
+        throw new Error("El servidor devolvió un archivo vacío.");
+      }
+      if (blob.type !== "application/pdf") {
+        throw new Error(`El servidor devolvió un tipo de archivo incorrecto (${blob.type}), se esperaba un PDF.`);
+      }
+
+      // Creamos una URL temporal local para el archivo blob
+      const fileURL = URL.createObjectURL(blob);
+      
+      // Abrimos la URL en una nueva pestaña. El navegador se encargará de mostrar el visor de PDF.
+      const newWindow = window.open(fileURL, '_blank');
+      
+      if (!newWindow) {
+        throw new Error("El navegador bloqueó la apertura de la nueva pestaña. Por favor, revisa la configuración de pop-ups.");
+      }
+
+      // Limpiamos la URL temporal después de un breve instante para darle tiempo al navegador de procesarla.
+      setTimeout(() => URL.revokeObjectURL(fileURL), 100);
+
+    } catch (err) {
+      console.error("Error detallado al imprimir:", err); // Muestra el error completo en la consola
+      if (err instanceof Error) {
+        toast.error(`Error al imprimir: ${err.message}`);
+      }
+    }
+};
+
+
   // Cerrar caja
-  const handleCerrarCaja = async (e: React.FormEvent) => {
-
-    e.preventDefault();
-
-    // Validaciones
+  const handleCerrarCaja = async (imprimirDespues: boolean) => {
     if (!nombreUsuario.trim() || !llave.trim()) {
       toast.error("Por favor, completá todos los campos.");
       return;
     }
-
-    if (
-      limpiarMoneda(saldoFinalTransferencias) < 0 ||
-      limpiarMoneda(saldoFinalBancario) < 0 ||
-      limpiarMoneda(saldoFinalEfectivo) < 0
-    ) {
-      toast.error("Los montos no pueden ser negativos.");
-      return;
-    }
-
-    if (parseFloat(saldoFinalDeclarado) < 0) {
-      toast.error("El monto final no puede ser negativo");
-      return;
-    }
-
     if (!token) return toast.error("No se encontró el token.");
+    
     setIsLoading(true);
 
     try {
-      // Primero validamos la llave
+      // Paso 1: Validar la llave (CON EL HEADER CORREGIDO)
       const validarRes = await fetch("https://sistema-ima.sistemataup.online/api/auth/validar-llave", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Admin-Token": token,
+          Authorization: `Bearer ${token}`, // <-- LA CORRECCIÓN CLAVE
         },
         body: JSON.stringify({ llave }),
       });
-
-      const validarData = await validarRes.json();
-      
       if (!validarRes.ok) {
-        return toast.error(`⛔ ${validarData.detail || "Llave incorrecta."}`);
+        const validarData = await validarRes.json();
+        throw new Error(validarData.detail || "Llave incorrecta.");
       }
 
-      
+      // Paso 2: Si la llave es válida, cerramos la caja
+      const saldoFinalLimpio = limpiarMoneda(saldoFinalDeclarado);
       const efectivo = limpiarMoneda(saldoFinalEfectivo);
       const transferencias = limpiarMoneda(saldoFinalTransferencias);
       const bancario = limpiarMoneda(saldoFinalBancario);
-      const saldoFinalLimpio = limpiarMoneda(saldoFinalDeclarado);
-      /* const total = efectivo + transferencias + bancario; */
-
-      // Si la llave es válida, cerramos la caja
+      
       const cerrarRes = await fetch("https://sistema-ima.sistemataup.online/api/caja/cerrar", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           saldo_final_declarado: saldoFinalLimpio,
           saldo_final_efectivo: efectivo,
@@ -222,22 +259,28 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
       });
 
       const cerrarData = await cerrarRes.json();
-
       if (!cerrarRes.ok) {
-        return toast.error(`⛔ ${cerrarData.detail || "Error al cerrar la caja"}`);
+        throw new Error(cerrarData.detail || "Error al cerrar la caja");
       }
-
       toast.success(cerrarData.message || "✅ Caja cerrada correctamente.");
+      
+      // LÓGICA CLAVE: Si se pidió imprimir, se llama a la función de impresión
+    const idSesionCerrada = cerrarData.data?.id_sesion;
+    if (imprimirDespues && idSesionCerrada) {
+      await handleImprimirCierre(idSesionCerrada);
+    }
+
+      // Limpiamos todo
       clearCaja();
       onCerrarCaja();
-      setNombreUsuario("");
-      setSaldoFinalDeclarado("");
       setLlave("");
+      setSaldoFinalDeclarado("");
+      setSaldoFinalEfectivo("");
+      setSaldoFinalBancario("");
+      setSaldoFinalTransferencias("");
 
     } catch (error) {
-      console.error("Error al cerrar caja:", error);
-      toast.error("Ocurrió un error inesperado.");
-      
+      if (error instanceof Error) toast.error(`⛔ ${error.message}`);
     } finally {
       setIsLoading(false);
       document.getElementById("close-caja-modal")?.click();
@@ -254,18 +297,22 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
     }));
   }, []);
 
+
   return (
     <>
-      <form onSubmit={handleSubmit}>
-
+      <form>
+        {/* ======================================================= */}
+        {/* SECCIÓN PRINCIPAL DE INPUTS */}
+        {/* ======================================================= */}
         <div className="grid gap-6 py-4">
-
-          {/* Input Montos Iniciales y Finales */}
-          {/* Montos Inicial y Finales (Transferencias, Bancario, Efectivo) */}
+          
+          {/* --- Renderizado Condicional: Muestra "Monto Inicial" o los "Saldos Finales" --- */}
           {!cajaAbierta ? (
+            // --- 1. VISTA PARA ABRIR CAJA (CUANDO LA CAJA ESTÁ CERRADA) ---
             <div className="flex items-center justify-between gap-4">
-              <Label className="text-right text-md md:text-lg">Monto Inicial</Label>
+              <Label htmlFor="monto-inicial" className="text-right text-md md:text-lg">Monto Inicial</Label>
               <Input
+                id="monto-inicial"
                 type="text"
                 value={saldoInicial}
                 onChange={(e) => setSaldoInicial(formatearMoneda(e.target.value))}
@@ -274,11 +321,14 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
               />
             </div>
           ) : (
+            // --- 2. VISTA PARA CERRAR CAJA (CUANDO LA CAJA ESTÁ ABIERTA) ---
             <>
-              <Label className="text-right text-md md:text-xl">Saldos Finales:</Label>
+              <Label className="text-left text-md md:text-xl font-semibold">Saldos Finales Declarados:</Label>
+              
               <div className="flex items-center justify-between gap-4">
-                <Label className="text-right text-md md:text-lg">Efectivo</Label>
+                <Label htmlFor="saldo-efectivo" className="text-right text-md md:text-lg">Efectivo</Label>
                 <Input
+                  id="saldo-efectivo"
                   type="text"
                   value={saldoFinalEfectivo}
                   onChange={(e) => setSaldoFinalEfectivo(formatearMoneda(e.target.value))}
@@ -288,8 +338,9 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
               </div>
 
               <div className="flex items-center justify-between gap-4">
-                <Label className="text-right text-md md:text-lg">Transferencias</Label>
+                <Label htmlFor="saldo-transferencias" className="text-right text-md md:text-lg">Transferencias</Label>
                 <Input
+                  id="saldo-transferencias"
                   type="text"
                   value={saldoFinalTransferencias}
                   onChange={(e) => setSaldoFinalTransferencias(formatearMoneda(e.target.value))}
@@ -299,8 +350,9 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
               </div>
 
               <div className="flex items-center justify-between gap-4">
-                <Label className="text-right text-md md:text-lg">Bancario</Label>
+                <Label htmlFor="saldo-bancario" className="text-right text-md md:text-lg">Bancario</Label>
                 <Input
+                  id="saldo-bancario"
                   type="text"
                   value={saldoFinalBancario}
                   onChange={(e) => setSaldoFinalBancario(formatearMoneda(e.target.value))}
@@ -309,43 +361,80 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
                 />
               </div>
             </>
-          )}     
-          <span className="block w-full h-0.5 bg-green-900"></span>
+          )}
 
-          {/* {/* Input Nombre}
-          <div className="flex items-center justify-between gap-4">
-            <Label className="text-right text-md md:text-lg">Nombre</Label>
-            <Input value={nombreUsuario} onChange={(e) => setNombreUsuario(e.target.value)} placeholder="Nombre de Usuario" className="w-full max-w-3/5" />
-          </div> */}
+          {/* Separador visual */}
+          <span className="block w-full h-px bg-border my-2"></span>
 
-          {/* Input Llave Maestra */}
+          {/* --- CAMPOS COMUNES PARA ABRIR Y CERRAR --- */}
           <div className="flex items-center justify-between gap-4">
-            <Label className="text-right text-md md:text-lg">Llave Maestra</Label>
-            <Input type="password" value={llave} onChange={(e) => setLlave(e.target.value)} placeholder="Llave del día" className="w-full max-w-3/5" />
+            <Label htmlFor="llave-maestra" className="text-right text-md md:text-lg">Llave Maestra</Label>
+            <Input 
+              id="llave-maestra"
+              type="password" 
+              value={llave} 
+              onChange={(e) => setLlave(e.target.value)} 
+              placeholder="Llave del día" 
+              className="w-full max-w-3/5" 
+            />
           </div>
 
-          {/* Fecha */}
           <div className="flex items-center justify-between gap-4">
             <Label className="text-right sm:text-lg">Fecha</Label>
-            <Input value={fechaActual} disabled className="w-full max-w-3/5 text-green-950 font-semibold border border-white placeholder-white disabled:opacity-100 rounded-lg" />
+            <Input 
+              value={fechaActual} 
+              disabled 
+              className="w-full max-w-3/5 text-muted-foreground font-semibold" 
+            />
           </div>
 
-          {/* Hora */}
           <div className="flex items-center justify-between gap-4">
             <Label className="text-right sm:text-lg">Hora</Label>
-            <Input value={horaActual} disabled className="w-full max-w-3/5 text-green-950 font-semibold border border-white placeholder-white disabled:opacity-100 rounded-lg" />
+            <Input 
+              value={horaActual} 
+              disabled 
+              className="w-full max-w-3/5 text-muted-foreground font-semibold" 
+            />
           </div>
         </div>
 
-        {/* Botones de Abrir o Cerrar Caja */}
-        <div className="flex justify-end mt-4 gap-2">
+        {/* ======================================================= */}
+        {/* SECCIÓN DE BOTONES DE ACCIÓN (CORREGIDA) */}
+        {/* ======================================================= */}
+        <div className="flex flex-col mt-4 gap-2">
           {cajaAbierta ? (
-            <Button type="button" variant="destructive" className="w-full" onClick={handleCerrarCaja} disabled={isLoading}>
-              {isLoading && <Loader2 className="animate-spin mr-2 h-4 w-4" />}
-              Cerrar Caja
-            </Button>
+            // --- BOTONES PARA CERRAR CAJA ---
+            <>
+              <Button 
+                type="button" 
+                variant="destructive" 
+                className="w-full" 
+                onClick={() => handleCerrarCaja(true)} // Llama con 'true' para imprimir
+                disabled={isLoading}
+              >
+                {isLoading ? <Loader2 className="animate-spin" /> : <PrinterIcon className="mr-2 h-4 w-4" />}
+                Imprimir y Cerrar Caja
+              </Button>
+              
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="w-full" 
+                onClick={() => handleCerrarCaja(false)} // Llama con 'false' para NO imprimir
+                disabled={isLoading}
+              >
+                {isLoading ? <Loader2 className="animate-spin" /> : "Sólo Cerrar Caja"}
+              </Button>
+            </>
           ) : (
-            <Button type="submit" variant="success" className="w-full" disabled={isLoading}>
+            // --- BOTÓN PARA ABRIR CAJA ---
+            <Button 
+              type="button" 
+              variant="success" 
+              className="w-full" 
+              onClick={handleSubmit} // Llama a la función de abrir caja
+              disabled={isLoading}
+            >
               {isLoading && <Loader2 className="animate-spin mr-2 h-4 w-4" />}
               Abrir Caja
             </Button>
@@ -354,7 +443,7 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
       </form>
 
       <DialogClose asChild>
-        <button id="close-caja-modal" className="hidden" />
+        <button id="close-caja-modal" className="hidden" aria-label="Cerrar modal"></button>
       </DialogClose>
     </>
   );

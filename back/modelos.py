@@ -111,6 +111,7 @@ class Articulo(SQLModel, table=True):
     activo: bool = Field(default=True)
     es_combo: bool = Field(default=False)
     maneja_lotes: bool = Field(default=False)
+    ubicacion: str = Field(default=None)
     
     id_categoria: Optional[int] = Field(default=None, foreign_key="categorias.id")
     id_marca: Optional[int] = Field(default=None, foreign_key="marcas.id")
@@ -346,6 +347,7 @@ class ConfiguracionEmpresa(SQLModel, table=True):
     
     # La clave primaria es el ID de la empresa. Esto asegura que solo haya
     # una fila de configuración por empresa. Es una relación uno a uno.
+    cuit: str = Field(unique=True, index=True)
     id_empresa: int = Field(foreign_key="empresas.id", primary_key=True)
     link_google_sheets: Optional[str] = Field(default=None) # Enlace a Google Sheets para reportes
     
@@ -358,7 +360,7 @@ class ConfiguracionEmpresa(SQLModel, table=True):
     concepto_recargo_transferencia: str = Field(default="Recargo por Transferencia")
     recargo_banco: float = Field(default=0.0)
     concepto_recargo_banco: str = Field(default="Recargo por Pago con Banco")
-    
+    cuit: Optional[int]
     # --- Configuración Fiscal (AFIP) ---
     afip_condicion_iva: Optional[str] = Field(default=None) # Ej: Monotributo, Responsable Inscripto
     afip_punto_venta_predeterminado: Optional[int] = Field(default=None)

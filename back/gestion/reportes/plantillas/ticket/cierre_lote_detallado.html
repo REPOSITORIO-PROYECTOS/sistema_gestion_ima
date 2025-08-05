@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -6,24 +5,29 @@
     <meta charset="UTF-8">
     <title>Cierre de Lote Detallado</title>
     <style>
+        /* Estilos optimizados para impresoras de 58mm */
         body { font-family: 'Courier New', Courier, monospace; font-size: 11px; margin: 0; padding: 0; }
         .ticket { width: 56mm; padding: 1mm; }
         .header, .footer { text-align: center; }
-        h1 { margin: 0; font-size: 14px; text-transform: uppercase; }
+        h1 { margin: 0; font-size: 14px; text-transform: uppercase; word-wrap: break-word; }
         h2 { margin: 5px 0; font-size: 13px; border-top: 1px dashed black; border-bottom: 1px dashed black; padding: 4px 0; }
         p { margin: 3px 0; }
         hr { border: none; border-top: 1px dashed black; margin: 4px 0; }
         .item { display: flex; justify-content: space-between; }
-        .item .concepto { width: 65%; text-align: left; word-wrap: break-word; }
-        .item .monto { width: 35%; text-align: right; }
+        .item .concepto { width: 70%; text-align: left; word-wrap: break-word; }
+        .item .monto { width: 30%; text-align: right; }
         .total-line { font-weight: bold; }
-        .section-title { font-weight: bold; margin-top: 10px; margin-bottom: 5px; text-align: center; }
+        .section-title { font-weight: bold; margin-top: 10px; margin-bottom: 5px; text-align: center; text-transform: uppercase;}
+        .info-line { display: flex; justify-content: space-between; align-items: center; }
+        .info-line .label { font-weight: bold; text-align: left; white-space: nowrap; }
+        .info-line .value { text-align: right; }
         .footer { text-align: center; }
         .final-message { margin-top: 20px; }
     </style>
 </head>
 <body>
     <div class="ticket">
+        <!-- === 1. CABECERA === -->
         <div class="header">
             <h1>{{ datos.empresa.nombre_fantasia or datos.empresa.nombre_legal }}</h1>
             <p>CUIT: {{ datos.empresa.cuit }}</p>
@@ -31,12 +35,32 @@
             <p>Sesión ID: {{ datos.sesion.id }}</p>
         </div>
         <hr>
-        <p><b>Fecha Impresión:</b> {{ fecha_emision|date }}</p>
-        <p><b>Apertura:</b> {{ datos.sesion.fecha_apertura|date }} por {{ datos.usuario_apertura }}</p>
-        <p><b>Cierre:</b> {{ datos.sesion.fecha_cierre|date }} por {{ datos.usuario_cierre }}</p>
-        <hr>
+
+        <!-- === 2. INFORMACIÓN DE LA SESIÓN === -->
+        <div class="info-line">
+            <span class="label">Impresión:</span>
+            <span class="value">{{ fecha_emision|date }}</span>
+        </div>
+        <div class="info-line">
+            <span class="label">Apertura:</span>
+            <span class="value">{{ datos.sesion.fecha_apertura|date }}</span>
+        </div>
+        <div class="info-line">
+            <span class="label">Cajero Apertura:</span>
+            <span class="value">{{ datos.usuario_apertura }}</span>
+        </div>
+        <div class="info-line">
+            <span class="label">Cierre:</span>
+            <span class="value">{{ datos.sesion.fecha_cierre|date }}</span>
+        </div>
+        <div class="info-line">
+            <span class="label">Cajero Cierre:</span>
+            <span class="value">{{ datos.usuario_cierre }}</span>
+        </div>
         
-        <p class="section-title">ARQUEO DE CAJA</p>
+        <!-- === 3. RESUMEN DEL ARQUEO DE CAJA === -->
+        <p class="section-title">Arqueo de Caja</p>
+        <hr>
         <div class="item"><p>Saldo Inicial:</p> <p>${{ "%.2f"|format(datos.sesion.saldo_inicial) }}</p></div>
         <div class="item"><p>(+) Total Ventas:</p> <p>${{ "%.2f"|format(datos.totales.ventas) }}</p></div>
         <div class="item"><p>(+) Ingresos Varios:</p> <p>${{ "%.2f"|format(datos.totales.ingresos) }}</p></div>
@@ -47,11 +71,29 @@
         <hr>
         <div class="item total-line"><p>DIFERENCIA:</p> <p>${{ "%.2f"|format(datos.sesion.diferencia) }}</p></div>
         
-        <!-- ======================================================= -->
-        <!-- DESGLOSE DE INGRESOS (AÑADIDO) -->
-        <!-- ======================================================= -->
+        <!-- === 4. DESGLOSE DE VENTAS POR MÉTODO DE PAGO === -->
+        <p class="section-title">Desglose de Ventas</p>
+        <hr>
+        <div class="item">
+            <p>Ventas en Efectivo:</p>
+            <p>${{ "%.2f"|format(datos.desglose_metodos_pago.efectivo) }}</p>
+        </div>
+        <div class="item">
+            <p>Ventas por Transferencia:</p>
+            <p>${{ "%.2f"|format(datos.desglose_metodos_pago.transferencia) }}</p>
+        </div>
+        <div class="item">
+            <p>Ventas por Banco:</p>
+            <p>${{ "%.2f"|format(datos.desglose_metodos_pago.bancario) }}</p>
+        </div>
+        <div class="item total-line">
+            <p>TOTAL VENTAS:</p>
+            <p>${{ "%.2f"|format(datos.totales.ventas) }}</p>
+        </div>
+
+        <!-- === 5. DESGLOSE DETALLADO DE INGRESOS === -->
         {% if datos.desglose_ingresos %}
-            <p class="section-title">DETALLE DE INGRESOS</p>
+            <p class="section-title">Detalle de Ingresos</p>
             <hr>
             {% for ingreso in datos.desglose_ingresos %}
                 <div class="item">
@@ -61,22 +103,20 @@
             {% endfor %}
         {% endif %}
 
-        <!-- ======================================================= -->
-        <!-- DESGLOSE DE EGRESOS (AÑADIDO) -->
-        <!-- ======================================================= -->
+        <!-- === 6. DESGLOSE DETALLADO DE EGRESOS === -->
         {% if datos.desglose_egresos %}
-            <p class="section-title">DETALLE DE EGRESOS</p>
+            <p class="section-title">Detalle de Egresos</p>
             <hr>
             {% for egreso in datos.desglose_egresos %}
                 <div class="item">
-                    <p class="concepto">{{ egreso.concepto[:20] }}:</p> <!-- Cortamos el concepto para que no desborde -->
+                    <p class="concepto">{{ egreso.concepto[:20] }}:</p>
                     <p class="monto">${{ "%.2f"|format(egreso.monto) }}</p>
                 </div>
             {% endfor %}
         {% endif %}
 
         <hr>
-        <p class="footer" style="margin-top: 20px;">Fin del reporte de cierre.</p>
+        <p class="footer final-message">Fin del reporte de cierre.</p>
     </div>
 </body>
 </html>

@@ -335,3 +335,20 @@ def api_generar_ticket_cierre_detallado(
     except RuntimeError as e:
         # Captura errores internos (ej: fallo al renderizar la plantilla).
         raise HTTPException(status_code=500, detail=f"Error interno al generar el ticket: {e}")
+    
+@router.get(
+    "/estado-actual", 
+    response_model=EstadoCajaResponse,
+    summary="Verifica el estado de la caja del usuario actual"
+)
+def api_obtener_estado_caja(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(obtener_usuario_actual)
+):
+    """
+    Verifica si el usuario autenticado tiene una caja abierta y devuelve el estado.
+    Este endpoint es clave para sincronizar el frontend al recargar la página.
+    """
+    # ASEGÚRATE DE QUE ESTA LÍNEA LLAME A LA FUNCIÓN CON EL NOMBRE CORRECTO
+    estado = consultas_caja.obtener_estado_caja_actual_usuario(db, current_user)
+    return estado
