@@ -118,3 +118,79 @@ def cerrar_caja(db: Session, usuario_cierre: Usuario, saldo_final_declarado: flo
 
     print("--- [FIN TRACE: CERRAR CAJA] ---\n")
     return sesion_a_cerrar
+
+def cerrar_caja_por_id(
+    db: Session, 
+    id_sesion: int, 
+    usuario_admin: Usuario, # El admin que ejecuta la acción
+    saldo_final_declarado: float,
+    saldo_final_transferencias: float,
+    saldo_final_bancario: float,
+    saldo_final_efectivo: float
+) -> CajaSesion:
+    """
+    [Admin] Cierra una sesión de caja específica por su ID.
+    Verifica que el admin y la caja a cerrar pertenezcan a la misma empresa.
+    """
+    print("\n--- [TRACE: CERRAR CAJA POR ID - ADMIN] ---")
+    print(f"1. Solicitud de cierre por Admin '{usuario_admin.nombre_usuario}' para Sesión ID: {id_sesion}")
+
+    # 1. Obtener la sesión de caja por su ID
+    sesion_a_cerrar = db.get(CajaSesion, id_sesion)
+    
+    if not sesion_a_cerrar:
+        raise ValueError(f"No se encontró ninguna sesión de caja con el ID {id_sesion}.")
+        
+    if sesion_a_cerrar.estado != "ABIERTA":
+        raise ValueError(f"La sesión de caja ID {id_sesion} no está abierta. Estado actual: {sesion_a_cerrar.estado}.")
+
+    # 2. Seguridad: Verificar que el admin y la caja pertenezcan a la misma empresa
+    if sesion_a_cerrar.id_empresa != usuario_admin.id_empresa:
+        raise PermissionError("Permiso denegado. No puede cerrar una caja de otra empresa.")
+
+    print(f"2. Sesión Abierta encontrada. ID: {sesion_a_cerrar.id}, Abierta por usuario ID: {sesion_a_cerrar.id_usuario_apertura}")
+
+    # 3. Lógica de cálculo (es idéntica a la otra función de cierre)
+    suma_condicional = func.sum(
+        case(
+            (CajaMovimiento.tipo.in_(["EGRESO"]), -CajaMovimiento.monto),
+            else_=CajaMovimiento.monto
+        )
+    )
+    consulta_movimientos = (
+        select(suma_condicional)
+        .where(CajaMovimiento.id_caja_sesion == sesion_a_cerrar.id)
+        .where(CajaMovimiento.tipo.not_in(["APERTURA"]))
+    )
+    suma_movimientos = db.exec(consulta_movimientos).first() or 0.0
+    print(f"3. Suma NETA de movimientos: {suma_movimientos}")
+
+    saldo_final_calculado = sesion_a_cerrar.saldo_inicial + suma_movimientos
+    diferencia = saldo_final_declarado - saldo_final_calculado
+    print(f"4. Saldo Final CALCULADO: {saldo_final_calculado} | Diferencia: {diferencia}")
+
+    # 4. Actualizar el estado y los campos de la sesión
+    sesion_a_cerrar.estado = "CERRADA"
+    sesion_a_cerrar.fecha_cierre = datetime.utcnow()
+    # Importante: El 'id_usuario_cierre' es el del admin que ejecuta la acción
+    sesion_a_cerrar.id_usuario_cierre = usuario_admin.id
+    sesion_a_cerrar.saldo_final_declarado = saldo_final_declarado
+    sesion_a_cerrar.saldo_final_transferencias = saldo_final_transferencias
+    sesion_a_cerrar.saldo_final_bancario = saldo_final_bancario
+    sesion_a_cerrar.saldo_final_efectivo = saldo_final_efectivo
+    sesion_a_cerrar.saldo_final_calculado = round(saldo_final_calculado, 2)
+    sesion_a_cerrar.diferencia = round(diferencia, 2)
+    
+    try:
+        db.add(sesion_a_cerrar)
+        print(f"5. Intentando actualizar Sesión ID {sesion_a_cerrar.id} a estado 'CERRADA'...")
+        db.commit()
+        db.refresh(sesion_a_cerrar)
+        print(f"   -> ÉXITO. La sesión ha sido cerrada por un administrador.")
+    except Exception as e:
+        print(f"   -> ERROR de BD al actualizar la sesión: {e}")
+        db.rollback()
+        raise
+
+    print("--- [FIN TRACE] ---\n")
+    return sesion_a_cerrar

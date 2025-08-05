@@ -9,7 +9,7 @@ from starlette.responses import Response
 
 # --- Módulos del Proyecto ---
 from back.database import get_db
-from back.security import es_cajero, obtener_usuario_actual
+from back.security import obtener_usuario_actual, es_rol
 from back.modelos import ConfiguracionEmpresa, Empresa, Usuario, Tercero, Venta, CajaMovimiento
 
 # Especialistas de la capa de gestión
@@ -41,7 +41,7 @@ def get_estado_caja_propia(db: Session = Depends(get_db), current_user: Usuario 
         return EstadoCajaResponse(caja_abierta=True, id_sesion=sesion_abierta.id, fecha_apertura=sesion_abierta.fecha_apertura)
     return EstadoCajaResponse(caja_abierta=False)
 
-@router.post("/abrir", response_model=RespuestaGenerica, dependencies=[Depends(es_cajero)])
+@router.post("/abrir", response_model=RespuestaGenerica, dependencies=[Depends(es_rol["Admin"])])
 def api_abrir_caja(req: AbrirCajaRequest, db: Session = Depends(get_db), current_user: Usuario = Depends(obtener_usuario_actual)):
     try:
         sesion = apertura_cierre.abrir_caja(db=db, usuario_apertura=current_user, saldo_inicial=req.saldo_inicial)
@@ -352,3 +352,29 @@ def api_obtener_estado_caja(
     # ASEGÚRATE DE QUE ESTA LÍNEA LLAME A LA FUNCIÓN CON EL NOMBRE CORRECTO
     estado = consultas_caja.obtener_estado_caja_actual_usuario(db, current_user)
     return estado
+
+@router.post("/admin/cerrar-por-id/{id_sesion}", response_model=RespuestaGenerica)
+def api_cerrar_caja_por_id(
+    id_sesion: int,
+    req: CerrarCajaRequest, # Reutilizamos el mismo schema
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(es_rol("Admin")) # ¡Protegido para admins!
+):
+    """
+    [Admin] Cierra una sesión de caja específica por su ID.
+    """
+    try:
+        sesion = apertura_cierre.cerrar_caja_por_id(
+            db=db, 
+            id_sesion=id_sesion,
+            usuario_admin=current_user,
+            saldo_final_declarado=req.saldo_final_declarado,
+            saldo_final_transferencias=req.saldo_final_transferencias,
+            saldo_final_bancario=req.saldo_final_bancario,
+            saldo_final_efectivo=req.saldo_final_efectivo
+        )
+        db.commit()
+        return RespuestaGenerica(status="success", message=f"Caja (Sesión ID: {sesion.id}) cerrada por un administrador.", data={"id_sesion": sesion.id})
+    except (ValueError, PermissionError) as e:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(e))
