@@ -111,7 +111,7 @@ class Articulo(SQLModel, table=True):
     activo: bool = Field(default=True)
     es_combo: bool = Field(default=False)
     maneja_lotes: bool = Field(default=False)
-    ubvicacion: str = Field(default=None)
+    ubicacion: str = Field(default=None)
     
     id_categoria: Optional[int] = Field(default=None, foreign_key="categorias.id")
     id_marca: Optional[int] = Field(default=None, foreign_key="marcas.id")
