@@ -360,7 +360,7 @@ class ConfiguracionEmpresa(SQLModel, table=True):
     concepto_recargo_transferencia: str = Field(default="Recargo por Transferencia")
     recargo_banco: float = Field(default=0.0)
     concepto_recargo_banco: str = Field(default="Recargo por Pago con Banco")
-    
+    cuit: Optional[int]
     # --- Configuración Fiscal (AFIP) ---
     afip_condicion_iva: Optional[str] = Field(default=None) # Ej: Monotributo, Responsable Inscripto
     afip_punto_venta_predeterminado: Optional[int] = Field(default=None)
