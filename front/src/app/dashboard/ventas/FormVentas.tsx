@@ -418,6 +418,8 @@ function FormVentas({
     fetchProductos();
   }, [token]);
 
+  console.log("Empresa en submit:", empresa);
+
   // POST Ventas - Registra la venta completa
   const handleSubmit = async (e: React.FormEvent) => {
 
@@ -502,8 +504,8 @@ function FormVentas({
     // GENERAR COMPROBANTE - Endpoint que se encarga de imprimir el ticket o comprobante de la venta realizada
     try {
 
-      if (!empresa) {
-        toast.error("No hay datos de la empresa, no se puede realizar la venta.");
+      if (!empresa || !empresa.id_empresa) {
+        toast.error("No hay datos válidos de la empresa, no se puede realizar la venta.");
         return;
       }
 

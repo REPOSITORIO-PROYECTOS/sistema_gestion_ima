@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { FormEvent, useState } from 'react'
 import { Eye, EyeOff } from "lucide-react"
 import { useAuthStore } from '@/lib/authStore'
+import { useEmpresaStore } from '@/lib/empresaStore'
 
 const API_URL = "https://sistema-ima.sistemataup.online/api"
 
@@ -13,9 +14,14 @@ function Login() {
   
   const router = useRouter()
   
+  // User Store
   const setToken = useAuthStore(state => state.setToken)
   const setUsuario = useAuthStore(state => state.setUsuario)
   const setRole = useAuthStore(state => state.setRole)
+
+  // Empresa Store
+  const setEmpresa = useEmpresaStore(state => state.setEmpresa) // ✅ HOOK NUEVO
+  const empresa = useEmpresaStore(state => state.empresa)
 
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -61,22 +67,37 @@ function Login() {
       if (!meResponse.ok) throw new Error("Error al obtener datos del usuario")
 
       const usuario = await meResponse.json()
-      /* console.log("🙋‍♂️ Usuario recibido:", usuario) */     // solo para debug
-      /* console.log("🙋‍♂️ Rol de Usuario:", usuario.rol) */ 
 
       // Guardar usuario y rol en el store
       setUsuario(usuario)
       setRole(usuario.rol) 
 
+      // Empresa (sólo si no está ya seteada)
+      if (!empresa) {
+        const empresaResponse = await fetch(`${API_URL}/configuracion/mi-empresa`, {
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+          },
+        })
+
+        if (!empresaResponse.ok) throw new Error("Error al obtener datos de la empresa")
+
+        const dataEmpresa = await empresaResponse.json()
+        setEmpresa(dataEmpresa) 
+        console.log("🏢 Empresa cargada:", dataEmpresa)
+      }
+
       router.push("/dashboard")
 
     } catch (error) {
       console.error("Error:", error)
+
       if (error instanceof Error) {
         alert(error.message)
       } else {
         alert("Error inesperado")
       }
+      
     } finally {
       setLoading(false)
     }
