@@ -9,7 +9,7 @@ from back.gestion import afip_tools_manager
 from back.schemas.afip_tools_schemas import CsrRequest, CertificadoRequest
 
 router = APIRouter(
-    prefix="afip-tools",
+    prefix="/api/afip-tools",
     tags=["Herramientas AFIP"],
     dependencies=[Depends(es_rol("admin"))]  # Solo accesible por administradores
 )
