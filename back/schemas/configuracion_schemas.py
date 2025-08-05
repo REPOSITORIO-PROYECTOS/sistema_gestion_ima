@@ -16,6 +16,7 @@ class ConfiguracionUpdate(BaseModel):
     telefono_negocio: Optional[str] = None
     mail_negocio: Optional[str] = None
     link_google_sheets: Optional[str] = None
+    cuit: Optional[int]
 
 class ConfiguracionResponse(BaseModel):
     """Schema completo para devolver la configuración de una empresa."""
