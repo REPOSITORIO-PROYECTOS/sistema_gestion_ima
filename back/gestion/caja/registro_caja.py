@@ -195,8 +195,7 @@ def registrar_venta_y_movimiento_caja(
 
         except Exception as e_sheets:
             print(f"❌ [DRIVE] Ocurrió un error al intentar registrar en Google Sheets: {e_sheets}")
-
-    return nueva_venta, movimiento_principal
+            return nueva_venta, movimiento_principal
 
 
 

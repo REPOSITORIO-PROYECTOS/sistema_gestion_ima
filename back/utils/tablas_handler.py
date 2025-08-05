@@ -68,7 +68,7 @@ class TablasHandler:
         if self.client:
             try:
                 sheet = self.client.open_by_key(self.google_sheet_id)
-                worksheet = sheet.worksheet("clientes") # <-- ¿Existe una hoja llamada "clientes"?
+                worksheet = sheet.worksheet("clientes") 
                 datos_clientes = worksheet.get_all_records()
                 return datos_clientes
             except gspread.exceptions.WorksheetNotFound:
