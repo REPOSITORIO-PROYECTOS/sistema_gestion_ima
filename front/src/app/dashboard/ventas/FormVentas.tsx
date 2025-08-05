@@ -530,7 +530,7 @@ function FormVentas({
               formato: formatoComprobante.toLowerCase(),         // por ahora, "pdf" o "ticket" desde facturacionStore
               tipo: tipoFacturacion.toLowerCase(),                                  
               emisor: {
-                cuit: empresa?.cuit || 0,
+                cuit: empresa?.cuit?.toString() || 0,
                 razon_social: empresa?.nombre_negocio || "Nombre no disponible",
                 domicilio: empresa?.direccion_negocio || "Domicilio no disponible",
                 punto_venta: empresa?.afip_punto_venta_predeterminado || 1,
