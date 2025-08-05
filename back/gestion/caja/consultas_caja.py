@@ -121,10 +121,11 @@ def obtener_todos_los_movimientos_de_caja(db: Session, usuario_actual: Usuario) 
 
 def obtener_datos_para_ticket_cierre_detallado(db: Session, id_sesion: int, usuario_actual: Usuario) -> dict:
     """
-    Recopila TODOS los datos necesarios para generar un ticket de cierre de lote
-    con el desglose de ingresos y egresos.
+    Recopila TODOS los datos necesarios para generar un ticket de cierre de lote,
+    incluyendo el desglose de ventas por método de pago y el detalle de
+    ingresos y egresos.
     """
-    print(f"\n--- [TRACE: PREPARAR DATOS TICKET CIERRE] ---")
+    print(f"\n--- [TRACE: PREPARAR DATOS TICKET CIERRE DETALLADO] ---")
     print(f"Buscando datos para Sesión ID: {id_sesion}")
 
     # 1. Obtener la sesión de caja y sus relaciones importantes (usuarios, empresa)
@@ -157,9 +158,20 @@ def obtener_datos_para_ticket_cierre_detallado(db: Session, id_sesion: int, usua
         .order_by(CajaMovimiento.timestamp.asc())
     ).all()
 
-    # 4. Procesar los datos y crear los desgloses
-    total_ventas = sum(m.monto for m in movimientos if m.tipo == 'VENTA')
+    # ====================================================================
+    # === 4. PROCESADO DE DATOS (CON LÓGICA DE MÉTODOS DE PAGO AÑADIDA) ===
+    # ====================================================================
     
+    # A. Desglose de Ventas por Método de Pago
+    ventas = [m for m in movimientos if m.tipo == 'VENTA']
+    total_ventas = sum(v.monto for v in ventas)
+    
+    total_ventas_efectivo = sum(v.monto for v in ventas if v.metodo_pago and v.metodo_pago.upper() == 'EFECTIVO')
+    total_ventas_transferencia = sum(v.monto for v in ventas if v.metodo_pago and v.metodo_pago.upper() == 'TRANSFERENCIA')
+    total_ventas_bancario = sum(v.monto for v in ventas if v.metodo_pago and v.metodo_pago.upper() == 'BANCARIO')
+    # Puedes añadir más métodos de pago aquí si los tienes (ej: 'MERCADO PAGO')
+
+    # B. Desglose de Ingresos y Egresos (como ya lo tenías)
     desglose_ingresos = [
         {"concepto": m.concepto, "monto": m.monto} 
         for m in movimientos if m.tipo == 'INGRESO'
@@ -172,7 +184,7 @@ def obtener_datos_para_ticket_cierre_detallado(db: Session, id_sesion: int, usua
     ]
     total_egresos = sum(egreso['monto'] for egreso in desglose_egresos)
     
-    print(f"Movimientos procesados: {len(desglose_ingresos)} ingresos, {len(desglose_egresos)} egresos.")
+    print(f"Movimientos procesados: {len(ventas)} ventas, {len(desglose_ingresos)} ingresos, {len(desglose_egresos)} egresos.")
 
     # 5. Construir el diccionario final que se pasará a la plantilla HTML
     datos_ticket = {
@@ -185,33 +197,15 @@ def obtener_datos_para_ticket_cierre_detallado(db: Session, id_sesion: int, usua
             "ingresos": total_ingresos,
             "egresos": total_egresos,
         },
+        # --- AÑADIMOS EL NUEVO DESGLOSE ---
+        "desglose_metodos_pago": {
+            "efectivo": total_ventas_efectivo,
+            "transferencia": total_ventas_transferencia,
+            "bancario": total_ventas_bancario,
+        },
         "desglose_ingresos": desglose_ingresos,
         "desglose_egresos": desglose_egresos
     }
     
     print("--- [FIN TRACE] ---\n")
     return datos_ticket
-
-def obtener_estado_caja_actual_usuario(db: Session, usuario_actual: Usuario) -> dict:
-    """
-    Verifica de forma rápida y eficiente si un usuario tiene una caja abierta
-    y devuelve su estado actual.
-    """
-    # Hacemos una consulta simple para ver si existe una fila que coincida
-    sesion_abierta = db.exec(
-        select(CajaSesion).where(
-            CajaSesion.id_usuario_apertura == usuario_actual.id,
-            CajaSesion.estado == "ABIERTA"
-        )
-    ).first()
-
-    if sesion_abierta:
-        # Si se encuentra una sesión, devolvemos el estado y algunos datos útiles
-        return {
-            "caja_abierta": True,
-            "id_sesion": sesion_abierta.id,
-            "fecha_apertura": sesion_abierta.fecha_apertura
-        }
-    else:
-        # Si no se encuentra, devolvemos que está cerrada
-        return {"caja_abierta": False}
