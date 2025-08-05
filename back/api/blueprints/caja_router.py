@@ -9,7 +9,7 @@ from starlette.responses import Response
 
 # --- Módulos del Proyecto ---
 from back.database import get_db
-from back.security import obtener_usuario_actual, es_rol
+from back.security import obtener_usuario_actual, es_admin, es_cajero
 from back.modelos import ConfiguracionEmpresa, Empresa, Usuario, Tercero, Venta, CajaMovimiento
 
 # Especialistas de la capa de gestión
@@ -41,7 +41,7 @@ def get_estado_caja_propia(db: Session = Depends(get_db), current_user: Usuario 
         return EstadoCajaResponse(caja_abierta=True, id_sesion=sesion_abierta.id, fecha_apertura=sesion_abierta.fecha_apertura)
     return EstadoCajaResponse(caja_abierta=False)
 
-@router.post("/abrir", response_model=RespuestaGenerica, dependencies=[Depends(es_rol["Admin"])])
+@router.post("/abrir", response_model=RespuestaGenerica, dependencies=[Depends(es_cajero)])
 def api_abrir_caja(req: AbrirCajaRequest, db: Session = Depends(get_db), current_user: Usuario = Depends(obtener_usuario_actual)):
     try:
         sesion = apertura_cierre.abrir_caja(db=db, usuario_apertura=current_user, saldo_inicial=req.saldo_inicial)
@@ -358,7 +358,7 @@ def api_cerrar_caja_por_id(
     id_sesion: int,
     req: CerrarCajaRequest, # Reutilizamos el mismo schema
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(es_rol("Admin")) # ¡Protegido para admins!
+    current_user: Usuario = Depends(es_admin) # ¡Protegido para admins!
 ):
     """
     [Admin] Cierra una sesión de caja específica por su ID.
