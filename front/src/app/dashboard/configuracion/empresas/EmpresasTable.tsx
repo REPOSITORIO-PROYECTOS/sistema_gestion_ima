@@ -38,6 +38,7 @@ export function EmpresasTable({ empresas, onConfigurarClick, onActionSuccess }: 
         }
         alert(`Empresa ${accion}da con éxito.`);
         onActionSuccess();
+        
       } catch (err) {
         if (err instanceof Error) alert(`Error: ${err.message}`);
       } finally {

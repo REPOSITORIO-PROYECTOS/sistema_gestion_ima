@@ -143,17 +143,22 @@ export function AfipToolsPanel({ empresaId }: AfipToolsPanelProps) {
   };
 
   return (
-    <div className="border rounded-lg p-6 space-y-8 bg-slate-50">
+    <div className="border rounded-lg p-6 space-y-6 bg-slate-50 w-full lg:w-2/3">
+
       <h2 className="text-xl font-bold">Herramientas de Credenciales AFIP</h2>
       
-      <div className="space-y-2">
+      {/* 1er Input */}
+      <div className="flex flex-col gap-4">
         <label className="font-medium">1. Selecciona la Empresa</label>
         <Select
           value={selectedEmpresa?.id.toString()}
           onValueChange={(value) => setSelectedEmpresa(empresas.find(e => e.id === parseInt(value)) || null)}
           disabled={!!empresaId} // Se deshabilita si la empresa viene pre-seleccionada
         >
-          <SelectTrigger><SelectValue placeholder="Seleccionar una empresa..." /></SelectTrigger>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Seleccionar una empresa..." />
+          </SelectTrigger>
+
           <SelectContent>
             {empresas.map(empresa => (
               <SelectItem key={empresa.id} value={empresa.id.toString()}>
@@ -161,26 +166,33 @@ export function AfipToolsPanel({ empresaId }: AfipToolsPanelProps) {
               </SelectItem>
             ))}
           </SelectContent>
+
         </Select>
       </div>
+      <hr className="p-0.25 bg-slate-900 my-8"/> {/* --------------------------------------- */}
 
+      {/* 2o y 3o */}
       <div className={`transition-opacity duration-300 ${!selectedEmpresa ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
-        <div className="border-t pt-6 space-y-2">
+        
+        {/* 2o Input */}
+        <div className="flex flex-col gap-4">
           <label className="font-medium">2. Generar Solicitud de Certificado</label>
           <p className="text-sm text-muted-foreground">
             Genera la clave privada (se guarda en el servidor) y descarga el `.csr` para subir a AFIP.
           </p>
-          <Button onClick={handleGenerateCSR} disabled={isLoading || !selectedEmpresa}>
+          <Button onClick={handleGenerateCSR} disabled={isLoading || !selectedEmpresa} className="w-full">
             {isLoading ? "Generando..." : "Generar y Descargar .csr"}
           </Button>
         </div>
+        <hr className="p-0.25 bg-slate-900 my-8"/> {/* --------------------------------------- */}
         
-        <div className="border-t pt-6 mt-6 space-y-2">
+        {/* 3er Input */}
+        <div className="flex flex-col gap-4">
           <label className="font-medium">3. Subir Certificado Firmado por AFIP</label>
           <p className="text-sm text-muted-foreground">
             Una vez que AFIP te devuelva el `.crt`, súbelo aquí para guardarlo en la bóveda segura.
           </p>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col items-center gap-4 w-full">
             <Input 
               ref={fileInputRef}
               type="file" 
@@ -189,12 +201,14 @@ export function AfipToolsPanel({ empresaId }: AfipToolsPanelProps) {
               className="flex-grow"
               disabled={isLoading || !selectedEmpresa}
             />
-            <Button onClick={handleUploadCertificate} disabled={isLoading || !selectedEmpresa || !certificateFile}>
+            <Button className="w-full" onClick={handleUploadCertificate} disabled={isLoading || !selectedEmpresa || !certificateFile}>
               {isLoading ? "Procesando..." : "Subir .crt"}
             </Button>
           </div>
         </div>
+ 
       </div>
+
     </div>
   );
 }

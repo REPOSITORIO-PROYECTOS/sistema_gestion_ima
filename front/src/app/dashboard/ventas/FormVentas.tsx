@@ -35,7 +35,6 @@ import { useFacturacionStore } from "@/lib/facturacionStore";
 import { useAuthStore } from "@/lib/authStore"
 import { useEmpresaStore } from '@/lib/empresaStore';
 
-
 // Esta interfaz es para el producto del codigo de barras
 interface Producto {
   id: number;
@@ -75,9 +74,9 @@ const tipoCliente = [
 ];
 
 function FormVentas({
-  onAgregarProducto,    /* Agrega productos al resumen (componente padre) */
-  totalVenta,           /* Valor total de todos los productos - costo total del pedido */
-  productosVendidos,     /* Lista con todos los productos vendidos y su cantidad */
+  onAgregarProducto,      /* Agrega productos al resumen (componente padre) */
+  totalVenta,             /* Valor total de todos los productos - costo total del pedido */
+  productosVendidos,      /* Lista con todos los productos vendidos y su cantidad */
   onLimpiarResumen
 }: {
     onAgregarProducto: (prod: {
@@ -127,8 +126,12 @@ function FormVentas({
 
   // Cantidad de un producto particular - se * por el producto y se saca el valor total
   const [cantidad, setCantidad] = useState(1)
-  // Porcentaje de Descuento sobre un producto en especifico
-  const [descuento, setDescuento] = useState(0);
+
+  // Descuento en porcentaje sobre un producto en especifico
+  const [descuentoPorcentual, setDescuentoPorcentual] = useState(0);
+
+  // Descuento en pesos sobre un producto en especifico
+  const [descuentoNominal, setDescuentoNominal] = useState(0);
 
   // Porcentaje de Descuento sobre valor final
   const [descuentoSobreTotal, setDescuentoSobreTotal] = useState(0);
@@ -180,9 +183,8 @@ function FormVentas({
   const [codigo, setCodigoEscaneado] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Store de empresas para facturación dinámica:
+  // Store de Empresas para facturación dinámica en el payload para imprimir comprobante
   const empresa = useEmpresaStore((state) => state.empresa);
-
 
 
   /* Hooks */ /* -------------------------------------------------------------- */
@@ -207,15 +209,18 @@ function FormVentas({
   ? getPrecioProducto(productoSeleccionado) * cantidad
   : 0;
 
-  const productoConDescuento = totalProducto - (totalProducto * (descuento / 100));
+  // Calculo de los descuentos aplicados a un producto - % o nominal
+  const subtotal = totalProducto * (1 - descuentoPorcentual / 100);
+  const productoConDescuento = Math.max(0, subtotal - descuentoNominal);
+
 
   // Hook para agregar producto al panel resumen de productos
   const handleAgregarProducto = () => {
 
     if (!productoSeleccionado) return;
 
-    const descuentoAplicado = descuento > 0;
-    const porcentajeDescuento = descuento;
+    const descuentoAplicado = descuentoPorcentual > 0;
+    const porcentajeDescuento = descuentoPorcentual;
 
     onAgregarProducto({
       tipo: productoSeleccionado.nombre,
@@ -243,7 +248,8 @@ function FormVentas({
     setDescuentoSobreTotal(0);
     setObservaciones("");
     setCantidad(1);
-    setDescuento(0);
+    setDescuentoPorcentual(0);
+    setDescuentoNominal(0);
     setBusquedaCliente("");
     setOpenCliente(false);
     setInputEfectivo("");
@@ -622,7 +628,7 @@ function FormVentas({
     } catch (error) {
 
       console.error("Detalles del error:", error);
-      alert("❌ Error al registrar venta:\n" + JSON.stringify(error, null, 2));
+      toast.error("❌ Error al registrar venta:\n" + JSON.stringify(error, null, 2));
 
     } finally { setIsLoading(false); }
   };
@@ -857,7 +863,7 @@ function FormVentas({
         </div>
         <span className="block w-full h-0.5 bg-green-900"></span>
 
-        {/* Descuento a Aplicar */}
+        {/* Descuento Porcentual */}
         <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
           <Label className="text-2xl font-semibold text-green-900">Descuento a Aplicar (%)</Label>
           <Input
@@ -865,19 +871,45 @@ function FormVentas({
             onWheel={(e) => (e.target as HTMLInputElement).blur()}
             min={0}
             max={100}
-            value={descuento === 0 ? "" : descuento}
+            value={descuentoPorcentual === 0 ? "" : descuentoPorcentual}
             onChange={(e) => {
               const input = e.target.value;
 
               if (input === "") {
-                setDescuento(0);
+                setDescuentoPorcentual(0);
                 return;
               }
 
               const parsed = parseInt(input, 10);
               if (isNaN(parsed)) return;
 
-              setDescuento(Math.min(parsed, 100)); // limitamos a 100%
+              setDescuentoPorcentual(Math.min(parsed, 100)); // limitamos a 100%
+            }}
+            className="w-full md:max-w-2/3 text-black"
+          />
+        </div>
+
+        {/* Descuento Nominal */}
+        <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
+          <Label className="text-2xl font-semibold text-green-900">Descuento a Aplicar ($)</Label>
+          <Input
+            type="number"
+            onWheel={(e) => (e.target as HTMLInputElement).blur()}
+            min={0}
+            value={descuentoNominal === 0 ? "" : descuentoNominal}
+            onChange={(e) => {
+              const input = e.target.value;
+
+              if (input === "") {
+                setDescuentoNominal(0);
+                return;
+              }
+
+              const parsed = parseFloat(input);
+              if (isNaN(parsed)) return;
+
+              const maxDescuento = getPrecioProducto(productoSeleccionado) * cantidad;
+              setDescuentoNominal(Math.min(parsed, maxDescuento)); // evita descuentos mayores al total
             }}
             className="w-full md:max-w-2/3 text-black"
           />

@@ -19,7 +19,7 @@ import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/lib/authStore'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image';
-import { useThemeStore } from '@/lib/themeStore'
+import { useEmpresaStore } from '@/lib/empresaStore'
 
 type NavLink = {
   href: string
@@ -36,8 +36,11 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
   const [show, setShow] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
 
-  const navbarColor = useThemeStore((state) => state.navbarColor)
-  const logoUrl = useThemeStore((state) => state.logoUrl)
+  // Los cambios de edicion de UI en gestion_negocio se renderizan aca:
+  const empresa = useEmpresaStore((state) => state.empresa);
+
+  const navbarColor = empresa?.color_principal || 'bg-green-800';
+  const logoUrl = empresa?.ruta_logo || '/default-logo.png';
 
   // Oculta NavBar en scroll
   useEffect(() => {
@@ -58,11 +61,17 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
 
   return (
     <nav className={`fixed top-0 z-10 w-full transition-transform duration-300 ${show ? 'translate-y-0' : '-translate-y-full'}`}>
-      <div className={`${navbarColor} shadow px-4 py-4 flex justify-between items-center`}>
+      
+      <div className={`${navbarColor} shadow px-4 py-4 flex justify-between items-center`}> 
 
         {/* Logo */}
         <a href="/dashboard" className="text-xl font-bold flex items-center gap-2">
-          <Image src={logoUrl} alt="Swing Jugos" width={60} height={60} />
+          <Image
+            src={`https://sistema-ima.sistemataup.online/api${logoUrl}`}    // sin slash pq ya viene del back
+            alt="Logo Empresa"
+            width={60}
+            height={60}
+          />
         </a>
 
         {/* Menú de secciones - responsivo */}

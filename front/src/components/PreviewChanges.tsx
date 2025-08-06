@@ -2,7 +2,6 @@
 
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-// No necesitamos importar Alert ni ScrollArea
 
 // La interfaz de la respuesta del backend
 export interface PrevisualizacionResponse {

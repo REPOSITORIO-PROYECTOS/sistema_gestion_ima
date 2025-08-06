@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { EmpresasTable } from "./EmpresasTable";
 import { CreateEmpresaModal } from "./CreateEmpresaModal";
 import { ConfiguracionForm } from "@/components/ConfiguracionForm"; // Asumo que está en la misma carpeta
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 // Definimos el tipo de dato para una Empresa, que será usado en todo el componente
 interface Empresa {
@@ -21,7 +22,8 @@ interface Empresa {
 }
 
 export default function GestionEmpresasPage() {
-  const { token } = useAuthStore(); // Es más idiomático destructurar el token
+
+  const { token } = useAuthStore();
 
   // --- Estados Principales ---
   const [empresas, setEmpresas] = React.useState<Empresa[]>([]);
@@ -74,52 +76,54 @@ export default function GestionEmpresasPage() {
   );
 
   return (
-    <div className="p-4 md:p-6 space-y-8">
-      {/* --- SECCIÓN 1: CABECERA Y TABLA --- */}
-      <div>
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-2xl font-bold">Panel de Administración de Empresas</h1>
-            <p className="text-muted-foreground">Crea, visualiza y gestiona las empresas clientes del sistema.</p>
-          </div>
-          <Button onClick={() => setIsCreateModalOpen(true)}>Crear Nueva Empresa</Button>
-        </div>
-
-        {loading && <p className="text-center p-8 text-muted-foreground">Cargando empresas...</p>}
-        
-        {!loading && (
-          <EmpresasTable
-            empresas={empresas}
-            onConfigurarClick={(empresaId) => setSelectedEmpresaId(empresaId)}
-            onActionSuccess={handleActionSuccess}
-          />
-        )}
-      </div>
-
-      {/* --- SECCIÓN 2: FORMULARIO DE CONFIGURACIÓN (CONDICIONAL) --- */}
-      {selectedEmpresaId && (
-        <div className="border-t pt-8">
+    <ProtectedRoute allowedRoles={["Admin", "Soporte"]}>
+      <div className="p-4 md:p-6 space-y-8">
+        {/* --- SECCIÓN 1: CABECERA Y TABLA --- */}
+        <div>
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold">
-              Configuración de: <span className="text-blue-600">{empresaSeleccionada?.nombre_legal || `Empresa ID: ${selectedEmpresaId}`}</span>
-            </h2>
-            <Button variant="ghost" onClick={() => setSelectedEmpresaId(null)}>
-              Cerrar Configuración
-            </Button>
+            <div>
+              <h1 className="text-2xl font-bold">Panel de Administración de Empresas</h1>
+              <p className="text-muted-foreground">Crea, visualiza y gestiona las empresas clientes del sistema.</p>
+            </div>
+            <Button onClick={() => setIsCreateModalOpen(true)}>Crear Nueva Empresa</Button>
           </div>
-          <ConfiguracionForm empresaId={selectedEmpresaId} />
-        </div>
-      )}
 
-      {/* --- MODAL DE CREACIÓN (CONTROLADO POR ESTADO) --- */}
-      <CreateEmpresaModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        onSuccess={() => {
-          handleActionSuccess();
-          setIsCreateModalOpen(false); // Cierra el modal tras el éxito
-        }}
-      />
-    </div>
+          {loading && <p className="text-center p-8 text-muted-foreground">Cargando empresas...</p>}
+          
+          {!loading && (
+            <EmpresasTable
+              empresas={empresas}
+              onConfigurarClick={(empresaId) => setSelectedEmpresaId(empresaId)}
+              onActionSuccess={handleActionSuccess}
+            />
+          )}
+        </div>
+
+        {/* --- SECCIÓN 2: FORMULARIO DE CONFIGURACIÓN (CONDICIONAL) --- */}
+        {selectedEmpresaId && (
+          <div className="border-t pt-8">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold">
+                Configuración de: <span className="text-blue-600">{empresaSeleccionada?.nombre_legal || `Empresa ID: ${selectedEmpresaId}`}</span>
+              </h2>
+              <Button variant="ghost" onClick={() => setSelectedEmpresaId(null)}>
+                Cerrar Configuración
+              </Button>
+            </div>
+            <ConfiguracionForm empresaId={selectedEmpresaId} />
+          </div>
+        )}
+
+        {/* --- MODAL DE CREACIÓN (CONTROLADO POR ESTADO) --- */}
+        <CreateEmpresaModal
+          isOpen={isCreateModalOpen}
+          onClose={() => setIsCreateModalOpen(false)}
+          onSuccess={() => {
+            handleActionSuccess();
+            setIsCreateModalOpen(false); // Cierra el modal tras el éxito
+          }}
+        />
+      </div>
+    </ProtectedRoute>
   );
 }

@@ -5,6 +5,7 @@ import { DataTable } from "./data-table";
 import { columns } from "./columns";
 import { MovimientoAPI } from "./columns";
 import { useAuthStore } from "@/lib/authStore";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 export default function ContabilidadPage() {
   const [data, setData] = useState<MovimientoAPI[]>([]);
@@ -65,21 +66,23 @@ export default function ContabilidadPage() {
   }, [fetchData]); // La dependencia es la propia función, como recomienda ESLint.
 
   return (
-    <div className="container mx-auto flex flex-col gap-6 py-4">
-      <h1 className="text-2xl font-bold">Movimientos de Contabilidad</h1>
-      
-      {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <p className="text-gray-500">Cargando movimientos...</p>
-        </div>
-      ) : (
-        <DataTable
-          columns={columns}
-          data={data}
-          token={token}
-          onActionComplete={fetchData} // Pasamos la función para que la tabla pueda recargar los datos
-        />
-      )}
-    </div>
+    <ProtectedRoute allowedRoles={["Admin", "Soporte"]}>
+      <div className="container mx-auto flex flex-col gap-6 py-4">
+        <h1 className="text-2xl font-bold text-green-950">Movimientos de Caja</h1>
+        
+        {loading ? (
+          <div className="flex justify-center items-center h-64">
+            <p className="text-gray-500">Cargando movimientos...</p>
+          </div>
+        ) : (
+          <DataTable
+            columns={columns}
+            data={data}
+            token={token}
+            onActionComplete={fetchData} // Pasamos la función para que la tabla pueda recargar los datos
+          />
+        )}
+      </div>
+    </ProtectedRoute>
   );
 }

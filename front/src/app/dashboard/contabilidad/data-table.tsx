@@ -150,9 +150,9 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
 
     return (
         <div>
+            {/* Opciones de la Tavla */}
             <div className="flex flex-col md:flex-row-reverse justify-between gap-2 pb-4">
-
-                <div className="flex flex-col-reverse md:flex-row justify-between items-center gap-2 w-full">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4 w-full">
 
                     {/* Selectores y Filtrados */}
                     <div className="flex flex-col md:flex-row w-full md:w-auto gap-4">
@@ -205,9 +205,9 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
                     </div>
             
                     {/* --- Botones de Facturación --- */}
-                    <div className="flex flex-col md:flex-row w-1/2 gap-4 px-4">
+                    <div className="flex flex-col md:flex-row w-full md:w-1/2 md:px-4 gap-4">
                         <Button
-                            className="w-1/2"
+                            className="w-full md:w-1/2"
                             variant="outline"
                             onClick={() => console.log("Lógica para facturar lote")}
                             disabled={!table.getIsSomeRowsSelected() || isLoading}
@@ -215,7 +215,7 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
                             Facturar Lote ({table.getFilteredSelectedRowModel().rows.length})
                         </Button>
                         <Button
-                            className="w-1/2"
+                            className="w-full md:w-1/2"
                             variant="default"
                             disabled={!table.getIsSomeRowsSelected() || isLoading}
                             onClick={handleAgrupar} 
@@ -230,6 +230,7 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
                 </div>
             </div>
 
+            {/* Tabla */}
             <div className="rounded-md border">
                 <Table>
                     <TableHeader>
@@ -265,6 +266,7 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
                 </Table>
             </div>
 
+            {/* Footer Tabla */}
             <div className="flex flex-col sm:flex-row justify-between items-center m-2">
                 <Select onValueChange={(value) => table.setPageSize(+value)}>
                     <SelectTrigger className="w-[100px] m-2 cursor-pointer">

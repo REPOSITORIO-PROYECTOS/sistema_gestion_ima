@@ -87,14 +87,16 @@ export const columns: ColumnDef<MovimientoAPI>[] = [
     },
   },
   {
-  accessorFn: (row) => row.venta?.tipo_comprobante_solicitado ?? "—",
+    accessorFn: (row) => row.venta?.tipo_comprobante_solicitado ?? "—",
     id: "tipo_comprobante_solicitado",
     header: "Tipo Comprobante",
     cell: ({ row }) => {
-      const value = row.getValue("tipo_comprobante_solicitado") as string;
+      const rawValue = row.getValue("tipo_comprobante_solicitado") as string;
+      const displayValue = rawValue.toLowerCase() === "recibo" ? "comprobante" : rawValue;
+
       return (
         <Badge variant="secondary" className="ml-4">
-          {value}
+          {displayValue.toUpperCase()}
         </Badge>
       );
     },
