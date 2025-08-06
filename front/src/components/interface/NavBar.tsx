@@ -41,7 +41,7 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
   // Los cambios de edicion de UI en gestion_negocio se renderizan aca:
   const [logoUrl, setLogoUrl] = useState('/default-logo.png');
   const [navbarColor, setNavbarColor] = useState('bg-green-800');
-  const [empresaCargada, setEmpresaCargada] = useState(false); // ✅ nuevo
+  const [empresaCargada, setEmpresaCargada] = useState(false); 
 
 
   // Oculta NavBar en scroll
@@ -56,34 +56,38 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [lastScrollY]);
 
-   // GET UI de Empresa
-    useEffect(() => {
-      const obtenerEmpresa = async () => {
-        try {
-          const res = await fetch('https://sistema-ima.sistemataup.online/api/configuracion/mi-empresa', {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
+  // GET UI de Empresa
+  useEffect(() => {
 
-          if (!res.ok) throw new Error('Error al obtener datos de empresa');
+    const obtenerEmpresa = async () => {
+      try {
+        const res = await fetch('https://sistema-ima.sistemataup.online/api/configuracion/mi-empresa', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
-          const data = await res.json();
-          setNavbarColor(data.color_principal || 'bg-green-800');
-          setLogoUrl(`https://sistema-ima.sistemataup.online/api${data.ruta_logo}`);
-        } catch (error) {
-          console.error('Error al cargar datos de empresa:', error);
-          setNavbarColor('bg-green-800'); // fallback
-          setLogoUrl('/default-logo.png'); // fallback
-        } finally {
-          setEmpresaCargada(true); // ✅ importante
-        }
-      };
+        if (!res.ok) throw new Error('Error al obtener datos de empresa');
 
-      if (token) {
-        obtenerEmpresa();
+        const data = await res.json();
+        setNavbarColor(data.color_principal);
+        setLogoUrl(`https://sistema-ima.sistemataup.online/api${data.ruta_logo}`);
+
+      } catch (error) {
+        console.error('Error al cargar datos de empresa:', error);
+        setNavbarColor('bg-green-800'); 
+        setLogoUrl('/default-logo.png');
+
+      } finally {
+        setEmpresaCargada(true); 
       }
-    }, [token]);
+    };
+
+    if (token) {
+      obtenerEmpresa();
+    }
+  }, [token]);
+
 
   // Detecta las iniciales del nombre_usuario para display en avatar
   const avatarText = usuario?.nombre_usuario

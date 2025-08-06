@@ -78,7 +78,7 @@ function DashboardVenta() {
     if (role?.nombre === "Admin") return "Administrador";
     if (role?.nombre === "Cajero") return "Cajero";
     if (role?.nombre === "Gerente") return "Gerente";
-    if (role?.nombre === "Cliente") return "Cliente";
+    if (role?.nombre === "Soporte") return "Soporte";
     return "Rol no identificado";
   };
 
