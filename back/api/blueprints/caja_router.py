@@ -119,7 +119,7 @@ def api_registrar_venta(
     if req.quiere_factura:
         try:
             # === INICIO DE LA LÓGICA DE FACTURACIÓN CORREGIDA ===
-            
+            print("entramos al try de requiere factura")
             id_empresa_actual = current_user.id_empresa
             if not id_empresa_actual:
                  raise RuntimeError("El usuario actual no tiene una empresa asignada.")
@@ -142,6 +142,10 @@ def api_registrar_venta(
             
             # Usar model_validate para manejar el caso de que cliente_db sea None
             cliente_data_schema = ReceptorData.model_validate(cliente_db, from_attributes=True) if cliente_db else None
+            print("veta data schema :")
+            print(venta_data_schema)
+            print("cliente data schema : ")
+            print(cliente_data_schema)
             
             # Construir el schema del emisor con TODOS los datos recuperados
             emisor_data_schema = EmisorData(
@@ -151,14 +155,14 @@ def api_registrar_venta(
                 punto_venta=config_empresa_db.afip_punto_venta_predeterminado,
                 condicion_iva=config_empresa_db.afip_condicion_iva
             )
-
+            print("ANTES DE LA FUNCION GENERAR FACTURA")
             # Llamar al especialista de facturación
             factura_generada = generar_factura_para_venta(
                 venta_data=venta_data_schema, 
                 cliente_data=cliente_data_schema,
                 emisor_data=emisor_data_schema
             )
-            
+            print("DESPUES DE LA FUNCION GENERAR FACTURA")
             # === FIN DE LA LÓGICA DE FACTURACIÓN CORREGIDA ===
             
             venta_creada.facturada = True

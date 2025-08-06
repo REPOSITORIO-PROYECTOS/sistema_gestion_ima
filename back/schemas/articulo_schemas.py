@@ -10,6 +10,7 @@ class ArticuloBase(BaseModel):
     venta_negocio : float
     costo_ultimo: Optional[float] = 0.0
     categoria: Optional[str] = None
+    ubicacion: Optional[str] = None
     # El ID de artículo del sistema viejo lo manejaremos en un campo específico si es necesario
     # id_articulo_legacy: Optional[str] = None
 

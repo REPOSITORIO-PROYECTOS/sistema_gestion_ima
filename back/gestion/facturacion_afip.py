@@ -62,6 +62,7 @@ def generar_factura_para_venta(
             "certificado": secreto_emisor.certificado,
             "clave_privada": secreto_emisor.clave_privada
         }
+        print(credenciales)
 
     except (ConnectionError, PermissionError) as e:
         # Error de infraestructura: no se puede comunicar con la bóveda.

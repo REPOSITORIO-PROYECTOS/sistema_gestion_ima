@@ -190,7 +190,7 @@ def sincronizar_articulos_desde_sheets(db: Session, id_empresa_actual: int) -> D
             # Se convierte cada valor a string ANTES de usar métodos de string.
             nombre_crudo = articulo_sheet.get("nombre", "Sin Descripción")
             nombre_texto = str(nombre_crudo).strip()
-
+            ubicacion_crudo = articulo_sheet.get("ubicacion", "Sin informacion")
             activo_crudo = articulo_sheet.get("Activo", "TRUE")
             activo_texto = str(activo_crudo).strip().upper()
             
@@ -201,6 +201,7 @@ def sincronizar_articulos_desde_sheets(db: Session, id_empresa_actual: int) -> D
                 "stock_actual": limpiar_precio(articulo_sheet.get("cantidad", 0)),
                 "activo": activo_texto == "TRUE",
                 "id_empresa": id_empresa_actual,
+                "ubicacion": ubicacion_crudo,
             }
 
             articulo_actual_db = None
