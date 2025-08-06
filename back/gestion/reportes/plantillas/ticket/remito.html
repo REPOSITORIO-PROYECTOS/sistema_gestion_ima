@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Remito N° {{ venta.id | default('S/N') }}</title>
+    <style>
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 10px;
+            margin: 0;
+            padding: 0;
+        }
+        .ticket {
+            width: 56mm;
+            padding: 1mm;
+        }
+        .header, .footer {
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 13px;
+        }
+        .header h2 {
+            margin: 4px 0;
+            font-size: 12px;
+        }
+        p {
+            margin: 2px 0;
+        }
+        hr {
+            border: none;
+            border-top: 1px dashed black;
+            margin: 4px 0;
+        }
+        .cliente-info {
+            margin-top: 4px;
+        }
+        .item-header, .item {
+            display: flex;
+            justify-content: space-between;
+        }
+        .item-header {
+            font-weight: bold;
+            border-bottom: 1px solid black;
+            padding-bottom: 2px;
+            margin-top: 6px;
+        }
+        .item {
+            margin: 2px 0;
+        }
+        .item .cantidad {
+            width: 15%;
+        }
+        .item .descripcion {
+            width: 45%;
+            word-wrap: break-word;
+        }
+        .item .unitario {
+            width: 20%;
+            text-align: right;
+        }
+        .item .subtotal {
+            width: 20%;
+            text-align: right;
+        }
+        .total {
+            font-weight: bold;
+            font-size: 12px;
+            text-align: right;
+            margin-top: 6px;
+        }
+        .footer {
+            font-size: 9px;
+            margin-top: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="ticket">
+        <div class="header">
+            <h1>Sistema de Gestión IMA</h1>
+            <p>Dirección de la Empresa</p>
+            <p>CUIT: {{ AFIP_CUIT }}</p>
+            <hr>
+            <h2>REMITO</h2>
+            <p>N°: {{ venta.id | default('S/N') }}</p>
+            <p>Fecha: {{ fecha_emision | date }}</p>
+            <hr>
+        </div>
+
+        <div class="cliente-info">
+            <p><strong>Cliente:</strong> {{ venta.cliente.nombre_razon_social if venta.cliente else 'Consumidor Final' }}</p>
+            <p><strong>CUIT/DNI:</strong> {{ venta.cliente.cuit if venta.cliente else 'S/N' }}</p>
+            <p><strong>Dirección:</strong> {{ venta.cliente.direccion if venta.cliente else 'S/N' }}</p>
+        </div>
+
+        <div class="item-header">
+            <span class="cantidad">Cant</span>
+            <span class="descripcion">Descripción</span>
+            <span class="unitario">P/U</span>
+            <span class="subtotal">Subt</span>
+        </div>
+
+        {% for item in venta.detalles %}
+        <div class="item">
+            <span class="cantidad">{{ item.cantidad }}</span>
+            <span class="descripcion">{{ item.articulo.descripcion }}</span>
+            <span class="unitario">${{ "%.2f"|format(item.precio_unitario) }}</span>
+            <span class="subtotal">${{ "%.2f"|format(item.cantidad * item.precio_unitario) }}</span>
+        </div>
+        {% endfor %}
+
+        <hr>
+        <p class="total">TOTAL: ${{ "%.2f"|format(venta.total) }}</p>
+
+        <p class="footer">DOCUMENTO NO VÁLIDO COMO FACTURA</p>
+    </div>
+</body>
+</html>
