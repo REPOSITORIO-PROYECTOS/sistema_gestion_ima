@@ -9,8 +9,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Jugos Swing",
-  description: "Gestión de Empresas - Desarrollado por TAUP Agency",
+  title: "Sistema IMA",
+  description: "Gestión Y Consultoría de Empresas - Desarrollado por TAUP Agency",
 };
 
 export default function RootLayout({

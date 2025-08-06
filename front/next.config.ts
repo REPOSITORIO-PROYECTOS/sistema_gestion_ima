@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'sistema-ima.sistemataup.online',
         port: '', 
-        pathname: '/**', // esto permite cualquier ruta, no solo /static/
+        pathname: '/api/static/**', // esto permite cualquier ruta, no solo /static/
       },
     ],
   },
