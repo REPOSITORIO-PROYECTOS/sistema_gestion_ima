@@ -13,7 +13,7 @@ from back.schemas.caja_schemas import RespuestaGenerica
 
 # Lógica de negocio y Schemas
 from back.gestion import configuracion_manager
-from back.schemas.configuracion_schemas import ConfiguracionResponse, ConfiguracionUpdate, RecargoData, RecargoUpdate
+from back.schemas.configuracion_schemas import ConfiguracionResponse, ConfiguracionUpdate, RecargoData, RecargoUpdate, ColorResponse, ColorUpdateRequest
 
 router = APIRouter(prefix="/configuracion", tags=["Configuración de Empresa"])
 
@@ -184,3 +184,44 @@ def patch_recargo_banco(
         return configuracion_manager.actualizar_recargo_por_tipo(db, current_user.id_empresa, "banco", data)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    
+@router.patch(
+    "/mi-empresa/color",
+    response_model=ColorResponse,
+    summary="Actualiza el color principal de la empresa del usuario"
+)
+def actualizar_color_de_mi_empresa(
+    req: ColorUpdateRequest, # El cuerpo de la petición: {"color_principal": "#FFFFFF"}
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(obtener_usuario_actual)
+):
+    """
+    Actualiza el color principal configurado para la empresa del usuario autenticado.
+    """
+    # Verificamos que el usuario pertenezca a una empresa
+    if not current_user.id_empresa:
+        raise HTTPException(
+            status_code=404,
+            detail="El usuario actual no está asociado a ninguna empresa."
+        )
+    
+    # Verificamos que el usuario tenga permiso para cambiar la configuración
+    verificar_permiso_admin(current_user)
+        
+    try:
+        # Llamamos a nuestra nueva función específica del manager
+        config_actualizada = configuracion_manager.actualizar_color_principal_empresa(
+            db=db, 
+            id_empresa=current_user.id_empresa,
+            nuevo_color=req.color_principal
+        )
+        
+        # Devolvemos el dato actualizado en el formato correcto
+        return ColorResponse(color_principal=config_actualizada.color_principal)
+        
+    except ValueError as e:
+        # Captura el error si el manager no encuentra la configuración
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        # Captura cualquier otro error inesperado
+        raise HTTPException(status_code=500, detail=f"Error interno: {e}")

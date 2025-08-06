@@ -44,3 +44,9 @@ class RecargoUpdate(BaseModel):
     """Schema para recibir la actualización de un recargo."""
     porcentaje: float = Field(..., ge=0) # El porcentaje debe ser 0 o mayor
     concepto: Optional[str] = None # Hacemos el concepto opcional
+    
+class ColorUpdateRequest(BaseModel):
+    color_principal: str
+
+class ColorResponse(BaseModel):
+    color_principal: str
