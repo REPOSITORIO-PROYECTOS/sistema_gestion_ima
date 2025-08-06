@@ -175,7 +175,7 @@ def sincronizar_articulos_desde_sheets(db: Session, id_empresa_actual: int) -> D
     query_codigos = select(ArticuloCodigo).options(selectinload(ArticuloCodigo.articulo))
     codigos_barras_db_objetos = db.exec(query_codigos).all()
     codigos_barras_db_dict = {cb.codigo: cb for cb in codigos_barras_db_objetos}
-    
+    id_codigo_barra_db_dict ={cb.id_articulo: cb for cb in codigos_barras_db_objetos}
     resumen = {"creados": 0, "actualizados": 0, "sin_cambios": 0, "errores": 0}
 
     # 5. BUCLE PRINCIPAL DE SINCRONIZACIÓN
@@ -231,65 +231,33 @@ def sincronizar_articulos_desde_sheets(db: Session, id_empresa_actual: int) -> D
                 articulo_actual_db = nuevo_articulo
 
             # --- SINCRONIZAR CÓDIGO DE BARRAS (con validación y limpieza) ---
-                codigo_barras_crudo = articulo_sheet.get("Codigo de barras", "")
-                # Limpiamos y nos aseguramos de que sea una cadena. Este es el estado final deseado.
-                codigo_barras_sheet = str(codigo_barras_crudo).strip()
+            codigo_barras_crudo = articulo_sheet.get("Codigo de barras", "")
+            codigo_barras_sheet = str(codigo_barras_crudo).strip()
 
-                # 2. OBTENER EL CÓDIGO "ACTUAL" DESDE LA BASE DE DATOS PARA ESTE ARTÍCULO
-                # Accedemos al primer código de la lista, si es que existe alguno.
-                # Usamos la relación `codigos` definida en tus modelos.
-                codigo_actual_db_obj = next(iter(articulo_actual_db.codigos), None)
-                codigo_actual_db_str = codigo_actual_db_obj.codigo if codigo_actual_db_obj else ""
+            if codigo_barras_sheet:
+                codigo_barras_existente_db = id_codigo_barra_db_dict.get(codigo_barras_sheet)
 
-                # 3. COMPARAR Y DECIDIR SI SE NECESITA UNA ACCIÓN
-                # Si el código en la base de datos ya es el mismo que el de la hoja, no hacemos nada.
-                if codigo_actual_db_str == codigo_barras_sheet:
-                    # print(f"--> Código de barras para '{articulo_actual_db.codigo_interno}' ya está actualizado. Sin cambios.")
-                    pass # O puedes usar 'continue' si esto está dentro de un bucle más grande
+                if not codigo_barras_existente_db:
+                    print(f"--> Creando y asociando nuevo código de barras '{codigo_barras_sheet}' al artículo '{codigo_interno}'.")
+                    nuevo_codigo_barras = ArticuloCodigo(codigo=codigo_barras_sheet, articulo=articulo_actual_db)
+                    db.add(nuevo_codigo_barras)
+                    codigos_barras_db_dict[codigo_barras_sheet] = nuevo_codigo_barras
                 else:
-                    # Si son diferentes, procedemos a la sincronización.
-                    print(f"--> Actualizando código de barras para '{articulo_actual_db.codigo_interno}'. "
-                        f"Viejo: '{codigo_actual_db_str}', Nuevo: '{codigo_barras_sheet}'.")
-
-                    # 4. ELIMINAR EL CÓDIGO ANTIGUO (SI EXISTÍA)
-                    # Este es el paso clave que faltaba en tu lógica original.
-                    if codigo_actual_db_obj:
-                        print(f"    - Eliminando código obsoleto: '{codigo_actual_db_str}'.")
-                        # Quitamos la referencia del diccionario global para evitar inconsistencias
-                        if codigo_actual_db_str in codigos_barras_db_dict:
-                            del codigos_barras_db_dict[codigo_actual_db_str]
-                        db.delete(codigo_actual_db_obj)
-                        
-                    # 5. AÑADIR EL CÓDIGO NUEVO (SI NO ESTÁ VACÍO)
-                    # Aquí reutilizamos tu lógica original para manejar la creación y los conflictos.
-                    if codigo_barras_sheet:
-                        # Verificamos si el nuevo código ya existe en el sistema
-                        codigo_barras_existente_db = codigos_barras_db_dict.get(codigo_barras_sheet)
-
-                        if not codigo_barras_existente_db:
-                            print(f"    + Creando y asociando nuevo código: '{codigo_barras_sheet}'.")
-                            nuevo_codigo_barras = ArticuloCodigo(codigo=codigo_barras_sheet, articulo=articulo_actual_db)
-                            db.add(nuevo_codigo_barras)
-                            # Lo añadimos al diccionario para que las siguientes iteraciones lo reconozcan
-                            codigos_barras_db_dict[codigo_barras_sheet] = nuevo_codigo_barras
-                        else:
-                            # El código existe, aplicamos lógica de re-asociación o conflicto
-                            articulo_asociado = codigo_barras_existente_db.articulo
-                            if not articulo_asociado:
-                                print(f"    * Re-asociando código de barras huérfano '{codigo_barras_sheet}'.")
-                                codigo_barras_existente_db.articulo = articulo_actual_db
-                                db.add(codigo_barras_existente_db)
-                            elif articulo_asociado.id_empresa == id_empresa_actual:
-                                if articulo_asociado.id != articulo_actual_db.id:
-                                    print(f"    * Re-asociando código '{codigo_barras_sheet}' (pertenecía a otro artículo de la misma empresa).")
-                                    codigo_barras_existente_db.articulo = articulo_actual_db
-                                    db.add(codigo_barras_existente_db)
-                            else:
-                                # Conflicto: El código pertenece a otra empresa y no se puede reasignar.
-                                print(f"## ERROR DE CONFLICTO ##: El código '{codigo_barras_sheet}' ya está asignado "
-                                    f"al artículo '{articulo_asociado.codigo_interno}' de la empresa ID {articulo_asociado.id_empresa}. "
-                                    f"No se puede asignar al artículo '{articulo_actual_db.codigo_interno}'.")
-                                resumen["errores"] += 1
+                    articulo_asociado = codigo_barras_existente_db.articulo
+                    if not articulo_asociado:
+                        print(f"--> Re-asociando código de barras huérfano '{codigo_barras_sheet}' al artículo '{codigo_interno}'.")
+                        codigo_barras_existente_db.articulo = articulo_actual_db
+                        db.add(codigo_barras_existente_db)
+                    elif articulo_asociado.id_empresa == id_empresa_actual:
+                        if articulo_asociado.id != articulo_actual_db.id:
+                            print(f"--> Re-asociando código de barras '{codigo_barras_sheet}' al artículo '{codigo_interno}' (misma empresa).")
+                            codigo_barras_existente_db.articulo = articulo_actual_db
+                            db.add(codigo_barras_existente_db)
+                    else:
+                        print(f"## ERROR DE CONFLICTO ##: El código de barras '{codigo_barras_sheet}' ya está asignado "
+                              f"al artículo '{articulo_asociado.codigo_interno}' de la empresa ID {articulo_asociado.id_empresa}. "
+                              f"No se puede asignar al artículo '{codigo_interno}' de la empresa {id_empresa_actual}.")
+                        resumen["errores"] += 1
 
         except Exception as e:
             codigo_info = articulo_sheet.get('Código', 'SIN CÓDIGO')
