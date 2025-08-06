@@ -115,8 +115,10 @@ def api_registrar_venta(
         raise HTTPException(status_code=500, detail="Error interno al registrar la venta.")
 
     # --- PASO 2: INTEGRACIÓN CON AFIP Y ACTUALIZACIÓN DE LA VENTA ---
+    print("TODAVIA NO SALIMOS DE CAJA ROUTER")
     resultado_afip: Dict[str, Any] = {"estado": "NO_SOLICITADA"}
     if req.quiere_factura:
+        print("PASA EL IF DE REQUIERE FACTURA")
         try:
             # === INICIO DE LA LÓGICA DE FACTURACIÓN CORREGIDA ===
             print("entramos al try de requiere factura")
@@ -146,7 +148,7 @@ def api_registrar_venta(
             print(venta_data_schema)
             print("cliente data schema : ")
             print(cliente_data_schema)
-            
+
             # Construir el schema del emisor con TODOS los datos recuperados
             emisor_data_schema = EmisorData(
                 cuit=empresa_db.cuit,
