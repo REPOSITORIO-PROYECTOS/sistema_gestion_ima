@@ -21,7 +21,7 @@ import EgresoForm from "./EgresoForm";
 function DashboardVenta() {
 
   /* Estados de la Caja de Ventas */
-   const verificarEstadoCaja = useCajaStore(state => state.verificarEstadoCaja);
+  const verificarEstadoCaja = useCajaStore(state => state.verificarEstadoCaja);
   const token = useAuthStore((state) => state.token);
   const [productos, setProductos] = useState<{
     tipo: string;
@@ -69,10 +69,10 @@ function DashboardVenta() {
 
   useEffect(() => {
     if (token) {
-      console.log("Token detectado, verificando estado de la caja...");
       verificarEstadoCaja(token);
     }
   }, [token, verificarEstadoCaja]);
+
   // Mapeamos el rol para mostrarlo legible
   const mostrarRol = () => {
     if (role?.nombre === "Admin") return "Administrador";
@@ -96,9 +96,18 @@ function DashboardVenta() {
     setProductos([]);
   };
 
+  // Formateo del total de venta
+  const formatearMoneda = (valor: number): string => {
+    return valor.toLocaleString("es-AR", {
+      style: "currency",
+      currency: "ARS",
+      minimumFractionDigits: 2,
+    });
+  };
+
 
   return (
-    <ProtectedRoute allowedRoles={["Admin", "Cajero"]}>
+    <ProtectedRoute allowedRoles={["Admin", "Cajero", "Soporte"]}>
       <div className="flex flex-col gap-4">
 
         {/* Header de Informacion */}
@@ -163,17 +172,17 @@ function DashboardVenta() {
           <div className="flex flex-col items-start w-full lg:w-1/2 md:max-w-2/3 bg-gray-100 rounded-xl shadow-md">
             <div className="w-full flex flex-row justify-between items-center p-6 bg-green-700 rounded-t-xl">
               <h4 className="text-xl font-semibold text-white">Resumen del Pedido</h4>
-              <p className="text-2xl font-semibold text-white">Total: ${totalVenta}</p>
+              <p className="text-2xl font-semibold text-white">Total: {formatearMoneda(totalVenta)}</p>
             </div>
 
             <ul className="flex flex-col items-center w-full p-6 gap-5 overflow-y-auto">
               {productos.map((prod, index) => (
                 <li
                   key={index}
-                  className="flex flex-col md:flex-row w-full justify-between items-start md:items-center px-8 py-6 bg-emerald-100 rounded-lg text-green-950 font-semibold border-3 border-green-800 text-xl shadow-lg"
+                  className="flex flex-col md:flex-row w-full justify-between items-start md:items-center px-6 py-6 bg-emerald-100 rounded-lg text-green-950 font-semibold border-3 border-green-800 text-xl shadow-lg"
                 >
                   <div className="flex flex-col">
-                    <span>{prod.tipo} - x{prod.cantidad} U. - ${prod.precioTotal}</span>
+                    <span>{prod.tipo} - x{prod.cantidad} U. - {formatearMoneda(prod.precioTotal)}</span>
 
                     {prod.descuentoAplicado && (
                       <span className="text-green-800 text-sm font-normal italic">

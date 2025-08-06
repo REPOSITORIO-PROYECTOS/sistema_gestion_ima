@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Eye, EyeOff } from "lucide-react";
 import { Role, useAuthStore } from "@/lib/authStore";
+import { toast } from "sonner";
 
 export default function UserForm() {
   
@@ -24,6 +25,9 @@ export default function UserForm() {
   const [selectedRoleId, setSelectedRoleId] = useState<number | undefined>();
   const token = useAuthStore((state) => state.token);
   const passwordsMatch = password === confirm;
+
+  const usuario = useAuthStore((state) => state.usuario);
+  const empresaId = usuario?.id_empresa;
 
   // Funcion que trae los roles del backend
   useEffect(() => {
@@ -65,7 +69,7 @@ export default function UserForm() {
 
     // Payload de User
     const newUser = {
-      id_empresa: 1,
+      id_empresa: empresaId,
       nombre_usuario,
       password,
       id_rol: selectedRoleId,
@@ -84,13 +88,13 @@ export default function UserForm() {
       if (!res.ok) {
         const errorData = await res.json();
         console.error("❌ Error al crear usuario:", errorData);
-        alert("No se pudo crear el usuario. Revisá los datos.");
+        toast.error("No se pudo crear el usuario. Revisá los datos.");
         return;
       }
 
       const result = await res.json();
       console.log("✅ Usuario creado:", result);
-      alert("Usuario creado exitosamente ✅");
+      toast.success("Usuario creado exitosamente ✅");
 
       // Resetear formulario
       setNombreUsuario("");
@@ -100,7 +104,7 @@ export default function UserForm() {
 
     } catch (error) {
       console.error("⚠️ Error inesperado:", error);
-      alert("Ocurrió un error inesperado.");
+      toast.error("Ocurrió un error inesperado.");
     }
   }
 

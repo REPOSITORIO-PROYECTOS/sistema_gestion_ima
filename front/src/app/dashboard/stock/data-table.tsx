@@ -104,7 +104,7 @@ export function DataTable<TData, TValue>({
                     onChange={(event) =>
                         table.getColumn("descripcion")?.setFilterValue(event.target.value)
                     }
-                    className="w-full md:max-w-1/6"
+                    className="w-full md:w-1/6"
                 />
 
                 {/* Input de Búsqueda por Código de Barras */}
@@ -114,7 +114,7 @@ export function DataTable<TData, TValue>({
                     onChange={(event) =>
                         table.getColumn("codigo_interno")?.setFilterValue(event.target.value)
                     }
-                    className="w-full md:max-w-1/6"
+                    className="w-full md:w-1/6"
                 />
 
                 {/* Botones para sincronización */}

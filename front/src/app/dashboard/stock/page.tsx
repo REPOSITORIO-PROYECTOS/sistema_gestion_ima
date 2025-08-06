@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { DataTable } from "./data-table";
 import { columns, ProductoAPI } from "./columns";
 import { useAuthStore } from "@/lib/authStore";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 export default function StockPage() {
     
@@ -11,6 +12,7 @@ export default function StockPage() {
   const [loading, setLoading] = useState(true);
   const token = useAuthStore((state) => state.token);
 
+  // GET Productos para tabla Stock
   useEffect(() => {
     const fetchProductos = async () => {
       try {
@@ -35,8 +37,11 @@ export default function StockPage() {
     fetchProductos();
   }, [token]);
 
-
   if (loading) return <p className="text-center py-10">Cargando productos...</p>;
 
-  return <DataTable columns={columns} data={productos} />;
+  return (
+    <ProtectedRoute allowedRoles={["Admin", "Soporte"]}>
+      <DataTable columns={columns} data={productos} />
+    </ProtectedRoute>
+  )
 }

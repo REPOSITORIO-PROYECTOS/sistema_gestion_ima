@@ -7,6 +7,7 @@ import { FormEvent, useState } from 'react'
 import { Eye, EyeOff } from "lucide-react"
 import { useAuthStore } from '@/lib/authStore'
 import { useEmpresaStore } from '@/lib/empresaStore'
+import { toast } from 'sonner'
 
 const API_URL = "https://sistema-ima.sistemataup.online/api"
 
@@ -34,7 +35,7 @@ function Login() {
     e.preventDefault()
 
     if (!username || !password) {
-      alert("Por favor complete usuario y contraseña")
+      toast.error("Por favor complete usuario y contraseña")
       return
     }
 

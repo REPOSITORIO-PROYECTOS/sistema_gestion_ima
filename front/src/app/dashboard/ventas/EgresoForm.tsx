@@ -61,7 +61,7 @@ export default function EgresosForm() {
     const handleSubmit = async () => {
 
         if (!concepto || !monto) {
-            alert("Por favor completá todos los campos.");
+            toast.error("Por favor completá todos los campos.");
             return;
         }
 

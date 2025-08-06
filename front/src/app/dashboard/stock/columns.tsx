@@ -11,6 +11,7 @@ export interface ProductoAPI {
   venta_negocio: number;
   stock_actual: number;
   codigo_interno: string;
+  ubicacion: string;
 }
 
 export const columns: ColumnDef<ProductoAPI>[] = [
@@ -22,6 +23,14 @@ export const columns: ColumnDef<ProductoAPI>[] = [
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
+  },
+    {
+    accessorKey: "codigo_interno",
+    header: "Código de Barras",
+    cell: ({ row }) => {
+      const codigo = row.getValue("codigo_interno") as string;
+      return <div className="font-mono text-sm">{codigo}</div>;
+    }
   },
   {
     accessorKey: "precio_venta",
@@ -56,12 +65,16 @@ export const columns: ColumnDef<ProductoAPI>[] = [
     },
   },
   {
-    accessorKey: "codigo_interno",
-    header: "Código de Barras",
+    accessorKey: "ubicacion",
+    header: ({ column }) => (
+      <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+        Ubicación del Producto
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
     cell: ({ row }) => {
-      const codigo = row.getValue("codigo_interno") as string;
+      const codigo = row.getValue("ubicacion") as string;
       return <div className="font-mono text-sm">{codigo}</div>;
     }
   }
-
 ];
