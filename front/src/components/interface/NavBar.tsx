@@ -19,7 +19,6 @@ import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/lib/authStore'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image';
-import { useEmpresaStore } from '@/lib/empresaStore'
 
 type NavLink = {
   href: string
@@ -32,17 +31,16 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
 
   const pathname = usePathname();
   const router = useRouter();
-  const usuario = useAuthStore((state) => state.usuario);
+  const usuario = useAuthStore((state) => state.usuario); 
+  const token = useAuthStore((state) => state.token);
+
+  // Scroll y ocultación del Nav
   const [show, setShow] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
 
   // Los cambios de edicion de UI en gestion_negocio se renderizan aca:
-  const empresa = useEmpresaStore((state) => state.empresa);
-
-  const navbarColor = empresa?.color_principal || 'bg-green-800';
-  const logoUrl = empresa?.ruta_logo || '/default-logo.png';
-
-  // console.log(empresa?.ruta_logo) // https://sistema-ima.sistemataup.online/api/static/logos_empresas/logo_empresa_1.png
+  const [logoUrl, setLogoUrl] = useState('/default-logo.png');
+  const [navbarColor, setNavbarColor] = useState('bg-green-800');
 
   // Oculta NavBar en scroll
   useEffect(() => {
@@ -56,6 +54,31 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [lastScrollY]);
 
+   // GET UI de Empresa
+  useEffect(() => {
+    const obtenerEmpresa = async () => {
+      try {
+        const res = await fetch('https://sistema-ima.sistemataup.online/api/configuracion/mi-empresa', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) throw new Error('Error al obtener datos de empresa');
+
+        const data = await res.json();
+        setNavbarColor(data.color_principal || 'bg-green-800');
+        setLogoUrl(`https://sistema-ima.sistemataup.online/api${data.ruta_logo}`); // ruta completa
+      } catch (error) {
+        console.error('Error al cargar datos de empresa:', error);
+      }
+    };
+
+    if (token) {
+      obtenerEmpresa();
+    }
+  }, [token]);
+
   // Detecta las iniciales del nombre_usuario para display en avatar
   const avatarText = usuario?.nombre_usuario
   ? usuario.nombre_usuario.slice(0, 2).toUpperCase()
@@ -64,12 +87,12 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
   return (
     <nav className={`fixed top-0 z-10 w-full transition-transform duration-300 ${show ? 'translate-y-0' : '-translate-y-full'}`}>
       
-      <div className={`${navbarColor} shadow px-4 py-4 flex justify-between items-center`}> 
-
+      <div className={`${navbarColor} shadow px-4 py-4 flex justify-between items-center`}>
+        
         {/* Logo */}
         <a href="/dashboard" className="text-xl font-bold flex items-center gap-2">
           <Image
-            src={`https://sistema-ima.sistemataup.online/api${logoUrl}`}
+            src={logoUrl}
             alt="Logo Empresa"
             width={60}
             height={60}

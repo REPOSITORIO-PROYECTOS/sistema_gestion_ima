@@ -430,7 +430,11 @@ export default function GestionNegocio() {
           <div className="flex flex-col items-start gap-4 mb-6">
             <label className="text-md font-semibold mb-1">Logo actual:</label>
             <div className="flex flex-col sm:flex-row items-center gap-4">
-              <Image src={logoUrl} alt="Logo actual" width={60} height={60} />
+              <Image 
+                src={`https://sistema-ima.sistemataup.online/api${logoUrl}`} 
+                alt="Logo actual" 
+                width={60} height={60} 
+              />
               <Input
                 type="file"
                 accept=".png,.jpg,.jpeg,.webp"

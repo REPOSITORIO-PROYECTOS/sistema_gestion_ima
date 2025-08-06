@@ -21,7 +21,7 @@ function Login() {
   const setRole = useAuthStore(state => state.setRole)
 
   // Empresa Store
-  const setEmpresa = useEmpresaStore(state => state.setEmpresa) // ✅ HOOK NUEVO
+  const setEmpresa = useEmpresaStore(state => state.setEmpresa)
   const empresa = useEmpresaStore(state => state.empresa)
 
   const [username, setUsername] = useState('')
@@ -55,7 +55,6 @@ function Login() {
 
       const data = await response.json()
       const { access_token } = data
-      /* console.log("🔑 Token recibido:", data) */ // solo para debug
       setToken(access_token)
 
       // Despues de autenticar, traemos los datos del usuario con:
@@ -84,8 +83,7 @@ function Login() {
         if (!empresaResponse.ok) throw new Error("Error al obtener datos de la empresa")
 
         const dataEmpresa = await empresaResponse.json()
-        setEmpresa(dataEmpresa) 
-        console.log("🏢 Empresa cargada:", dataEmpresa)
+        setEmpresa(dataEmpresa)
       }
 
       router.push("/dashboard")
@@ -95,10 +93,10 @@ function Login() {
 
       if (error instanceof Error) {
         alert(error.message)
+
       } else {
         alert("Error inesperado")
       }
-      
     } finally {
       setLoading(false)
     }

@@ -59,7 +59,7 @@ export default function GestionUsuarios() {
   // GET Usuarios
   useEffect(() => {
 
-    if (!token || usuario?.rol?.nombre === "Cajero") return;
+    if (!token) return;
 
     const fetchUsuarios = async () => {
       try {
@@ -88,7 +88,7 @@ export default function GestionUsuarios() {
   const fetchUsuariosRef = useRef<() => void>(() => {});
 
   return (
-    <ProtectedRoute allowedRoles={["Admin", "Cajero", "Soporte"]}>
+    <ProtectedRoute allowedRoles={["Admin", "Soporte"]}>
       <div className="flex flex-col gap-6 p-2">
 
         {/* Header */}
@@ -142,7 +142,6 @@ export default function GestionUsuarios() {
         </div>
 
         {/* Tabla de usuarios */}
-        {usuario?.rol?.nombre !== "Cajero" && (
         <div className="border rounded-lg overflow-hidden">
           <Table>
 
@@ -195,7 +194,7 @@ export default function GestionUsuarios() {
             </TableBody>
 
           </Table>
-        </div>)}
+        </div>
       </div>
     </ProtectedRoute>
   );

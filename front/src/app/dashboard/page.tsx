@@ -1,6 +1,12 @@
 "use client"
 
+// import { useEmpresaStore } from "@/lib/empresaStore";
+
 export default function Inicio() {
+
+  // const empresa = useEmpresaStore((state) => state.empresa);
+
+  // console.log(empresa)
 
   return (
 
