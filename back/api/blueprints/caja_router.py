@@ -125,20 +125,23 @@ def api_registrar_venta(
             id_empresa_actual = current_user.id_empresa
             if not id_empresa_actual:
                  raise RuntimeError("El usuario actual no tiene una empresa asignada.")
-
+            print("POR CONSULTAR LOS DATOS DEL EMISOR")
             # Consultar los datos del EMISOR
             empresa_db = db.get(Empresa, id_empresa_actual)
+            print("POR HACER EL STATAMENT")
             statement = select(ConfiguracionEmpresa).where(ConfiguracionEmpresa.id_empresa == id_empresa_actual)
+            print("POR ASIGNAR CONFIG EMPRESA")
             config_empresa_db = db.exec(statement).first()
-
+            print("POR CONSULTAR EMPRESA DB")
             if not empresa_db or not empresa_db.cuit:
                 raise ValueError(f"No se encontraron datos de empresa o CUIT para la empresa ID: {id_empresa_actual}")
+            print("POR CONSULTAR CONFIG EMPRESA DB")
             if not config_empresa_db or not config_empresa_db.afip_punto_venta_predeterminado:
                 raise ValueError(f"No se encontró un punto de venta predeterminado para la empresa ID: {id_empresa_actual}")
-            
+            print("POR SACAR CLIENTE DB")
             # Consultar los datos del RECEPTOR
             cliente_db = db.get(Tercero, req.id_cliente) if req.id_cliente else None
-            
+            print("POR SACAR VENTA DB")
             # Mapear datos a Schemas Pydantic (¡AHORA CON TODOS LOS CAMPOS!)
             venta_data_schema = TransaccionData.model_validate(venta_creada, from_attributes=True)
             
