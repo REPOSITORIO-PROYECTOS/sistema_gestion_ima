@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 interface Empresa {
   id_empresa: number;
@@ -21,8 +22,15 @@ interface EmpresaStore {
   clearEmpresa: () => void;
 }
 
-export const useEmpresaStore = create<EmpresaStore>()((set) => ({
-  empresa: null,
-  setEmpresa: (empresa) => set({ empresa }),
-  clearEmpresa: () => set({ empresa: null }),
-}));
+export const useEmpresaStore = create<EmpresaStore>()(
+  persist(
+    (set) => ({
+      empresa: null,
+      setEmpresa: (empresa) => set({ empresa }),
+      clearEmpresa: () => set({ empresa: null }),
+    }),
+    {
+      name: 'empresa-storage', // localStorage key
+    }
+  )
+);

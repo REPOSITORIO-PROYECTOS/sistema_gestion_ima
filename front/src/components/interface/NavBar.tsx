@@ -237,5 +237,4 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
   );
 }
 
-
 export default NavBar;
