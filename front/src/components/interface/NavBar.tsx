@@ -41,6 +41,8 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
   // Los cambios de edicion de UI en gestion_negocio se renderizan aca:
   const [logoUrl, setLogoUrl] = useState('/default-logo.png');
   const [navbarColor, setNavbarColor] = useState('bg-green-800');
+  const [empresaCargada, setEmpresaCargada] = useState(false); // ✅ nuevo
+
 
   // Oculta NavBar en scroll
   useEffect(() => {
@@ -55,34 +57,43 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
   }, [lastScrollY]);
 
    // GET UI de Empresa
-  useEffect(() => {
-    const obtenerEmpresa = async () => {
-      try {
-        const res = await fetch('https://sistema-ima.sistemataup.online/api/configuracion/mi-empresa', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+    useEffect(() => {
+      const obtenerEmpresa = async () => {
+        try {
+          const res = await fetch('https://sistema-ima.sistemataup.online/api/configuracion/mi-empresa', {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
 
-        if (!res.ok) throw new Error('Error al obtener datos de empresa');
+          if (!res.ok) throw new Error('Error al obtener datos de empresa');
 
-        const data = await res.json();
-        setNavbarColor(data.color_principal || 'bg-green-800');
-        setLogoUrl(`https://sistema-ima.sistemataup.online/api${data.ruta_logo}`); // ruta completa
-      } catch (error) {
-        console.error('Error al cargar datos de empresa:', error);
+          const data = await res.json();
+          setNavbarColor(data.color_principal || 'bg-green-800');
+          setLogoUrl(`https://sistema-ima.sistemataup.online/api${data.ruta_logo}`);
+        } catch (error) {
+          console.error('Error al cargar datos de empresa:', error);
+          setNavbarColor('bg-green-800'); // fallback
+          setLogoUrl('/default-logo.png'); // fallback
+        } finally {
+          setEmpresaCargada(true); // ✅ importante
+        }
+      };
+
+      if (token) {
+        obtenerEmpresa();
       }
-    };
-
-    if (token) {
-      obtenerEmpresa();
-    }
-  }, [token]);
+    }, [token]);
 
   // Detecta las iniciales del nombre_usuario para display en avatar
   const avatarText = usuario?.nombre_usuario
   ? usuario.nombre_usuario.slice(0, 2).toUpperCase()
   : 'US';
+
+  // ✅ Evitar render hasta que esté todo listo
+  if (!empresaCargada || !navbarColor || !logoUrl) {
+    return null; 
+  }
 
   return (
     <nav className={`fixed top-0 z-10 w-full transition-transform duration-300 ${show ? 'translate-y-0' : '-translate-y-full'}`}>
