@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { ConfiguracionForm } from "@/components/ConfiguracionForm";
 import { useEmpresaStore } from '@/lib/empresaStore';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import eventBus from "@/utils/eventBus";
 
 export default function GestionNegocio() {
 
@@ -192,7 +193,7 @@ export default function GestionNegocio() {
       useEmpresaStore.getState().setEmpresa(data);
 
       toast.success("Logo subido correctamente.");
-      refrescarEmpresa();
+      eventBus.emit("empresa_actualizada");
 
     } catch (error) {
       console.error(error);
@@ -215,24 +216,12 @@ export default function GestionNegocio() {
       if (!res.ok) throw new Error("Error en el PATCH");
 
       toast.success("Color de navbar actualizado correctamente.");
-      refrescarEmpresa();
+      eventBus.emit("empresa_actualizada");
 
     } catch (error) {
       console.error(error);
       toast.error("Error al actualizar el color de navbar");
     }
-  };
-
-  // Funcion para refrescar los cambios de UI hechos
-  const refrescarEmpresa = async () => {
-    const token = useAuthStore.getState().token;
-    const res = await fetch("https://sistema-ima.sistemataup.online/api/configuracion/mi-empresa", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    const data = await res.json();
-    useEmpresaStore.getState().setEmpresa(data);
   };
 
   return (

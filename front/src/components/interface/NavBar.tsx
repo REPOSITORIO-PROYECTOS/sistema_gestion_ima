@@ -19,6 +19,7 @@ import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/lib/authStore'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image';
+import eventBus from "@/utils/eventBus";
 
 type NavLink = {
   href: string
@@ -86,6 +87,15 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
     if (token) {
       obtenerEmpresa();
     }
+
+     // Escuchar evento
+    const refrescar = () => obtenerEmpresa();
+    eventBus.on("empresa_actualizada", refrescar);
+
+    return () => {
+      eventBus.off("empresa_actualizada", refrescar);
+    };
+
   }, [token]);
 
 

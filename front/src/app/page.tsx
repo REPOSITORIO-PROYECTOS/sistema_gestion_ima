@@ -105,7 +105,7 @@ function Login() {
   return (
     <div className="flex flex-col h-screen justify-center items-center gap-10 bg-sky-700 px-8 py-8 md:h-screen">
       
-      <Image src="/logo_software.png" alt="Swing Jugos" width={80} height={80} />
+      <Image src="/default-logo.png" alt="Swing Jugos" width={80} height={80} />
 
       <form onSubmit={handleLogin} className="w-[95%] sm:w-1/2 lg:w-1/3 form-login bg-slate-100 shadow-2xl flex flex-col items-center justify-center p-10 gap-10 rounded-4xl">
         
