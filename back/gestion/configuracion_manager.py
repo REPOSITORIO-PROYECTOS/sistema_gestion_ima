@@ -165,3 +165,33 @@ def obtener_configuracion_empresa(db: Session, id_empresa: int) -> Configuracion
         db.commit()
         db.refresh(config)
     return config
+
+def actualizar_color_principal_empresa(db: Session, id_empresa: int, nuevo_color: str) -> ConfiguracionEmpresa:
+    """
+    Actualiza específicamente el color principal de la configuración de una empresa.
+    Es llamada por el endpoint PATCH /mi-empresa/color.
+    """
+    print(f"\n--- [TRACE: ACTUALIZAR COLOR] ---")
+    print(f"Solicitud para actualizar color de Empresa ID: {id_empresa} a '{nuevo_color}'")
+
+    # 1. Obtenemos el registro de configuración existente usando tu función.
+    #    'obtener_configuracion_por_id_empresa' ya maneja el caso de que no exista.
+    config_db = obtener_configuracion_por_id_empresa(db, id_empresa)
+    
+    # 2. Actualizamos únicamente el campo del color en el objeto.
+    config_db.color_principal = nuevo_color
+    
+    # 3. Guardamos los cambios en la base de datos.
+    try:
+        db.add(config_db)
+        db.commit()
+        db.refresh(config_db)
+        print("   -> ÉXITO. Color actualizado en la base de datos.")
+    except Exception as e:
+        print(f"   -> ERROR de BD al actualizar el color: {e}")
+        db.rollback()
+        # Relanzamos la excepción para que el router pueda manejarla
+        raise RuntimeError(f"Error de base de datos al actualizar el color: {e}")
+        
+    print("--- [FIN TRACE] ---\n")
+    return config_db
