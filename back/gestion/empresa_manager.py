@@ -48,9 +48,6 @@ def crear_empresa_y_primer_admin(db: Session, data: EmpresaCreate) -> Empresa:
             link_google_sheets=data.link_google_sheets,
             afip_condicion_iva=data.afip_condicion_iva,
             afip_punto_venta_predeterminado=data.afip_punto_venta_predeterminado,
-            direccion_negocio=data.direccion_negocio,
-            telefono_negocio=data.telefono_negocio,
-            mail_negocio=data.mail_negocio
             # Nota: Otros campos como 'color_principal', etc., usarán sus valores por defecto
             # definidos en el modelo si no se pasan aquí.
         )
