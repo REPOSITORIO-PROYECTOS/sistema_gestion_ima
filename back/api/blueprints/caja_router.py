@@ -141,16 +141,11 @@ def api_registrar_venta(
             print("POR SACAR CLIENTE DB")
             # Consultar los datos del RECEPTOR
             cliente_db = db.get(Tercero, req.id_cliente) if req.id_cliente else None
-            print("POR SACAR VENTA SCHEMA")
-            # Mapear datos a Schemas Pydantic (¡AHORA CON TODOS LOS CAMPOS!)
-           
-            #venta_data_schema = TransaccionData.model_validate(venta_creada, from_attributes=True)
+  
             
             print("POR SACAR CLIENTE SCHEMA")
             # Usar model_validate para manejar el caso de que cliente_db sea None
             cliente_data_schema = ReceptorData.model_validate(cliente_db, from_attributes=True) if cliente_db else None
-            print("veta data schema :")
-           # print(venta_data_schema)
             print("cliente data schema : ")
             print(cliente_data_schema)
 
