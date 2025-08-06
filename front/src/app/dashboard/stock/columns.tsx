@@ -11,6 +11,7 @@ export interface ProductoAPI {
   venta_negocio: number;
   stock_actual: number;
   codigo_interno: string;
+  codigos: { codigo: string }[];
   ubicacion: string;
 }
 
@@ -24,32 +25,20 @@ export const columns: ColumnDef<ProductoAPI>[] = [
       </Button>
     ),
   },
-    {
-    accessorKey: "codigo_barras",
+  {
+    accessorKey: "codigos", 
+    id: "codigos",           
     header: "Código de Barras",
     cell: ({ row }) => {
-      const codigo = row.getValue("codigo_barras") as string;
-      return <div className="font-mono text-sm">{codigo}</div>;
-    }
+      const codigos = row.getValue("codigos") as { codigo: string }[];
+      const texto = codigos?.map(c => c.codigo).join(" / ") || "—";
+      return <div className="font-mono text-sm">{texto}</div>;
+    },
+    filterFn: (row, columnId, filterValue) => {
+      const codigos = row.getValue(columnId) as { codigo: string }[];
+      return codigos?.some(c => c.codigo.toLowerCase().includes(filterValue.toLowerCase()));
+    },
   },
-  /* MOSTRAR CODIGO D BARRAS EN COLUMNA:
-  "descripcion": "BOLILLERO 32209 (45x85x25)",
-  "precio_venta": 1000.0,
-  "venta_negocio": 1000.0,
-  "costo_ultimo": 0.0,
-  "categoria": null,
-  "ubicacion": "Local (Sucursal Central)",
-  "id": 4048,
-  "codigo_interno": "32209 J2/Q",
-  "stock_actual": 5.0,
-  "activo": true,
-  "codigos": [
-    {
-        "codigo": "7316577005861;600792;"
-    }
-  ] 
-  */
-
   {
     accessorKey: "precio_venta",
     header: "Precio de Venta al Público",

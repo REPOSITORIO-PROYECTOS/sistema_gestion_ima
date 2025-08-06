@@ -110,9 +110,9 @@ export function DataTable<TData, TValue>({
                 {/* Input de Búsqueda por Código de Barras */}
                 <Input
                     placeholder="Filtrar por código de barras"
-                    value={(table.getColumn("codigo_interno")?.getFilterValue() as string) ?? ""}
+                    value={(table.getColumn("codigos")?.getFilterValue() as string) ?? ""}
                     onChange={(event) =>
-                        table.getColumn("codigo_interno")?.setFilterValue(event.target.value)
+                        table.getColumn("codigos")?.setFilterValue(event.target.value)
                     }
                     className="w-full md:w-1/6"
                 />
