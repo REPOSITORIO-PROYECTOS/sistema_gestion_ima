@@ -42,6 +42,8 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
   const navbarColor = empresa?.color_principal || 'bg-green-800';
   const logoUrl = empresa?.ruta_logo || '/default-logo.png';
 
+  // console.log(empresa?.ruta_logo) // https://sistema-ima.sistemataup.online/api/static/logos_empresas/logo_empresa_1.png
+
   // Oculta NavBar en scroll
   useEffect(() => {
     const handleScroll = () => {
@@ -67,10 +69,11 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
         {/* Logo */}
         <a href="/dashboard" className="text-xl font-bold flex items-center gap-2">
           <Image
-            src={`https://sistema-ima.sistemataup.online/api${logoUrl}`}    // sin slash pq ya viene del back
+            src={`https://sistema-ima.sistemataup.online/api${logoUrl}`}
             alt="Logo Empresa"
             width={60}
             height={60}
+            unoptimized
           />
         </a>
 
