@@ -180,6 +180,10 @@ def api_registrar_venta(
             resultado_afip = {"estado": "EXITOSO", **factura_generada}
 
         except (ValueError, RuntimeError) as e:
+            # Imprime el error completo en la consola para ver el detalle
+            print("!!!!!!!! ERROR DE VALIDACIÓN DE PYDANTIC !!!!!!!!")
+            print(e)
+            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             resultado_afip = {"estado": "FALLIDO", "error": str(e)}
 
     # --- RESPUESTA FINAL (sin cambios) ---
