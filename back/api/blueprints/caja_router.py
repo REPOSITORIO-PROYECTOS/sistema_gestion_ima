@@ -144,13 +144,13 @@ def api_registrar_venta(
             print("POR SACAR VENTA SCHEMA")
             # Mapear datos a Schemas Pydantic (¡AHORA CON TODOS LOS CAMPOS!)
            
-            venta_data_schema = TransaccionData.model_validate(venta_creada, from_attributes=True)
+            #venta_data_schema = TransaccionData.model_validate(venta_creada, from_attributes=True)
             
             print("POR SACAR CLIENTE SCHEMA")
             # Usar model_validate para manejar el caso de que cliente_db sea None
             cliente_data_schema = ReceptorData.model_validate(cliente_db, from_attributes=True) if cliente_db else None
             print("veta data schema :")
-            print(venta_data_schema)
+           # print(venta_data_schema)
             print("cliente data schema : ")
             print(cliente_data_schema)
 
@@ -165,7 +165,7 @@ def api_registrar_venta(
             print("ANTES DE LA FUNCION GENERAR FACTURA")
             # Llamar al especialista de facturación
             factura_generada = generar_factura_para_venta(
-                venta_data=venta_data_schema, 
+                total=req.total_venta, 
                 cliente_data=cliente_data_schema,
                 emisor_data=emisor_data_schema
             )

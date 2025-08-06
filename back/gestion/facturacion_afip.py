@@ -34,7 +34,7 @@ cliente_boveda = ClienteBoveda(base_url=BOVEDA_URL, api_key=BOVEDA_API_KEY)
 
 
 def generar_factura_para_venta(
-    venta_data: TransaccionData,
+    total: float,
     cliente_data: Optional[ReceptorData],
     emisor_data: EmisorData
 ) -> Dict[str, Any]:
@@ -86,7 +86,7 @@ def generar_factura_para_venta(
         "punto_venta": emisor_data.punto_venta,
         "tipo_documento": tipo_documento,
         "documento": documento,
-        "total": venta_data.total,
+        "total": total,
         "id_condicion_iva": id_condicion_iva_receptor,
         "neto": 0.0,
         "iva": 0.0,

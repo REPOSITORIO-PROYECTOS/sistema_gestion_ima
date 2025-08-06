@@ -1,7 +1,6 @@
 # back/schemas/comprobante_schemas.py
 
-from decimal import Decimal
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field
 from typing import List, Literal, Optional, Dict, Any
 
 # --- Definición de Tipos ---
@@ -33,25 +32,6 @@ class ItemData(BaseModel):
     descripcion: str
     precio_unitario: float
     subtotal: float
-    @computed_field
-    @property
-    def descripcion(self) -> str:
-        # Pydantic pasará aquí el objeto VentaDetalle.
-        # Asume que tu modelo VentaDetalle tiene una relación 'articulo'
-        # que permite acceder al objeto Articulo relacionado.
-        # Si la relación no existe, la validación fallará.
-        if not hasattr(self, 'articulo') or not self.articulo:
-            return "Descripción no disponible"
-        return self.articulo.nombre  # O el campo que uses para la descripción
-        
-    @computed_field
-    @property
-    def subtotal(self) -> Decimal:
-        # Pydantic calcula este valor usando otros campos del modelo.
-        return self.cantidad * self.precio_unitario
-
-    class Config:
-        from_attributes = True # Permite leer desde atributos de objetos 
 
 class TransaccionData(BaseModel):
     items: List[ItemData]
