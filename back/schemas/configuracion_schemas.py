@@ -9,7 +9,7 @@ class ConfiguracionUpdate(BaseModel):
     para permitir actualizaciones parciales.
     """
     nombre_negocio: Optional[str] = None
-    color_principal: Optional[str] = Field(None, example="#3F51B5") # Valida que sea un color hex
+    color_principal: Optional[str] = None # Valida que sea un color hex
     afip_condicion_iva: Optional[str] = None
     afip_punto_venta_predeterminado: Optional[int] = None
     direccion_negocio: Optional[str] = None
