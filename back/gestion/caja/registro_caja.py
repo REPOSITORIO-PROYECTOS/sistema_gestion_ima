@@ -197,7 +197,21 @@ def registrar_venta_y_movimiento_caja(
                     # --- FIN DE LA LÓGICA CORREGIDA ---
                     print("ESTAMOS SALIENDO DE LA FUNCION REGISTRAR_VENTA_Y _MOVIMIENTO")
                 else:
-                    print(f"⚠️ [DRIVE] No se pudo encontrar el cliente con ID {id_cliente}. No se registrará el movimiento en Drive.")
+                    datos_para_sheets = {
+                        "id_cliente": "0",
+                        "cliente": "cliente final",
+                        "cuit": "-",
+                        "razon_social": "-",
+                        "Tipo_movimiento": "venta",
+                        "descripcion": f"Venta de {len(articulos_vendidos)} artículos",
+                        "monto": total_final_con_recargo,
+                    }
+                    caller = TablasHandler(id_empresa=usuario_actual.id_empresa, db=db)
+                    if not caller.registrar_movimiento(datos_para_sheets):
+                        print("⚠️ [DRIVE] La función registrar_movimiento devolvió False.")
+                    if afectar_stock and not caller.restar_stock(articulos_vendidos): # Solo resta stock si afectar_stock es True
+                        print("⚠️ [DRIVE] Ocurrió un error al intentar actualizar el stock en Google Sheets.")
+
         except Exception as e_sheets:
             print(f"❌ [DRIVE] Ocurrió un error al intentar registrar en Google Sheets: {e_sheets}")
     return nueva_venta, movimiento_principal
