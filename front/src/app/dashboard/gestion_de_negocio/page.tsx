@@ -3,8 +3,7 @@
 import { useFacturacionStore } from '@/lib/facturacionStore';
 import * as Switch from '@radix-ui/react-switch';
 import { Input } from "@/components/ui/input";
-import Image from "next/image"
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Select,
   SelectContent,
@@ -47,8 +46,9 @@ export default function GestionNegocio() {
 
   // Edición de UI de empresa
   /* const [navbarColor, setNavbarColor] = useState("default"); */
-  const empresa = useEmpresaStore((state) => state.empresa);
-  const logoUrl = empresa?.ruta_logo || '/default-logo.png';
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  /* const logoUrl = empresa?.ruta_logo || '/default-logo.png'; */
   
 
   /* Manejo de Negocio y Ventas */
@@ -192,8 +192,14 @@ export default function GestionNegocio() {
       const data = await res.json();
       useEmpresaStore.getState().setEmpresa(data);
 
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""; 
+      }
+
       toast.success("Logo subido correctamente.");
       eventBus.emit("empresa_actualizada");
+
+      window.location.reload();
 
     } catch (error) {
       console.error(error);
@@ -397,43 +403,40 @@ export default function GestionNegocio() {
           </div>
 
           {/* Color del Nav */}
-          <Select
-            value={navbarColor}
-            onValueChange={(val) => {
-              setNavbarColor(val); 
-              actualizarColorNavbar(val); 
-            }}
-          >
-            <SelectTrigger className="w-[180px] cursor-pointer">
-              <SelectValue placeholder="Color del Navbar" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="bg-green-800">Verde</SelectItem>
-              <SelectItem value="bg-blue-800">Azul</SelectItem>
-              <SelectItem value="bg-red-800">Rojo</SelectItem>
-              <SelectItem value="bg-yellow-600">Amarillo</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex flex-col sm:flex-row w-full md:w-1/2 items-start gap-8 mb-6">
+            <label className="text-lg font-semibold text-green-950">🖌️ Personalizá el color de tu empresa:</label>
+            <Select
+              value={navbarColor}
+              onValueChange={(val) => {
+                setNavbarColor(val); 
+                actualizarColorNavbar(val); 
+              }}
+            >
+              <SelectTrigger className="w-full cursor-pointer">
+                <SelectValue placeholder="Color del Navbar" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="bg-green-800">Verde</SelectItem>
+                <SelectItem value="bg-blue-800">Azul</SelectItem>
+                <SelectItem value="bg-red-800">Rojo</SelectItem>
+                <SelectItem value="bg-yellow-600">Amarillo</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
           {/* LOGO */}
-          <div className="flex flex-col items-start gap-4 mb-6">
-            <label className="text-md font-semibold mb-1">Logo actual:</label>
-            <div className="flex flex-col sm:flex-row items-center gap-4">
-              <Image 
-                src={`https://sistema-ima.sistemataup.online/api${logoUrl}`} 
-                alt="Logo actual" 
-                width={60} height={60} 
-              />
-              <Input
-                type="file"
-                accept=".png,.jpg,.jpeg,.webp"
-                onChange={handleFileChange}
-                className="max-w-sm"
-              />
-            </div>
+          <div className="flex flex-col sm:flex-row w-full md:w-1/2 items-start gap-8 mb-6">
+            <label className="text-lg font-semibold text-green-950">🎨 Cambiar logo de empresa:</label>
+            <Input
+              type="file"
+              accept=".png,.jpg,.jpeg,.webp"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              className="max-w-sm"
+            />
           </div>
-        </div>
 
+        </div>
       </div>
     </ProtectedRoute>
   );
