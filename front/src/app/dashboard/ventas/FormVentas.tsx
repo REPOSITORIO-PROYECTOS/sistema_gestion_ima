@@ -338,7 +338,6 @@ function FormVentas({
           descuentoAplicado: false,
           porcentajeDescuento: 0,
         };
-
         console.log(producto)
         
         onAgregarProducto({
@@ -576,8 +575,6 @@ function FormVentas({
               }
             };
 
-            console.log(req)
-
             const response = await fetch("https://sistema-ima.sistemataup.online/api/comprobantes/generar", {
               method: "POST",
               headers: {
@@ -586,7 +583,6 @@ function FormVentas({
               },
               body: JSON.stringify(req)
             });
-            console.log(req)
 
             if (!response.ok) {
               const error = await response.json();
