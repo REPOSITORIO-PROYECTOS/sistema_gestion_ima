@@ -47,3 +47,18 @@ def api_sincronizar_articulos(db: Session = Depends(get_db),current_user: Usuari
         return {"status": "success", "message": "Sincronización de artículos completada.", "data": resultado}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ocurrió un error inesperado: {e}")
+    
+
+
+    
+@router.post("/proveedores", response_model=Dict)
+def api_sincronizar_proveedores(db: Session = Depends(get_db),current_user: Usuario = Depends(obtener_usuario_actual)):
+
+    try:
+        id_empresa = current_user.id_empresa
+        resultado = mod_sync.sincronizar_proveedores_desde_sheets(db,id_empresa)
+        if "error" in resultado:
+            raise HTTPException(status_code=500, detail=resultado["error"])
+        return {"status": "success", "message": "Sincronización de proveedores completada.", "data": resultado}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ocurrió un error inesperado: {e}")

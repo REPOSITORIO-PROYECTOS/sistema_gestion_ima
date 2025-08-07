@@ -294,3 +294,113 @@ def sincronizar_articulos_desde_sheets(db: Session, id_empresa_actual: int) -> D
         db.rollback()
         
     return resumen
+
+
+
+def sincronizar_proveedores_desde_sheets(db: Session, id_empresa_actual: int) -> Dict[str, int]:
+    """
+    Sincroniza proveedores
+    """
+    # 1. VERIFICAR CONFIGURACIÓN
+    config_empresa = db.get(ConfiguracionEmpresa, id_empresa_actual)
+    if not config_empresa or not config_empresa.link_google_sheets:
+        print(f"Error: Falta configuración de Google Sheets para la empresa ID {id_empresa_actual}.")
+        return {"creados": 0, "actualizados": 0, "errores": 0, "sin_cambios": 0}
+
+    # 2. CARGAR DATOS DE GOOGLE SHEETS
+    handler = TablasHandler(id_empresa=id_empresa_actual, db=db)
+    print("Obteniendo datos de clientes desde Google Sheets...")
+    proveedores_sheets = handler.cargar_proveedores()
+    if not proveedores_sheets:
+        print("Advertencia: No se pudieron cargar datos de Google Sheets o la hoja está vacía.")
+        return {"creados": 0, "actualizados": 0, "errores": 0, "sin_cambios": 0}
+
+    # 3. CARGAR CLIENTES EXISTENTES DE LA EMPRESA ACTUAL EN UN DICCIONARIO
+    print("Obteniendo clientes existentes de la base de datos (solo empresa actual)...")
+    clientes_db_objetos = db.exec(
+        select(Tercero).where(Tercero.id_empresa == id_empresa_actual)
+    ).all()
+
+    # La clave del diccionario será el 'codigo_interno', que corresponde al 'id-cliente' de la hoja.
+    clientes_db_dict = {
+        tercero.codigo_interno: tercero 
+        for tercero in clientes_db_objetos if tercero.codigo_interno
+    }
+    
+    resumen = {"creados": 0, "actualizados": 0, "sin_cambios": 0, "errores": 0}
+
+    # 4. ITERAR Y SINCRONIZAR
+    for proveedor_sheet in proveedores_sheets:
+        try:
+            # El 'id-cliente' de la hoja es nuestra clave de negocio 'codigo_interno'
+            codigo_interno_sheet = str(proveedor_sheet.get("id", "")).strip()
+            if not codigo_interno_sheet:
+                resumen["errores"] += 1
+                continue
+
+            # Buscamos el cliente en el diccionario que ya está filtrado por empresa
+            proveedor_existente = clientes_db_dict.get(codigo_interno_sheet)
+            cuit_sheet = str(proveedor_sheet.get("cuit", "")).strip() or None
+
+            # Preparamos el conjunto de datos limpios que vienen del Excel
+            datos_limpios = {
+                "codigo_interno": codigo_interno_sheet,
+                "nombre_razon_social": str(proveedor_sheet.get("nombre social", f"Proveedor #{codigo_interno_sheet}")).strip(),
+                "telefono": str(proveedor_sheet.get("telefono", "")).strip(),
+                "nombre_fantasia": str(proveedor_sheet.get("nombre fantasia", "")).strip() or None,
+                "direccion": str(proveedor_sheet.get("direccion", "")).strip(),
+                "identificacion_fiscal": str(proveedor_sheet.get("id fiscal", "")).strip(),
+                "limite_credito": str(proveedor_sheet.get("limite credito", "")).strip(),
+                "provincia": str(proveedor_sheet.get("provincia", "")).strip(),
+                "cuit": cuit_sheet,
+                "condicion_iva": str(proveedor_sheet.get("condicion iva", "")).strip() or "Consumidor Final",
+                "id_empresa": id_empresa_actual,
+                "es_proveedor": True,
+                "es_cliente": False,
+            }
+
+            if proveedor_existente:
+                # --- ACTUALIZAR CLIENTE EXISTENTE ---
+                cambios_detectados = False
+                for campo, valor_nuevo in datos_limpios.items():
+                    valor_viejo = getattr(proveedor_existente, campo)
+                    if str(valor_viejo or '') != str(valor_nuevo or ''):
+                        setattr(proveedor_existente, campo, valor_nuevo)
+                        cambios_detectados = True
+                
+                if cambios_detectados:
+                    print(f"Actualizando cliente con código interno: {codigo_interno_sheet}")
+                    db.add(proveedor_existente)
+                    resumen["actualizados"] += 1
+                else:
+                    resumen["sin_cambios"] += 1
+            else:
+                # --- CREAR NUEVO CLIENTE ---
+                print(f"Creando nuevo cliente con código interno: {codigo_interno_sheet}")
+                
+                # Añadimos los valores por defecto que el modelo necesita al crear
+                datos_limpios['activo'] = True
+                datos_limpios['es_cliente'] = False
+                datos_limpios['es_proveedor'] = True
+                # Asumimos que el modelo Tercero maneja 'fecha_alta' con un default_factory
+                
+                nuevo_cliente = Tercero(**datos_limpios)
+                db.add(nuevo_cliente)
+                resumen["creados"] += 1
+
+        except Exception as e:
+            codigo_info = proveedor_sheet.get('id', 'SIN ID')
+            print(f"ERROR al procesar fila del sheet con id-cliente '{codigo_info}'. Detalle: {e}")
+            resumen["errores"] += 1
+            continue
+            
+    # 5. COMMIT FINAL
+    try:
+        db.commit()
+        print("Sincronización de clientes completada.")
+    except Exception as e:
+        print(f"ERROR FATAL DURANTE EL COMMIT: Se revirtió la transacción. Detalle: {e}")
+        db.rollback()
+        
+    return resumen
+# ----- LÓGICA PARA ARTÍCULOS -----

@@ -81,6 +81,25 @@ class TablasHandler:
         return [] # Devuelve lista vacía en caso de cualquier error
     
 
+    def cargar_proveedores(self):
+        print("Intentando cargar/recargar datos de proveedores...")
+        if self.client:
+            try:
+                sheet = self.client.open_by_key(self.google_sheet_id)
+                worksheet = sheet.worksheet("proveedores") 
+                datos_proveedores = worksheet.get_all_records()
+                return datos_proveedores
+            except gspread.exceptions.WorksheetNotFound:
+                print("❌ ERROR: La hoja de cálculo no tiene una pestaña llamada 'proveedores'.")
+            except Exception as e:
+                # ¡IMPRIME EL ERROR REAL!
+                print(f"❌ Error detallado al cargar datos de proveedores: {type(e).__name__} - {e}")
+        else:
+            print("Cliente de Google Sheets no disponible.")
+        return [] # Devuelve lista vacía en caso de cualquier error
+    
+
+
 
     def registrar_movimiento(self, datos_venta: Dict[str, Any]) -> bool:
         if not self.client:
