@@ -85,6 +85,43 @@ def obtener_todos_los_articulos(db: Session, id_empresa_actual: int, skip: int =
     )
     return db.exec(statement).all()
 
+def buscar_articulos_por_termino(
+    db: Session, 
+    id_empresa_actual: int, 
+    termino: str,
+    skip: int = 0, 
+    limit: int = 100
+) -> List[Articulo]:
+    """
+    NUEVA FUNCIÓN: Busca artículos de una empresa que coincidan con un término de búsqueda.
+    Filtra por descripción, código interno y códigos de barras asociados.
+    """
+    
+    # Preparamos el término para una búsqueda de tipo "contiene"
+    termino_like = f"%{termino}%"
+
+    # La consulta es casi idéntica a la que te propuse antes, pero ahora
+    # vive en su propia función.
+    statement = (
+        select(Articulo)
+        .join(ArticuloCodigo, isouter=True) # isouter=True es un LEFT JOIN
+        .where(
+            Articulo.id_empresa == id_empresa_actual,
+            or_(
+                Articulo.descripcion.ilike(termino_like),
+                Articulo.codigo_interno.ilike(termino_like),
+                ArticuloCodigo.codigo.ilike(termino_like)
+            )
+        )
+        .distinct()
+        .order_by(Articulo.descripcion)
+        .offset(skip)
+        .limit(limit)
+        .options(selectinload(Articulo.codigos))
+    )
+    
+    return db.exec(statement).all()
+
 # ===================================================================
 # === OPERACIONES DE ESCRITURA (CREATE, UPDATE, DELETE)
 # ===================================================================
