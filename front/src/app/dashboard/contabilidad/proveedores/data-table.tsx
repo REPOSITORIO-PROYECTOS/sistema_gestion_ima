@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { toast } from "sonner"
+import { useAuthStore } from "@/lib/authStore"
 
 // ==========================================================
 // === CORRECCIÓN 1: Actualizamos las props que el componente recibe ===
@@ -52,19 +53,33 @@ export function DataTable<TData, TValue>({
 
     const [sorting, setSorting] = useState<SortingState>([])
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+    const token = useAuthStore((state) => state.token);
 
-    // Esta función de sincronización no está relacionada con la de carga,
-    // pero la mantenemos como la tenías.
+    // Sincronizador de Proveedores
     const handleSyncProveedores = async () => {
+
         toast("Sincronizando proveedores... Por favor espera");
-        try {
-            // Lógica de sincronización aquí...
-            toast.success("Proveedores sincronizados ✅");
-        } catch (error) {
-            console.error("Error al sincronizar:", error);
-            toast.error("Error al sincronizar ❌");
-        }
+    
+            try {
+                const response = await fetch("https://sistema-ima.sistemataup.online/api/sincronizar/proveedores", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({}),
+                });
+    
+                if (!response.ok) throw new Error("Fallo en la respuesta del servidor");
+
+                toast.success("✅ Proveedores sincronizados!");
+
+            } catch (error) {
+                console.error("Error al sincronizar proveedores:", error);
+                toast.error("❌ Error al sincronizar proveedores");
+            }
     };
+
 
     const table = useReactTable({
         data,
