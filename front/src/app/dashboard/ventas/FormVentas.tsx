@@ -951,7 +951,7 @@ function FormVentas({
               <SelectContent>
                 <SelectItem value="efectivo">Efectivo</SelectItem>
                 <SelectItem value="transferencia">Transferencia</SelectItem>
-                <SelectItem value="bancario">Bancario</SelectItem>
+                <SelectItem value="bancario">POS</SelectItem>
               </SelectContent>
             </Select>
           </div>
