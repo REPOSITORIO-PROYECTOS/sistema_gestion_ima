@@ -353,9 +353,9 @@ class ConfiguracionEmpresa(SQLModel, table=True):
     
     # --- Configuración de Apariencia ---
     nombre_negocio: Optional[str] # Nombre a mostrar en los tickets
-    color_principal: str = Field(default="#000000")
-    ruta_logo: Optional[str] = Field(default=None)
-    ruta_icono: Optional[str] = Field(default=None)
+    color_principal: str = Field(default="bg-sky-800")
+    ruta_logo: Optional[str] = Field(default="front\public\default-logo.png")
+    ruta_icono: Optional[str] = Field(default="front\public\favicon.ico")
     recargo_transferencia: float = Field(default=0.0)
     concepto_recargo_transferencia: str = Field(default="Recargo por Transferencia")
     recargo_banco: float = Field(default=0.0)
