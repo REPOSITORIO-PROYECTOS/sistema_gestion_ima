@@ -1,7 +1,7 @@
 # back/gestion/stock/articulos.py
 # VERSIÓN REFACTORIZADA - Lógica de negocio para Artículos usando SQLModel (ORM)
 
-from sqlmodel import Session, select
+from sqlmodel import Session, or_, select
 from typing import List, Optional
 from sqlalchemy.orm import selectinload
 
@@ -47,20 +47,30 @@ def obtener_articulo_por_id(id_empresa: int, db: Session, articulo_id: int) -> O
 
 def buscar_articulo_por_codigo(db: Session, id_empresa_actual: int, codigo: str) -> Optional[Articulo]:
     """
-    Busca un artículo por su código de barras, asegurando que pertenezca a la empresa del usuario.
+    Busca un artículo por uno de sus códigos de barras, incluso si hay múltiples códigos
+    separados por punto y coma. Asegura que el artículo pertenezca a la empresa del usuario.
     Pre-carga eficientemente todos los demás códigos de barras asociados al artículo encontrado.
     """
+
     statement = (
         select(Articulo)
         .join(ArticuloCodigo)
         .where(
-            ArticuloCodigo.codigo == codigo,
+            # Aseguramos que la búsqueda sea dentro de la empresa y en artículos activos
             Articulo.id_empresa == id_empresa_actual,
-            Articulo.activo == True
+            Articulo.activo == True,
+            # Nueva condición para buscar el código dentro del string
+            or_(
+                ArticuloCodigo.codigo == codigo,
+                ArticuloCodigo.codigo.like(f'{codigo};%'),
+                ArticuloCodigo.codigo.like(f'%;{codigo};%'),
+                ArticuloCodigo.codigo.like(f'%;{codigo}')
+            )
         )
         .options(selectinload(Articulo.codigos))
     )
     return db.exec(statement).first()
+
 
 def obtener_todos_los_articulos(db: Session, id_empresa_actual: int, skip: int = 0, limit: int = 100) -> List[Articulo]:
     """
