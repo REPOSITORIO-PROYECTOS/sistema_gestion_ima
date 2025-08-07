@@ -304,6 +304,7 @@ function FormVentas({
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+  
   // Disparador de buscar y agregar producto con codigo de barras
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
 

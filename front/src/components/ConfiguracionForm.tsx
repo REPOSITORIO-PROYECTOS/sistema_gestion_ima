@@ -19,6 +19,7 @@ const formSchema = z.object({
   mail_negocio: z.string().email("Debe ser un email válido.").optional().or(z.literal("")).nullable(),
   cuit: z.string().length(11, "CUIT debe tener 11 dígitos.").optional().nullable(),
   afip_punto_venta_predeterminado: z.string().min(1, "Requerido.").max(5, "Máximo 5 dígitos.").optional().nullable(),
+  afip_condicion_iva: z.string().optional().nullable(), 
   link_google_sheets: z.string().optional().nullable(),
 });
 
@@ -97,6 +98,15 @@ export function ConfiguracionForm({ empresaId }: Props) {
                 )} />
                 <FormField control={form.control} name="cuit" render={({ field }) => (
                     <FormItem><FormLabel>CUIT</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="afip_condicion_iva" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Condición frente al IVA</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value ?? ''} placeholder="Ej. Responsable Inscripto" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
                 <FormField control={form.control} name="afip_punto_venta_predeterminado" render={({ field }) => (
                     <FormItem><FormLabel>Punto de Venta</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
