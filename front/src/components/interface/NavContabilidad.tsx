@@ -35,7 +35,7 @@ function NavContabilidad({ links }: { links: { href: string; name: string }[] })
       {/* Nav en menú dropdown para mobile */}
       <div className="md:hidden my-4">
         <Select onValueChange={(value) => (window.location.href = value)}>
-          <SelectTrigger>
+          <SelectTrigger className='w-full'>
             <SelectValue placeholder="Elija que seccion desea ver..." />
           </SelectTrigger>
           <SelectContent >

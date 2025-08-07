@@ -16,7 +16,7 @@ function ContabilidadLayout({ children } : { children: React.ReactNode }) {
     <ProtectedRoute allowedRoles={["Admin", "Cajero"]}>
 
       <div className="flex flex-col lg:flex-row w-full items-center lg:justify-between gap-4">
-        <h2 className="text-3xl font-semibold">Sección de Contabilidad</h2>
+        <h2 className="text-3xl font-semibold text-green-950">Sección de Contabilidad</h2>
 
         {/* Nav de Contabilidad */}
         <NavContabilidad links={links}/>

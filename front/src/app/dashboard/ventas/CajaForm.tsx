@@ -350,7 +350,7 @@ const handleImprimirCierre = async (idSesionCerrada: number) => {
               </div>
 
               <div className="flex items-center justify-between gap-4">
-                <Label htmlFor="saldo-bancario" className="text-right text-md md:text-lg">Bancario</Label>
+                <Label htmlFor="saldo-bancario" className="text-right text-md md:text-lg">POS</Label>
                 <Input
                   id="saldo-bancario"
                   type="text"

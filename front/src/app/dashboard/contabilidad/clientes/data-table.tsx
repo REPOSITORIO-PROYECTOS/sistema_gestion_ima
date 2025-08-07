@@ -107,10 +107,10 @@ export function DataTable<TData, TValue>({
                     className="w-full sm:w-1/2 md:max-w-1/4"
                 />
 
-                <div className="flex flex-row gap-2 md:justify-end sm:w-1/2 md:max-w-2/5">
+                <div className="flex flex-col md:flex-row gap-2 md:justify-end sm:w-1/2 md:max-w-2/5">
 
                     {/* Sincro tabla de clientes */}
-                    <Button variant="outline" className="w-2/3 md:w-1/3" onClick={handleSyncClientes}>Sincronizar Clientes</Button>
+                    <Button variant="outline" className="w-full md:w-1/2" onClick={handleSyncClientes}>Sincronizar Clientes</Button>
 
                     {/* Input de Seleccion por status */}
                     <Select
@@ -122,7 +122,7 @@ export function DataTable<TData, TValue>({
                             );
                         }}
                         >
-                        <SelectTrigger className="cursor-pointer w-1/3">
+                        <SelectTrigger className="cursor-pointer w-full md:w-1/2">
                             <SelectValue placeholder="Filtrar por CUIT" />
                         </SelectTrigger>
 
