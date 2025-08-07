@@ -5,6 +5,7 @@ import { ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { formatDateArgentina } from "@/utils/formatDate";
 
 export interface MovimientoAPI {
   id: number;
@@ -143,11 +144,11 @@ export const columns: ColumnDef<MovimientoAPI>[] = [
     header: "Método de Pago",
   },
   {
-    accessorKey: "fecha_hora",
+    accessorKey: "timestamp",
     header: "Fecha",
     cell: ({ row }) => {
-      const fecha = new Date(row.getValue("fecha_hora") as string);
-      return fecha.toLocaleString("es-AR");
+      const fecha = row.getValue("timestamp") as string;
+      return <span>{formatDateArgentina(fecha)}</span>;
     },
   },
 ];

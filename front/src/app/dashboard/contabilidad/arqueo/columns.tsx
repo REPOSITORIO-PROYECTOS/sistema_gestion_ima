@@ -3,6 +3,7 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { ArrowUpDown } from "lucide-react";
+import { formatDateArgentina } from "@/utils/formatDate";
 
 // Este tipo debe coincidir con los datos reales
 export type ArqueoCaja = {
@@ -144,15 +145,4 @@ function formatCurrency(value: number | null) {
     style: "currency",
     currency: "ARS",
   }).format(value);
-}
-
-// Convierte string ISO (UTC) a fecha/hora local argentina
-function formatDateArgentina(fecha: string): string {
-  const fechaUTC = fecha.endsWith("Z") ? fecha : `${fecha}Z`; // ← forzamos que sea UTC
-  return new Date(fechaUTC).toLocaleString("es-AR", {
-    timeZone: "America/Argentina/Buenos_Aires",
-    hour12: false,
-    dateStyle: "short",
-    timeStyle: "short",
-  });
 }

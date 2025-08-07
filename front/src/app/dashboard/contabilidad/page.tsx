@@ -79,7 +79,7 @@ export default function ContabilidadPage() {
             columns={columns}
             data={data}
             token={token}
-            onActionComplete={fetchData} // Pasamos la función para que la tabla pueda recargar los datos
+            onActionComplete={fetchData}
           />
         )}
       </div>
