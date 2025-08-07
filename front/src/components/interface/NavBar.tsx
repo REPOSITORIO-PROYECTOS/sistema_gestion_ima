@@ -20,6 +20,7 @@ import { useAuthStore } from '@/lib/authStore'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image';
 import eventBus from "@/utils/eventBus";
+import { useEmpresaStore } from "@/lib/empresaStore";
 
 type NavLink = {
   href: string
@@ -57,9 +58,7 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [lastScrollY]);
 
-  // GET UI de Empresa
   useEffect(() => {
-
     const obtenerEmpresa = async () => {
       try {
         const res = await fetch('https://sistema-ima.sistemataup.online/api/configuracion/mi-empresa', {
@@ -71,14 +70,18 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
         if (!res.ok) throw new Error('Error al obtener datos de empresa');
 
         const data = await res.json();
-        setNavbarColor(data.color_principal);
+
+        // Actualizar visualmente logo y color
+        setNavbarColor(data.color_principal || 'bg-green-800');
         setLogoUrl(`https://sistema-ima.sistemataup.online/api${data.ruta_logo}`);
+
+        // Actualizar la store global
+        useEmpresaStore.getState().setEmpresa(data);
 
       } catch (error) {
         console.error('Error al cargar datos de empresa:', error);
         setNavbarColor('bg-green-800'); 
         setLogoUrl('/default-logo.png');
-
       } finally {
         setEmpresaCargada(true); 
       }
@@ -88,15 +91,15 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
       obtenerEmpresa();
     }
 
-     // Escuchar evento
-    const refrescar = () => obtenerEmpresa();
-    eventBus.on("empresa_actualizada", refrescar);
+    // Escuchar evento y refrescar los datos de empresa al recibirlo
+    eventBus.on("empresa_actualizada", obtenerEmpresa);
 
+    // Limpiar al desmontar
     return () => {
-      eventBus.off("empresa_actualizada", refrescar);
+      eventBus.off("empresa_actualizada", obtenerEmpresa);
     };
-
   }, [token]);
+
 
 
   // Detecta las iniciales del nombre_usuario para display en avatar
@@ -183,10 +186,11 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                 <DropdownMenuSeparator />
 
                 <DropdownMenuItem 
-                  className="cursor-pointer text-red-600"
+                  className="text-red-600"
                   onClick={() => {
-                    useAuthStore.getState().logout();
-                    router.push('/');
+                    useAuthStore.getState().logout();           // Limpia auth
+                    useEmpresaStore.getState().clearEmpresa();  // Limpia empresa
+                    router.push('/');                           // Redirecciona
                   }}
                 >
                   Cerrar Sesión
@@ -259,8 +263,9 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                 <DropdownMenuItem 
                   className="text-red-600"
                   onClick={() => {
-                    useAuthStore.getState().logout();
-                    router.push('/');
+                    useAuthStore.getState().logout();           // Limpia auth
+                    useEmpresaStore.getState().clearEmpresa();  // Limpia empresa
+                    router.push('/');                           // Redirecciona
                   }}
                 >
                   Cerrar Sesión

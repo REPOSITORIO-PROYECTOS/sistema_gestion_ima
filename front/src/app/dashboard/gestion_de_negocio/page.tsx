@@ -35,7 +35,7 @@ export default function GestionNegocio() {
     formatoComprobante, 
     setFormatoComprobante
   } = useFacturacionStore();
-  const [navbarColor, setNavbarColor] = useState("bg-green-800");
+  const [navbarColor, setNavbarColor] = useState("bg-sky-600");
 
   // Formatos de impresión de ticket - escalable a mas opciones 
   const formatosDisponibles = ["PDF", "Ticket"];  
@@ -416,10 +416,15 @@ export default function GestionNegocio() {
                 <SelectValue placeholder="Color del Navbar" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="bg-sky-600">Colores:</SelectItem>
                 <SelectItem value="bg-green-800">Verde</SelectItem>
-                <SelectItem value="bg-blue-800">Azul</SelectItem>
-                <SelectItem value="bg-red-800">Rojo</SelectItem>
+                <SelectItem value="bg-emerald-700">Verde Claro</SelectItem>
+                <SelectItem value="bg-blue-900">Azul</SelectItem>
+                <SelectItem value="bg-sky-400">Azul Claro</SelectItem>
+                <SelectItem value="bg-red-700">Rojo</SelectItem>
+                <SelectItem value="bg-red-600">Rojo Claro</SelectItem>
                 <SelectItem value="bg-yellow-600">Amarillo</SelectItem>
+                <SelectItem value="bg-amber-300">Amarillo Claro</SelectItem>
               </SelectContent>
             </Select>
           </div>

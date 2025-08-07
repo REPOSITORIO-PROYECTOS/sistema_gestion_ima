@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
 interface Empresa {
   id_empresa: number;
@@ -30,7 +30,8 @@ export const useEmpresaStore = create<EmpresaStore>()(
       clearEmpresa: () => set({ empresa: null }),
     }),
     {
-      name: 'empresa-storage', // localStorage key
+      name: 'empresa-storage',
+      storage: createJSONStorage(() => sessionStorage),
     }
   )
 );
