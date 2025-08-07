@@ -86,13 +86,16 @@ def generar_factura_para_venta(
         # secreto_emisor = cliente_boveda.obtener_secreto(emisor_data.cuit)
         # if not secreto_emisor:
         #     raise ValueError(f"No se encontraron credenciales en la bóveda para el CUIT {emisor_data.cuit}.")
-        
+        secreto_emisor = cliente_boveda.obtener_secreto(emisor_data.cuit)
+        if not secreto_emisor:
+            # Error de negocio: el emisor no tiene credenciales cargadas.
+            raise ValueError(f"No se encontraron credenciales en la bóveda para el CUIT {emisor_data.cuit}.")
         print("Credenciales obtenidas con éxito de la bóveda (simulado).")
         
         credenciales = {
             "cuit": emisor_data.cuit,
-            "certificado": "---CERTIFICADO-SIMULADO---",
-            "clave_privada": "---CLAVE-PRIVADA-SIMULADA---"
+            "certificado": secreto_emisor.certificado,
+            "clave_privada": secreto_emisor.clave_privada
         }
 
     except (ConnectionError, PermissionError) as e:
@@ -146,8 +149,7 @@ def generar_factura_para_venta(
         "datos_factura": datos_factura
     }
     
-    # URL de tu microservicio
-    FACTURACION_API_URL = "http://tu-microservicio-de-facturacion.com/api/facturar"
+
 
     print(f"Enviando petición al microservicio de facturación en: {FACTURACION_API_URL}")
     try:
