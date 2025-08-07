@@ -41,9 +41,7 @@ export default function ContabilidadPage() {
       }
       
       const json = await res.json();
-      setData(json); // Actualizamos el estado con los datos recibidos.
-
-      console.log(json)
+      setData(json);
 
     } catch (err) {
       console.error("Error al obtener los datos:", err);

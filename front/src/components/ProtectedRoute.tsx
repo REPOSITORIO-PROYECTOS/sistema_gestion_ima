@@ -22,8 +22,6 @@ export default function ProtectedRoute({ allowedRoles, children }: Props) {
     
     if (!isClient) return
 
-    /* console.log("🔐 [ProtectedRoute] Rol actual:", role) */  // solo para debug
-
     if (!role || !allowedRoles.includes(role.nombre)) {
       router.push("/")
     }
