@@ -304,12 +304,12 @@ function FormVentas({
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
-
+  // Disparador de buscar y agregar producto con codigo de barras
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
 
     if (e.key === 'Enter') {
-      e.preventDefault();
 
+      e.preventDefault();
       if (!codigo) return;
 
       try {
@@ -324,7 +324,6 @@ function FormVentas({
         );
 
         if (!res.ok) throw new Error('Producto no encontrado');
-        console.log(res)
         const data = await res.json();
         
         const producto: Producto = {
@@ -349,7 +348,7 @@ function FormVentas({
           porcentajeDescuento: 0,
         });
         
-        toast.success(`Producto agregado: ${data.tipo}`);
+        toast.success(`Producto agregado: ${data.descripcion}`);
 
       } catch (error) {
         console.error(error);

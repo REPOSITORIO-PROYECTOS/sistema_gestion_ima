@@ -73,7 +73,7 @@ function DashboardVenta() {
     }
   }, [token, verificarEstadoCaja]);
 
-  // Mapeamos el rol para mostrarlo legible
+  // Mapeamos el rol para mostrarlo legible en el panel de informacion
   const mostrarRol = () => {
     if (role?.nombre === "Admin") return "Administrador";
     if (role?.nombre === "Cajero") return "Cajero";
