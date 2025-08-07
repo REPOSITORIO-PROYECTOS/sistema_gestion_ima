@@ -8,6 +8,7 @@ import { useAuthStore } from "@/lib/authStore";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
 export default function ContabilidadPage() {
+
   const [data, setData] = useState<MovimientoAPI[]>([]);
   const [loading, setLoading] = useState(true);
   const { token } = useAuthStore();
@@ -42,6 +43,7 @@ export default function ContabilidadPage() {
       
       const json = await res.json();
       setData(json);
+      console.log(json)
 
     } catch (err) {
       console.error("Error al obtener los datos:", err);

@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/select"
 import { MovimientoAPI } from "./columns";
 import { toast } from "sonner";
+import { Input } from "@/components/ui/input"
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
@@ -53,7 +54,8 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
     const [rowSelection, setRowSelection] = useState({});
     const [isLoading, setIsLoading] = useState(false);
 
-     const handleAgrupar = async () => {
+    // Agrupar Movimientos
+    const handleAgrupar = async () => {
         setIsLoading(true);
 
         const selectedRows = table.getSelectedRowModel().flatRows;
@@ -106,6 +108,73 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
         }
     };
 
+    // POST para facturar movimientos (ventas) en el back
+    const handleFacturarLote = async () => {
+        setIsLoading(true);
+
+        try {
+            const selectedRows = table.getSelectedRowModel().flatRows;
+
+            if (selectedRows.length === 0) {
+                toast.error("Selección inválida", {
+                    description: "Debes seleccionar al menos una venta."
+                });
+                setIsLoading(false);
+                return;
+            }
+
+            // Validar que todos los clientes sean iguales
+            const clientes = selectedRows.map(row => row.original.venta?.cliente?.id ?? null);
+            const todosIguales = clientes.every(id => id === clientes[0]);
+
+            if (!todosIguales) {
+                toast.error("Error de selección", {
+                    description: "Todas las ventas seleccionadas deben pertenecer al mismo cliente."
+                });
+                setIsLoading(false);
+                return;
+            }
+
+            const ids_movimientos = selectedRows.map(row => row.original.id);
+            const id_cliente_final = clientes[0] && clientes[0] !== 0 ? clientes[0] : null;
+
+            const response = await fetch(
+                "https://sistema-ima.sistemataup.online/api/comprobantes/facturar-lote",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                        ids_movimientos,
+                        id_cliente_final,
+                    }),
+                }
+            );
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || "Error en la facturación del lote.");
+            }
+
+            toast.success("¡Facturación exitosa!", {
+                description: `Se facturaron ${ids_movimientos.length} movimientos correctamente.`
+            });
+
+            table.resetRowSelection();
+            onActionComplete();
+
+        } catch (error) {
+            toast.error("Error al facturar", {
+                description: error instanceof Error ? error.message : "Ocurrió un error inesperado."
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Generador de tabla
     const table = useReactTable<TData>({
         data,
         columns,
@@ -118,24 +187,18 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
             const facturada = row.original.venta?.facturada;
             const tipoSolicitado = row.original.venta?.tipo_comprobante_solicitado;
 
-            // No permitir selección de EGRESO o facturada
-            if (tipo === "EGRESO" || facturada === true) return false;
+            // No permitir selección que no sea VENTA o ya facturada
+            if (tipo !== "VENTA" || facturada === true) return false;
 
             const selectedKeys = Object.keys(rowSelection);
             if (selectedKeys.length === 0) return true;
 
-            // Obtener la primera fila seleccionada
             const primeraSeleccionada = data.find((item) =>
                 selectedKeys.includes(String(item.id))
             );
             if (!primeraSeleccionada) return true;
 
             const tipoSolicitadoBase = primeraSeleccionada.venta?.tipo_comprobante_solicitado;
-
-            // Si no hay tipo solicitado base, permitimos libre selección
-            if (!tipoSolicitadoBase) return true;
-
-            // Solo permitir si coincide el tipo_comprobante_solicitado
             return tipoSolicitado === tipoSolicitadoBase;
         },
         onSortingChange: setSorting,
@@ -156,6 +219,16 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
 
                     {/* Selectores y Filtrados */}
                     <div className="flex flex-col md:flex-row w-full md:w-auto gap-4">
+
+                        {/* Input de busqueda por nombre de cliente para facturarle */}
+                        <Input
+                            placeholder="Buscar cliente..."
+                            value={(table.getColumn("id_cliente")?.getFilterValue() as string) ?? ""}
+                            onChange={(event) =>
+                                table.getColumn("id_cliente")?.setFilterValue(event.target.value)
+                            }
+                            className="w-full md:w-1/3"
+                        />
 
                         {/* Elegir por tipo de movimiento */}
                         <Select
@@ -205,11 +278,11 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
                     </div>
             
                     {/* --- Botones de Facturación --- */}
-                    <div className="flex flex-col md:flex-row w-full md:w-1/2 md:px-4 gap-4">
+                    <div className="flex flex-col md:flex-row w-full md:w-1/3 md:px-4 gap-4">
                         <Button
                             className="w-full md:w-1/2"
                             variant="outline"
-                            onClick={() => console.log("Lógica para facturar lote")}
+                            onClick={handleFacturarLote}
                             disabled={!table.getIsSomeRowsSelected() || isLoading}
                         >
                             Facturar Lote ({table.getFilteredSelectedRowModel().rows.length})

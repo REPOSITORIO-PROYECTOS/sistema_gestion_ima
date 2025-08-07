@@ -88,6 +88,49 @@ export const columns: ColumnDef<MovimientoAPI>[] = [
     },
   },
   {
+    accessorFn: (row) => row.venta?.cliente?.id ?? "—",
+    id: "id_cliente",
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        className="px-0"
+      >
+        Cliente
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => {
+      const idCliente = row.getValue("id_cliente") as number | string;
+      const nombre = row.original.venta?.cliente?.nombre_razon_social ?? "Consumidor Final";
+
+      return (
+        <div className="flex flex-col">
+          <span className="font-medium">{idCliente}</span>
+          <span className="text-xs text-muted-foreground">{nombre}</span>
+        </div>
+      );
+    },
+    sortingFn: (rowA, rowB, columnId) => {
+      // Sort por número si ambos son números, si no, por string normal
+      const a = rowA.getValue(columnId);
+      const b = rowB.getValue(columnId);
+
+      if (typeof a === "number" && typeof b === "number") {
+        return a - b;
+      }
+
+      return String(a).localeCompare(String(b));
+    },
+    filterFn: (row, id, filterValue) => {
+      const idCliente = String(row.getValue(id) ?? "").toLowerCase();
+      const nombreCliente = row.original.venta?.cliente?.nombre_razon_social?.toLowerCase() ?? "";
+      const search = String(filterValue).toLowerCase();
+
+      return idCliente.includes(search) || nombreCliente.includes(search);
+    },
+  },
+  {
     accessorFn: (row) => row.venta?.tipo_comprobante_solicitado ?? "—",
     id: "tipo_comprobante_solicitado",
     header: "Tipo Comprobante",
