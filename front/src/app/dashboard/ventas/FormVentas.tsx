@@ -171,14 +171,6 @@ function FormVentas({
     recargoBancario,
   } = useFacturacionStore();
 
-  // Seccion del calculo del recargo
-  let totalConRecargo = totalConDescuento;
-  if (metodoPago === "transferencia" && recargoTransferenciaActivo) {
-    totalConRecargo += (totalConDescuento * recargoTransferencia) / 100;
-  } else if (metodoPago === "bancario" && recargoBancarioActivo) {
-    totalConRecargo += (totalConDescuento * recargoBancario) / 100;
-  }
-
   // Código de Barras
   const [codigo, setCodigoEscaneado] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -212,6 +204,22 @@ function FormVentas({
   // Calculo de los descuentos aplicados a un producto - % o nominal
   const subtotal = totalProducto * (1 - descuentoPorcentual / 100);
   const productoConDescuento = Math.max(0, subtotal - descuentoNominal);
+
+  // Calculo total de toda la venta con descuentos y recargos
+  const totalVentaFinal = (() => {
+    // Aplicar descuento sobre el total
+    let total = totalVenta * (1 - descuentoSobreTotal / 100);
+
+    // Aplicar recargos según método de pago
+    if (metodoPago === "transferencia" && recargoTransferenciaActivo) {
+      total += total * (recargoTransferencia / 100);
+    } else if (metodoPago === "bancario" && recargoBancarioActivo) {
+      total += total * (recargoBancario / 100);
+    }
+
+    // Redondear a 2 decimales
+    return Math.round(total * 100) / 100;
+  })();
 
 
   // Hook para agregar producto al panel resumen de productos
@@ -613,7 +621,6 @@ function FormVentas({
         await generarComprobante();
         resetFormularioVenta();
         window.scrollTo({ top: 20, behavior: "smooth" });
-        /* inputRef.current?.focus(); */
 
       } else {
 
@@ -1182,7 +1189,7 @@ function FormVentas({
             </p>
           )}
           <p className="text-2xl font-bold text-green-900">
-            <span className="font-semibold">Total Final:</span> ${totalConRecargo.toFixed(2)}
+            <span className="font-semibold">Total Final:</span> ${totalVentaFinal}
           </p>
         </div>
 
