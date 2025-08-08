@@ -17,6 +17,7 @@ import { ConfiguracionForm } from "@/components/ConfiguracionForm";
 import { useEmpresaStore } from '@/lib/empresaStore';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import eventBus from "@/utils/eventBus";
+import { Button } from '@/components/ui/button';
 
 export default function GestionNegocio() {
 
@@ -335,13 +336,13 @@ export default function GestionNegocio() {
             className="w-full md:w-1/3 mt-2"
           />
 
-          <button
+          <Button
             onClick={actualizarRecargoTransferencia}
             disabled={!recargoTransferenciaActivo}
-            className="w-full md:w-1/3 bg-green-900 text-white px-4 py-1 rounded mt-2 disabled:opacity-50"
+            className="w-full md:w-1/3 bg-green-900 text-white px-4 py-1 rounded mt-2 disabled:opacity-50 transition"
           >
             Guardar recargo transferencia
-          </button>
+          </Button>
         </div>
 
         <hr className="p-0.25 bg-green-900 my-8"/> {/* --------------------------------------- */}
@@ -382,13 +383,13 @@ export default function GestionNegocio() {
             className="w-full md:w-1/3 mt-2"
           />
 
-          <button
+          <Button
             onClick={actualizarRecargoBancario}
             disabled={!recargoBancarioActivo}
-            className="w-full md:w-1/3 bg-green-900 text-white px-4 py-1 rounded mt-2 disabled:opacity-50"
+            className="w-full md:w-1/3 bg-green-900 text-white px-4 py-1 rounded mt-2 disabled:opacity-50 transition"
           >
             Guardar recargo bancario
-          </button>
+          </Button>
         </div>
 
         <hr className="h-0.25 my-4" />  {/* --------------------------------------------------------------- */}

@@ -18,18 +18,21 @@ import CajaForm from "./CajaForm";
 import { useCajaStore } from "@/lib/cajaStore";
 import EgresoForm from "./EgresoForm";
 
+interface ProductoVendido {
+  tipo: string;
+  cantidad: number;
+  precioTotal: number;
+  descuentoAplicado?: boolean;
+  porcentajeDescuento?: number; // %
+  descuentoNominal?: number;    // $
+}
+
 function DashboardVenta() {
 
   /* Estados de la Caja de Ventas */
   const verificarEstadoCaja = useCajaStore(state => state.verificarEstadoCaja);
   const token = useAuthStore((state) => state.token);
-  const [productos, setProductos] = useState<{
-    tipo: string;
-    cantidad: number;
-    precioTotal: number;
-    descuentoAplicado?: boolean;
-    porcentajeDescuento?: number;
-  }[]>([]);
+  const [productos, setProductos] = useState<ProductoVendido[]>([]);
   const [fechaActual, setFechaActual] = useState("");
   const [horaActual, setHoraActual] = useState("");  
   const { cajaAbierta } = useCajaStore();
@@ -83,10 +86,15 @@ function DashboardVenta() {
   };
 
   const totalVenta = productos.reduce((acc, prod) => acc + prod.precioTotal, 0);
-
-  const handleAgregarProducto = (producto: { tipo: string; cantidad: number; precioTotal: number }) => {
-    setProductos((prev) => [...prev, producto]);
-  };
+  
+  const handleAgregarProducto = (
+    producto: { tipo: string; 
+    cantidad: number; 
+    precioTotal: number; 
+    descuentoAplicado: boolean;
+    porcentajeDescuento: number;
+    descuentoNominal: number; }
+  ) => { setProductos((prev) => [...prev, producto]); };
 
   const handleEliminarProducto = (index: number) => {
     setProductos((prev) => prev.filter((_, i) => i !== index));
@@ -187,6 +195,11 @@ function DashboardVenta() {
                     {prod.descuentoAplicado && (
                       <span className="text-green-800 text-sm font-normal italic">
                         Descuento aplicado: {prod.porcentajeDescuento}% OFF
+                      </span>
+                    )}
+                    {prod.descuentoAplicado && (
+                      <span className="text-green-800 text-sm font-normal italic">
+                        Descuento aplicado: - ${prod.descuentoNominal}
                       </span>
                     )}
                   </div>
