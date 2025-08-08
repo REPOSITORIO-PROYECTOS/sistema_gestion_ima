@@ -5,88 +5,49 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Factura</title>
     <style>
-        /* Estilos optimizados para impresoras térmicas de 58mm/80mm */
-        body { 
-            font-family: 'Courier New', Courier, monospace; 
-            font-size: 10px; 
-            margin: 0; 
-            padding: 0; 
-            color: #000;
-        }
-        .ticket { 
-            width: 56mm; /* Ancho para rollo de 58mm, ajustable a 78mm para 80mm */
-            padding: 1mm; 
-        }
-        .header, .afip-footer { 
-            text-align: center; 
-        }
-        .header h1 { 
-            margin: 0; 
-            font-size: 14px; 
-            font-weight: bold;
-            word-wrap: break-word; 
-        }
+        body { font-family: 'Courier New', Courier, monospace; font-size: 10px; margin: 0; padding: 0; color: #000; }
+        .ticket { width: 56mm; padding: 1mm; }
+        .header, .afip-footer { text-align: center; }
+        .header h1 { margin: 0; font-size: 14px; font-weight: bold; word-wrap: break-word; }
         .header p { margin: 2px 0; }
-        .factura-info {
-            display: flex;
-            justify-content: space-between;
-            font-size: 11px;
-            font-weight: bold;
-        }
-        p { margin: 3px 0; }
+        .factura-info { display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; }
         hr { border: none; border-top: 1px dashed black; margin: 5px 0; }
         .cliente-info p { margin-bottom: 3px; }
 
-        .item-list { margin-top: 8px; }
-        .item { display: flex; justify-content: space-between; margin: 3px 0; }
-        .item .descripcion { flex-grow: 1; text-align: left; word-wrap: break-word; padding: 0 4px; }
-        .item .precio-col { text-align: right; white-space: nowrap; }
-
-        .item-table { width: 100%; border-collapse: collapse; }
+        .item-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
         .item-table th, .item-table td { padding: 2px 0; }
-        .item-table .col-cant { width: 15%; text-align: left; }
-        .item-table .col-desc { width: 45%; text-align: left; }
-        .item-table .col-pu { width: 20%; text-align: right; }
-        .item-table .col-subt { width: 20%; text-align: right; }
+        .col-cant { width: 15%; text-align: left; }
+        .col-desc { width: 45%; text-align: left; }
+        .col-pu { width: 20%; text-align: right; }
+        .col-subt { width: 20%; text-align: right; }
         
-        .item-discount { font-size: 9px; color: #d9534f; }
-        .item-discount td { border-top: none; padding-top: 0; }
-
+        .item-discount td { font-size: 9px; color: #555; border-top: none; padding-top: 0; }
+        
         .totals-section { margin-top: 8px; border-top: 1px dashed black; padding-top: 5px; }
-        .totals-section .item { font-weight: bold; }
-        .totals-section .discount { color: #d9534f; }
-        .total-final { font-weight: bold; font-size: 13px; }
-
+        .totals-section .item { display: flex; justify-content: space-between; font-weight: bold; }
+        .totals-section .discount { color: #555; }
+        .total-final { font-size: 13px; }
         .afip-footer { margin-top: 15px; }
         .afip-footer p { margin: 1px 0; font-weight: bold; }
-
     </style>
 </head>
 <body>
     <div class="ticket">
         <div class="header">
-            <!-- Datos del Emisor -->
             <h1>{{ emisor.razon_social }}</h1>
             <p>{{ emisor.domicilio }}</p>
             <p>CUIT: {{ emisor.cuit }}</p>
             <p>IVA: {{ emisor.condicion_iva }}</p>
             <hr>
-            
-            <!-- Datos de la Factura -->
             <div class="factura-info">
                 <span>FACTURA</span>
-                <!-- La letra de la factura viene de la respuesta de AFIP -->
                 <span>{{ afip.tipo_comprobante_letra or 'B' }}</span> 
             </div>
-            <p>
-                P. Venta: {{ '%05d'|format(emisor.punto_venta) }} - 
-                N°: {{ '%08d'|format(afip.numero_comprobante or 0) }}
-            </p>
+            <p>P.Venta: {{ '%05d'|format(emisor.punto_venta) }} - N°: {{ '%08d'|format(afip.numero_comprobante or 0) }}</p>
             <p>Fecha: {{ fecha_emision | date }}</p>
             <hr>
         </div>
 
-        <!-- Datos del Cliente (Receptor) -->
         <div class="cliente-info">
             <p><strong>Cliente:</strong> {{ receptor.nombre_razon_social or 'Consumidor Final' }}</p>
             <p><strong>CUIT/DNI:</strong> {{ receptor.cuit_o_dni or 'S/D' }}</p>
@@ -95,14 +56,13 @@
 
         <hr>
         
-        <!-- SECCIÓN DE ÍTEMS -->
         <table class="item-table">
             <thead>
                 <tr>
-                    <th class="col-cant">Cant.</th>
-                    <th class="col-desc">Descripción</th>
+                    <th class="col-cant">Cant</th>
+                    <th class="col-desc">Desc</th>
                     <th class="col-pu">P/U</th>
-                    <th class="col-subt">Subt.</th>
+                    <th class="col-subt">Subt</th>
                 </tr>
             </thead>
             <tbody>
@@ -113,13 +73,11 @@
                     <td class="col-pu">${{ "%.2f"|format(item.precio_unitario) }}</td>
                     <td class="col-subt">${{ "%.2f"|format(item.cantidad * item.precio_unitario) }}</td>
                 </tr>
-                <!-- Lógica para descuento específico -->
                 {% if item.descuento_especifico and item.descuento_especifico > 0 %}
                 <tr class="item-discount">
                     <td></td>
                     <td colspan="2">
-                        Desc. 
-                        {% if item.descuento_especifico_por > 0 %}({{ "%.0f"|format(item.descuento_especifico_por) }}%){% endif %}
+                        Desc. {% if item.descuento_especifico_por > 0 %}({{ "%.0f"|format(item.descuento_especifico_por) }}%){% endif %}
                     </td>
                     <td class="col-subt">-${{ "%.2f"|format(item.descuento_especifico) }}</td>
                 </tr>
@@ -128,31 +86,17 @@
             </tbody>
         </table>
 
-        <!-- SECCIÓN DE TOTALES -->
         <div class="totals-section">
             <div class="item">
                 <span>SUBTOTAL</span>
                 <span>${{ "%.2f"|format(transaccion.total + (transaccion.descuento_general or 0)) }}</span>
             </div>
-
-            <!-- Lógica para Descuento General -->
             {% if transaccion.descuento_general and transaccion.descuento_general > 0 %}
                 <div class="item discount">
-                    <span>
-                        DESCUENTO 
-                        {% if transaccion.descuento_general_por > 0 %}({{ "%.0f"|format(transaccion.descuento_general_por) }}%){% endif %}
-                    </span>
+                    <span>DESC. GRAL. {% if transaccion.descuento_general_por > 0 %}({{ "%.0f"|format(transaccion.descuento_general_por) }}%){% endif %}</span>
                     <span>-${{ "%.2f"|format(transaccion.descuento_general) }}</span>
                 </div>
             {% endif %}
-
-            <!-- Aquí podrías desglosar el IVA si lo tuvieras en el payload -->
-            <!-- Ejemplo: -->
-            <!-- <div class="item">
-                <span>IVA (21%)</span>
-                <span>${{ "%.2f"|format(afip.importe_iva) }}</span>
-            </div> -->
-
             <div class="item total-final">
                 <span>TOTAL</span>
                 <span>${{ "%.2f"|format(transaccion.total) }}</span>
@@ -161,20 +105,14 @@
         
         <hr>
 
-        <!-- SECCIÓN DE DATOS DE AFIP -->
         <div class="afip-footer">
-            <p>CAE N°: {{ afip.cae or 'N/A' }}</p>
-            <p>Vto. CAE: {{ afip.vencimiento_cae or 'N/A' }}</p>
-            
-            <!-- Aquí iría el código de barras. Si es una imagen, se usaría <img>. -->
-            <!-- Si es texto, se puede mostrar directamente. -->
-            <div class="barcode">
-                <p>{{ afip.barcode_string or '' }}</p>
-            </div>
-            
-            <p>Comprobante Autorizado</p>
+            {% if afip and afip.cae %}
+                <p>CAE N°: {{ afip.cae }}</p>
+                <p>Vto. CAE: {{ afip.vencimiento_cae }}</p>
+                <!-- Aquí podrías renderizar un código de barras si tu impresora lo soporta -->
+                <p>Comprobante Autorizado</p>
+            {% endif %}
         </div>
-
     </div>
 </body>
 </html>
