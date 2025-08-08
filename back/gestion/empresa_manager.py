@@ -19,13 +19,7 @@ def crear_empresa_y_primer_admin(db: Session, data: EmpresaCreate) -> Empresa:
     print(f"\n--- [TRACE: CREAR EMPRESA Y ADMIN (Reutilizando Lógica)] ---")
     print(f"1. Solicitud para CUIT: {data.cuit}, Admin: {data.admin_username}")
 
-    # --- INICIO DE LA TRANSACCIÓN ---
-    # 1. Validaciones de unicidad (CUIT, Nombre Legal)
-    if db.exec(select(Empresa).where(Empresa.cuit == data.cuit)).first():
-        raise ValueError(f"El CUIT '{data.cuit}' ya está registrado.")
-    if db.exec(select(Empresa).where(Empresa.nombre_legal == data.nombre_legal)).first():
-        raise ValueError(f"El nombre legal '{data.nombre_legal}' ya está registrado.")
-    
+
     # El admin_manager ya valida la unicidad del username, no necesitamos repetirlo.
     print("2. Validaciones de empresa superadas.")
 
