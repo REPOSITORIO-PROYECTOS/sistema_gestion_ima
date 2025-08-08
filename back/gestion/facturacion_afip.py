@@ -143,6 +143,7 @@ def generar_factura_para_venta(
         "neto": logica_factura["neto"],
         "iva": logica_factura["iva"],
     }
+    print(f"LLAS CREDENCIALES QUE ESTOY ENVIANDO SON : {credenciales}")
     print(f"LOS DATOS QUE LE ESTOY ENVIANDO A FACTURAR SON : {datos_factura}")
 
     payload = {
