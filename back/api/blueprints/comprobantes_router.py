@@ -49,12 +49,14 @@ def api_generar_comprobante(req: GenerarComprobanteRequest):
     Recibe todos los datos necesarios en el cuerpo de la petición y genera
     un comprobante en PDF (factura, remito, presupuesto o recibo).
     """
+    print("entramos a generar comprobante")
     try:
+        print("entramos al try de generar comprobante")
         pdf_bytes = generar_comprobante_stateless(req)
-        
+        print("salimos de genrerar comprobantes stateless")
         # Generamos un nombre de archivo más robusto
         filename = f"{req.tipo}_{req.emisor.punto_venta}_{req.receptor.cuit_o_dni or 'consumidor'}.pdf"
-        
+        print("estamos por hacer la response")
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
