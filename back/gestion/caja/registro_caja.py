@@ -185,7 +185,7 @@ def registrar_venta_y_movimiento_caja(
                         "cuit": cuit_cliente_para_sheets,
                         "razon_social": razon_social_para_sheets,
                         "Tipo_movimiento": f"venta en {metodo_pago}",
-                        "descripcion": f"Venta de {articulos_vendidos}",
+                        "descripcion": f"Venta de {', '.join(f'({item.id_articulo}, {item.cantidad})' for item in articulos_vendidos)}",
                         "monto": total_final_con_recargo,
                         "Repartidor": usuario_actual.nombre_usuario
                     }
@@ -204,7 +204,7 @@ def registrar_venta_y_movimiento_caja(
                         "cuit": "-",
                         "razon_social": "-",
                         "Tipo_movimiento": f"venta en {metodo_pago}",
-                        "descripcion": f"Venta de {articulos_vendidos}",
+                        "descripcion": f"Venta de {', '.join(f'({item.id_articulo}, {item.cantidad})' for item in articulos_vendidos)}",
                         "monto": total_final_con_recargo,
                         "Repartidor": usuario_actual.nombre_usuario
                     }
