@@ -158,7 +158,8 @@ def generar_factura_para_venta(
         response = requests.post(
             FACTURACION_API_URL,
             json=payload,
-            timeout=20
+            timeout=20,
+            production=False
         )
         
         response.raise_for_status() 
