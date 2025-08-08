@@ -32,12 +32,14 @@ class ItemData(BaseModel):
     descripcion: str
     precio_unitario: float
     subtotal: float
-
+    descuento_especifico: Optional[float] = 0.0
+    descuento_especifico_por:Optional[float] = 0.0
+    
 class TransaccionData(BaseModel):
     items: List[ItemData]
     total: float
     descuento_general: Optional[float] = 0.0
-    descuento_especifico: Optional[float] = 0.0
+    descuento_general_por:Optional[float] = 0.0
     impuestos: Optional[float] = 0.0
     observaciones: Optional[str] = None
     datos_factura_previa: Optional[Dict[str, Any]] = None
