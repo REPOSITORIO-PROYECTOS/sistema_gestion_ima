@@ -36,15 +36,6 @@ import { useAuthStore } from "@/lib/authStore"
 import { useEmpresaStore } from '@/lib/empresaStore';
 import { useProductoStore } from "@/lib/productoStore";
 
-// Esta interfaz es para los productos de la BDD de cada empresa
-/* interface ProductoAPI {
-  id: number;
-  descripcion: string;
-  precio_venta: number;
-  venta_negocio: number;
-  stock_actual: number;
-} */
-
 // Esta interfaz es para el producto del codigo de barras
 interface Producto {
   id: number;
@@ -80,15 +71,23 @@ function FormVentas({
   productosVendidos,      /* Lista con todos los productos vendidos y su cantidad */
   onLimpiarResumen
 }: {
-    onAgregarProducto: (prod: {
-    tipo: string;
-    cantidad: number;
-    precioTotal: number;
-    descuentoAplicado: boolean;
-    porcentajeDescuento: number;
+  onAgregarProducto: (prod: {
+  tipo: string;
+  cantidad: number;
+  precioTotal: number;
+  descuentoAplicado: boolean;
+  porcentajeDescuento: number;
+  descuentoNominal: number;
   }) => void
   totalVenta: number,
-  productosVendidos: { tipo: string; cantidad: number; precioTotal: number }[]
+  productosVendidos: { 
+  tipo: string; 
+  cantidad: number; 
+  precioTotal: number; 
+  descuentoAplicado?: boolean;
+  porcentajeDescuento?: number;
+  descuentoNominal?: number; 
+  }[]
   onLimpiarResumen: () => void;
 }) {
 
@@ -96,15 +95,6 @@ function FormVentas({
 
   // Listado de productos - GET 
   const productos = useProductoStore((state) => state.productos);
-
-  // Momentaneamente eliminado
-  /* const [productos, setProductos] = useState<{
-    id: string;
-    nombre: string;
-    precio_venta: number;
-    venta_negocio: number;
-    stock_actual: number;
-  }[]>([]); */
 
   // Necesario para clasificar precios segun tipo de cliente
   const [productoSeleccionado, setProductoSeleccionado] = useState<{
@@ -137,7 +127,10 @@ function FormVentas({
   // Descuento en pesos sobre un producto en especifico
   const [descuentoNominal, setDescuentoNominal] = useState(0);
 
-  // Porcentaje de Descuento sobre valor final
+  // Descuento nominal sobre el total de venta
+  const [descuentoNominalTotal, setDescuentoNominalTotal] = useState(0);
+
+  // Porcentaje de Descuento sobre el total de venta
   const [descuentoSobreTotal, setDescuentoSobreTotal] = useState(0);
   const totalConDescuento = Math.round(totalVenta * (1 - descuentoSobreTotal / 100));
 
@@ -145,7 +138,7 @@ function FormVentas({
   const [open, setOpen] = useState(false);
 
   // Sección Facturación 
-  const [tipoClienteSeleccionado, setTipoClienteSeleccionado] = useState(tipoCliente[1])
+  const [tipoClienteSeleccionado, setTipoClienteSeleccionado] = useState(tipoCliente[0])
   const [metodoPago, setMetodoPago] = useState("efectivo")
 
   // Estados para la opcion de efectivo y vuelto
@@ -211,17 +204,20 @@ function FormVentas({
 
   // Calculo total de toda la venta con descuentos y recargos
   const totalVentaFinal = (() => {
-    // Aplicar descuento sobre el total
+    // 1. Aplicar descuento % sobre el total
     let total = totalVenta * (1 - descuentoSobreTotal / 100);
 
-    // Aplicar recargos según método de pago
+    // 2. Aplicar descuento nominal sobre el total
+    total = Math.max(0, total - descuentoNominalTotal);
+
+    // 3. Recargos según método de pago
     if (metodoPago === "transferencia" && recargoTransferenciaActivo) {
       total += total * (recargoTransferencia / 100);
     } else if (metodoPago === "bancario" && recargoBancarioActivo) {
       total += total * (recargoBancario / 100);
     }
 
-    // Redondear a 2 decimales
+    // 4. Redondeo
     return Math.round(total * 100) / 100;
   })();
 
@@ -240,6 +236,7 @@ function FormVentas({
       precioTotal: productoConDescuento,
       descuentoAplicado,
       porcentajeDescuento,
+      descuentoNominal
     });
 
     setCantidad(1);
@@ -255,15 +252,16 @@ function FormVentas({
     setDetallePagoDividido("");
     setTipoFacturacion("ticket");
     setClienteSeleccionado(null);
-    setTipoClienteSeleccionado({ id: "0", nombre: "Consumidor Final" });
-    setCuitManual("");
-    setDescuentoSobreTotal(0);
-    setObservaciones("");
-    setCantidad(1);
-    setDescuentoPorcentual(0);
-    setDescuentoNominal(0);
+    setTipoClienteSeleccionado({ id: "1", nombre: "Cliente Registrado" });
     setBusquedaCliente("");
     setOpenCliente(false);
+    setCuitManual("");
+    setDescuentoNominalTotal(0);  // $
+    setDescuentoSobreTotal(0);    // %
+    setDescuentoPorcentual(0);
+    setDescuentoNominal(0);
+    setObservaciones("");
+    setCantidad(1);
     setInputEfectivo("");
     setVuelto(0);
     setOpen(false);
@@ -358,6 +356,7 @@ function FormVentas({
           precioTotal: data.precio_venta,
           descuentoAplicado: false,
           porcentajeDescuento: 0,
+          descuentoNominal: 0
         });
         
         toast.success(`Producto agregado: ${data.descripcion}`);
@@ -396,44 +395,6 @@ function FormVentas({
 
     fetchClientes();
   }, [token]);
-
-  // GET Productos - trae los productos reales de la empresa
-  /* useEffect(() => {
-
-    const fetchProductos = async () => {
-
-      try {
-        const res = await fetch("https://sistema-ima.sistemataup.online/api/articulos/obtener_todos",
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-        );
-        const data: ProductoAPI[] = await res.json();
-
-        const productosMapeados = data.map((item) => ({
-          id: String(item.id),
-          nombre: item.descripcion,
-          precio_venta: item.precio_venta,
-          venta_negocio: item.venta_negocio,
-          stock_actual: item.stock_actual,
-        }));
-
-        setProductos(productosMapeados);
-
-        // Setear el primer producto como seleccionado por defecto
-        if (productosMapeados.length > 0) {
-          setProductoSeleccionado(productosMapeados[0]);
-        }
-
-      } catch (error) {
-        console.error("❌ Error al obtener productos:", error);
-      }
-    };
-    
-    fetchProductos();
-  }, [token]); */
 
   // POST Ventas - Registra la venta completa
   const handleSubmit = async (e: React.FormEvent) => {
@@ -552,8 +513,6 @@ function FormVentas({
                 domicilio: empresa?.direccion_negocio || "Domicilio no disponible",
                 punto_venta: empresa?.afip_punto_venta_predeterminado || 1,
                 condicion_iva: empresa?.afip_condicion_iva || "Responsable Inscripto",
-                afip_certificado: "", 
-                afip_clave_privada: ""
               },
               receptor: {
                 nombre_razon_social:
@@ -578,11 +537,13 @@ function FormVentas({
                     cantidad: p.cantidad,
                     precio_unitario: productoReal ? getPrecioProducto(productoReal) : 0,
                     subtotal: p.precioTotal,
-                    tasa_iva: 21
+                    descuento_especifico: productoReal ? p.descuentoNominal || 0 : 0,
+                    descuento_especifico_por: productoReal ? p.porcentajeDescuento || 0 : 0
                   };
                 }),
                 total: totalConDescuento,
-                descuento_general: descuentoSobreTotal || 0,
+                descuento_general: descuentoNominalTotal || 0,       // $ sobre total
+                descuento_general_por: descuentoSobreTotal || 0,     // % sobre total
                 observaciones: observaciones || ""
               }
             };
@@ -869,7 +830,7 @@ function FormVentas({
         </div>
         <span className="block w-full h-0.5 bg-green-900"></span>
 
-        {/* Descuento Porcentual */}
+        {/* Descuento Porcentual por Producto */}
         <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
           <Label className="text-2xl font-semibold text-green-900">Descuento a Aplicar (%)</Label>
           <Input
@@ -895,7 +856,7 @@ function FormVentas({
           />
         </div>
 
-        {/* Descuento Nominal */}
+        {/* Descuento Nominal por Producto */}
         <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
           <Label className="text-2xl font-semibold text-green-900">Descuento a Aplicar ($)</Label>
           <Input
@@ -1144,7 +1105,7 @@ function FormVentas({
         </div>
         <span className="block w-full h-0.5 bg-green-900"></span>
 
-        {/* Descuento a Aplicar sobre el TOTAL */}
+        {/* Descuento Porcentual a Aplicar sobre el TOTAL */}
         <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
           <Label className="text-2xl font-semibold text-green-900">Descuento Sobre Total (%)</Label>
           <Input
@@ -1166,6 +1127,32 @@ function FormVentas({
             className="w-full md:max-w-2/3 text-black"
           />
         </div>
+
+        {/* Descuento Nominal a Aplicar sobre el TOTAL */}
+        <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
+          <Label className="text-2xl font-semibold text-green-900">
+            Descuento Sobre Total ($)
+          </Label>
+          <Input
+            type="number"
+            min={0}
+            value={descuentoNominalTotal === 0 ? "" : descuentoNominalTotal}
+            onWheel={(e) => (e.target as HTMLInputElement).blur()}
+            onChange={(e) => {
+              const input = e.target.value;
+              if (input === "") {
+                setDescuentoNominalTotal(0);
+                return;
+              }
+              const parsed = parseFloat(input);
+              if (isNaN(parsed)) return;
+
+              // Evitamos que el descuento supere el total actual
+              setDescuentoNominalTotal(Math.min(parsed, totalVenta));
+            }}
+            className="w-full md:max-w-2/3 text-black"
+          />
+        </div>
         <span className="block w-full h-0.5 bg-green-900"></span>
                 
         {/* Total Venta */}
@@ -1177,23 +1164,30 @@ function FormVentas({
           <p className="text-xl text-green-400">
             <span className="font-semibold">Descuento aplicado al total:</span> {descuentoSobreTotal}%
           </p>
-          <p className="text-2xl font-bold text-green-900">
-            <span className="font-semibold">Total con descuento:</span> ${totalConDescuento}
+          <p className="text-xl text-green-400">
+            <span className="font-semibold">Descuento nominal sobre total:</span> ${descuentoNominalTotal}
           </p>
           {metodoPago === "transferencia" && recargoTransferenciaActivo && (
             <p className="text-xl text-red-500">
               <span className="font-semibold">Recargo por Transferencia:</span> {recargoTransferencia}% (${(totalConDescuento * recargoTransferencia / 100).toFixed(2)})
             </p>
           )}
-
           {metodoPago === "bancario" && recargoBancarioActivo && (
             <p className="text-xl text-red-500">
-              <span className="font-semibold">Recargo por Bancario:</span> {recargoBancario}% (${(totalConDescuento * recargoBancario / 100).toFixed(2)})
+              <span className="font-semibold">Recargo por POS:</span> {recargoBancario}% (${(totalConDescuento * recargoBancario / 100).toFixed(2)})
             </p>
           )}
+
+          <span className="block w-full h-0.5 bg-green-900"></span>
+
           <p className="text-2xl font-bold text-green-900">
-            <span className="font-semibold">Total Final:</span> ${totalVentaFinal}
+            <span className="font-semibold">Valor Final del Pedido:</span> ${totalVentaFinal}
           </p>
+          {metodoPago === "efectivo" && montoPagado > 0 && (
+            <p className="text-xl text-emerald-700">
+              <span className="font-semibold">Vuelto para el cliente:</span> ${vuelto}
+            </p>
+          )}
         </div>
 
         {/* Botón Final: Registra venta y envia toda la info al server */}
