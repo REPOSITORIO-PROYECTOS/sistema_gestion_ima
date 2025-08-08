@@ -198,6 +198,7 @@ def sincronizar_articulos_desde_sheets(db: Session, id_empresa_actual: int) -> D
                 "activo": str(articulo_sheet.get("Activo", "TRUE")).strip().upper() == "TRUE",
                 "id_empresa": id_empresa_actual,
                 "ubicacion": str(articulo_sheet.get("ubicacion", "Sin informacion")).strip(),
+                "unidad_venta": str(articulo_sheet.get("unidad", "Sin informacion")).strip(),
             }
 
             articulo_actual_db = None
