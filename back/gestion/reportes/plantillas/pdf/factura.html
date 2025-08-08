@@ -5,38 +5,96 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Factura N° {{ '%05d'|format(emisor.punto_venta) }}-{{ '%08d'|format(afip.numero_comprobante or 0) }}</title>
     <style>
-        body { font-family: Helvetica, Arial, sans-serif; font-size: 12px; color: #333; }
-        .container { width: 190mm; margin: auto; } /* Ancho estándar A4 con márgenes */
-        .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #000; padding-bottom: 10px; }
-        .header .empresa-info { font-size: 14px; }
-        .header .empresa-info .empresa-nombre { font-size: 18px; font-weight: bold; }
-        .header .comprobante-info { text-align: left; border: 2px solid #000; padding: 10px; }
-        .header .comprobante-info .letra { font-size: 48px; font-weight: bold; text-align: center; margin-bottom: 5px; }
-        .comprobante-info div { margin-bottom: 3px; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-size: 11px; 
+            color: #333;
+        }
+        .container { 
+            width: 190mm; 
+            margin: auto; 
+        }
+        .header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: flex-start; 
+            border-bottom: 2px solid #000; 
+            padding-bottom: 15px; 
+        }
+        .header .empresa-info .empresa-nombre { 
+            font-size: 20px; 
+            font-weight: bold; 
+        }
+        .header .comprobante-info { 
+            text-align: left; 
+            border: 2px solid #000; 
+            padding: 10px; 
+        }
+        .header .comprobante-info .letra { 
+            font-size: 48px; 
+            font-weight: bold; 
+            text-align: center; 
+            margin-bottom: 5px; 
+            line-height: 1;
+        }
+        .comprobante-info div { 
+            margin-bottom: 4px; 
+        }
         
-        .cliente-info { border: 1px solid #ccc; padding: 10px; margin-top: 20px; }
-        .cliente-info strong { display: inline-block; width: 120px; } /* Para alinear los datos del cliente */
+        .cliente-info { 
+            border: 1px solid #ccc; 
+            padding: 15px; 
+            margin-top: 25px; 
+            line-height: 1.6;
+        }
+        .cliente-info strong { 
+            display: inline-block; 
+            width: 120px; 
+        }
 
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 25px; 
+        }
+        th, td { 
+            border: 1px solid #ccc; 
+            padding: 8px; 
+            text-align: left; 
+        }
+        th { 
+            background-color: #f2f2f2; 
+        }
         .text-right { text-align: right; }
         .text-center { text-align: center; }
 
-        /* === ESTILOS NUEVOS Y MEJORADOS PARA DESCUENTOS Y TOTALES === */
         .item-discount td {
             font-size: 0.9em;
-            color: #d9534f; /* Rojo suave */
+            color: #d9534f;
             border-top: none;
-            padding-top: 0;
-            padding-left: 20px; /* Indentación para el descuento */
+            padding: 2px 8px 6px 20px;
         }
-        tfoot td { border: none; font-weight: bold; }
-        tfoot .total-final td { border-top: 2px solid #000; font-size: 14px; }
-        tfoot .discount td { color: #d9534f; }
+        tfoot td { 
+            border: none; 
+            font-weight: bold;
+            padding: 6px 8px;
+        }
+        tfoot .total-final td { 
+            border-top: 2px solid #000; 
+            font-size: 14px; 
+        }
+        tfoot .discount td { 
+            color: #d9534f; 
+        }
 
-        .afip-data { text-align: center; margin-top: 30px; }
-        .afip-data img { max-width: 300px; } /* Ajusta el tamaño del código de barras si es necesario */
+        .afip-data { 
+            text-align: center; 
+            margin-top: 30px; 
+        }
+        .afip-data img { 
+            max-width: 350px;
+            height: auto;
+        }
     </style>
 </head>
 <body>
@@ -66,10 +124,10 @@
         <table>
             <thead>
                 <tr>
-                    <th class="text-center">Cant.</th>
-                    <th>Descripción</th>
-                    <th class="text-right">P. Unit.</th>
-                    <th class="text-right">Subtotal</th>
+                    <th class="text-center" style="width: 15%;">Cant.</th>
+                    <th style="width: 50%;">Descripción</th>
+                    <th class="text-right" style="width: 17.5%;">P. Unit.</th>
+                    <th class="text-right" style="width: 17.5%;">Subtotal</th>
                 </tr>
             </thead>
             <tbody>
@@ -78,17 +136,12 @@
                     <td class="text-center">{{ item.cantidad }}</td>
                     <td>{{ item.descripcion }}</td>
                     <td class="text-right">${{ "%.2f"|format(item.precio_unitario) }}</td>
-                    <!-- Subtotal del ítem ANTES de su descuento específico -->
                     <td class="text-right">${{ "%.2f"|format(item.cantidad * item.precio_unitario) }}</td>
                 </tr>
-                <!-- LÓGICA PARA MOSTRAR DESCUENTO ESPECÍFICO DEL ÍTEM -->
                 {% if item.descuento_especifico and item.descuento_especifico > 0 %}
                 <tr class="item-discount">
                     <td colspan="3" class="text-right">
-                        Descuento 
-                        {% if item.descuento_especifico_por and item.descuento_especifico_por > 0 %}
-                            ({{ "%.0f"|format(item.descuento_especifico_por) }}%)
-                        {% endif %}
+                        Descuento {% if item.descuento_especifico_por > 0 %}({{ "%.0f"|format(item.descuento_especifico_por) }}%){% endif %}
                     </td>
                     <td class="text-right">-${{ "%.2f"|format(item.descuento_especifico) }}</td>
                 </tr>
@@ -98,28 +151,18 @@
             <tfoot>
                 <tr>
                     <td colspan="3" class="text-right">SUBTOTAL</td>
-                    <!-- Subtotal Bruto (calculado a partir del total y descuento) -->
                     <td class="text-right">${{ "%.2f"|format(transaccion.total + (transaccion.descuento_general or 0)) }}</td>
                 </tr>
-                
-                <!-- LÓGICA PARA MOSTRAR DESCUENTO GENERAL -->
                 {% if transaccion.descuento_general and transaccion.descuento_general > 0 %}
                 <tr class="discount">
                     <td colspan="3" class="text-right">
-                        DESCUENTO GENERAL 
-                        {% if transaccion.descuento_general_por and transaccion.descuento_general_por > 0 %}
-                            ({{ "%.0f"|format(transaccion.descuento_general_por) }}%)
-                        {% endif %}
+                        DESCUENTO GRAL. {% if transaccion.descuento_general_por > 0 %}({{ "%.0f"|format(transaccion.descuento_general_por) }}%){% endif %}
                     </td>
                     <td class="text-right">-${{ "%.2f"|format(transaccion.descuento_general) }}</td>
                 </tr>
                 {% endif %}
-
-                <!-- Aquí se podrían añadir filas para IVA u otros impuestos si los tienes -->
-
                 <tr class="total-final">
                     <td colspan="3" class="text-right">TOTAL</td>
-                    <!-- Total final, que ya viene calculado -->
                     <td class="text-right">${{ "%.2f"|format(transaccion.total) }}</td>
                 </tr>
             </tfoot>
@@ -127,9 +170,8 @@
 
         {% if afip and afip.cae %}
         <div class="afip-data">
-            <!-- Asumo que el backend genera el código de barras como imagen y pasa la URL -->
             <img src="{{ afip.barcode_url }}" alt="Código de Barras AFIP" />
-            <p><strong>CAE N°:</strong> {{ afip.cae }} | <strong>Fecha Vto. CAE:</strong> {{ afip.vencimiento_cae }}</p>
+            <p><strong>CAE N°:</strong> {{ afip.cae }} | <strong>Vto. CAE:</strong> {{ afip.vencimiento_cae }}</p>
         </div>
         {% endif %}
     </div>
