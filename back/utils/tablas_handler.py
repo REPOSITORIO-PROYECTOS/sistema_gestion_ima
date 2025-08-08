@@ -118,7 +118,7 @@ class TablasHandler:
                 datos_venta.get("id_cliente", ""),
                 datos_venta.get("id_ingresos", ""),
                 datos_venta.get("id_repartidor", ""),
-                datos_venta.get("repartidor", ""),
+                datos_venta.get("Repartidor", ""),
                 fecha_hora,
                 fecha_actual,
                 datos_venta.get("cliente", ""),
