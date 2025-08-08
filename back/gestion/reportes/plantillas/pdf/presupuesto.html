@@ -4,68 +4,123 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Presupuesto</title>
-    <!-- (Puedes usar los mismos estilos que la factura o personalizarlos) -->
     <style>
-        body { font-family: Helvetica, Arial, sans-serif; font-size: 12px; }
-        .container { width: 180mm; margin: auto; }
+        body { font-family: Helvetica, Arial, sans-serif; font-size: 12px; color: #333; }
+        .container { width: 190mm; margin: auto; }
         .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #000; padding-bottom: 10px; }
-        .header .empresa { font-size: 16px; font-weight: bold; }
-        .cliente { border: 1px solid #ccc; padding: 10px; margin-top: 20px; }
+        .header .empresa-info { font-size: 14px; }
+        .header .empresa-info .empresa-nombre { font-size: 18px; font-weight: bold; }
+        .header .comprobante-info { text-align: right; }
+        .comprobante-info h2 { margin: 0; font-size: 24px; }
+        .comprobante-info div { margin-top: 5px; }
+
+        .cliente-info { border: 1px solid #ccc; padding: 10px; margin-top: 20px; }
+        .cliente-info strong { display: inline-block; width: 120px; }
+
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
         th { background-color: #f2f2f2; }
         .text-right { text-align: right; }
-        .total { font-size: 14px; font-weight: bold; }
+        .text-center { text-align: center; }
+
+        /* === ESTILOS PARA DESCUENTOS Y TOTALES === */
+        .item-discount td {
+            font-size: 0.9em;
+            color: #d9534f;
+            border-top: none;
+            padding-top: 0;
+            padding-left: 20px;
+        }
+        tfoot td { border: none; font-weight: bold; }
+        tfoot .total-final td { border-top: 2px solid #000; font-size: 14px; }
+        tfoot .discount td { color: #d9534f; }
+
         .footer { text-align: left; margin-top: 30px; font-size: 10px; color: #555; border-top: 1px solid #ccc; padding-top: 10px; }
-        .comprobante { text-align: right; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <div>
-                <div class="empresa">{{ data.emisor.razon_social }}</div>
-                <div>{{ data.emisor.domicilio }}</div>
-            <div class="comprobante">
+            <div class="empresa-info">
+                <div class="empresa-nombre">{{ emisor.razon_social }}</div>
+                <div>{{ emisor.domicilio }}</div>
+                <div>CUIT: {{ emisor.cuit }}</div>
+            </div>
+            <div class="comprobante-info">
                 <h2>PRESUPUESTO</h2>
-                <div>Fecha:<strong>{{ fecha_emision|date }}</strong></div>
+                <div>Fecha: <strong>{{ fecha_emision | date('%d/%m/%Y') }}</strong></div>
                 <div>Validez: <strong>15 días</strong></div>
             </div>
-            </div>
         </div>
-        <div class="cliente">
-            <strong>Cliente:</strong> {{ data.receptor.nombre_razon_social }}<br>
-            <strong>CUIT/DNI:</strong> {{ data.receptor.cuit_o_dni }}
+
+        <div class="cliente-info">
+            <strong>Cliente:</strong> {{ receptor.nombre_razon_social or 'A definir' }}<br>
+            <strong>CUIT/DNI:</strong> {{ receptor.cuit_o_dni or 'S/D' }}<br>
+            <strong>Dirección:</strong> {{ receptor.domicilio or 'S/D' }}
         </div>
+
         <table>
-            <!-- (La tabla es idéntica a la del remito) -->
             <thead>
                 <tr>
-                    <th>Cantidad</th>
+                    <th class="text-center">Cant.</th>
                     <th>Descripción</th>
-                    <th class="text-right">Precio Unitario</th>
+                    <th class="text-right">P. Unit.</th>
                     <th class="text-right">Subtotal</th>
                 </tr>
             </thead>
             <tbody>
-                {% for item in data.transaccion.items %}
+                {% for item in transaccion.items %}
                 <tr>
-                    <td>{{ item.cantidad }}</td>
+                    <td class="text-center">{{ item.cantidad }}</td>
                     <td>{{ item.descripcion }}</td>
                     <td class="text-right">${{ "%.2f"|format(item.precio_unitario) }}</td>
-                    <td class="text-right">${{ "%.2f"|format(item.subtotal) }}</td>
+                    <!-- Subtotal del ítem ANTES de su descuento específico -->
+                    <td class="text-right">${{ "%.2f"|format(item.cantidad * item.precio_unitario) }}</td>
                 </tr>
+                <!-- LÓGICA PARA MOSTRAR DESCUENTO ESPECÍfico DEL ÍTEM -->
+                {% if item.descuento_especifico and item.descuento_especifico > 0 %}
+                <tr class="item-discount">
+                    <td colspan="3" class="text-right">
+                        Descuento 
+                        {% if item.descuento_especifico_por and item.descuento_especifico_por > 0 %}
+                            ({{ "%.0f"|format(item.descuento_especifico_por) }}%)
+                        {% endif %}
+                    </td>
+                    <td class="text-right">-${{ "%.2f"|format(item.descuento_especifico) }}</td>
+                </tr>
+                {% endif %}
                 {% endfor %}
             </tbody>
             <tfoot>
                 <tr>
-                    <td colspan="3" class="text-right total">TOTAL</td>
-                    <td class="text-right total">${{ "%.2f"|format(data.transaccion.total) }}</td>
+                    <td colspan="3" class="text-right">SUBTOTAL</td>
+                    <!-- Subtotal Bruto (calculado a partir del total y descuento) -->
+                    <td class="text-right">${{ "%.2f"|format(transaccion.total + (transaccion.descuento_general or 0)) }}</td>
+                </tr>
+                
+                <!-- LÓGICA PARA MOSTRAR DESCUENTO GENERAL -->
+                {% if transaccion.descuento_general and transaccion.descuento_general > 0 %}
+                <tr class="discount">
+                    <td colspan="3" class="text-right">
+                        DESCUENTO GENERAL 
+                        {% if transaccion.descuento_general_por and transaccion.descuento_general_por > 0 %}
+                            ({{ "%.0f"|format(transaccion.descuento_general_por) }}%)
+                        {% endif %}
+                    </td>
+                    <td class="text-right">-${{ "%.2f"|format(transaccion.descuento_general) }}</td>
+                </tr>
+                {% endif %}
+
+                <tr class="total-final">
+                    <td colspan="3" class="text-right">TOTAL</td>
+                    <!-- Total final, que ya viene calculado -->
+                    <td class="text-right">${{ "%.2f"|format(transaccion.total) }}</td>
                 </tr>
             </tfoot>
         </table>
+
         <div class="footer">
-            <strong>Términos y Condiciones:</strong> Los precios están expresados en Pesos Argentinos y no incluyen IVA.
+            <strong>Términos y Condiciones:</strong> Los precios están expresados en Pesos Argentinos y no incluyen IVA. Este presupuesto está sujeto a cambios sin previo aviso.
         </div>
     </div>
 </body>

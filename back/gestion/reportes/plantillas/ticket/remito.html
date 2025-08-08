@@ -2,119 +2,126 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Remito N° {{ venta.id | default('S/N') }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Remito</title>
     <style>
-        body {
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 10px;
-            margin: 0;
-            padding: 0;
+        /* Estilos optimizados para impresoras térmicas */
+        body { 
+            font-family: 'Courier New', Courier, monospace; 
+            font-size: 10px; 
+            margin: 0; 
+            padding: 0; 
+            color: #000;
         }
-        .ticket {
-            width: 56mm;
-            padding: 1mm;
+        .ticket { 
+            width: 56mm; /* Ajustable a 78mm para rollos de 80mm */
+            padding: 1mm; 
         }
-        .header, .footer {
-            text-align: center;
+        .header { 
+            text-align: center; 
         }
-        .header h1 {
-            margin: 0;
-            font-size: 13px;
+        .header h1 { 
+            margin: 0; 
+            font-size: 14px; 
+            word-wrap: break-word; 
         }
-        .header h2 {
+        .header p, .header h2 { 
+            margin: 3px 0; 
+            font-size: 11px;
+        }
+        p { 
+            margin: 3px 0; 
+        }
+        hr { 
+            border: none; 
+            border-top: 1px dashed black; 
+            margin: 5px 0; 
+        }
+        .info-section p {
+            margin-bottom: 4px;
+        }
+
+        .item-list { 
+            margin-top: 8px; 
+        }
+        /* Estructura de columnas para Remito (solo Cantidad y Descripción) */
+        .item-row { 
+            display: grid; 
+            grid-template-columns: 1.5fr 4fr; /* Columna para Cantidad y Descripción */
+            gap: 5px;
             margin: 4px 0;
-            font-size: 12px;
-        }
-        p {
-            margin: 2px 0;
-        }
-        hr {
-            border: none;
-            border-top: 1px dashed black;
-            margin: 4px 0;
-        }
-        .cliente-info {
-            margin-top: 4px;
-        }
-        .item-header, .item {
-            display: flex;
-            justify-content: space-between;
         }
         .item-header {
             font-weight: bold;
             border-bottom: 1px solid black;
             padding-bottom: 2px;
-            margin-top: 6px;
         }
-        .item {
-            margin: 2px 0;
+        
+        .footer { 
+            margin-top: 20px; 
         }
-        .item .cantidad {
-            width: 15%;
+        .firma {
+            margin-top: 30px;
+            text-align: center;
         }
-        .item .descripcion {
-            width: 45%;
-            word-wrap: break-word;
-        }
-        .item .unitario {
-            width: 20%;
-            text-align: right;
-        }
-        .item .subtotal {
-            width: 20%;
-            text-align: right;
-        }
-        .total {
-            font-weight: bold;
-            font-size: 12px;
-            text-align: right;
-            margin-top: 6px;
-        }
-        .footer {
-            font-size: 9px;
-            margin-top: 12px;
+        .disclaimer { 
+            font-weight: bold; 
+            text-align: center; 
+            margin-top: 15px; 
         }
     </style>
 </head>
 <body>
     <div class="ticket">
         <div class="header">
-            <h1>Sistema de Gestión IMA</h1>
-            <p>Dirección de la Empresa</p>
-            <p>CUIT: {{ AFIP_CUIT }}</p>
+            <!-- Usamos las variables directas y estandarizadas del contexto -->
+            <h1>{{ emisor.razon_social }}</h1>
+            <p>{{ emisor.domicilio }}</p>
+            <p>CUIT: {{ emisor.cuit }}</p>
             <hr>
-            <h2>REMITO</h2>
-            <p>N°: {{ venta.id | default('S/N') }}</p>
-            <p>Fecha: {{ fecha_emision | date }}</p>
+            <h2>REMITO DE ENTREGA</h2>
             <hr>
         </div>
 
-        <div class="cliente-info">
-            <p><strong>Cliente:</strong> {{ venta.cliente.nombre_razon_social if venta.cliente else 'Consumidor Final' }}</p>
-            <p><strong>CUIT/DNI:</strong> {{ venta.cliente.cuit if venta.cliente else 'S/N' }}</p>
-            <p><strong>Dirección:</strong> {{ venta.cliente.direccion if venta.cliente else 'S/N' }}</p>
+        <div class="info-section">
+            <p><strong>Fecha:</strong> {{ fecha_emision | date }}</p>
+            <p><strong>Cliente:</strong> {{ receptor.nombre_razon_social or 'A definir' }}</p>
+            <p><strong>CUIT/DNI:</strong> {{ receptor.cuit_o_dni or 'S/D' }}</p>
+            <p><strong>Domicilio Entrega:</strong> {{ receptor.domicilio or 'S/D' }}</p>
         </div>
-
-        <div class="item-header">
-            <span class="cantidad">Cant</span>
-            <span class="descripcion">Descripción</span>
-            <span class="unitario">P/U</span>
-            <span class="subtotal">Subt</span>
-        </div>
-
-        {% for item in venta.detalles %}
-        <div class="item">
-            <span class="cantidad">{{ item.cantidad }}</span>
-            <span class="descripcion">{{ item.articulo.descripcion }}</span>
-            <span class="unitario">${{ "%.2f"|format(item.precio_unitario) }}</span>
-            <span class="subtotal">${{ "%.2f"|format(item.cantidad * item.precio_unitario) }}</span>
-        </div>
-        {% endfor %}
 
         <hr>
-        <p class="total">TOTAL: ${{ "%.2f"|format(venta.total) }}</p>
+        
+        <!-- SECCIÓN DE ÍTEMS (SIN PRECIOS) -->
+        <div class="item-list">
+            <div class="item-row item-header">
+                <b>Cantidad</b>
+                <b>Descripción del Producto</b>
+            </div>
 
-        <p class="footer">DOCUMENTO NO VÁLIDO COMO FACTURA</p>
+            {% for item in transaccion.items %}
+            <div class="item-row">
+                <!-- Se muestra la cantidad con hasta 3 decimales, útil para productos pesables -->
+                <span>{{ "%.3f"|format(item.cantidad) }}</span>
+                <span>{{ item.descripcion }}</span>
+            </div>
+            {% endfor %}
+        </div>
+
+        <hr>
+
+        <div class="footer">
+            {% if transaccion.observaciones %}
+                <p><strong>Observaciones:</strong> {{ transaccion.observaciones }}</p>
+            {% endif %}
+
+            <p class="disclaimer">DOCUMENTO NO VÁLIDO COMO FACTURA</p>
+
+            <div class="firma">
+                <p>....................</p>
+                <p>Recibí Conforme</p>
+            </div>
+        </div>
     </div>
 </body>
 </html>
