@@ -42,10 +42,45 @@ function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Fetch Periódico de Productos para la Store de Productos
+  const iniciarPollingProductos = (token: string) => {
+    const fetchProductos = async () => {
+      try {
+        const res = await fetch(`${API_URL}/articulos/obtener_todos`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!res.ok) throw new Error("Error al refrescar productos");
+
+        const data: ProductoAPI[] = await res.json();
+        const adaptados = data.map((p) => ({
+          id: String(p.id),
+          nombre: p.nombre ?? p.descripcion ?? "",
+          precio_venta: p.precio_venta,
+          venta_negocio: p.venta_negocio,
+          stock_actual: p.stock_actual,
+        }));
+
+        setProductos(adaptados);
+        localStorage.setItem("productos", JSON.stringify(adaptados));
+      } catch (err) {
+        console.error("Error actualizando productos:", err);
+      }
+    };
+
+    // Primer fetch inmediato
+    fetchProductos();
+
+    // Refetch cada 60 segundos (puedes ajustar)
+    const interval = setInterval(fetchProductos, 300000);   // cada 5 min fetch
+
+    // Guardamos referencia por si necesitamos limpiar
+    return interval;
+  };
+
   // Login App
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
-
     if (!username || !password) {
       toast.error("Por favor complete usuario y contraseña");
       return;
@@ -54,7 +89,7 @@ function Login() {
     try {
       setLoading(true);
 
-      // Login
+      // --- LOGIN ---
       const response = await fetch(`${API_URL}/auth/token`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -66,40 +101,31 @@ function Login() {
       const { access_token } = await response.json();
       setToken(access_token);
 
-      // Datos usuario
+      // --- USUARIO ---
       const meResponse = await fetch(`${API_URL}/users/me`, {
         headers: { Authorization: `Bearer ${access_token}` },
       });
-
       if (!meResponse.ok) throw new Error("Error al obtener datos del usuario");
-
       const usuario = await meResponse.json();
       setUsuario(usuario);
       setRole(usuario.rol);
 
-      // Empresa
+      // --- EMPRESA ---
       if (!empresa) {
         const empresaResponse = await fetch(`${API_URL}/configuracion/mi-empresa`, {
           headers: { Authorization: `Bearer ${access_token}` },
         });
-
         if (!empresaResponse.ok) throw new Error("Error al obtener datos de la empresa");
-
         const dataEmpresa = await empresaResponse.json();
         setEmpresa(dataEmpresa);
       }
 
-      // Productos del catálogo
+      // --- PRODUCTOS inicial ---
       const productosResponse = await fetch(`${API_URL}/articulos/obtener_todos`, {
         headers: { Authorization: `Bearer ${access_token}` },
       });
-
-      if (!productosResponse.ok)
-        throw new Error("Error al obtener catálogo de productos");
-
+      if (!productosResponse.ok) throw new Error("Error al obtener catálogo de productos");
       const productosData: ProductoAPI[] = await productosResponse.json();
-
-      // Adaptar datos: si no hay `nombre`, usamos `descripcion`
       const productosAdaptados = productosData.map((p) => ({
         id: String(p.id),
         nombre: p.nombre ?? p.descripcion ?? "",
@@ -107,17 +133,20 @@ function Login() {
         venta_negocio: p.venta_negocio,
         stock_actual: p.stock_actual,
       }));
-
       setProductos(productosAdaptados);
-      console.log(productosAdaptados)
+      localStorage.setItem("productos", JSON.stringify(productosAdaptados));
 
-      // Redirigir
+      // --- INICIAR POLLING ---
+      const intervalId = iniciarPollingProductos(access_token);
+
+      // Guardar intervalId si querés limpiar luego en logout
+      localStorage.setItem("productosPollingId", String(intervalId));
+
+      // --- REDIRIGIR ---
       router.push("/dashboard");
-      
     } catch (error) {
       console.error("Error:", error);
       toast.error(error instanceof Error ? error.message : "Error inesperado");
-
     } finally {
       setLoading(false);
     }

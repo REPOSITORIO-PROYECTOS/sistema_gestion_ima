@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { useProductoStore } from './productoStore'
 
 export interface Usuario {
   id: number
@@ -48,7 +49,26 @@ export const useAuthStore = create<AuthState>()(
       setNombreUsuario: (name) => set({ nombre_usuario: name }),
       setUsuario: (usuario) => set({ usuario }),
 
-      logout: () => set({ token: null, role: null, nombre_usuario: null, usuario: null }),
+      logout: () => {
+        // 1️⃣ Detener el polling
+        const intervalId = localStorage.getItem("productosPollingId");
+        if (intervalId) {
+          clearInterval(Number(intervalId));
+          localStorage.removeItem("productosPollingId");
+        }
+
+        // 2️⃣ Limpiar productos
+        useProductoStore.getState().clearProductos();
+        localStorage.removeItem("producto-storage");
+
+        // 3️⃣ Limpiar auth
+        set({
+          token: null,
+          role: null,
+          nombre_usuario: null,
+          usuario: null
+        });
+      },
 
       hasHydrated: false,
       setHasHydrated: (val) => set({ hasHydrated: val }),
