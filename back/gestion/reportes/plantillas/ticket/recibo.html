@@ -5,46 +5,76 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Recibo de Pago</title>
     <style>
-        /* Estilos optimizados para impresoras de 58mm */
+        /* Estilos optimizados para impresoras térmicas de 58mm/80mm */
         body { 
             font-family: 'Courier New', Courier, monospace; 
-            font-size: 10px;
+            font-size: 10px; /* Tamaño de fuente base para tickets */
             margin: 0; 
             padding: 0; 
             color: #000;
         }
         .ticket { 
-            width: 56mm;
+            width: 56mm; /* Ancho para rollo de 58mm, ajustable a 78mm para rollos de 80mm */
             padding: 1mm; 
         }
-        .header { text-align: center; }
-        .header h1 { margin: 0; font-size: 14px; word-wrap: break-word; }
-        .header h2 { margin: 4px 0; font-size: 12px; }
-        p { margin: 3px 0; }
-        hr { border: none; border-top: 1px dashed black; margin: 4px 0; }
+        .header { 
+            text-align: center; 
+        }
+        .header h1 { 
+            margin: 0; 
+            font-size: 14px; 
+            word-wrap: break-word; /* Evita que nombres largos se desborden */
+        }
+        .header p, .header h2 { 
+            margin: 3px 0; 
+            font-size: 11px;
+        }
+        p { 
+            margin: 3px 0; 
+        }
+        hr { 
+            border: none; 
+            border-top: 1px dashed black; 
+            margin: 5px 0; 
+        }
         
-        .item-list { margin: 8px 0; }
-        .item { display: flex; justify-content: space-between; }
-        .item .description { flex-grow: 1; text-align: left; word-wrap: break-word; }
-        .item .price { text-align: right; white-space: nowrap; padding-left: 5px; }
+        .item-list { 
+            margin: 8px 0; 
+        }
+        .item { 
+            display: flex; 
+            justify-content: space-between; 
+        }
+        .item .description { 
+            flex-grow: 1; 
+            text-align: left; 
+            word-wrap: break-word; 
+        }
+        .item .price { 
+            text-align: right; 
+            white-space: nowrap; 
+            padding-left: 5px; 
+        }
         
-        /* === ESTILOS NUEVOS Y MEJORADOS === */
-        .item-detail { 
+        .item-detail, .item-discount { 
             font-size: 9px; 
             color: #555; 
-            padding-left: 4px; 
+            padding-left: 8px; /* Indentación para detalles */
             margin-top: -2px; /* Acerca los detalles al ítem principal */
         }
         .item-discount {
-            font-size: 9px;
-            color: #d9534f; /* Rojo suave para descuentos */
-            padding-left: 4px;
-            margin-top: -2px;
+            color: #d9534f; /* Color rojo suave para descuentos */
         }
         
-        .totals-section { margin-top: 8px; }
-        .totals-section .item { font-weight: bold; } /* Hacemos todas las líneas de totales en negrita */
-        .totals-section .discount { color: #d9534f; }
+        .totals-section { 
+            margin-top: 8px; 
+        }
+        .totals-section .item { 
+            font-weight: bold; 
+        }
+        .totals-section .discount { 
+            color: #d9534f;
+        }
         .total-final { 
             font-weight: bold; 
             font-size: 14px; 
@@ -53,40 +83,48 @@
             padding-top: 4px;
             border-top: 1px solid black;
         }
-        .footer { text-align: center; margin-top: 12px; }
-        .disclaimer { font-weight: bold; text-align: center; margin-top: 15px; }
+        .footer { 
+            text-align: center; 
+            margin-top: 12px; 
+        }
+        .disclaimer { 
+            font-weight: bold; 
+            text-align: center; 
+            margin-top: 15px; 
+        }
     </style>
 </head>
 <body>
     <div class="ticket">
         <div class="header">
-            <!-- Asumimos que los datos vienen en una variable 'data' -->
-            <h1>{{ data.emisor.razon_social }}</h1>
-            <p>CUIT: {{ data.emisor.cuit }}</p>
+            <h1>{{ emisor.razon_social }}</h1>
+            <p>CUIT: {{ emisor.cuit }}</p>
+            <p>{{ emisor.domicilio }}</p>
             <hr>
             <h2>RECIBO DE PAGO</h2>
             <hr>
         </div>
-        <p>Fecha: {{ fecha_emision }}</p> <!-- Usamos la variable directa que pasamos -->
-        <p>Recibimos de: {{ data.receptor.nombre_razon_social or 'Consumidor Final' }}</p>
+
+        <p>Fecha: {{ fecha_emision | date }}</p>
+        <p>Cliente: {{ receptor.nombre_razon_social or 'Consumidor Final' }}</p>
+        <p>CUIT/DNI: {{ receptor.cuit_o_dni or 'S/D' }}</p>
         
         <hr>
-
-        <!-- ======================================================= -->
-        <!--        SECCIÓN DE ITEMS TOTALMENTE REFACTORIZADA        -->
-        <!-- ======================================================= -->
+        
+        <!-- SECCIÓN DE ÍTEMS -->
         <div class="item-list">
-            {% for item in data.transaccion.items %}
+            {% for item in transaccion.items %}
                 <div class="item">
                     <span class="description">{{ item.descripcion }}</span>
                     <!-- Mostramos el subtotal del ítem SIN el descuento aplicado -->
                     <span class="price">${{ "%.2f"|format(item.cantidad * item.precio_unitario) }}</span>
                 </div>
                 <div class="item item-detail">
+                    <!-- Detalle de cantidad x precio unitario -->
                     <span>{{ item.cantidad }} x ${{ "%.2f"|format(item.precio_unitario) }}</span>
                 </div>
 
-                <!-- === LÓGICA PARA MOSTRAR DESCUENTO ESPECÍFICO DEL ÍTEM === -->
+                <!-- LÓGICA PARA MOSTRAR DESCUENTO ESPECÍFICO DEL ÍTEM -->
                 {% if item.descuento_especifico and item.descuento_especifico > 0 %}
                 <div class="item item-discount">
                     <span>
@@ -98,41 +136,42 @@
                     <span>-${{ "%.2f"|format(item.descuento_especifico) }}</span>
                 </div>
                 {% endif %}
-                
             {% endfor %}
         </div>
         
-        <!-- ======================================================= -->
-        <!--        SECCIÓN DE TOTALES TOTALMENTE REFACTORIZADA        -->
-        <!-- ======================================================= -->
+        <!-- SECCIÓN DE TOTALES -->
         <div class="totals-section">
             <hr>
             
-            <!-- 1. Calculamos el Subtotal Bruto (antes de CUALQUIER descuento) -->
-            {% set subtotal_bruto = data.transaccion.items | sum(attribute='cantidad * precio_unitario') %}
+            <!-- 1. Mostramos el Subtotal Bruto (calculado a partir del total y el descuento) -->
             <div class="item">
                 <p>SUBTOTAL:</p>
-                <p>${{ "%.2f"|format(subtotal_bruto) }}</p>
+                <!-- Este cálculo es seguro porque el backend se asegura de que los valores sean numéricos -->
+                <p>${{ "%.2f"|format(transaccion.total + (transaccion.descuento_general or 0)) }}</p>
             </div>
 
-            <!-- 2. Mostramos el Descuento General (SÓLO si es mayor a cero) -->
-            {% if data.transaccion.descuento_general and data.transaccion.descuento_general > 0 %}
+            <!-- 2. Mostramos el Descuento General (solo si existe y es mayor a 0) -->
+            {% if transaccion.descuento_general and transaccion.descuento_general > 0 %}
                 <div class="item discount">
                     <p>
-                        DESCUENTO GENERAL 
-                        {% if data.transaccion.descuento_general_por and data.transaccion.descuento_general_por > 0 %}
-                            ({{ "%.0f"|format(data.transaccion.descuento_general_por) }}%)
+                        DESCUENTO GRAL. 
+                        {% if transaccion.descuento_general_por and transaccion.descuento_general_por > 0 %}
+                            ({{ "%.0f"|format(transaccion.descuento_general_por) }}%)
                         {% endif %}
                     </p>
-                    <p>-${{ "%.2f"|format(data.transaccion.descuento_general) }}</p>
+                    <p>-${{ "%.2f"|format(transaccion.descuento_general) }}</p>
                 </div>
             {% endif %}
 
-            <!-- 3. Mostramos el Total final (este es el valor que ya viene calculado en el payload) -->
-            <p class="total-final">TOTAL: ${{ "%.2f"|format(data.transaccion.total) }}</p>
+            <!-- 3. Mostramos el Total final, que ya viene calculado del payload -->
+            <p class="total-final">TOTAL A PAGAR: ${{ "%.2f"|format(transaccion.total) }}</p>
         </div>
         
-        <p>En concepto de: {{ data.transaccion.observaciones or 'Venta de mercadería' }}</p>
+        <!-- SECCIÓN FINAL -->
+        {% if transaccion.observaciones %}
+            <hr>
+            <p><strong>Observaciones:</strong> {{ transaccion.observaciones }}</p>
+        {% endif %}
         
         <p class="disclaimer">COMPROBANTE NO VÁLIDO COMO FACTURA</p>
         
