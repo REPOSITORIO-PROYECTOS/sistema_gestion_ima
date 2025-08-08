@@ -49,6 +49,16 @@ interface Producto {
   porcentajeDescuento: number;
 }
 
+interface ItemComprobante {
+  descripcion: string;
+  cantidad: number;
+  precio_unitario: number;
+  subtotal: number;
+  tasa_iva: number;
+  descuento_especifico?: number;
+  descuento_especifico_por?: number;
+}
+
 type Cliente = {
   id: number;
   nombre_razon_social: string;
@@ -250,7 +260,7 @@ function FormVentas({
     setMontoPagado(0);
     setPagoDividido(false);
     setDetallePagoDividido("");
-    setTipoFacturacion("ticket");
+    setTipoFacturacion("factura");
     setClienteSeleccionado(null);
     setTipoClienteSeleccionado({ id: "1", nombre: "Cliente Registrado" });
     setBusquedaCliente("");
@@ -270,23 +280,13 @@ function FormVentas({
 
   // Effect para mostrar la calculadora de vuelto si es pago con efectivo
   useEffect(() => {
-    if (metodoPago === 'efectivo' && typeof montoPagado === 'number') {
-      const cambio = montoPagado - totalProducto;
-      setVuelto(cambio >= 0 ? cambio : 0);
-    } else {
-      setVuelto(0);
-    }
-  }, [montoPagado, totalProducto, metodoPago]);
-
-  // Effect para el calculo del vuelto en pago con efectivo
-  useEffect(() => {
-    if (metodoPago === "efectivo") {
-      const calculado = montoPagado - totalVenta;
-      setVuelto(calculado > 0 ? calculado : 0);
-    } else {
-      setVuelto(0);
-    }
-  }, [montoPagado, metodoPago, totalVenta]);
+      if (metodoPago === "efectivo" && typeof montoPagado === "number" && !isNaN(montoPagado)) {
+          const cambio = montoPagado - totalVentaFinal;
+          setVuelto(cambio >= 0 ? cambio : 0);
+      } else {
+          setVuelto(0);
+      }
+  }, [montoPagado, metodoPago, totalVentaFinal]);
 
   /* Formateos Numéricos */
   // Formatea el input en string para mejor UI
@@ -398,72 +398,50 @@ function FormVentas({
 
   // POST Ventas - Registra la venta completa
   const handleSubmit = async (e: React.FormEvent) => {
-
-    // Animacion de carga
     setIsLoading(true);
     e.preventDefault();
 
-    /* Validaciones - no se puede mandar venta sin: */
-    // Productos en el carrito
+    // === VALIDACIONES ===
     if (productosVendidos.length === 0) {
       toast.error("❌ No hay productos cargados en la venta.");
       setIsLoading(false);
       return;
     }
 
-    // Con menos plata de lo que cuesta el pedido
     if (metodoPago === "efectivo" && montoPagado < totalVenta) {
       toast.error("❌ El monto pagado no puede ser menor al total del pedido.");
       setIsLoading(false);
       return;
     }
 
-    // Sin identificar el cliente registrado
-    if (
-      tipoClienteSeleccionado.id === "1" &&
-      !clienteSeleccionado
-    ) {
+    if (tipoClienteSeleccionado.id === "1" && !clienteSeleccionado) {
       toast.error("❌ Debe seleccionar un cliente registrado.");
       setIsLoading(false);
       return;
     }
 
-    // Si es Cliente Final y el total supera 200.000, se requiere CUIT manual
-    if (
-      tipoClienteSeleccionado.id === "0" &&
-      totalVenta > 200000 &&
-      cuitManual.trim() === ""
-    ) {
+    if (tipoClienteSeleccionado.id === "0" && totalVenta > 200000 && cuitManual.trim() === "") {
       toast.error("❌ Para montos mayores a $200.000, debe ingresar un CUIT.");
       setIsLoading(false);
       return;
     }
 
-    // El CUIT argentino debe tener si o si 11 digitos:
-    if (
-      tipoClienteSeleccionado.id === "0" &&
-      totalVenta > 200000 &&
-      !/^\d{11}$/.test(cuitManual.trim())
-    ) {
+    if (tipoClienteSeleccionado.id === "0" && totalVenta > 200000 && !/^\d{11}$/.test(cuitManual.trim())) {
       toast.error("❌ El CUIT debe tener 11 dígitos numéricos.");
       setIsLoading(false);
       return;
     }
 
-    // Payload de Venta
+    // === PAYLOAD DE VENTA ===
     const ventaPayload = {
-      id_cliente:
-        // Si el cliente no esta registrado (tipo "0") manda id=9, si sí, entonces manda el id de ese cliente
-        tipoClienteSeleccionado.id === "0"
-          ? 0                                     
-          : clienteSeleccionado?.id ?? 0,               
+      id_cliente: tipoClienteSeleccionado.id === "0" ? 0 : clienteSeleccionado?.id ?? 0,
       metodo_pago: metodoPago.toUpperCase(),
       total_venta: totalVenta,
       paga_con: montoPagado,
       pago_separado: pagoDividido,
       detalles_pago_separado: detallePagoDividido,
       tipo_comprobante_solicitado: tipoFacturacion.toLowerCase(),
-      quiere_factura: tipoFacturacion === "factura",              // si marca factura en tipoFacturacion true, si no false
+      quiere_factura: tipoFacturacion === "factura",
       articulos_vendidos: productosVendidos.map((p) => {
         const productoReal = productos.find(prod => prod.nombre === p.tipo);
         return {
@@ -472,14 +450,12 @@ function FormVentas({
           cantidad: p.cantidad,
           precio_unitario: productoReal ? getPrecioProducto(productoReal) : 0,
           subtotal: p.precioTotal,
-          tasa_iva: 21.0                     
+          tasa_iva: 21.0
         };
       })
     };
 
-    // GENERAR COMPROBANTE - Endpoint que se encarga de imprimir el ticket o comprobante de la venta realizada
     try {
-
       if (!empresa || !empresa.id_empresa) {
         toast.error("No hay datos válidos de la empresa, no se puede realizar la venta.");
         return;
@@ -495,18 +471,51 @@ function FormVentas({
       });
 
       if (response.ok) {
-
         const data = await response.json();
         toast.success("✅ Venta registrada: " + data.message);
 
         const generarComprobante = async () => {
-
           try {
+            // Construir items base
+            const itemsBase = productosVendidos.map((p) => {
+              const productoReal = productos.find((prod) => prod.nombre === p.tipo);
+              const item: ItemComprobante = {
+                descripcion: productoReal?.nombre || p.tipo,
+                cantidad: p.cantidad,
+                precio_unitario: productoReal ? getPrecioProducto(productoReal) : 0,
+                subtotal: p.precioTotal,
+                tasa_iva: 21
+              };
 
-            // Payload para el comprobante a imprimir
+              // Solo agregamos descuentos si NO es factura
+              if (tipoFacturacion !== "factura") {
+                item.descuento_especifico = productoReal ? p.descuentoNominal || 0 : 0;
+                item.descuento_especifico_por = productoReal ? p.porcentajeDescuento || 0 : 0;
+              }
+
+              return item;
+            });
+
+            // Construir transacción según tipo de facturación
+            const transaccion =
+              tipoFacturacion === "factura"
+                ? {
+                    items: itemsBase,
+                    total: totalConDescuento,
+                    observaciones: observaciones || ""
+                  }
+                : {
+                    items: itemsBase,
+                    total: totalConDescuento,
+                    descuento_general: descuentoNominalTotal || 0,
+                    descuento_general_por: descuentoSobreTotal || 0,
+                    observaciones: observaciones || ""
+                  };
+                  
+            // Payload imprimir comprobante 
             const req = {
-              formato: formatoComprobante.toLowerCase(),         // por ahora, "pdf" o "ticket" desde facturacionStore
-              tipo: tipoFacturacion.toLowerCase(),                                  
+              formato: formatoComprobante.toLowerCase(),
+              tipo: tipoFacturacion.toLowerCase(),
               emisor: {
                 cuit: empresa?.cuit?.toString() || 0,
                 razon_social: empresa?.nombre_negocio || "Nombre no disponible",
@@ -529,26 +538,10 @@ function FormVentas({
                     ? "Consumidor Final"
                     : clienteSeleccionado?.condicion_iva ?? "Consumidor Final"
               },
-              transaccion: {
-                items: productosVendidos.map((p) => {
-                  const productoReal = productos.find((prod) => prod.nombre === p.tipo);
-                  return {
-                    descripcion: productoReal?.nombre || p.tipo,
-                    cantidad: p.cantidad,
-                    precio_unitario: productoReal ? getPrecioProducto(productoReal) : 0,
-                    subtotal: p.precioTotal,
-                    descuento_especifico: productoReal ? p.descuentoNominal || 0 : 0,
-                    descuento_especifico_por: productoReal ? p.porcentajeDescuento || 0 : 0
-                  };
-                }),
-                total: totalConDescuento,
-                descuento_general: descuentoNominalTotal || 0,       // $ sobre total
-                descuento_general_por: descuentoSobreTotal || 0,     // % sobre total
-                observaciones: observaciones || ""
-              }
+              transaccion
             };
 
-            const response = await fetch("https://sistema-ima.sistemataup.online/api/comprobantes/generar", {
+            const respComp = await fetch("https://sistema-ima.sistemataup.online/api/comprobantes/generar", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -557,16 +550,13 @@ function FormVentas({
               body: JSON.stringify(req)
             });
 
-            if (!response.ok) {
-              const error = await response.json();
+            if (!respComp.ok) {
+              const error = await respComp.json();
               toast.error("❌ Error al generar comprobante: " + error.detail);
               return;
             }
 
-            // Espera un PDF, descargamos como blob
-            const blob = await response.blob();
-
-            // Crea un link de descarga e imprime
+            const blob = await respComp.blob();
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
             link.href = url;
@@ -580,25 +570,21 @@ function FormVentas({
             console.error("❌ Error al generar comprobante:", error);
             toast.error("❌ Error al generar comprobante");
           }
-        };        
+        };
 
-        // Cuando se emite el comprobante exitosamente se limpia el form y vuelve al inicio
         await generarComprobante();
         resetFormularioVenta();
         window.scrollTo({ top: 20, behavior: "smooth" });
-
       } else {
-
         const error = await response.json();
         toast.error("❌ Error al registrar venta: " + error.detail);
       }
-    
     } catch (error) {
-
       console.error("Detalles del error:", error);
       toast.error("❌ Error al registrar venta:\n" + JSON.stringify(error, null, 2));
-
-    } finally { setIsLoading(false); }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   /* -------------------------------------------------------------- */
@@ -883,7 +869,7 @@ function FormVentas({
         </div>
         <span className="block w-full h-0.5 bg-green-900"></span>
 
-        {/* Total de prod * cant */}
+        {/* Total de precio producto individual * cantidad de este producto */}
         <div className="flex flex-col md:flex-row gap-4 justify-between items-start mt-4">
           <Label className="text-2xl font-semibold text-green-900">Total Productos Seleccionados:</Label>
           <p className="text-2xl font-semibold text-green-900">
@@ -935,7 +921,7 @@ function FormVentas({
                 <Label className="text-2xl font-semibold text-white">Costo del Pedido:</Label>
                 <Input
                   type="text"
-                  value={formatearMoneda(totalVenta.toString())}
+                  value={formatearMoneda(totalVentaFinal.toString())}
                   disabled
                   className="w-full md:max-w-1/2 font-semibold text-white"
                 />
