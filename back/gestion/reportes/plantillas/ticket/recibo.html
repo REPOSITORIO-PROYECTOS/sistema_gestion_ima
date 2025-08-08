@@ -11,9 +11,10 @@
             font-size: 10px;
             margin: 0; 
             padding: 0; 
+            color: #000;
         }
         .ticket { 
-            width: 56mm; /* Dejamos 1mm de margen a cada lado para un rollo de 58mm */
+            width: 56mm;
             padding: 1mm; 
         }
         .header { text-align: center; }
@@ -23,15 +24,35 @@
         hr { border: none; border-top: 1px dashed black; margin: 4px 0; }
         
         .item-list { margin: 8px 0; }
-        .item-header { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 4px; }
         .item { display: flex; justify-content: space-between; }
-        .item .description { width: 65%; text-align: left; word-wrap: break-word; }
-        .item .price { width: 35%; text-align: right; }
-        .item-detail { font-size: 9px; color: #555; padding-left: 4px; }
+        .item .description { flex-grow: 1; text-align: left; word-wrap: break-word; }
+        .item .price { text-align: right; white-space: nowrap; padding-left: 5px; }
+        
+        /* === ESTILOS NUEVOS Y MEJORADOS === */
+        .item-detail { 
+            font-size: 9px; 
+            color: #555; 
+            padding-left: 4px; 
+            margin-top: -2px; /* Acerca los detalles al ítem principal */
+        }
+        .item-discount {
+            font-size: 9px;
+            color: #d9534f; /* Rojo suave para descuentos */
+            padding-left: 4px;
+            margin-top: -2px;
+        }
         
         .totals-section { margin-top: 8px; }
-        .highlight { font-weight: bold; } /* Clase para destacar el descuento */
-        .total { font-weight: bold; font-size: 13px; text-align: right; margin-top: 8px; }
+        .totals-section .item { font-weight: bold; } /* Hacemos todas las líneas de totales en negrita */
+        .totals-section .discount { color: #d9534f; }
+        .total-final { 
+            font-weight: bold; 
+            font-size: 14px; 
+            text-align: right; 
+            margin-top: 8px; 
+            padding-top: 4px;
+            border-top: 1px solid black;
+        }
         .footer { text-align: center; margin-top: 12px; }
         .disclaimer { font-weight: bold; text-align: center; margin-top: 15px; }
     </style>
@@ -39,59 +60,79 @@
 <body>
     <div class="ticket">
         <div class="header">
+            <!-- Asumimos que los datos vienen en una variable 'data' -->
             <h1>{{ data.emisor.razon_social }}</h1>
             <p>CUIT: {{ data.emisor.cuit }}</p>
             <hr>
             <h2>RECIBO DE PAGO</h2>
             <hr>
         </div>
-        <p>Fecha: {{ fecha_emision|date }}</p>
-        <p>Recibimos de: {{ data.receptor.nombre_razon_social }}</p>
+        <p>Fecha: {{ fecha_emision }}</p> <!-- Usamos la variable directa que pasamos -->
+        <p>Recibimos de: {{ data.receptor.nombre_razon_social or 'Consumidor Final' }}</p>
         
         <hr>
+
+        <!-- ======================================================= -->
+        <!--        SECCIÓN DE ITEMS TOTALMENTE REFACTORIZADA        -->
+        <!-- ======================================================= -->
         <div class="item-list">
-            <div class="item-header">
-                <span>Desc.</span>
-                <span>Subt.</span>
-            </div>
             {% for item in data.transaccion.items %}
                 <div class="item">
                     <span class="description">{{ item.descripcion }}</span>
-                    <span class="price">${{ "%.2f"|format(item.subtotal) }}</span>
+                    <!-- Mostramos el subtotal del ítem SIN el descuento aplicado -->
+                    <span class="price">${{ "%.2f"|format(item.cantidad * item.precio_unitario) }}</span>
                 </div>
                 <div class="item item-detail">
-                    <span class="description">{{ item.cantidad }} x ${{ "%.2f"|format(item.precio_unitario) }}</span>
+                    <span>{{ item.cantidad }} x ${{ "%.2f"|format(item.precio_unitario) }}</span>
                 </div>
+
+                <!-- === LÓGICA PARA MOSTRAR DESCUENTO ESPECÍFICO DEL ÍTEM === -->
+                {% if item.descuento_especifico and item.descuento_especifico > 0 %}
+                <div class="item item-discount">
+                    <span>
+                        Desc. 
+                        {% if item.descuento_especifico_por and item.descuento_especifico_por > 0 %}
+                            ({{ "%.0f"|format(item.descuento_especifico_por) }}%)
+                        {% endif %}
+                    </span>
+                    <span>-${{ "%.2f"|format(item.descuento_especifico) }}</span>
+                </div>
+                {% endif %}
+                
             {% endfor %}
         </div>
         
         <!-- ======================================================= -->
-        <!-- SECCIÓN DE TOTALES CORREGIDA Y ACTUALIZADA -->
+        <!--        SECCIÓN DE TOTALES TOTALMENTE REFACTORIZADA        -->
         <!-- ======================================================= -->
         <div class="totals-section">
             <hr>
-            <!-- 1. Calculamos y mostramos el Subtotal -->
-            {% set subtotal = data.transaccion.items | sum(attribute='subtotal') %}
+            
+            <!-- 1. Calculamos el Subtotal Bruto (antes de CUALQUIER descuento) -->
+            {% set subtotal_bruto = data.transaccion.items | sum(attribute='cantidad * precio_unitario') %}
             <div class="item">
                 <p>SUBTOTAL:</p>
-                <p>${{ "%.2f"|format(subtotal) }}</p>
+                <p>${{ "%.2f"|format(subtotal_bruto) }}</p>
             </div>
 
-            <!-- 2. Mostramos el Descuento en PORCENTAJE (SÓLO si es mayor a cero) -->
-            {% if data.transaccion.descuento_general > 0 %}
-                <div class="item highlight">
-                    <p>Descuento:</p>
-                    <!-- CORRECCIÓN: Mostramos el número y el símbolo '%' -->
-                    <p>{{ data.transaccion.descuento_general }}%</p>
+            <!-- 2. Mostramos el Descuento General (SÓLO si es mayor a cero) -->
+            {% if data.transaccion.descuento_general and data.transaccion.descuento_general > 0 %}
+                <div class="item discount">
+                    <p>
+                        DESCUENTO GENERAL 
+                        {% if data.transaccion.descuento_general_por and data.transaccion.descuento_general_por > 0 %}
+                            ({{ "%.0f"|format(data.transaccion.descuento_general_por) }}%)
+                        {% endif %}
+                    </p>
+                    <p>-${{ "%.2f"|format(data.transaccion.descuento_general) }}</p>
                 </div>
             {% endif %}
 
-            <!-- 3. Mostramos el Total final correctamente formateado -->
-            <p class="total">TOTAL A PAGAR: ${{ "%.2f"|format(data.transaccion.total) }}</p>
+            <!-- 3. Mostramos el Total final (este es el valor que ya viene calculado en el payload) -->
+            <p class="total-final">TOTAL: ${{ "%.2f"|format(data.transaccion.total) }}</p>
         </div>
-        <!-- ======================================================= -->
         
-        <p>En concepto de: {{ data.transaccion.observaciones or 'Venta/Servicio' }}</p>
+        <p>En concepto de: {{ data.transaccion.observaciones or 'Venta de mercadería' }}</p>
         
         <p class="disclaimer">COMPROBANTE NO VÁLIDO COMO FACTURA</p>
         
