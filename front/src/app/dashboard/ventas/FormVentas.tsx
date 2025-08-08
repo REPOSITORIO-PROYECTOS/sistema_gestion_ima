@@ -34,6 +34,16 @@ import { ChevronsUpDown } from "lucide-react";
 import { useFacturacionStore } from "@/lib/facturacionStore";
 import { useAuthStore } from "@/lib/authStore"
 import { useEmpresaStore } from '@/lib/empresaStore';
+import { useProductoStore } from "@/lib/productoStore";
+
+// Esta interfaz es para los productos de la BDD de cada empresa
+/* interface ProductoAPI {
+  id: number;
+  descripcion: string;
+  precio_venta: number;
+  venta_negocio: number;
+  stock_actual: number;
+} */
 
 // Esta interfaz es para el producto del codigo de barras
 interface Producto {
@@ -46,15 +56,6 @@ interface Producto {
   precioTotal: number;
   descuentoAplicado: boolean;
   porcentajeDescuento: number;
-}
-
-// Esta interfaz es para los productos de la BDD de cada empresa
-interface ProductoAPI {
-  id: number;
-  descripcion: string;
-  precio_venta: number;
-  venta_negocio: number;
-  stock_actual: number;
 }
 
 type Cliente = {
@@ -94,13 +95,16 @@ function FormVentas({
   /* Estados */
 
   // Listado de productos - GET 
-  const [productos, setProductos] = useState<{
+  const productos = useProductoStore((state) => state.productos);
+
+  // Momentaneamente eliminado
+  /* const [productos, setProductos] = useState<{
     id: string;
     nombre: string;
     precio_venta: number;
     venta_negocio: number;
     stock_actual: number;
-  }[]>([]);
+  }[]>([]); */
 
   // Necesario para clasificar precios segun tipo de cliente
   const [productoSeleccionado, setProductoSeleccionado] = useState<{
@@ -394,7 +398,7 @@ function FormVentas({
   }, [token]);
 
   // GET Productos - trae los productos reales de la empresa
-  useEffect(() => {
+  /* useEffect(() => {
 
     const fetchProductos = async () => {
 
@@ -429,7 +433,7 @@ function FormVentas({
     };
     
     fetchProductos();
-  }, [token]);
+  }, [token]); */
 
   // POST Ventas - Registra la venta completa
   const handleSubmit = async (e: React.FormEvent) => {
@@ -779,8 +783,7 @@ function FormVentas({
         {/* Dropdown de Productos */}
         <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
           <Label className="text-2xl font-semibold text-green-900">Producto</Label>
-
-          {!productoSeleccionado ? (
+          {productos.length === 0 ? (
             <p className="text-green-900 font-semibold">Cargando productos...</p>
           ) : (
             <div className="w-full md:max-w-2/3 flex flex-col gap-2">

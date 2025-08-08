@@ -1,117 +1,146 @@
-"use client"
+"use client";
 
-import Image from 'next/image'
-import "../styles/globals.css"
-import { useRouter } from 'next/navigation'
-import { FormEvent, useState } from 'react'
-import { Eye, EyeOff } from "lucide-react"
-import { useAuthStore } from '@/lib/authStore'
-import { useEmpresaStore } from '@/lib/empresaStore'
-import { toast } from 'sonner'
+import Image from "next/image";
+import "../styles/globals.css";
+import { useRouter } from "next/navigation";
+import { FormEvent, useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
+import { toast } from "sonner";
+import { useAuthStore } from "@/lib/authStore";
+import { useEmpresaStore } from "@/lib/empresaStore";
+import { useProductoStore } from "@/lib/productoStore";
 
-const API_URL = "https://sistema-ima.sistemataup.online/api"
+const API_URL = "https://sistema-ima.sistemataup.online/api";
+
+// Tipado del producto que devuelve la API
+type ProductoAPI = {
+  id: number | string;
+  nombre?: string;
+  descripcion?: string;
+  precio_venta: number;
+  venta_negocio: number;
+  stock_actual: number;
+};
 
 function Login() {
-  
-  const router = useRouter()
-  
+  const router = useRouter();
+
   // User Store
-  const setToken = useAuthStore(state => state.setToken)
-  const setUsuario = useAuthStore(state => state.setUsuario)
-  const setRole = useAuthStore(state => state.setRole)
+  const setToken = useAuthStore((state) => state.setToken);
+  const setUsuario = useAuthStore((state) => state.setUsuario);
+  const setRole = useAuthStore((state) => state.setRole);
 
   // Empresa Store
-  const setEmpresa = useEmpresaStore(state => state.setEmpresa)
-  const empresa = useEmpresaStore(state => state.empresa)
+  const setEmpresa = useEmpresaStore((state) => state.setEmpresa);
+  const empresa = useEmpresaStore((state) => state.empresa);
 
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
+  // Catálogo de Productos
+  const setProductos = useProductoStore((state) => state.setProductos);
+
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   // Login App
   const handleLogin = async (e: FormEvent) => {
-
-    e.preventDefault()
+    e.preventDefault();
 
     if (!username || !password) {
-      toast.error("Por favor complete usuario y contraseña")
-      return
+      toast.error("Por favor complete usuario y contraseña");
+      return;
     }
 
     try {
-      setLoading(true)
+      setLoading(true);
 
-      // Autenticamos las credenciales en el back end
+      // Login
       const response = await fetch(`${API_URL}/auth/token`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({ username, password }),
-      })
+      });
 
-      if (!response.ok) throw new Error("Credenciales inválidas")
+      if (!response.ok) throw new Error("Credenciales inválidas");
 
-      const data = await response.json()
-      const { access_token } = data
-      setToken(access_token)
+      const { access_token } = await response.json();
+      setToken(access_token);
 
-      // Despues de autenticar, traemos los datos del usuario con:
+      // Datos usuario
       const meResponse = await fetch(`${API_URL}/users/me`, {
-        headers: {
-          Authorization: `Bearer ${access_token}`,
-        },
-      })
+        headers: { Authorization: `Bearer ${access_token}` },
+      });
 
-      if (!meResponse.ok) throw new Error("Error al obtener datos del usuario")
+      if (!meResponse.ok) throw new Error("Error al obtener datos del usuario");
 
-      const usuario = await meResponse.json()
+      const usuario = await meResponse.json();
+      setUsuario(usuario);
+      setRole(usuario.rol);
 
-      // Guardar usuario y rol en el store
-      setUsuario(usuario)
-      setRole(usuario.rol) 
-
-      // Empresa (sólo si no está ya seteada)
+      // Empresa
       if (!empresa) {
         const empresaResponse = await fetch(`${API_URL}/configuracion/mi-empresa`, {
-          headers: {
-            Authorization: `Bearer ${access_token}`,
-          },
-        })
+          headers: { Authorization: `Bearer ${access_token}` },
+        });
 
-        if (!empresaResponse.ok) throw new Error("Error al obtener datos de la empresa")
+        if (!empresaResponse.ok) throw new Error("Error al obtener datos de la empresa");
 
-        const dataEmpresa = await empresaResponse.json()
-        setEmpresa(dataEmpresa)
+        const dataEmpresa = await empresaResponse.json();
+        setEmpresa(dataEmpresa);
       }
 
-      router.push("/dashboard")
+      // Productos del catálogo
+      const productosResponse = await fetch(`${API_URL}/articulos/obtener_todos`, {
+        headers: { Authorization: `Bearer ${access_token}` },
+      });
 
+      if (!productosResponse.ok)
+        throw new Error("Error al obtener catálogo de productos");
+
+      const productosData: ProductoAPI[] = await productosResponse.json();
+
+      // Adaptar datos: si no hay `nombre`, usamos `descripcion`
+      const productosAdaptados = productosData.map((p) => ({
+        id: String(p.id),
+        nombre: p.nombre ?? p.descripcion ?? "",
+        precio_venta: p.precio_venta,
+        venta_negocio: p.venta_negocio,
+        stock_actual: p.stock_actual,
+      }));
+
+      setProductos(productosAdaptados);
+      console.log(productosAdaptados)
+
+      // Redirigir
+      router.push("/dashboard");
+      
     } catch (error) {
-      console.error("Error:", error)
+      console.error("Error:", error);
+      toast.error(error instanceof Error ? error.message : "Error inesperado");
 
-      if (error instanceof Error) {
-        alert(error.message)
-
-      } else {
-        alert("Error inesperado")
-      }
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="flex flex-col h-screen justify-center items-center gap-10 bg-sky-700 px-8 py-8 md:h-screen">
-      
-      <Image src="/default-logo.png" alt="Swing Jugos" width={80} height={80} />
+      <Image
+        src="/default-logo.png"
+        alt="Swing Jugos"
+        width={80}
+        height={80}
+      />
 
-      <form onSubmit={handleLogin} className="w-[95%] sm:w-1/2 lg:w-1/3 form-login bg-slate-100 shadow-2xl flex flex-col items-center justify-center p-10 gap-10 rounded-4xl">
-        
+      <form
+        onSubmit={handleLogin}
+        className="w-[95%] sm:w-1/2 lg:w-1/3 form-login bg-slate-100 shadow-2xl flex flex-col items-center justify-center p-10 gap-10 rounded-4xl"
+      >
         {/* Usuario */}
         <div className="flex flex-col gap-1 relative">
-          <label htmlFor="username" className="text-sky-800">Usuario</label>
+          <label htmlFor="username" className="text-sky-800">
+            Usuario
+          </label>
           <input
             id="username"
             type="text"
@@ -123,7 +152,9 @@ function Login() {
 
         {/* Contraseña */}
         <div className="flex flex-col gap-1 relative">
-          <label htmlFor="password" className="text-sky-800">Contraseña</label>
+          <label htmlFor="password" className="text-sky-800">
+            Contraseña
+          </label>
           <input
             id="password"
             type={showPassword ? "text" : "password"}
@@ -144,14 +175,15 @@ function Login() {
         <button
           type="submit"
           disabled={loading}
-          className={`flex w-4/5 sm:max-w-1/2 sm:w-1/2 justify-center items-center px-4 py-3 text-white border-2 border-white bg-blue-700 rounded-xl cursor-pointer transition hover:bg-sky-800 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+          className={`flex w-4/5 sm:max-w-1/2 sm:w-1/2 justify-center items-center px-4 py-3 text-white border-2 border-white bg-blue-700 rounded-xl cursor-pointer transition hover:bg-sky-800 ${
+            loading ? "opacity-50 cursor-not-allowed" : ""
+          }`}
         >
-          {loading ? 'Ingresando...' : 'Ingresar'}
+          {loading ? "Ingresando..." : "Ingresar"}
         </button>
- 
       </form>
     </div>
-  )
+  );
 }
 
-export default Login
+export default Login;
