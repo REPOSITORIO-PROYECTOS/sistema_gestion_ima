@@ -149,7 +149,6 @@ def generar_factura_para_venta(
     payload = {
         "credenciales": credenciales,
         "datos_factura": datos_factura,
-        "production": True,
     }
     
 
