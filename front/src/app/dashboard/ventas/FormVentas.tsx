@@ -1,54 +1,37 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import {
-  Select, SelectContent, SelectItem,
-  SelectTrigger, SelectValue
-} from "@/components/ui/select"
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-} from "@/components/ui/command";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ChevronsUpDown } from "lucide-react";
+import {
+  Select, SelectContent, SelectItem,
+  SelectTrigger, SelectValue
+} from "@/components/ui/select"
+
+// Stores
 import { useFacturacionStore } from "@/lib/facturacionStore";
 import { useAuthStore } from "@/lib/authStore"
 import { useEmpresaStore } from '@/lib/empresaStore';
 import { useProductoStore } from "@/lib/productoStore";
 
-// Esta interfaz es para el producto del codigo de barras
-interface Producto {
-  id: number;
-  descripcion: string;
-  precio_venta: number;
-  stock_actual: number;
-  codigos: { codigo: string }[];
-  cantidad: number;
-  precioTotal: number;
-  descuentoAplicado: boolean;
-  porcentajeDescuento: number;
-}
+// --- Componentes Hijos ---
+import { SeccionCliente } from "./SeccionCliente";
+import { SeccionProducto } from "./SeccionProducto";
+import { SeccionCantidad } from "./SeccionCantidad";
 
+
+// --- Interfaces y Tipos ---
 interface ItemComprobante {
   descripcion: string;
   cantidad: number;
@@ -69,192 +52,211 @@ type Cliente = {
   activo: boolean;
 };
 
-// Dropdown tipo de cliente - final o registrado
-const tipoCliente = [
-  { id: "0", nombre: "Cliente Final" },
-  { id: "1", nombre: "Cliente Registrado" },
-];
-
-function FormVentas({
-  onAgregarProducto,      /* Agrega productos al resumen (componente padre) */
-  totalVenta,             /* Valor total de todos los productos - costo total del pedido */
-  productosVendidos,      /* Lista con todos los productos vendidos y su cantidad */
-  onLimpiarResumen
-}: {
-  onAgregarProducto: (prod: {
-  tipo: string;
-  cantidad: number;
-  precioTotal: number;
-  descuentoAplicado: boolean;
-  porcentajeDescuento: number;
-  descuentoNominal: number;
-  }) => void
-  totalVenta: number,
-  productosVendidos: { 
-  tipo: string; 
-  cantidad: number; 
-  precioTotal: number; 
-  descuentoAplicado?: boolean;
-  porcentajeDescuento?: number;
-  descuentoNominal?: number; 
-  }[]
-  onLimpiarResumen: () => void;
-}) {
-
-  /* Estados */
-
-  // Listado de productos - GET 
-  const productos = useProductoStore((state) => state.productos);
-
-  // Necesario para clasificar precios segun tipo de cliente
-  const [productoSeleccionado, setProductoSeleccionado] = useState<{
+// Tipo para el producto que se selecciona del dropdown
+type ProductoSeleccionado = {
     id: string;
     nombre: string;
     precio_venta: number;
     venta_negocio: number;
     stock_actual: number;
-  } | null>(null);
+    unidad_venta: string;
+};
 
-  // Stores
+// --- Constantes ---
+const tipoCliente = [
+  { id: "0", nombre: "Cliente Final" },
+  { id: "1", nombre: "Cliente Registrado" },
+];
+
+// --- Props del Componente ---
+interface FormVentasProps {
+  onAgregarProducto: (prod: {
+    tipo: string;
+    cantidad: number;
+    precioTotal: number;
+    descuentoAplicado: boolean;
+    porcentajeDescuento: number;
+    descuentoNominal: number;
+  }) => void;
+  totalVenta: number;
+  productosVendidos: {
+    tipo: string;
+    cantidad: number;
+    precioTotal: number;
+    descuentoAplicado?: boolean;
+    porcentajeDescuento?: number;
+    descuentoNominal?: number;
+  }[];
+  onLimpiarResumen: () => void;
+}
+
+
+// --- Componente Principal ---
+function FormVentas({
+  onAgregarProducto,
+  totalVenta,
+  productosVendidos,
+  onLimpiarResumen
+}: FormVentasProps) {
+
+  /* Estados */
+  const productos = useProductoStore((state) => state.productos);
+  const [productoSeleccionado, setProductoSeleccionado] = useState<ProductoSeleccionado | null>(null);
   const token = useAuthStore((state) => state.token);
   const { formatoComprobante } = useFacturacionStore();
-
-  // Listado de Clientes - GET
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null);
   const [openCliente, setOpenCliente] = useState(false);
   const [busquedaCliente, setBusquedaCliente] = useState("");
-
-  // Ingresar el CUIT de un Cliente Final - POST
   const [cuitManual, setCuitManual] = useState("");
-
-  // Cantidad de un producto particular - se * por el producto y se saca el valor total
-  const [cantidad, setCantidad] = useState(1)
-
-  // Descuento en porcentaje sobre un producto en especifico
+  const [cantidad, setCantidad] = useState(1); // Representa la cantidad final a agregar
   const [descuentoPorcentual, setDescuentoPorcentual] = useState(0);
-
-  // Descuento en pesos sobre un producto en especifico
   const [descuentoNominal, setDescuentoNominal] = useState(0);
-
-  // Descuento nominal sobre el total de venta
   const [descuentoNominalTotal, setDescuentoNominalTotal] = useState(0);
-
-  // Porcentaje de Descuento sobre el total de venta
   const [descuentoSobreTotal, setDescuentoSobreTotal] = useState(0);
-  const totalConDescuento = Math.round(totalVenta * (1 - descuentoSobreTotal / 100));
-
-  // Input de Busqueda para Productos
   const [open, setOpen] = useState(false);
-
-  // Sección Facturación 
-  const [tipoClienteSeleccionado, setTipoClienteSeleccionado] = useState(tipoCliente[0])
-  const [metodoPago, setMetodoPago] = useState("efectivo")
-
-  // Estados para la opcion de efectivo y vuelto
+  const [tipoClienteSeleccionado, setTipoClienteSeleccionado] = useState(tipoCliente[0]);
+  const [metodoPago, setMetodoPago] = useState("efectivo");
   const [montoPagado, setMontoPagado] = useState<number>(0);
   const [vuelto, setVuelto] = useState<number>(0);
-  const [inputEfectivo, setInputEfectivo] = useState(""); 
-
-  // Si el pago realizado se hizo en distintos metodos (efec, transfe, credito)
+  const [inputEfectivo, setInputEfectivo] = useState("");
   const [pagoDividido, setPagoDividido] = useState(false);
   const [detallePagoDividido, setDetallePagoDividido] = useState("");
-
-  // Estado para las observaciones de la venta
-  const [observaciones, setObservaciones] = useState("")
-
-  // Estado animación para spinner de carga submit
+  const [observaciones, setObservaciones] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-
-  // Estado para la opción de facturación - habilitaciones y recargos de la facturacionStore
-  const { habilitarExtras } = useFacturacionStore();  
+  const { habilitarExtras } = useFacturacionStore();
   const [tipoFacturacion, setTipoFacturacion] = useState("factura");
-
-  // Recargos seteados desde gestión empresa traídos a la caja para aplicar
-  const {
-    recargoTransferenciaActivo,
-    recargoTransferencia,
-    recargoBancarioActivo,
-    recargoBancario,
-  } = useFacturacionStore();
-
-  // Código de Barras
+  const { recargoTransferenciaActivo, recargoTransferencia, recargoBancarioActivo, recargoBancario } = useFacturacionStore();
   const [codigo, setCodigoEscaneado] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-
-  // Store de Empresas para facturación dinámica en el payload para imprimir comprobante
   const empresa = useEmpresaStore((state) => state.empresa);
 
+  // Estados para Venta a Granel
+  const [modoVenta, setModoVenta] = useState<'unidad' | 'granel'>('unidad');
+  const [inputCantidadGranel, setInputCantidadGranel] = useState("1");
+  const [inputPrecioGranel, setInputPrecioGranel] = useState("");
 
-  /* Hooks */ /* -------------------------------------------------------------- */
+  
 
-  // Producto seleccionado * cantidad = total
-  const getPrecioProducto = (producto: {
-    id: string;
-    nombre: string;
-    precio_venta: number;
-    venta_negocio: number;
-  } | null): number => {
-    if (!producto) return 0;
+  /* Lógica y Hooks */
+  const getPrecioProducto = useCallback((producto: ProductoSeleccionado | null): number => {
+  if (!producto) return 0;
+  if (tipoClienteSeleccionado.id === "0") return producto.precio_venta;
+  return producto.venta_negocio;
+}, [tipoClienteSeleccionado]);
 
-    // Cliente Final usa precio_venta siempre
-    if (tipoClienteSeleccionado.id === "0") return producto.precio_venta;
 
-    // Cliente con CUIT o sin CUIT
-    return producto.venta_negocio;
-  };
-
-  const totalProducto = productoSeleccionado
-  ? getPrecioProducto(productoSeleccionado) * cantidad
-  : 0;
-
-  // Calculo de los descuentos aplicados a un producto - % o nominal
+  const totalProducto = productoSeleccionado ? getPrecioProducto(productoSeleccionado) * cantidad : 0;
   const subtotal = totalProducto * (1 - descuentoPorcentual / 100);
   const productoConDescuento = Math.max(0, subtotal - descuentoNominal);
+  const totalConDescuento = Math.max(0, totalVenta * (1 - descuentoSobreTotal / 100) - descuentoNominalTotal);
 
-  // Calculo total de toda la venta con descuentos y recargos
   const totalVentaFinal = (() => {
-    // 1. Aplicar descuento % sobre el total
-    let total = totalVenta * (1 - descuentoSobreTotal / 100);
-
-    // 2. Aplicar descuento nominal sobre el total
-    total = Math.max(0, total - descuentoNominalTotal);
-
-    // 3. Recargos según método de pago
+    let total = totalConDescuento; // Usamos la variable que acabamos de definir
     if (metodoPago === "transferencia" && recargoTransferenciaActivo) {
       total += total * (recargoTransferencia / 100);
     } else if (metodoPago === "bancario" && recargoBancarioActivo) {
       total += total * (recargoBancario / 100);
     }
-
-    // 4. Redondeo
     return Math.round(total * 100) / 100;
   })();
 
+  // Hook para cambiar el modo de venta según el producto seleccionado
+useEffect(() => {
+    // --- INICIO DEL CÓDIGO DE DEPURACIÓN ---
+    console.clear(); // Limpia la consola para ver solo el resultado importante
+    console.log("===================================");
+    console.log(" disparado. Producto actual:", productoSeleccionado);
+    
+    if (productoSeleccionado) {
+      console.log("1. ¿El objeto tiene 'unidad_venta'?", productoSeleccionado.hasOwnProperty('unidad_venta'));
+      console.log("   Valor de 'unidad_venta':", productoSeleccionado.unidad_venta);
 
-  // Hook para agregar producto al panel resumen de productos
+      // 2. Ejecutamos la condición
+      const esVentaPorUnidad = !productoSeleccionado.unidad_venta || productoSeleccionado.unidad_venta.toLowerCase() === 'unidad';
+      console.log("2. ¿El producto es por unidad?", esVentaPorUnidad);
+
+      // 3. Vemos la decisión final
+      if (!esVentaPorUnidad) {
+        console.log("3. DECISIÓN: Cambiar a modo GRANEL.");
+        setModoVenta('granel');
+        // ... (resto de la lógica)
+      } else {
+        console.log("3. DECISIÓN: Mantener/Cambiar a modo UNIDAD.");
+        setModoVenta('unidad');
+        // ... (resto de la lógica)
+      }
+    } else {
+      setModoVenta('unidad');
+    }
+    console.log("===================================");
+    // --- FIN DEL CÓDIGO DE DEPURACIÓN ---
+
+    // El resto de tu lógica del useEffect va aquí...
+    if (productoSeleccionado) {
+      const esVentaPorUnidad = !productoSeleccionado.unidad_venta || productoSeleccionado.unidad_venta.toLowerCase() === 'unidad';
+      if (!esVentaPorUnidad) {
+        setModoVenta('granel');
+        const precioUnitario = getPrecioProducto(productoSeleccionado);
+        setInputCantidadGranel("1");
+        setInputPrecioGranel(precioUnitario.toFixed(2));
+        setCantidad(1);
+      } else {
+        setModoVenta('unidad');
+        setCantidad(1);
+      }
+    } else {
+      setModoVenta('unidad');
+    }
+  }, [productoSeleccionado, tipoClienteSeleccionado, getPrecioProducto]);
+
+  // Handlers para los inputs de venta a granel
+  const handleCantidadGranelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const nuevoValor = e.target.value;
+    setInputCantidadGranel(nuevoValor);
+    if (productoSeleccionado) {
+      const cantidadNum = parseFloat(nuevoValor) || 0;
+      const precioUnitario = getPrecioProducto(productoSeleccionado);
+      setInputPrecioGranel((cantidadNum * precioUnitario).toFixed(2));
+      setCantidad(cantidadNum);
+    }
+  };
+
+  const handlePrecioGranelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const nuevoValor = e.target.value;
+    setInputPrecioGranel(nuevoValor);
+    if (productoSeleccionado && getPrecioProducto(productoSeleccionado) > 0) {
+      const precioNum = parseFloat(nuevoValor) || 0;
+      const precioUnitario = getPrecioProducto(productoSeleccionado);
+      const cantidadCalculada = (precioNum / precioUnitario).toFixed(3);
+      setInputCantidadGranel(cantidadCalculada);
+      setCantidad(parseFloat(cantidadCalculada));
+    }
+  };
+
   const handleAgregarProducto = () => {
-
-    if (!productoSeleccionado) return;
-
-    const descuentoAplicado = descuentoPorcentual > 0;
-    const porcentajeDescuento = descuentoPorcentual;
-
+    if (!productoSeleccionado || cantidad <= 0) {
+      toast.error("Seleccione un producto y una cantidad válida.");
+      return;
+    };
     onAgregarProducto({
       tipo: productoSeleccionado.nombre,
       cantidad,
       precioTotal: productoConDescuento,
-      descuentoAplicado,
-      porcentajeDescuento,
-      descuentoNominal
+      descuentoAplicado: descuentoPorcentual > 0 || descuentoNominal > 0,
+      porcentajeDescuento: descuentoPorcentual, // Asignación explícita
+      descuentoNominal: descuentoNominal    
     });
-
+    setProductoSeleccionado(null);
     setCantidad(1);
+    setDescuentoNominal(0);
+    setDescuentoPorcentual(0);
+    setModoVenta('unidad');
+    inputRef.current?.focus();
+    toast.success("Producto agregado al resumen.");
   };
 
-  // Funcion para resetear los inputs post venta
   const resetFormularioVenta = () => {
-
     onLimpiarResumen();
     setMetodoPago("efectivo");
     setMontoPagado(0);
@@ -262,12 +264,12 @@ function FormVentas({
     setDetallePagoDividido("");
     setTipoFacturacion("factura");
     setClienteSeleccionado(null);
-    setTipoClienteSeleccionado({ id: "1", nombre: "Cliente Registrado" });
+    setTipoClienteSeleccionado(tipoCliente[0]);
     setBusquedaCliente("");
     setOpenCliente(false);
     setCuitManual("");
-    setDescuentoNominalTotal(0);  // $
-    setDescuentoSobreTotal(0);    // %
+    setDescuentoNominalTotal(0);
+    setDescuentoSobreTotal(0);
     setDescuentoPorcentual(0);
     setDescuentoNominal(0);
     setObservaciones("");
@@ -276,95 +278,61 @@ function FormVentas({
     setVuelto(0);
     setOpen(false);
     setCodigoEscaneado("");
+    setProductoSeleccionado(null);
+    setModoVenta('unidad');
   };
 
-  // Effect para mostrar la calculadora de vuelto si es pago con efectivo
   useEffect(() => {
-      if (metodoPago === "efectivo" && typeof montoPagado === "number" && !isNaN(montoPagado)) {
-          const cambio = montoPagado - totalVentaFinal;
-          setVuelto(cambio >= 0 ? cambio : 0);
-      } else {
-          setVuelto(0);
-      }
+    if (metodoPago === "efectivo" && typeof montoPagado === "number" && !isNaN(montoPagado)) {
+      const cambio = montoPagado - totalVentaFinal;
+      setVuelto(cambio >= 0 ? cambio : 0);
+    } else {
+      setVuelto(0);
+    }
   }, [montoPagado, metodoPago, totalVentaFinal]);
 
-  /* Formateos Numéricos */
-  // Formatea el input en string para mejor UI
-  function formatearMoneda(valor: string): string {
-    const limpio = valor.replace(/[^\d]/g, "");     // Todo menos dígitos
+  const formatearMoneda = (valor: string): string => {
+    const limpio = valor.replace(/[^\d]/g, "");
     if (!limpio) return "";
     const conPuntos = parseInt(limpio).toLocaleString("es-AR");
     return `$${conPuntos}`;
   }
 
-  // Ayuda a limpiar el string para hacer number
-  function limpiarMoneda(valor: string): number {
+  const limpiarMoneda = (valor: string): number => {
     if (!valor) return 0;
     const limpio = valor
-      .replace(/\./g, "")           // Quitamos puntos (separador de miles)
-      .replace(",", ".")            // Reemplazamos la coma decimal por punto
-      .replace(/[^\d.]/g, "");      // Quitamos todo menos números y punto decimal
+      .replace(/\./g, "")
+      .replace(",", ".")
+      .replace(/[^\d.]/g, "");
     return parseFloat(limpio) || 0;
   }
 
-  /* Endpoints */ /* -------------------------------------------------------------- */
-
-  /* Lógica Código de Barras */
-  // Enfocar el input automáticamente cuando el componente se monta
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
-  
-  // Disparador de buscar y agregar producto con codigo de barras
+
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-
     if (e.key === 'Enter') {
-
       e.preventDefault();
       if (!codigo) return;
-
       try {
-
-        const res = await fetch(`https://sistema-ima.sistemataup.online/api/articulos/codigos/buscar/${codigo}`,
-          {
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
+        const res = await fetch(`https://sistema-ima.sistemataup.online/api/articulos/codigos/buscar/${codigo}`, {
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        });
         if (!res.ok) throw new Error('Producto no encontrado');
         const data = await res.json();
-        
-        const producto: Producto = {
-          id: data.id,
-          descripcion: data.descripcion,
-          precio_venta: data.precio_venta,
-          stock_actual: data.stock_actual,
-          codigos: data.codigos,
-          cantidad: 1,
-          precioTotal: data.precio_venta,
-          descuentoAplicado: false,
-          porcentajeDescuento: 0,
-        };
-        console.log(producto)
-        
         onAgregarProducto({
           tipo: data.descripcion,
-          cantidad: 1,
+          cantidad: 1, // Barcode always adds 1 unit
           precioTotal: data.precio_venta,
           descuentoAplicado: false,
           porcentajeDescuento: 0,
           descuentoNominal: 0
         });
-        
         toast.success(`Producto agregado: ${data.descripcion}`);
-
       } catch (error) {
         console.error(error);
         toast.error(`Producto no encontrado: ${codigo}`);
-
       } finally {
         setCodigoEscaneado('');
         inputRef.current?.focus();
@@ -372,44 +340,36 @@ function FormVentas({
     }
   };
 
-  // GET Clientes - trae todos los clientes inscriptos
   useEffect(() => {
     const fetchClientes = async () => {
       try {
-        const res = await fetch("https://sistema-ima.sistemataup.online/api/clientes/obtener-todos",
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-        );
+        const res = await fetch("https://sistema-ima.sistemataup.online/api/clientes/obtener-todos", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
         const data: Cliente[] = await res.json();
         const clientesActivos = data.filter((cliente: Cliente) => cliente.activo);
-
         setClientes(clientesActivos);
-
       } catch (error) {
         console.error("❌ Error al obtener clientes:", error);
       }
     };
-
     fetchClientes();
   }, [token]);
 
-  // POST Ventas - Registra la venta completa
-  const handleSubmit = async (e: React.FormEvent) => {
-    setIsLoading(true);
+const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
 
-    // === VALIDACIONES ===
+    // --- 1. VALIDACIONES INICIALES ---
     if (productosVendidos.length === 0) {
       toast.error("❌ No hay productos cargados en la venta.");
       setIsLoading(false);
       return;
     }
 
-    if (metodoPago === "efectivo" && montoPagado < totalVenta) {
-      toast.error("❌ El monto pagado no puede ser menor al total del pedido.");
+    if (metodoPago === "efectivo" && montoPagado < totalVentaFinal) {
+      toast.error("❌ El monto abonado no puede ser menor al valor final del pedido.");
       setIsLoading(false);
       return;
     }
@@ -420,23 +380,24 @@ function FormVentas({
       return;
     }
 
-    if (tipoClienteSeleccionado.id === "0" && totalVenta > 200000 && cuitManual.trim() === "") {
-      toast.error("❌ Para montos mayores a $200.000, debe ingresar un CUIT.");
-      setIsLoading(false);
-      return;
+    if (tipoClienteSeleccionado.id === "0" && totalVenta > 200000) {
+      if(cuitManual.trim() === "") {
+        toast.error("❌ Para montos mayores a $200.000, debe ingresar un CUIT.");
+        setIsLoading(false);
+        return;
+      }
+      if (!/^\d{11}$/.test(cuitManual.trim())) {
+        toast.error("❌ El CUIT ingresado no es válido. Debe tener 11 dígitos.");
+        setIsLoading(false);
+        return;
+      }
     }
-
-    if (tipoClienteSeleccionado.id === "0" && totalVenta > 200000 && !/^\d{11}$/.test(cuitManual.trim())) {
-      toast.error("❌ El CUIT debe tener 11 dígitos numéricos.");
-      setIsLoading(false);
-      return;
-    }
-
-    // === PAYLOAD DE VENTA ===
+    
+    // --- 2. CONSTRUCCIÓN DEL PAYLOAD PARA REGISTRAR LA VENTA ---
     const ventaPayload = {
       id_cliente: tipoClienteSeleccionado.id === "0" ? 0 : clienteSeleccionado?.id ?? 0,
       metodo_pago: metodoPago.toUpperCase(),
-      total_venta: totalVenta,
+      total_venta: totalVenta, // Se envía el total sin descuentos/recargos finales
       paga_con: montoPagado,
       pago_separado: pagoDividido,
       detalles_pago_separado: detallePagoDividido,
@@ -449,18 +410,20 @@ function FormVentas({
           nombre: productoReal?.nombre ?? p.tipo,
           cantidad: p.cantidad,
           precio_unitario: productoReal ? getPrecioProducto(productoReal) : 0,
-          subtotal: p.precioTotal,
+          subtotal: p.precioTotal, // Este es el subtotal con descuentos por item
           tasa_iva: 21.0
         };
       })
     };
-
+    
     try {
       if (!empresa || !empresa.id_empresa) {
-        toast.error("No hay datos válidos de la empresa, no se puede realizar la venta.");
+        toast.error("No se pudieron cargar los datos de la empresa. No se puede realizar la venta.");
+        setIsLoading(false);
         return;
       }
-
+      
+      // --- 3. LLAMADA A LA API PARA REGISTRAR LA VENTA ---
       const response = await fetch("https://sistema-ima.sistemataup.online/api/caja/ventas/registrar", {
         method: "POST",
         headers: {
@@ -470,353 +433,157 @@ function FormVentas({
         body: JSON.stringify(ventaPayload)
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        toast.success("✅ Venta registrada: " + data.message);
-
-        const generarComprobante = async () => {
-          try {
-            // Construir items base
-            const itemsBase = productosVendidos.map((p) => {
-              const productoReal = productos.find((prod) => prod.nombre === p.tipo);
-              const item: ItemComprobante = {
-                descripcion: productoReal?.nombre || p.tipo,
-                cantidad: p.cantidad,
-                precio_unitario: productoReal ? getPrecioProducto(productoReal) : 0,
-                subtotal: p.precioTotal,
-                tasa_iva: 21
-              };
-
-              // Solo agregamos descuentos si NO es factura
-              if (tipoFacturacion !== "factura") {
-                item.descuento_especifico = productoReal ? p.descuentoNominal || 0 : 0;
-                item.descuento_especifico_por = productoReal ? p.porcentajeDescuento || 0 : 0;
-              }
-
-              return item;
-            });
-
-            // Construir transacción según tipo de facturación
-            const transaccion =
-              tipoFacturacion === "factura"
-                ? {
-                    items: itemsBase,
-                    total: totalConDescuento,
-                    observaciones: observaciones || ""
-                  }
-                : {
-                    items: itemsBase,
-                    total: totalConDescuento,
-                    descuento_general: descuentoNominalTotal || 0,
-                    descuento_general_por: descuentoSobreTotal || 0,
-                    observaciones: observaciones || ""
-                  };
-                  
-            // Payload imprimir comprobante 
-            const req = {
-              formato: formatoComprobante.toLowerCase(),
-              tipo: tipoFacturacion.toLowerCase(),
-              emisor: {
-                cuit: empresa?.cuit?.toString() || 0,
-                razon_social: empresa?.nombre_negocio || "Nombre no disponible",
-                domicilio: empresa?.direccion_negocio || "Domicilio no disponible",
-                punto_venta: empresa?.afip_punto_venta_predeterminado || 1,
-                condicion_iva: empresa?.afip_condicion_iva || "Responsable Inscripto",
-              },
-              receptor: {
-                nombre_razon_social:
-                  tipoClienteSeleccionado.id === "0"
-                    ? "Consumidor Final"
-                    : clienteSeleccionado?.nombre_razon_social ?? "Consumidor Final",
-                cuit_o_dni:
-                  tipoClienteSeleccionado.id === "0"
-                    ? cuitManual || "0"
-                    : clienteSeleccionado?.cuit || clienteSeleccionado?.identificacion_fiscal || "0",
-                domicilio: "Sin especificar",
-                condicion_iva:
-                  tipoClienteSeleccionado.id === "0"
-                    ? "Consumidor Final"
-                    : clienteSeleccionado?.condicion_iva ?? "Consumidor Final"
-              },
-              transaccion
-            };
-
-            const respComp = await fetch("https://sistema-ima.sistemataup.online/api/comprobantes/generar", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`
-              },
-              body: JSON.stringify(req)
-            });
-
-            if (!respComp.ok) {
-              const error = await respComp.json();
-              toast.error("❌ Error al generar comprobante: " + error.detail);
-              return;
-            }
-
-            const blob = await respComp.blob();
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = `comprobante-${Date.now()}.pdf`;
-            link.click();
-            URL.revokeObjectURL(url);
-
-            toast.success("✅ Comprobante generado correctamente");
-
-          } catch (error) {
-            console.error("❌ Error al generar comprobante:", error);
-            toast.error("❌ Error al generar comprobante");
-          }
-        };
-
-        await generarComprobante();
-        resetFormularioVenta();
-        window.scrollTo({ top: 20, behavior: "smooth" });
-      } else {
+      if (!response.ok) {
         const error = await response.json();
-        toast.error("❌ Error al registrar venta: " + error.detail);
+        toast.error(`❌ Error al registrar venta: ${error.detail || response.statusText}`);
+        setIsLoading(false);
+        return;
       }
+
+      // Venta registrada con éxito, ahora se genera el comprobante
+      const data = await response.json();
+      toast.success(`✅ Venta registrada: ${data.message}`);
+      
+      // --- 4. FUNCIÓN ANIDADA PARA GENERAR Y DESCARGAR EL COMPROBANTE ---
+      const generarComprobante = async () => {
+        try {
+          const itemsBase = productosVendidos.map((p): ItemComprobante => {
+            const productoReal = productos.find((prod) => prod.nombre === p.tipo);
+            const item: ItemComprobante = {
+              descripcion: productoReal?.nombre || p.tipo,
+              cantidad: p.cantidad,
+              precio_unitario: productoReal ? getPrecioProducto(productoReal) : 0,
+              subtotal: p.precioTotal,
+              tasa_iva: 21
+            };
+            if (tipoFacturacion !== "factura") {
+              item.descuento_especifico = p.descuentoNominal || 0;
+              item.descuento_especifico_por = p.porcentajeDescuento || 0;
+            }
+            return item;
+          });
+
+          const transaccion = tipoFacturacion === "factura"
+            ? { items: itemsBase, total: totalVentaFinal, observaciones: observaciones || "" }
+            : { items: itemsBase, total: totalVentaFinal, descuento_general: descuentoNominalTotal || 0, descuento_general_por: descuentoSobreTotal || 0, observaciones: observaciones || "" };
+          
+          const reqPayload = {
+            formato: formatoComprobante.toLowerCase(),
+            tipo: tipoFacturacion.toLowerCase(),
+            emisor: {
+              cuit: empresa.cuit?.toString() || "0",
+              razon_social: empresa.nombre_negocio || "N/A",
+              domicilio: empresa.direccion_negocio || "N/A",
+              punto_venta: empresa.afip_punto_venta_predeterminado || 1,
+              condicion_iva: empresa.afip_condicion_iva || "Responsable Inscripto",
+            },
+            receptor: {
+              nombre_razon_social: tipoClienteSeleccionado.id === "0" ? "Consumidor Final" : clienteSeleccionado?.nombre_razon_social ?? "N/A",
+              cuit_o_dni: tipoClienteSeleccionado.id === "0" ? cuitManual || "0" : clienteSeleccionado?.cuit || clienteSeleccionado?.identificacion_fiscal || "0",
+              domicilio: "Sin especificar",
+              condicion_iva: tipoClienteSeleccionado.id === "0" ? "Consumidor Final" : clienteSeleccionado?.condicion_iva ?? "Consumidor Final"
+            },
+            transaccion
+          };
+
+          const respComp = await fetch("https://sistema-ima.sistemataup.online/api/comprobantes/generar", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify(reqPayload)
+          });
+
+          if (!respComp.ok) {
+            const errorComp = await respComp.json();
+            toast.error(`❌ Error al generar comprobante: ${errorComp.detail}`);
+            return;
+          }
+
+          const blob = await respComp.blob();
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = `${tipoFacturacion}-${Date.now()}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+          toast.success("✅ Comprobante generado correctamente.");
+
+        } catch (error) {
+          console.error("❌ Error en la generación del comprobante:", error);
+          toast.error("❌ Fallo al intentar generar el comprobante.");
+        }
+      };
+
+      await generarComprobante();
+      
+      // --- 5. LIMPIEZA FINAL DEL FORMULARIO ---
+      resetFormularioVenta();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+
     } catch (error) {
-      console.error("Detalles del error:", error);
-      toast.error("❌ Error al registrar venta:\n" + JSON.stringify(error, null, 2));
+      console.error("Detalles del error de registro:", error);
+      toast.error("❌ Error de red al registrar la venta.");
     } finally {
       setIsLoading(false);
     }
   };
+  
+  
+  /* Renderizado del Componente */
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col w-full lg:w-1/2 rounded-xl bg-white shadow-md">
 
-  /* -------------------------------------------------------------- */
-
-  return (            
-
-    <form onSubmit={handleSubmit} 
-    className="flex flex-col w-full lg:w-1/2 rounded-xl bg-white shadow-md">
-
-      {/* Header del Cajero */}
       <div className="w-full flex flex-row justify-between items-center p-6 bg-green-700 rounded-t-xl">
         <h4 className="text-2xl font-semibold text-white">Cajero</h4>
-        <p className="text-2xl font-semibold text-white md:hidden">${totalVenta}</p>
+        <p className="text-2xl font-semibold text-white md:hidden">${totalVenta.toFixed(2)}</p>
       </div>
 
-      {/* Cajero */}
       <div className="flex flex-col justify-between w-full gap-6 p-8">
 
-        {/* Tipo Cliente */}
-        <div className="flex flex-col md:flex-row w-full gap-4 justify-between items-center">
-          <Label className="text-2xl font-semibold text-green-900 w-full md:max-w-1/4">Tipo de Cliente</Label>
-          <div className="flex flex-col gap-2 w-full md:w-2/3">
-            <Select
-              defaultValue={tipoClienteSeleccionado.id}
-              onValueChange={(value) => {
-                const cliente = tipoCliente.find(p => p.id === value);
-                if (cliente) setTipoClienteSeleccionado(cliente);
-              }}
-            >
-              <SelectTrigger className="w-full cursor-pointer text-black">
-                <SelectValue placeholder="Seleccionar cliente" />
-              </SelectTrigger>
-              <SelectContent>
-                {tipoCliente.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Si es Cliente Final, input para registrar su CUIT */}
-            {tipoClienteSeleccionado.id === "0" && (
-              <>
-                <Input
-                  type="text"
-                  placeholder="Ingresar CUIT del cliente - sin espacios ni puntos"
-                  value={cuitManual}
-                  onChange={(e) => setCuitManual(e.target.value)}
-                  className="mt-1 text-black w-full"
-                />
-                
-                {totalVenta > 200000 && (
-                  <p className="text-sm text-red-600 font-semibold mt-1">
-                    ⚠️ Para ventas mayores a $200.000 el CUIT es obligatorio.
-                  </p>
-                )}
-              </>
-            )}
-
-            {/* Si el tipo de cliente es con CUIT... */}
-            {tipoClienteSeleccionado.id === "1" && (
-            <div className="w-full flex flex-col gap-2">
-              {!clientes.length ? (
-                <p className="text-green-900 font-semibold">Cargando clientes...</p>
-              ) : (
-                <Popover open={openCliente} onOpenChange={setOpenCliente}>
-                  <PopoverTrigger asChild>
-                    <button
-                      role="combobox"
-                      aria-controls="clientes-list"
-                      aria-expanded={openCliente}
-                      className="w-full justify-between text-left cursor-pointer border px-3 py-2 rounded-md shadow-sm bg-white text-black flex items-center"
-                    >
-                      {clienteSeleccionado
-                        ? `${clienteSeleccionado.nombre_razon_social} (${clienteSeleccionado.cuit || "Sin CUIT"})`
-                        : "Seleccionar cliente"}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    side="bottom"
-                    align="start"
-                    className="w-full md:max-w-[98%] p-0 max-h-64 overflow-y-auto z-50"
-                    sideOffset={8}
-                  >
-                    <Command>
-                      <CommandInput
-                        placeholder="Buscar cliente por nombre o CUIT..."
-                        value={busquedaCliente}
-                        onValueChange={setBusquedaCliente}
-                      />
-                      <CommandEmpty>No se encontró ningún cliente.</CommandEmpty>
-                      <CommandGroup>
-                        {clientes
-                          .filter((cliente) => {
-                            const texto = busquedaCliente.toLowerCase();
-                            return (
-                              cliente.nombre_razon_social.toLowerCase().includes(texto) ||
-                              cliente.cuit?.toString().includes(texto)
-                            );
-                          })
-                          .map((cliente) => (
-                            <CommandItem
-                              key={cliente.id}
-                              value={`${cliente.nombre_razon_social} ${cliente.cuit || ""}`}
-                              className="pl-2 pr-4 py-2 text-sm text-black cursor-pointer"
-                              onSelect={() => {
-                                setClienteSeleccionado(cliente);
-                                setOpenCliente(false);
-                              }}
-                            >
-                              <span className="truncate">
-                                {cliente.nombre_razon_social} ({cliente.cuit || "Sin CUIT"})
-                              </span>
-                            </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              )}
-            </div>
-          )}
-          </div>
-        </div>
+        <SeccionCliente
+          tipoClienteSeleccionado={tipoClienteSeleccionado}
+          setTipoClienteSeleccionado={setTipoClienteSeleccionado}
+          tiposDeCliente={tipoCliente}
+          cuitManual={cuitManual}
+          setCuitManual={setCuitManual}
+          totalVenta={totalVenta}
+          clientes={clientes}
+          clienteSeleccionado={clienteSeleccionado}
+          setClienteSeleccionado={setClienteSeleccionado}
+          openCliente={openCliente}
+          setOpenCliente={setOpenCliente}
+          busquedaCliente={busquedaCliente}
+          setBusquedaCliente={setBusquedaCliente}
+        />
         <span className="block w-full h-0.5 bg-green-900"></span>
 
-        {/* Código de Barras */}
-        <div className="w-full flex flex-col md:flex-row gap-4 items-start md:items-center">
-          <Label className="text-2xl font-semibold text-green-900 text-left">Código de Barras</Label>
-          <Input
-            ref={inputRef}
-            type="text"
-            value={codigo}
-            onChange={(e) => setCodigoEscaneado(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="border w-full md:max-w-2/3"
-            autoFocus
-          />
-        </div>
+        <SeccionProducto
+          inputRef={inputRef}
+          codigo={codigo}
+          setCodigoEscaneado={setCodigoEscaneado}
+          handleKeyDown={handleKeyDown}
+          productos={productos}
+          productoSeleccionado={productoSeleccionado}
+          setProductoSeleccionado={setProductoSeleccionado}
+          open={open}
+          setOpen={setOpen}
+          tipoClienteSeleccionadoId={tipoClienteSeleccionado.id}
+        />
 
-        {/* Dropdown de Productos */}
-        <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
-          <Label className="text-2xl font-semibold text-green-900">Producto</Label>
-          {productos.length === 0 ? (
-            <p className="text-green-900 font-semibold">Cargando productos...</p>
-          ) : (
-            <div className="w-full md:max-w-2/3 flex flex-col gap-2">
-              <Popover open={open} onOpenChange={setOpen}>
-                <PopoverTrigger asChild>
-                  <button
-                    role="combobox"
-                    aria-controls="productos-list"
-                    aria-expanded={open}
-                    className="w-full justify-between text-left cursor-pointer border px-3 py-2 rounded-md shadow-sm bg-white text-black flex items-center"
-                    onClick={() => setOpen(!open)}
-                  >
-                    {productoSeleccionado
-                      ? `${productoSeleccionado.nombre} - $${tipoClienteSeleccionado.id === "1"
-                          ? productoSeleccionado.venta_negocio
-                          : productoSeleccionado.precio_venta}`
-                      : "Seleccionar producto"}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent
-                  side="bottom"
-                  align="start"
-                  className="w-full md:max-w-[98%] p-0 max-h-64 overflow-y-auto z-50"
-                  sideOffset={8} 
-                >
-                  <Command>
-                    <CommandInput placeholder="Buscar producto..." />
-                    <CommandEmpty>No se encontró ningún producto.</CommandEmpty>
-                    <CommandGroup>
-                      {productos.map((p) => (
-                        <CommandItem
-                          key={p.id}
-                          value={p.nombre}
-                          className="pl-2 pr-4 py-2 text-sm text-black cursor-pointer"
-                          onSelect={() => {
-                            setProductoSeleccionado(p);
-                            setOpen(false);
-                          }}
-                        >
-                          <span className="truncate">
-                            {p.nombre} | ${tipoClienteSeleccionado.id === "1" ? p.venta_negocio : p.precio_venta} | Stock: {p.stock_actual}
-                          </span>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
-          )}
-        </div>       
-
-        {/* Seleccionar cantidad de un Producto - limitada por Stock*/}
-        <div className="flex flex-col gap-4 items-start justify-between md:flex-row">
-          <Label className="text-2xl font-semibold text-green-900">Cantidad</Label>
-          <Input
-            type="number"
-            onWheel={(e) => (e.target as HTMLInputElement).blur()}
-            min={1}
-            max={productoSeleccionado?.stock_actual || 9999}
-            value={cantidad === 0 ? "" : cantidad}
-            onChange={(e) => {
-              const input = e.target.value;
-
-              // Permitir input vacío
-              if (input === "") {
-                setCantidad(0);
-                return;
-              }
-
-              // Convertimos a numero
-              const parsed = parseInt(input, 10);
-              // Ignorar si no es número válido
-              if (isNaN(parsed)) return;
-
-              // Limitar al stock
-              const max = productoSeleccionado?.stock_actual ?? Infinity;
-              setCantidad(Math.min(parsed, max));
-            }}
-            className="w-full md:max-w-2/3 text-black"
-          />
-        </div>
+        <SeccionCantidad
+          modoVenta={modoVenta}
+          cantidadUnidad={cantidad}
+          setCantidadUnidad={setCantidad}
+          stockActual={productoSeleccionado?.stock_actual ?? 9999}
+          unidadDeVenta={productoSeleccionado?.unidad_venta || ''}
+          inputCantidadGranel={inputCantidadGranel}
+          handleCantidadGranelChange={handleCantidadGranelChange}
+          inputPrecioGranel={inputPrecioGranel}
+          handlePrecioGranelChange={handlePrecioGranelChange}
+        />
         <span className="block w-full h-0.5 bg-green-900"></span>
 
-        {/* Descuento Porcentual por Producto */}
         <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
           <Label className="text-2xl font-semibold text-green-900">Descuento a Aplicar (%)</Label>
           <Input
@@ -825,24 +592,11 @@ function FormVentas({
             min={0}
             max={100}
             value={descuentoPorcentual === 0 ? "" : descuentoPorcentual}
-            onChange={(e) => {
-              const input = e.target.value;
-
-              if (input === "") {
-                setDescuentoPorcentual(0);
-                return;
-              }
-
-              const parsed = parseInt(input, 10);
-              if (isNaN(parsed)) return;
-
-              setDescuentoPorcentual(Math.min(parsed, 100)); // limitamos a 100%
-            }}
+            onChange={(e) => setDescuentoPorcentual(Math.min(parseInt(e.target.value, 10) || 0, 100))}
             className="w-full md:max-w-2/3 text-black"
           />
         </div>
 
-        {/* Descuento Nominal por Producto */}
         <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
           <Label className="text-2xl font-semibold text-green-900">Descuento a Aplicar ($)</Label>
           <Input
@@ -850,58 +604,31 @@ function FormVentas({
             onWheel={(e) => (e.target as HTMLInputElement).blur()}
             min={0}
             value={descuentoNominal === 0 ? "" : descuentoNominal}
-            onChange={(e) => {
-              const input = e.target.value;
-
-              if (input === "") {
-                setDescuentoNominal(0);
-                return;
-              }
-
-              const parsed = parseFloat(input);
-              if (isNaN(parsed)) return;
-
-              const maxDescuento = getPrecioProducto(productoSeleccionado) * cantidad;
-              setDescuentoNominal(Math.min(parsed, maxDescuento)); // evita descuentos mayores al total
-            }}
+            onChange={(e) => setDescuentoNominal(Math.min(parseFloat(e.target.value) || 0, totalProducto))}
             className="w-full md:max-w-2/3 text-black"
           />
         </div>
         <span className="block w-full h-0.5 bg-green-900"></span>
 
-        {/* Total de precio producto individual * cantidad de este producto */}
         <div className="flex flex-col md:flex-row gap-4 justify-between items-start mt-4">
-          <Label className="text-2xl font-semibold text-green-900">Total Productos Seleccionados:</Label>
-          <p className="text-2xl font-semibold text-green-900">
-            ${productoConDescuento.toFixed(2)}
-          </p>
+          <Label className="text-2xl font-semibold text-green-900">Total Producto Seleccionado:</Label>
+          <p className="text-2xl font-semibold text-green-900">${productoConDescuento.toFixed(2)}</p>
         </div>
 
-        {/* Botón Agregar Producto */}
         <Button
           variant="success"
           className="!py-6"
           type="button"
-          onClick={() => {
-            handleAgregarProducto();
-            toast.success("Producto agregado al resumen.");
-          }}
+          onClick={handleAgregarProducto}
         >
           + Agregar producto
         </Button>
+        <hr className="p-0.75 bg-green-900 my-8"/>
 
-
-        <hr className="p-0.75 bg-green-900 my-8"/> {/* --------------------------------------- */}
-
-
-        {/* Método de Pago y condicional efectivo */}
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-4 items-start justify-between md:flex-row">
             <Label className="text-2xl font-semibold text-green-900">Método de Pago</Label>
-            <Select
-              value={metodoPago}
-              onValueChange={(value) => setMetodoPago(value)}
-            >
+            <Select value={metodoPago} onValueChange={setMetodoPago}>
               <SelectTrigger className="w-full md:max-w-1/2 cursor-pointer text-black">
                 <SelectValue placeholder="Seleccionar método" />
               </SelectTrigger>
@@ -913,20 +640,12 @@ function FormVentas({
             </Select>
           </div>
           
-          {/* Caja de Vuelto en Efectivo: */}
-          {metodoPago === 'efectivo' && (      
+          {metodoPago === 'efectivo' && (
             <div className="flex flex-col gap-4 p-4 bg-green-800 rounded-lg mt-2">
-              
               <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
                 <Label className="text-2xl font-semibold text-white">Costo del Pedido:</Label>
-                <Input
-                  type="text"
-                  value={formatearMoneda(totalVentaFinal.toString())}
-                  disabled
-                  className="w-full md:max-w-1/2 font-semibold text-white"
-                />
+                <Input type="text" value={formatearMoneda(totalVentaFinal.toString())} disabled className="w-full md:max-w-1/2 font-semibold text-white" />
               </div>
-
               <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
                 <Label className="text-2xl font-semibold text-white">Con cuánto abona:</Label>
                 <Input
@@ -934,267 +653,97 @@ function FormVentas({
                   value={inputEfectivo}
                   onChange={(e) => {
                     const valorInput = e.target.value;
-
-                    // Limpiar y obtener valor numérico real
-                    const valorNumerico = limpiarMoneda(valorInput);
-
-                    // Actualiza ambos estados: visual + interno
                     setInputEfectivo(formatearMoneda(valorInput));
-                    setMontoPagado(valorNumerico);
+                    setMontoPagado(limpiarMoneda(valorInput));
                   }}
                   className="w-full md:max-w-1/2 font-semibold text-white"
                 />
               </div>
-
               <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
                 <Label className="text-2xl font-semibold text-white">Vuelto:</Label>
-                <Input
-                  type="text"
-                  value={formatearMoneda(vuelto.toString())}
-                  disabled
-                  className="w-full md:max-w-1/2 font-semibold text-white"
-                />
+                <Input type="text" value={formatearMoneda(vuelto.toString())} disabled className="w-full md:max-w-1/2 font-semibold text-white" />
               </div>
             </div>
           )}
         </div>
 
-        {/* Pago Dividido */}
         <div className="flex flex-col gap-2 mt-1">
           <div className="flex items-center space-x-2">
-            <input
-              id="pagoDividido"
-              type="checkbox"
-              checked={pagoDividido}
-              onChange={(e) => setPagoDividido(e.target.checked)}
-              className="h-5 w-5 text-green-700 border-gray-300 rounded focus:ring-green-600 cursor-pointer"
-            />
-            <Label htmlFor="pagoDividido" className="text-green-950 text-md font-medium">
-              ¿Paga de dos o mas formas?
-            </Label>
+            <input id="pagoDividido" type="checkbox" checked={pagoDividido} onChange={(e) => setPagoDividido(e.target.checked)} className="h-5 w-5 text-green-700 border-gray-300 rounded focus:ring-green-600 cursor-pointer" />
+            <Label htmlFor="pagoDividido" className="text-green-950 text-md font-medium">¿Paga de dos o mas formas?</Label>
           </div>
-
-          {pagoDividido && (
-            <Input
-              placeholder="Detalle del pago (ej: mitad efectivo, mitad transferencia)"
-              value={detallePagoDividido}
-              onChange={(e) => setDetallePagoDividido(e.target.value)}
-              className="mt-2 text-black"
-            />
-          )}
+          {pagoDividido && ( <Input placeholder="Detalle del pago..." value={detallePagoDividido} onChange={(e) => setDetallePagoDividido(e.target.value)} className="mt-2 text-black" /> )}
         </div>
         <span className="block w-full h-0.5 bg-green-900"></span>
-
-        {/* Opciones de Tipo de Facturación */}
-        <RadioGroup
-          value={tipoFacturacion}
-          onValueChange={setTipoFacturacion}
-          className="flex flex-col gap-4 md:flex-row flex-wrap"
-        >
-          {/* Factura */}
-          <Label
-            htmlFor="factura"
-            className="flex flex-row items-center w-full md:w-[48%] lg:flex-row cursor-pointer text-black border-green-900 hover:bg-green-400 dark:hover:bg-green-700 gap-3 rounded-lg border p-3 transition-colors duration-200 data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900"
-          >
-            <RadioGroupItem
-              value="factura"
-              id="factura"
-              className="data-[state=checked]:border-white data-[state=checked]:bg-white"
-            />
+        
+        <RadioGroup value={tipoFacturacion} onValueChange={setTipoFacturacion} className="flex flex-col gap-4 md:flex-row flex-wrap">
+          <Label htmlFor="factura" className="flex flex-row items-center w-full md:w-[48%] lg:flex-row cursor-pointer text-black border-green-900 hover:bg-green-400 dark:hover:bg-green-700 gap-3 rounded-lg border p-3 transition-colors duration-200 data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900">
+            <RadioGroupItem value="factura" id="factura" className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
             <span className="text-sm leading-none font-medium">Factura</span>
           </Label>
-
-          {/* Comprobante */}
-          <Label
-            htmlFor="comprobante"
-            className="flex flex-row items-center w-full md:w-[48%] lg:flex-row cursor-pointer text-black border-green-900 hover:bg-green-400 dark:hover:bg-green-700 gap-3 rounded-lg border p-3 transition-colors duration-200 data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900"
-          >
-            <RadioGroupItem
-              value="recibo"
-              id="comprobante"
-              className="data-[state=checked]:border-white data-[state=checked]:bg-white"
-            />
+          <Label htmlFor="comprobante" className="flex flex-row items-center w-full md:w-[48%] lg:flex-row cursor-pointer text-black border-green-900 hover:bg-green-400 dark:hover:bg-green-700 gap-3 rounded-lg border p-3 transition-colors duration-200 data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900">
+            <RadioGroupItem value="recibo" id="comprobante" className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
             <span className="text-sm leading-none font-medium">Comprobante</span>
           </Label>
-
-          {/* Remito y Presupuesto */}
           <TooltipProvider>
             <div className="flex flex-wrap gap-4 w-full">
-              {/* Remito - con mensaje informativo */}
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Label
-                    htmlFor="remito"
-                    className={`flex flex-row items-center w-full md:w-[48%] lg:flex-row text-black border-green-900 gap-3 rounded-lg border p-3 transition-colors duration-200
-                      ${!habilitarExtras
-                        ? "opacity-50 cursor-not-allowed"
-                        : "cursor-pointer hover:bg-green-400 dark:hover:bg-green-700"}
-                      data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900`}
-                  >
-                    <RadioGroupItem
-                      value="remito"
-                      id="remito"
-                      disabled={!habilitarExtras}
-                      className="data-[state=checked]:border-white data-[state=checked]:bg-white"
-                    />
+                  <Label htmlFor="remito" className={`flex flex-row items-center w-full md:w-[48%] lg:flex-row text-black border-green-900 gap-3 rounded-lg border p-3 transition-colors duration-200 ${!habilitarExtras ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-green-400 dark:hover:bg-green-700"} data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900`}>
+                    <RadioGroupItem value="remito" id="remito" disabled={!habilitarExtras} className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
                     <span className="text-sm leading-none font-medium">Remito</span>
                   </Label>
                 </TooltipTrigger>
-                {!habilitarExtras && (
-                  <TooltipContent>
-                    <p>Contactá al administrador para habilitar esta opción</p>
-                  </TooltipContent>
-                )}
+                {!habilitarExtras && ( <TooltipContent><p>Contactá al administrador</p></TooltipContent> )}
               </Tooltip>
-
-              {/* Presupuesto - - con mensaje informativo */}
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Label
-                    htmlFor="presupuesto"
-                    className={`flex flex-row items-center w-full md:w-[48%] lg:flex-row text-black border-green-900 gap-3 rounded-lg border p-3 transition-colors duration-200
-                      ${!habilitarExtras
-                        ? "opacity-50 cursor-not-allowed"
-                        : "cursor-pointer hover:bg-green-400 dark:hover:bg-green-700"}
-                      data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900`}
-                  >
-                    <RadioGroupItem
-                      value="presupuesto"
-                      id="presupuesto"
-                      disabled={!habilitarExtras}
-                      className="data-[state=checked]:border-white data-[state=checked]:bg-white"
-                    />
+                  <Label htmlFor="presupuesto" className={`flex flex-row items-center w-full md:w-[48%] lg:flex-row text-black border-green-900 gap-3 rounded-lg border p-3 transition-colors duration-200 ${!habilitarExtras ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-green-400 dark:hover:bg-green-700"} data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900`}>
+                    <RadioGroupItem value="presupuesto" id="presupuesto" disabled={!habilitarExtras} className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
                     <span className="text-sm leading-none font-medium">Presupuesto</span>
                   </Label>
                 </TooltipTrigger>
-                {!habilitarExtras && (
-                  <TooltipContent>
-                    <p>Contactá al administrador para habilitar esta opción</p>
-                  </TooltipContent>
-                )}
+                {!habilitarExtras && ( <TooltipContent><p>Contactá al administrador</p></TooltipContent> )}
               </Tooltip>
             </div>
           </TooltipProvider>
-
         </RadioGroup>
         <span className="block w-full h-0.5 bg-green-900"></span>
-
-        {/* Observaciones */}
+        
         <div className="flex flex-col w-full gap-2">
           <Label className="text-green-900 text-xl" htmlFor="message-2">Observaciones</Label>
-          <Textarea
-            placeholder="Observaciones.."
-            id="message-2"
-            value={observaciones}
-            onChange={(e) => setObservaciones(e.target.value)}
-          />
+          <Textarea placeholder="Observaciones de la venta..." id="message-2" value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
         </div>
         <span className="block w-full h-0.5 bg-green-900"></span>
 
-        {/* Descuento Porcentual a Aplicar sobre el TOTAL */}
         <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
           <Label className="text-2xl font-semibold text-green-900">Descuento Sobre Total (%)</Label>
-          <Input
-            type="number"
-            min={0}
-            max={100}
-            value={descuentoSobreTotal === 0 ? "" : descuentoSobreTotal}
-            onWheel={(e) => (e.target as HTMLInputElement).blur()}
-            onChange={(e) => {
-              const input = e.target.value;
-              if (input === "") {
-                setDescuentoSobreTotal(0);
-                return;
-              }
-              const parsed = parseInt(input, 10);
-              if (isNaN(parsed)) return;
-              setDescuentoSobreTotal(Math.min(parsed, 100));
-            }}
-            className="w-full md:max-w-2/3 text-black"
-          />
+          <Input type="number" min={0} max={100} value={descuentoSobreTotal === 0 ? "" : descuentoSobreTotal} onWheel={(e) => (e.target as HTMLInputElement).blur()} onChange={(e) => setDescuentoSobreTotal(Math.min(parseInt(e.target.value, 10) || 0, 100))} className="w-full md:max-w-2/3 text-black" />
         </div>
-
-        {/* Descuento Nominal a Aplicar sobre el TOTAL */}
         <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
-          <Label className="text-2xl font-semibold text-green-900">
-            Descuento Sobre Total ($)
-          </Label>
-          <Input
-            type="number"
-            min={0}
-            value={descuentoNominalTotal === 0 ? "" : descuentoNominalTotal}
-            onWheel={(e) => (e.target as HTMLInputElement).blur()}
-            onChange={(e) => {
-              const input = e.target.value;
-              if (input === "") {
-                setDescuentoNominalTotal(0);
-                return;
-              }
-              const parsed = parseFloat(input);
-              if (isNaN(parsed)) return;
-
-              // Evitamos que el descuento supere el total actual
-              setDescuentoNominalTotal(Math.min(parsed, totalVenta));
-            }}
-            className="w-full md:max-w-2/3 text-black"
-          />
+          <Label className="text-2xl font-semibold text-green-900">Descuento Sobre Total ($)</Label>
+          <Input type="number" min={0} value={descuentoNominalTotal === 0 ? "" : descuentoNominalTotal} onWheel={(e) => (e.target as HTMLInputElement).blur()} onChange={(e) => setDescuentoNominalTotal(Math.min(parseFloat(e.target.value) || 0, totalVenta))} className="w-full md:max-w-2/3 text-black" />
         </div>
         <span className="block w-full h-0.5 bg-green-900"></span>
-                
-        {/* Total Venta */}
+        
         <div className="flex flex-col gap-4 p-6 border border-green-900 rounded-lg">
           <Label className="text-2xl font-semibold text-green-900">Resumen del Pedido</Label>
-          <p className="text-xl text-green-900">
-            <span className="font-semibold">Total sin descuento:</span> ${totalVenta}
-          </p>
-          <p className="text-xl text-green-400">
-            <span className="font-semibold">Descuento aplicado al total:</span> {descuentoSobreTotal}%
-          </p>
-          <p className="text-xl text-green-400">
-            <span className="font-semibold">Descuento nominal sobre total:</span> ${descuentoNominalTotal}
-          </p>
-          {metodoPago === "transferencia" && recargoTransferenciaActivo && (
-            <p className="text-xl text-red-500">
-              <span className="font-semibold">Recargo por Transferencia:</span> {recargoTransferencia}% (${(totalConDescuento * recargoTransferencia / 100).toFixed(2)})
-            </p>
-          )}
-          {metodoPago === "bancario" && recargoBancarioActivo && (
-            <p className="text-xl text-red-500">
-              <span className="font-semibold">Recargo por POS:</span> {recargoBancario}% (${(totalConDescuento * recargoBancario / 100).toFixed(2)})
-            </p>
-          )}
-
-          <span className="block w-full h-0.5 bg-green-900"></span>
-
-          <p className="text-2xl font-bold text-green-900">
-            <span className="font-semibold">Valor Final del Pedido:</span> ${totalVentaFinal}
-          </p>
-          {metodoPago === "efectivo" && montoPagado > 0 && (
-            <p className="text-xl text-emerald-700">
-              <span className="font-semibold">Vuelto para el cliente:</span> ${vuelto}
-            </p>
-          )}
+          <p className="text-xl text-green-900"><span className="font-semibold">Total sin descuento:</span> ${totalVenta.toFixed(2)}</p>
+          <p className="text-xl text-green-400"><span className="font-semibold">Descuento sobre total (%):</span> {descuentoSobreTotal}%</p>
+          <p className="text-xl text-green-400"><span className="font-semibold">Descuento sobre total ($):</span> ${descuentoNominalTotal}</p>
+          {metodoPago === "transferencia" && recargoTransferenciaActivo && ( <p className="text-xl text-red-500"><span className="font-semibold">Recargo por Transferencia:</span> {recargoTransferencia}% (${(totalConDescuento * recargoTransferencia / 100).toFixed(2)})</p> )}
+          {metodoPago === "bancario" && recargoBancarioActivo && ( <p className="text-xl text-red-500"><span className="font-semibold">Recargo por POS:</span> {recargoBancario}% (${(totalConDescuento * recargoBancario / 100).toFixed(2)})</p> )}
+          <span className="block w-full h-0.5 bg-green-900 my-2"></span>
+          <p className="text-2xl font-bold text-green-900"><span className="font-semibold">Valor Final del Pedido:</span> ${totalVentaFinal.toFixed(2)}</p>
+          {metodoPago === "efectivo" && montoPagado > 0 && ( <p className="text-xl text-emerald-700 font-semibold">Vuelto para el cliente: ${vuelto.toFixed(2)}</p> )}
         </div>
-
-        {/* Botón Final: Registra venta y envia toda la info al server */}
-        <Button
-          type="submit"
-          disabled={isLoading}
-          className={`!py-6 bg-green-900 flex items-center justify-center gap-2 "
-            ${isLoading 
-              ? "cursor-not-allowed opacity-50"
-              : "hover:bg-green-700 cursor-pointer"
-            }
-          `}
-        >
+        
+        <Button type="submit" disabled={isLoading} className={`!py-6 bg-green-900 flex items-center justify-center gap-2 ${isLoading ? "cursor-not-allowed opacity-50" : "hover:bg-green-700 cursor-pointer"}`}>
           {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
           {isLoading ? "Registrando..." : "Registrar Venta"}
         </Button>
-
       </div>
-
     </form>
   );
 }
-
 export default FormVentas;
