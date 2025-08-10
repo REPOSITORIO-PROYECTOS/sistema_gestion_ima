@@ -355,3 +355,49 @@ Modificar el modelo Venta y aplicar la migración de base de datos.
 Crear el router ventas_ciclo_de_vida_router.py y los schemas necesarios.
 Refactorizar todos los "managers" restantes para que sus consultas filtren por id_empresa.
 Construir el Microservicio Bóveda.
+
+Contexto y Estado del Proyecto: Sistema de Gestión IMA
+1. Misión y Visión General del Proyecto
+Producto: Un Sistema de Gestión (ERP) multi-empresa (multi-tenant) con backend y frontend.
+Objetivo: Permitir que múltiples empresas clientes gestionen de forma aislada y segura sus operaciones de ventas, caja, inventario y facturación.
+Estado General: El núcleo de la aplicación es funcional. La arquitectura está definida y estabilizada. Los módulos de seguridad, gestión de empresas (para el super-admin) y generación de comprobantes están implementados. El foco actual es perfeccionar el Punto de Venta (caja).
+2. Stack Tecnológico
+Backend: Python con FastAPI, SQLModel (como ORM sobre SQLAlchemy), y MySQL como base de datos.
+Frontend: Next.js con App Router, TypeScript, Zustand para la gestión de estado global, y Tailwind CSS con componentes de shadcn/ui.
+3. Arquitectura Fundamental (Reglas del Sistema)
+Esta es la "ley" del proyecto. Cualquier nuevo desarrollo debe respetarla.
+Backend (Capas Estrictas):
+modelos.py: Define las tablas de la base de datos (la única fuente de la verdad de la estructura de datos).
+schemas/: Define los DTOs (contratos de datos) con Pydantic. Valida toda la información que entra y sale de la API.
+gestion/: "Managers". Contiene toda la lógica de negocio pura. No sabe nada de HTTP.
+api/blueprints/: "Routers". La capa externa que define las rutas HTTP, maneja dependencias (Depends), llama a los managers y gestiona respuestas/errores HTTP.
+Frontend:
+Lógica encapsulada en componentes reutilizables (FormVentas, DataTable, etc.).
+Estado global mínimo gestionado por Zustand (useAuthStore, useEmpresaStore).
+4. Estado Actual de los Módulos Clave
+Seguridad: Estable. Autenticación con JWT (OAuth2) y autorización por roles funcionan correctamente.
+Gestión de Empresas (Super-Admin): Funcional. El panel permite listar, crear y desactivar empresas clientes.
+Gestión de Credenciales AFIP: Funcional. Se implementó una arquitectura segura donde la API principal se comunica con un microservicio de "Bóveda". Se ha modificado el cliente_boveda.py para que la subida de credenciales sea un "upsert" (crea si no existe, actualiza si ya existe), permitiendo al usuario corregir errores.
+Generación de Comprobantes (PDFs): Recientemente Solucionado.
+Problema: Se producían errores 500 Internal Server Error al generar comprobantes (facturas, recibos, etc.).
+Diagnóstico: El error era un jinja2.exceptions.UndefinedError. La causa raíz era una inconsistencia entre el contexto de datos que el backend (Python) pasaba a la plantilla y las variables que la plantilla (HTML) esperaba.
+Solución: Se refactorizó el generador_comprobantes.py para que arme un contexto simple y directo (emisor, receptor, transaccion, afip). Se actualizaron todas las plantillas HTML (factura.html, recibo.html, remito.html, presupuesto.html en formatos PDF y Ticket) para que usen estas variables directas y no realicen cálculos complejos.
+5. Depuración Reciente (Problemas Resueltos)
+Errores de Arranque del Backend: Se solucionaron ModuleNotFoundError (ejecutando uvicorn desde la raíz del proyecto) y ValueError por falta de variables de entorno (configurando el archivo .env correctamente).
+Error de Instalación en Windows: Se solucionó el error de uvloop (que no es compatible con Windows) modificando requirements.txt a: uvloop ; sys_platform != "win32".
+Error de Firma Digital AFIP: Se diagnosticó un error 600: No validó la firma digital, probablemente por un certificado vencido. Se hizo el código del generador de comprobantes más robusto para que, en caso de fallo de AFIP, genere un comprobante "X" sin valor fiscal en lugar de crashear.
+Conflictos de Git: Se guio al usuario en el proceso de git stash, git pull y resolución de conflictos de merge.
+6. TAREA INMEDIATA Y PENDIENTE (Tu Función a Cumplir)
+El objetivo actual es implementar la venta de productos "a granel" (por Kilo, Metro, Litro, etc.) en el Punto de Venta.
+Decisión Arquitectónica Clave: NO se modificará la base de datos. Se reutilizará el campo unidad_venta que ya existe en el modelo Articulo.
+Convención:
+Si articulo.unidad_venta es "Unidad", el producto se vende por cantidad entera.
+Si es cualquier otra cosa ("Kg", "Mt", etc.), se vende por cantidad decimal.
+Backend: No requiere cambios. La lógica de registro_caja.py ya maneja cantidad como un float, por lo que acepta decimales.
+Frontend (La Tarea a Realizar): La modificación se debe hacer enteramente en el archivo FormVentas.tsx.
+El Plan: Modificar el <Input> de "Cantidad" existente para que sea "inteligente".
+Comportamiento Deseado:
+Cuando el usuario selecciona un producto en el dropdown, el componente debe leer el campo productoSeleccionado.unidad_venta.
+Si es "Unidad", el input de cantidad debe seguir funcionando como ahora (aceptando solo enteros o redondeando).
+Si es "Kg", "Mt", etc., el mismo input debe cambiar su comportamiento para aceptar números decimales (ej: step="0.001"). El Label junto al input también debería actualizarse para mostrar la unidad (ej: "Cantidad (Kg)").
+Importante: Se descartó la idea de usar un modal extra para no añadir pasos al cajero. La modificación debe ser directamente en el campo de cantidad existente.
