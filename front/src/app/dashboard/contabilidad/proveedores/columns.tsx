@@ -35,10 +35,6 @@ export const columns: ColumnDef<Proveedor>[] = [
     header: "CUIT",
   },
   {
-    accessorKey: "email",
-    header: "Email",
-  },
-  {
     id: "acciones",
     header: () => <div className="text-right">Acciones</div>,
     cell: ({ row, table }) => {
