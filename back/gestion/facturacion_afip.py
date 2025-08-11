@@ -97,7 +97,7 @@ def generar_factura_para_venta(
             "certificado": secreto_emisor.certificado,
             "clave_privada": secreto_emisor.clave_privada
         }
-
+    
     except (ConnectionError, PermissionError) as e:
         print(f"ERROR CRÍTICO: No se pudo conectar a la bóveda. Detalle: {e}")
         raise RuntimeError(f"El servicio de bóveda de secretos no está disponible o la API Key es incorrecta.")
