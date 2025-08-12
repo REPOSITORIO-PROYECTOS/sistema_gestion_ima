@@ -2,6 +2,7 @@
 # VERSIÓN FINAL ADAPTADA A LOS NUEVOS SCHEMAS Y MANTENIENDO RUTAS ORIGINALES
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import ValidationError
 from sqlmodel import Session
 from typing import List
 
@@ -45,7 +46,32 @@ def api_get_all_articulos(
         skip=skip, 
         limit=limite
     )
-    return lista_articulos
+
+    # --- INICIO DEL BLOQUE DE DEPURACIÓN ---
+    # Este bloque intentará validar los datos antes de que FastAPI lo haga,
+    # para que podamos capturar y registrar cualquier error de Pydantic.
+    try:
+        # Validamos manualmente cada artículo contra el schema de respuesta.
+        # Esto simula lo que FastAPI hace internamente.
+        for articulo in lista_articulos:
+            ArticuloReadConCodigos.model_validate(articulo)
+        
+        # Si todos los artículos son válidos, los retornamos normalmente.
+        return lista_articulos
+
+    except ValidationError as e:
+        # ¡AQUÍ ATRAPAMOS AL CULPABLE!
+        print("!!!!!!!!!!!!!! ERROR DE VALIDACIÓN DE PYDANTIC DETECTADO !!!!!!!!!!!!!!")
+        # Imprimimos el error en un formato JSON muy detallado en los logs del servidor.
+        print(e.json(indent=2))
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        
+        # Lanzamos una excepción HTTP 500 para que el proceso no se cierre.
+        # Esto estabilizará la aplicación y evitará el bucle de reinicios.
+        raise HTTPException(
+            status_code=500, 
+            detail="Error de validación en el servidor al procesar la lista de artículos. Revisar logs."
+        )
 
 @router.get("/obtener/{id_articulo}", response_model=ArticuloReadConCodigos)
 def api_get_articulo(
