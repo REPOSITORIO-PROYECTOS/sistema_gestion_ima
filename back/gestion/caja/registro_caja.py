@@ -243,7 +243,8 @@ def registrar_ingreso_egreso(
     tipo: str,
     id_usuario: int,
     facturado: bool,
-    fecha_hora: datetime
+    fecha_hora: datetime,
+    metodo_pago:str
 ) -> CajaMovimiento:
     """
     Registra un ingreso o egreso simple en la caja usando SQLModel.
@@ -265,7 +266,7 @@ def registrar_ingreso_egreso(
         tipo=tipo.upper(),
         concepto=concepto,
         monto=monto,  # El monto siempre se guarda en positivo
-        metodo_pago="EFECTIVO", # Asumimos efectivo para movimientos simples
+        metodo_pago=metodo_pago, # Asumimos efectivo para movimientos simples
         facturado=facturado,
         fecha_hora=fecha_hora,
     )
@@ -280,7 +281,7 @@ def registrar_ingreso_egreso(
         try:
 
             datos_para_sheets = {
-                    "Tipo_movimiento": "egreso",
+                    "Tipo_movimiento": f"egreso en {metodo_pago}",
                     "descripcion": concepto,
                     "monto": monto,
             }
