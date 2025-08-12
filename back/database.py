@@ -18,7 +18,7 @@ if not all([DB_USER, DB_PASSWORD, DB_HOST, DB_NAME]):
     raise ValueError("Faltan variables de entorno para la base de datos. Asegúrate de que el archivo .env esté configurado correctamente.")
 
 # Línea corregida
-DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+DATABASE_URL = f"mysql+mysqlconnector://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 engine = create_engine(DATABASE_URL, echo=True)
 
