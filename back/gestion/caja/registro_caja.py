@@ -184,9 +184,8 @@ def registrar_venta_y_movimiento_caja(
                         "cliente": nombre_cliente_para_sheets,
                         "cuit": cuit_cliente_para_sheets,
                         "razon_social": razon_social_para_sheets,
-                        "Tipo_movimiento": f"venta en {metodo_pago}",
+                        "Tipo_movimiento": f"[{tipo_comprobante_solicitado}] Venta en {metodo_pago}",
                         "descripcion": f"Venta de {', '.join(f'(articulo id = {item.id_articulo}, cantidad = {item.cantidad})' for item in articulos_vendidos)}",
-                        "monto": total_final_con_recargo,
                         "monto": total_final_con_recargo,
                         "Repartidor": usuario_actual.nombre_usuario
                     }
@@ -204,7 +203,7 @@ def registrar_venta_y_movimiento_caja(
                         "cliente": "cliente final",
                         "cuit": "-",
                         "razon_social": "-",
-                        "Tipo_movimiento": f"venta en {metodo_pago}",
+                         "Tipo_movimiento": f"[{tipo_comprobante_solicitado}] Venta en {metodo_pago}",
                         "descripcion": f"Venta de {', '.join(f'(articulo id = {item.id_articulo}, cantidad = {item.cantidad})' for item in articulos_vendidos)}",
                         "monto": total_final_con_recargo,
                         "Repartidor": usuario_actual.nombre_usuario
