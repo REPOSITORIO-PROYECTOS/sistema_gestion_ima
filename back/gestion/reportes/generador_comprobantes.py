@@ -43,7 +43,8 @@ def generar_comprobante_stateless(data: GenerarComprobanteRequest) -> bytes:
         "emisor": data.emisor,
         "receptor": data.receptor,
         "transaccion": data.transaccion,
-        "fecha_emision": datetime.now()
+        "fecha_emision": datetime.now(),
+        "afip": getattr(data, 'afip', {})
     }
     
     # --- PASO 2: RENDERIZAR LA PLANTILLA ---
