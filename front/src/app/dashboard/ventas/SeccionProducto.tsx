@@ -1,5 +1,3 @@
-// src/app/dashboard)/ventas/SeccionProductos.tsx
-
 "use client"
 
 import { LegacyRef } from "react"
@@ -8,6 +6,7 @@ import { Label } from "@/components/ui/label"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command"
 import { ChevronsUpDown } from "lucide-react"
+import { Button } from "@/components/ui/button" // <-- Importar Button
 
 // Tipos
 type Producto = {
@@ -19,7 +18,7 @@ type Producto = {
   unidad_venta: string;
 };
 
-// Props
+// Props que el componente recibe del orquestador (FormVentas)
 interface SeccionProductoProps {
   inputRef: LegacyRef<HTMLInputElement>;
   codigo: string;
@@ -31,34 +30,97 @@ interface SeccionProductoProps {
   open: boolean;
   setOpen: (open: boolean) => void;
   tipoClienteSeleccionadoId: string;
+
+  // Nuevas props para el Popover de cantidad
+  popoverOpen: boolean;
+  setPopoverOpen: (open: boolean) => void;
+  productoEscaneado: Producto | null;
+  cantidadEscaneada: number;
+  setCantidadEscaneada: (cantidad: number) => void;
+  handleAgregarDesdePopover: () => void;
 }
 
 export function SeccionProducto({
   inputRef, codigo, setCodigoEscaneado, handleKeyDown,
   productos, productoSeleccionado, setProductoSeleccionado,
-  open, setOpen, tipoClienteSeleccionadoId
+  open, setOpen, tipoClienteSeleccionadoId,
+  popoverOpen, setPopoverOpen, productoEscaneado,
+  cantidadEscaneada, setCantidadEscaneada, handleAgregarDesdePopover
 }: SeccionProductoProps) {
-  return (
-    <>
-      {/* Código de Barras */}
-      <div className="w-full flex flex-col md:flex-row gap-4 items-start md:items-center">
-        <Label className="text-2xl font-semibold text-green-900 text-left">Código de Barras</Label>
-        <Input ref={inputRef} type="text" value={codigo} onChange={(e) => setCodigoEscaneado(e.target.value)} onKeyDown={handleKeyDown} className="border w-full md:max-w-2/3" autoFocus />
+return (
+    // Usamos un div contenedor con flex-col y gap para espaciar las secciones internas
+    <div className="flex flex-col gap-6">
+      
+      {/* --- CÓDIGO DE BARRAS ALINEADO --- */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 items-center">
+        <Label htmlFor="codigo-barras" className="text-xl font-semibold text-green-900 md:text-right">
+          Código de Barras
+        </Label>
+        <div className="md:col-span-2">
+          <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Input
+                id="codigo-barras"
+                ref={inputRef}
+                type="text"
+                value={codigo}
+                onChange={(e) => setCodigoEscaneado(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="border w-full"
+                autoFocus
+              />
+            </PopoverTrigger>
+            <PopoverContent className="w-80">
+              {productoEscaneado && (
+                <div className="grid gap-4">
+                  <div className="space-y-2">
+                    <h4 className="font-medium leading-none">Agregar Producto</h4>
+                    <p className="text-sm text-muted-foreground">{productoEscaneado.nombre}</p>
+                  </div>
+                  <div className="grid gap-2">
+                    <div className="grid grid-cols-3 items-center gap-4">
+                      <Label htmlFor="cantidad-popover">Cantidad</Label>
+                      <Input
+                        id="cantidad-popover"
+                        type="number"
+                        min={1}
+                        value={cantidadEscaneada}
+                        onChange={(e) => setCantidadEscaneada(Number(e.target.value))}
+                        className="col-span-2 h-8"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAgregarDesdePopover();
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <Button onClick={handleAgregarDesdePopover}>Agregar</Button>
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
 
-      {/* Dropdown de Productos */}
-      <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
-        <Label className="text-2xl font-semibold text-green-900">Producto</Label>
-        {productos.length === 0 ? (
-          <p className="text-green-900 font-semibold">Cargando productos...</p>
-        ) : (
-          <div className="w-full md:max-w-2/3 flex flex-col gap-2">
+      {/* --- PRODUCTO ALINEADO --- */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 items-center">
+        <Label className="text-xl font-semibold text-green-900 md:text-right">
+          Producto
+        </Label>
+        <div className="md:col-span-2">
+          {productos.length === 0 ? (
+            <p className="text-green-900 font-semibold">Cargando...</p>
+          ) : (
             <Popover open={open} onOpenChange={setOpen}>
               <PopoverTrigger asChild>
                 <button
+                  aria-label="Seleccionar un producto"
                   role="combobox"
                   aria-expanded={open}
-                  aria-controls="productos-lista" // Este apunta al ID de abajo
+                  aria-controls="productos-lista"
                   className="w-full justify-between text-left cursor-pointer border px-3 py-2 rounded-md shadow-sm bg-white text-black flex items-center"
                   onClick={() => setOpen(!open)}
                 >
@@ -66,10 +128,8 @@ export function SeccionProducto({
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent side="bottom" align="start" className="w-full md:max-w-[98%] p-0 max-h-64 overflow-y-auto z-50" sideOffset={8}>
-                {/* === MODIFICACIÓN CLAVE AQUÍ === */}
+              <PopoverContent side="bottom" align="start" className="w-full p-0 max-h-64 overflow-y-auto z-50" sideOffset={8}>
                 <Command id="productos-lista">
-                {/* === FIN DE LA MODIFICACIÓN === */}
                   <CommandInput placeholder="Buscar producto..." />
                   <CommandEmpty>No se encontró ningún producto.</CommandEmpty>
                   <CommandGroup>
@@ -82,9 +142,9 @@ export function SeccionProducto({
                 </Command>
               </PopoverContent>
             </Popover>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </>
+    </div>
   );
 }

@@ -233,7 +233,8 @@ def api_registrar_egreso(
             tipo="EGRESO",
             id_usuario=current_user.id,  
             fecha_hora=datetime.now(timezone.utc),
-            facturado=False
+            facturado=False,
+            metodo_pago=req.metodo_pago
         )
 
         return CajaMovimientoResponse(
