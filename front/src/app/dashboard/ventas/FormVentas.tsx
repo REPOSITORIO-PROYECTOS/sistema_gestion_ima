@@ -18,6 +18,13 @@ import {
   Select, SelectContent, SelectItem,
   SelectTrigger, SelectValue
 } from "@/components/ui/select"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
+
 
 // Stores
 import { useFacturacionStore } from "@/lib/facturacionStore";
@@ -29,7 +36,6 @@ import { useProductoStore } from "@/lib/productoStore";
 import { SeccionCliente } from "./SeccionCliente";
 import { SeccionProducto } from "./SeccionProducto";
 import { SeccionCantidad } from "./SeccionCantidad";
-
 
 // --- Interfaces y Tipos ---
 interface ItemComprobante {
@@ -88,6 +94,17 @@ interface FormVentasProps {
     descuentoNominal?: number;
   }[];
   onLimpiarResumen: () => void;
+  // Props para mover la lógica del total al padre
+  descuentoSobreTotal: number;
+  setDescuentoSobreTotal: (value: number) => void;
+  descuentoNominalTotal: number;
+  setDescuentoNominalTotal: (value: number) => void;
+  metodoPago: string;
+  setMetodoPago: (value: string) => void;
+  totalVentaFinal: number;
+  vuelto: number;
+  montoPagado: number;
+  setMontoPagado: (value: number) => void;
 }
 
 
@@ -96,7 +113,17 @@ function FormVentas({
   onAgregarProducto,
   totalVenta,
   productosVendidos,
-  onLimpiarResumen
+  onLimpiarResumen,
+  descuentoSobreTotal,
+  setDescuentoSobreTotal,
+  descuentoNominalTotal,
+  setDescuentoNominalTotal,
+  metodoPago,
+  setMetodoPago,
+  totalVentaFinal,
+  vuelto,
+  montoPagado,
+  setMontoPagado,
 }: FormVentasProps) {
 
   /* Estados */
@@ -112,13 +139,8 @@ function FormVentas({
   const [cantidad, setCantidad] = useState(1); // Representa la cantidad final a agregar
   const [descuentoPorcentual, setDescuentoPorcentual] = useState(0);
   const [descuentoNominal, setDescuentoNominal] = useState(0);
-  const [descuentoNominalTotal, setDescuentoNominalTotal] = useState(0);
-  const [descuentoSobreTotal, setDescuentoSobreTotal] = useState(0);
   const [open, setOpen] = useState(false);
   const [tipoClienteSeleccionado, setTipoClienteSeleccionado] = useState(tipoCliente[0]);
-  const [metodoPago, setMetodoPago] = useState("efectivo");
-  const [montoPagado, setMontoPagado] = useState<number>(0);
-  const [vuelto, setVuelto] = useState<number>(0);
   const [inputEfectivo, setInputEfectivo] = useState("");
   const [pagoDividido, setPagoDividido] = useState(false);
   const [detallePagoDividido, setDetallePagoDividido] = useState("");
@@ -126,7 +148,6 @@ function FormVentas({
   const [isLoading, setIsLoading] = useState(false);
   const { habilitarExtras } = useFacturacionStore();
   const [tipoFacturacion, setTipoFacturacion] = useState("factura");
-  const { recargoTransferenciaActivo, recargoTransferencia, recargoBancarioActivo, recargoBancario } = useFacturacionStore();
   const [codigo, setCodigoEscaneado] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const empresa = useEmpresaStore((state) => state.empresa);
@@ -140,75 +161,34 @@ function FormVentas({
 
   /* Lógica y Hooks */
   const getPrecioProducto = useCallback((producto: ProductoSeleccionado | null): number => {
-  if (!producto) return 0;
-  if (tipoClienteSeleccionado.id === "0") return producto.precio_venta;
-  return producto.venta_negocio;
-}, [tipoClienteSeleccionado]);
+    if (!producto) return 0;
+    if (tipoClienteSeleccionado.id === "0") return producto.precio_venta;
+    return producto.venta_negocio;
+  }, [tipoClienteSeleccionado]);
 
 
   const totalProducto = productoSeleccionado ? getPrecioProducto(productoSeleccionado) * cantidad : 0;
   const subtotal = totalProducto * (1 - descuentoPorcentual / 100);
   const productoConDescuento = Math.max(0, subtotal - descuentoNominal);
-  const totalConDescuento = Math.max(0, totalVenta * (1 - descuentoSobreTotal / 100) - descuentoNominalTotal);
-
-  const totalVentaFinal = (() => {
-    let total = totalConDescuento; // Usamos la variable que acabamos de definir
-    if (metodoPago === "transferencia" && recargoTransferenciaActivo) {
-      total += total * (recargoTransferencia / 100);
-    } else if (metodoPago === "bancario" && recargoBancarioActivo) {
-      total += total * (recargoBancario / 100);
-    }
-    return Math.round(total * 100) / 100;
-  })();
 
   // Hook para cambiar el modo de venta según el producto seleccionado
-useEffect(() => {
-    // --- INICIO DEL CÓDIGO DE DEPURACIÓN ---
-    console.clear(); // Limpia la consola para ver solo el resultado importante
-    console.log("===================================");
-    console.log(" disparado. Producto actual:", productoSeleccionado);
-    
-    if (productoSeleccionado) {
-      console.log("1. ¿El objeto tiene 'unidad_venta'?", productoSeleccionado.hasOwnProperty('unidad_venta'));
-      console.log("   Valor de 'unidad_venta':", productoSeleccionado.unidad_venta);
-
-      // 2. Ejecutamos la condición
-      const esVentaPorUnidad = !productoSeleccionado.unidad_venta || productoSeleccionado.unidad_venta.toLowerCase() === 'unidad';
-      console.log("2. ¿El producto es por unidad?", esVentaPorUnidad);
-
-      // 3. Vemos la decisión final
-      if (!esVentaPorUnidad) {
-        console.log("3. DECISIÓN: Cambiar a modo GRANEL.");
-        setModoVenta('granel');
-        // ... (resto de la lógica)
-      } else {
-        console.log("3. DECISIÓN: Mantener/Cambiar a modo UNIDAD.");
-        setModoVenta('unidad');
-        // ... (resto de la lógica)
-      }
-    } else {
-      setModoVenta('unidad');
-    }
-    console.log("===================================");
-    // --- FIN DEL CÓDIGO DE DEPURACIÓN ---
-
-    // El resto de tu lógica del useEffect va aquí...
-    if (productoSeleccionado) {
-      const esVentaPorUnidad = !productoSeleccionado.unidad_venta || productoSeleccionado.unidad_venta.toLowerCase() === 'unidad';
-      if (!esVentaPorUnidad) {
-        setModoVenta('granel');
-        const precioUnitario = getPrecioProducto(productoSeleccionado);
-        setInputCantidadGranel("1");
-        setInputPrecioGranel(precioUnitario.toFixed(2));
-        setCantidad(1);
+  useEffect(() => {
+      if (productoSeleccionado) {
+        const esVentaPorUnidad = !productoSeleccionado.unidad_venta || productoSeleccionado.unidad_venta.toLowerCase() === 'unidad';
+        if (!esVentaPorUnidad) {
+          setModoVenta('granel');
+          const precioUnitario = getPrecioProducto(productoSeleccionado);
+          setInputCantidadGranel("1");
+          setInputPrecioGranel(precioUnitario.toFixed(2));
+          setCantidad(1);
+        } else {
+          setModoVenta('unidad');
+          setCantidad(1);
+        }
       } else {
         setModoVenta('unidad');
-        setCantidad(1);
       }
-    } else {
-      setModoVenta('unidad');
-    }
-  }, [productoSeleccionado, tipoClienteSeleccionado, getPrecioProducto]);
+    }, [productoSeleccionado, tipoClienteSeleccionado, getPrecioProducto]);
 
   // Handlers para los inputs de venta a granel
   const handleCantidadGranelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -275,21 +255,11 @@ useEffect(() => {
     setObservaciones("");
     setCantidad(1);
     setInputEfectivo("");
-    setVuelto(0);
     setOpen(false);
     setCodigoEscaneado("");
     setProductoSeleccionado(null);
     setModoVenta('unidad');
   };
-
-  useEffect(() => {
-    if (metodoPago === "efectivo" && typeof montoPagado === "number" && !isNaN(montoPagado)) {
-      const cambio = montoPagado - totalVentaFinal;
-      setVuelto(cambio >= 0 ? cambio : 0);
-    } else {
-      setVuelto(0);
-    }
-  }, [montoPagado, metodoPago, totalVentaFinal]);
 
   const formatearMoneda = (valor: string): string => {
     const limpio = valor.replace(/[^\d]/g, "");
@@ -534,29 +504,59 @@ const handleSubmit = async (e: React.FormEvent) => {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col w-full lg:w-1/2 rounded-xl bg-white shadow-md">
 
-      <div className="w-full flex flex-row justify-between items-center p-6 bg-green-700 rounded-t-xl">
+      <div className="w-full flex flex-row justify-between items-center p-4 bg-green-700 rounded-t-xl">
         <h4 className="text-2xl font-semibold text-white">Cajero</h4>
         <p className="text-2xl font-semibold text-white md:hidden">${totalVenta.toFixed(2)}</p>
       </div>
 
       <div className="flex flex-col justify-between w-full gap-6 p-8">
+        <Accordion type="single" collapsible className="w-full">
+          <AccordionItem value="item-1">
+            <AccordionTrigger>Configuración de Cliente y Descuentos</AccordionTrigger>
+            <AccordionContent className="flex flex-col gap-4 pt-4">
+              <SeccionCliente
+                tipoClienteSeleccionado={tipoClienteSeleccionado}
+                setTipoClienteSeleccionado={setTipoClienteSeleccionado}
+                tiposDeCliente={tipoCliente}
+                cuitManual={cuitManual}
+                setCuitManual={setCuitManual}
+                totalVenta={totalVenta}
+                clientes={clientes}
+                clienteSeleccionado={clienteSeleccionado}
+                setClienteSeleccionado={setClienteSeleccionado}
+                openCliente={openCliente}
+                setOpenCliente={setOpenCliente}
+                busquedaCliente={busquedaCliente}
+                setBusquedaCliente={setBusquedaCliente}
+              />
+              <span className="block w-full h-0.5 bg-green-900"></span>
+              <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
+                <Label className="text-lg font-semibold text-green-900">Descuento por Producto (%)</Label>
+                <Input
+                  type="number"
+                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                  min={0}
+                  max={100}
+                  value={descuentoPorcentual === 0 ? "" : descuentoPorcentual}
+                  onChange={(e) => setDescuentoPorcentual(Math.min(parseInt(e.target.value, 10) || 0, 100))}
+                  className="w-full md:max-w-2/3 text-black"
+                />
+              </div>
 
-        <SeccionCliente
-          tipoClienteSeleccionado={tipoClienteSeleccionado}
-          setTipoClienteSeleccionado={setTipoClienteSeleccionado}
-          tiposDeCliente={tipoCliente}
-          cuitManual={cuitManual}
-          setCuitManual={setCuitManual}
-          totalVenta={totalVenta}
-          clientes={clientes}
-          clienteSeleccionado={clienteSeleccionado}
-          setClienteSeleccionado={setClienteSeleccionado}
-          openCliente={openCliente}
-          setOpenCliente={setOpenCliente}
-          busquedaCliente={busquedaCliente}
-          setBusquedaCliente={setBusquedaCliente}
-        />
-        <span className="block w-full h-0.5 bg-green-900"></span>
+              <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
+                <Label className="text-lg font-semibold text-green-900">Descuento por Producto ($)</Label>
+                <Input
+                  type="number"
+                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                  min={0}
+                  value={descuentoNominal === 0 ? "" : descuentoNominal}
+                  onChange={(e) => setDescuentoNominal(Math.min(parseFloat(e.target.value) || 0, totalProducto))}
+                  className="w-full md:max-w-2/3 text-black"
+                />
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
 
         <SeccionProducto
           inputRef={inputRef}
@@ -582,32 +582,6 @@ const handleSubmit = async (e: React.FormEvent) => {
           inputPrecioGranel={inputPrecioGranel}
           handlePrecioGranelChange={handlePrecioGranelChange}
         />
-        <span className="block w-full h-0.5 bg-green-900"></span>
-
-        <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
-          <Label className="text-2xl font-semibold text-green-900">Descuento a Aplicar (%)</Label>
-          <Input
-            type="number"
-            onWheel={(e) => (e.target as HTMLInputElement).blur()}
-            min={0}
-            max={100}
-            value={descuentoPorcentual === 0 ? "" : descuentoPorcentual}
-            onChange={(e) => setDescuentoPorcentual(Math.min(parseInt(e.target.value, 10) || 0, 100))}
-            className="w-full md:max-w-2/3 text-black"
-          />
-        </div>
-
-        <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
-          <Label className="text-2xl font-semibold text-green-900">Descuento a Aplicar ($)</Label>
-          <Input
-            type="number"
-            onWheel={(e) => (e.target as HTMLInputElement).blur()}
-            min={0}
-            value={descuentoNominal === 0 ? "" : descuentoNominal}
-            onChange={(e) => setDescuentoNominal(Math.min(parseFloat(e.target.value) || 0, totalProducto))}
-            className="w-full md:max-w-2/3 text-black"
-          />
-        </div>
         <span className="block w-full h-0.5 bg-green-900"></span>
 
         <div className="flex flex-col md:flex-row gap-4 justify-between items-start mt-4">
@@ -644,7 +618,7 @@ const handleSubmit = async (e: React.FormEvent) => {
             <div className="flex flex-col gap-4 p-4 bg-green-800 rounded-lg mt-2">
               <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
                 <Label className="text-2xl font-semibold text-white">Costo del Pedido:</Label>
-                <Input type="text" value={formatearMoneda(totalVentaFinal.toString())} disabled className="w-full md:max-w-1/2 font-semibold text-white" />
+                <Input type="text" value={`$${totalVentaFinal.toLocaleString('es-AR')}`} disabled className="w-full md:max-w-1/2 font-semibold text-white" />
               </div>
               <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
                 <Label className="text-2xl font-semibold text-white">Con cuánto abona:</Label>
@@ -661,7 +635,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               </div>
               <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
                 <Label className="text-2xl font-semibold text-white">Vuelto:</Label>
-                <Input type="text" value={formatearMoneda(vuelto.toString())} disabled className="w-full md:max-w-1/2 font-semibold text-white" />
+                <Input type="text" value={`$${vuelto.toLocaleString('es-AR')}`} disabled className="w-full md:max-w-1/2 font-semibold text-white" />
               </div>
             </div>
           )}
@@ -708,35 +682,28 @@ const handleSubmit = async (e: React.FormEvent) => {
             </div>
           </TooltipProvider>
         </RadioGroup>
-        <span className="block w-full h-0.5 bg-green-900"></span>
         
-        <div className="flex flex-col w-full gap-2">
-          <Label className="text-green-900 text-xl" htmlFor="message-2">Observaciones</Label>
-          <Textarea placeholder="Observaciones de la venta..." id="message-2" value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
-        </div>
-        <span className="block w-full h-0.5 bg-green-900"></span>
+        <Accordion type="single" collapsible className="w-full">
+          <AccordionItem value="item-1">
+            <AccordionTrigger>Observaciones y Descuentos Globales</AccordionTrigger>
+            <AccordionContent className="flex flex-col gap-4 pt-4">
+              <div className="flex flex-col w-full gap-2">
+                <Label className="text-green-900 text-xl" htmlFor="message-2">Observaciones</Label>
+                <Textarea placeholder="Observaciones de la venta..." id="message-2" value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
+              </div>
+              <span className="block w-full h-0.5 bg-green-900"></span>
 
-        <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
-          <Label className="text-2xl font-semibold text-green-900">Descuento Sobre Total (%)</Label>
-          <Input type="number" min={0} max={100} value={descuentoSobreTotal === 0 ? "" : descuentoSobreTotal} onWheel={(e) => (e.target as HTMLInputElement).blur()} onChange={(e) => setDescuentoSobreTotal(Math.min(parseInt(e.target.value, 10) || 0, 100))} className="w-full md:max-w-2/3 text-black" />
-        </div>
-        <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
-          <Label className="text-2xl font-semibold text-green-900">Descuento Sobre Total ($)</Label>
-          <Input type="number" min={0} value={descuentoNominalTotal === 0 ? "" : descuentoNominalTotal} onWheel={(e) => (e.target as HTMLInputElement).blur()} onChange={(e) => setDescuentoNominalTotal(Math.min(parseFloat(e.target.value) || 0, totalVenta))} className="w-full md:max-w-2/3 text-black" />
-        </div>
-        <span className="block w-full h-0.5 bg-green-900"></span>
-        
-        <div className="flex flex-col gap-4 p-6 border border-green-900 rounded-lg">
-          <Label className="text-2xl font-semibold text-green-900">Resumen del Pedido</Label>
-          <p className="text-xl text-green-900"><span className="font-semibold">Total sin descuento:</span> ${totalVenta.toFixed(2)}</p>
-          <p className="text-xl text-green-400"><span className="font-semibold">Descuento sobre total (%):</span> {descuentoSobreTotal}%</p>
-          <p className="text-xl text-green-400"><span className="font-semibold">Descuento sobre total ($):</span> ${descuentoNominalTotal}</p>
-          {metodoPago === "transferencia" && recargoTransferenciaActivo && ( <p className="text-xl text-red-500"><span className="font-semibold">Recargo por Transferencia:</span> {recargoTransferencia}% (${(totalConDescuento * recargoTransferencia / 100).toFixed(2)})</p> )}
-          {metodoPago === "bancario" && recargoBancarioActivo && ( <p className="text-xl text-red-500"><span className="font-semibold">Recargo por POS:</span> {recargoBancario}% (${(totalConDescuento * recargoBancario / 100).toFixed(2)})</p> )}
-          <span className="block w-full h-0.5 bg-green-900 my-2"></span>
-          <p className="text-2xl font-bold text-green-900"><span className="font-semibold">Valor Final del Pedido:</span> ${totalVentaFinal.toFixed(2)}</p>
-          {metodoPago === "efectivo" && montoPagado > 0 && ( <p className="text-xl text-emerald-700 font-semibold">Vuelto para el cliente: ${vuelto.toFixed(2)}</p> )}
-        </div>
+              <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
+                <Label className="text-lg font-semibold text-green-900">Descuento Sobre Total (%)</Label>
+                <Input type="number" min={0} max={100} value={descuentoSobreTotal === 0 ? "" : descuentoSobreTotal} onWheel={(e) => (e.target as HTMLInputElement).blur()} onChange={(e) => setDescuentoSobreTotal(Math.min(parseInt(e.target.value, 10) || 0, 100))} className="w-full md:max-w-2/3 text-black" />
+              </div>
+              <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
+                <Label className="text-lg font-semibold text-green-900">Descuento Sobre Total ($)</Label>
+                <Input type="number" min={0} value={descuentoNominalTotal === 0 ? "" : descuentoNominalTotal} onWheel={(e) => (e.target as HTMLInputElement).blur()} onChange={(e) => setDescuentoNominalTotal(Math.min(parseFloat(e.target.value) || 0, totalVenta))} className="w-full md:max-w-2/3 text-black" />
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
         
         <Button type="submit" disabled={isLoading} className={`!py-6 bg-green-900 flex items-center justify-center gap-2 ${isLoading ? "cursor-not-allowed opacity-50" : "hover:bg-green-700 cursor-pointer"}`}>
           {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -746,4 +713,5 @@ const handleSubmit = async (e: React.FormEvent) => {
     </form>
   );
 }
+
 export default FormVentas;

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import CajaForm from "./CajaForm";
 import { useCajaStore } from "@/lib/cajaStore";
+import { useFacturacionStore } from "@/lib/facturacionStore"; // Importar
 import EgresoForm from "./EgresoForm";
 
 interface ProductoVendido {
@@ -37,6 +38,15 @@ function DashboardVenta() {
   const [horaActual, setHoraActual] = useState("");  
   const { cajaAbierta } = useCajaStore();
   const role = useAuthStore((state) => state.role);   
+  
+  // Estados movidos desde FormVentas
+  const [descuentoSobreTotal, setDescuentoSobreTotal] = useState(0);
+  const [descuentoNominalTotal, setDescuentoNominalTotal] = useState(0);
+  const [metodoPago, setMetodoPago] = useState("efectivo");
+  const [montoPagado, setMontoPagado] = useState<number>(0);
+  const [vuelto, setVuelto] = useState<number>(0);
+  const { recargoTransferenciaActivo, recargoTransferencia, recargoBancarioActivo, recargoBancario } = useFacturacionStore();
+
 
   // Hook para calcular fecha y hora en vivo
   useEffect(() => {
@@ -86,6 +96,28 @@ function DashboardVenta() {
   };
 
   const totalVenta = productos.reduce((acc, prod) => acc + prod.precioTotal, 0);
+
+  // Lógica de cálculo de total final movida aquí
+  const totalConDescuento = Math.max(0, totalVenta * (1 - descuentoSobreTotal / 100) - descuentoNominalTotal);
+
+  const totalVentaFinal = (() => {
+    let total = totalConDescuento;
+    if (metodoPago === "transferencia" && recargoTransferenciaActivo) {
+      total += total * (recargoTransferencia / 100);
+    } else if (metodoPago === "bancario" && recargoBancarioActivo) {
+      total += total * (recargoBancario / 100);
+    }
+    return Math.round(total * 100) / 100;
+  })();
+
+  useEffect(() => {
+    if (metodoPago === "efectivo" && typeof montoPagado === "number" && !isNaN(montoPagado)) {
+      const cambio = montoPagado - totalVentaFinal;
+      setVuelto(cambio >= 0 ? cambio : 0);
+    } else {
+      setVuelto(0);
+    }
+  }, [montoPagado, metodoPago, totalVentaFinal]);
   
   const handleAgregarProducto = (
     producto: { tipo: string; 
@@ -102,6 +134,10 @@ function DashboardVenta() {
 
   const limpiarResumen = () => {
     setProductos([]);
+    setDescuentoNominalTotal(0);
+    setDescuentoSobreTotal(0);
+    setMontoPagado(0);
+    setVuelto(0);
   };
 
   // Formateo del total de venta
@@ -178,12 +214,13 @@ function DashboardVenta() {
 
           {/* Panel izquierdo: Resumen */}
           <div className="flex flex-col items-start w-full lg:w-1/2 md:max-w-2/3 bg-gray-100 rounded-xl shadow-md">
-            <div className="w-full flex flex-row justify-between items-center p-6 bg-green-700 rounded-t-xl">
+            
+            <div className="w-full flex flex-row justify-between items-center p-4 bg-green-700 rounded-t-xl">
               <h4 className="text-xl font-semibold text-white">Resumen del Pedido</h4>
-              <p className="text-2xl font-semibold text-white">Total: {formatearMoneda(totalVenta)}</p>
+              {/* <p className="text-2xl font-semibold text-white">Total: {formatearMoneda(totalVenta)}</p> */}
             </div>
 
-            <ul className="flex flex-col items-center w-full p-6 gap-5 overflow-y-auto">
+            <ul className="flex flex-col items-center w-full p-6 gap-5 overflow-y-auto max-h-[50vh]">
               {productos.map((prod, index) => (
                 <li
                   key={index}
@@ -208,6 +245,30 @@ function DashboardVenta() {
                 </li>
               ))}
             </ul>
+            
+            {/* --- SECCIÓN MOVIDA DESDE FormVentas --- */}
+            <div className="w-full p-6 border-t border-gray-300">
+                <div className="flex flex-col gap-4 p-6 bg-white border border-green-900 rounded-lg">
+                    <h3 className="text-2xl font-semibold text-green-900">Resumen Final del Pedido</h3>
+                    <p className="text-xl text-green-900"><span className="font-semibold">Total sin descuento:</span> {formatearMoneda(totalVenta)}</p>
+                    <p className="text-xl text-green-400"><span className="font-semibold">Descuento sobre total (%):</span> {descuentoSobreTotal}%</p>
+                    <p className="text-xl text-green-400"><span className="font-semibold">Descuento sobre total ($):</span> {formatearMoneda(descuentoNominalTotal)}</p>
+                    
+                    {metodoPago === "transferencia" && recargoTransferenciaActivo && (
+                        <p className="text-xl text-red-500"><span className="font-semibold">Recargo por Transferencia:</span> {recargoTransferencia}% ({formatearMoneda(totalConDescuento * recargoTransferencia / 100)})</p>
+                    )}
+                    {metodoPago === "bancario" && recargoBancarioActivo && (
+                        <p className="text-xl text-red-500"><span className="font-semibold">Recargo por POS:</span> {recargoBancario}% ({formatearMoneda(totalConDescuento * recargoBancario / 100)})</p>
+                    )}
+                    
+                    <span className="block w-full h-0.5 bg-green-900 my-2"></span>
+                    <p className="text-2xl font-bold text-green-900"><span className="font-semibold">Valor Final del Pedido:</span> {formatearMoneda(totalVentaFinal)}</p>
+                    
+                    {metodoPago === "efectivo" && montoPagado > 0 && (
+                        <p className="text-xl text-emerald-700 font-semibold">Vuelto para el cliente: {formatearMoneda(vuelto)}</p>
+                    )}
+                </div>
+            </div>
           </div>
 
           {/* Panel derecho: Formulario */}
@@ -217,6 +278,16 @@ function DashboardVenta() {
               totalVenta={totalVenta}
               productosVendidos={productos}
               onLimpiarResumen={limpiarResumen}
+              descuentoSobreTotal={descuentoSobreTotal}
+              setDescuentoSobreTotal={setDescuentoSobreTotal}
+              descuentoNominalTotal={descuentoNominalTotal}
+              setDescuentoNominalTotal={setDescuentoNominalTotal}
+              metodoPago={metodoPago}
+              setMetodoPago={setMetodoPago}
+              totalVentaFinal={totalVentaFinal}
+              vuelto={vuelto}
+              montoPagado={montoPagado}
+              setMontoPagado={setMontoPagado}
             />
           ) : (
             <div className="flex justify-center items-center w-full p-8 bg-yellow-100 border border-yellow-300 rounded-lg text-yellow-800 font-semibold text-xl">
