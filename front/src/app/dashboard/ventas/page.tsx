@@ -215,16 +215,17 @@ function DashboardVenta() {
           {/* Panel izquierdo: Resumen */}
           <div className="flex flex-col items-start w-full lg:w-1/2 md:max-w-2/3 bg-gray-100 rounded-xl shadow-md">
             
-            <div className="w-full flex flex-row justify-between items-center p-4 bg-green-700 rounded-t-xl">
+            {/* Header */}
+            <div className="w-full flex flex-row justify-between items-center px-6 py-4 bg-green-700 rounded-t-xl">
               <h4 className="text-xl font-semibold text-white">Resumen del Pedido</h4>
-              {/* <p className="text-2xl font-semibold text-white">Total: {formatearMoneda(totalVenta)}</p> */}
             </div>
 
+            {/* Render de los Productos */}
             <ul className="flex flex-col items-center w-full p-6 gap-5 overflow-y-auto max-h-[50vh]">
               {productos.map((prod, index) => (
                 <li
                   key={index}
-                  className="flex flex-col md:flex-row w-full justify-between items-start md:items-center px-6 py-6 bg-emerald-100 rounded-lg text-green-950 font-semibold border-3 border-green-800 text-xl shadow-lg"
+                  className="flex flex-col md:flex-row w-full justify-between items-start md:items-center px-6 py-4 bg-emerald-100 rounded-lg text-green-950 font-semibold border-3 border-green-800 text-xl shadow-lg"
                 >
                   <div className="flex flex-col">
                     <span>{prod.tipo} - x{prod.cantidad} U. - {formatearMoneda(prod.precioTotal)}</span>
@@ -246,8 +247,8 @@ function DashboardVenta() {
               ))}
             </ul>
             
-            {/* --- SECCIÓN MOVIDA DESDE FormVentas --- */}
-            <div className="w-full p-6 border-t border-gray-300">
+            {/* Resumen de toda la Venta */}
+            <div className="w-full p-4 border-t border-gray-300">
                 <div className="flex flex-col gap-4 p-6 bg-white border border-green-900 rounded-lg">
                     <h3 className="text-2xl font-semibold text-green-900">Resumen Final del Pedido</h3>
                     <p className="text-xl text-green-900"><span className="font-semibold">Total sin descuento:</span> {formatearMoneda(totalVenta)}</p>

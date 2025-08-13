@@ -49,7 +49,7 @@ export function SeccionCliente({
 }: SeccionClienteProps) {
   return (
     <div className="flex flex-col md:flex-row w-full gap-4 justify-between items-center">
-      <Label className="text-2xl font-semibold text-green-900 w-full md:max-w-1/4">Tipo de Cliente</Label>
+      <Label className="text-xl font-semibold text-green-900 w-full md:max-w-1/4">Tipo de Cliente</Label>
       <div className="flex flex-col gap-2 w-full md:w-2/3">
         <Select
           defaultValue={tipoClienteSeleccionado.id}
