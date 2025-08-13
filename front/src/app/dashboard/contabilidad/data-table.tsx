@@ -7,7 +7,6 @@ import {
   ColumnFiltersState,
   SortingState,
   flexRender,
-  Row,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
@@ -58,63 +57,41 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
     // Agrupar Movimientos
     const handleAgrupar = async () => {
         setIsLoading(true);
-        const selectedRows: Row<TData>[] = table.getSelectedRowModel().flatRows; 
+
+        const selectedRows = table.getSelectedRowModel().flatRows;
         const idsParaAgrupar = selectedRows.map(row => row.original.id);
-        try {
-            if (selectedRows.length === 0) {
-                toast.error("Selección inválida", { description: "Debes seleccionar al menos un presupuesto o remito." });
-                setIsLoading(false);
-                return;
-            }
-
-            // --- VALIDACIÓN #1: Asegurarse de que SÓLO sean Presupuestos o Remitos ---
-            const esValidoParaAgrupar = selectedRows.every(row => {
-                const tipo = row.original.venta?.tipo_comprobante_solicitado?.toLowerCase();
-                return tipo === 'presupuesto' || tipo === 'remito';
+        
+        const yaFacturado = selectedRows.some(row => row.original.venta?.facturada === true);
+        if (yaFacturado) {
+            toast.error("Error de selección", {
+                description: "No puedes agrupar movimientos que ya han sido facturados.",
             });
+            setIsLoading(false);
+            return;
+        }
 
-            if (!esValidoParaAgrupar) {
-                toast.error("Error de selección", { description: "Solo puedes agrupar movimientos de tipo 'Presupuesto' o 'Remito'." });
-                setIsLoading(false);
-                return;
-            }
-            
-            // --- VALIDACIÓN #2: Que todos pertenezcan al mismo cliente ---
-            const clientes = selectedRows.map(row => row.original.venta?.cliente?.id ?? null);
-            const todosIguales = clientes.every(id => id === clientes[0]);
-            if (!todosIguales) {
-                toast.error("Error de selección", { description: "Todos los movimientos deben pertenecer al mismo cliente." });
-                setIsLoading(false);
-                return;
-            }
-            
-            // --- Construcción del Payload ---
-            const ids_movimientos = selectedRows.map(row => row.original.id);
-            const id_cliente_final = clientes[0] && clientes[0] !== 0 ? clientes[0] : null;
-
-            // --- LLAMADA AL ENDPOINT CORRECTO: Convertir a Venta No Fiscal ---
-            const response = await fetch('https://sistema-ima.sistemataup.online/api/comprobantes/agrupar-a-comprobante', { // <-- ENDPOINT ESPECÍFICO
+        try {
+            const response = await fetch('/api/comprobantes/agrupar', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
-                    ids_movimientos,
-                    id_cliente_final
+                ids_comprobantes: idsParaAgrupar,
+                nuevo_tipo_comprobante: 'Factura A'
                 })
             });
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.detail || 'Error en el servidor al agrupar.');
+                throw new Error(errorData.detail || 'Ocurrió un error en el servidor.');
             }
 
             const nuevoComprobante = await response.json();
             
-            // --- MENSAJE DE ÉXITO CORREGIDO ---
-            toast.success("¡Agrupación Exitosa!", {
-                description: `Se creó el Comprobante Interno ID: ${nuevoComprobante.id_movimiento_nuevo} a partir de ${ids_movimientos.length} movimientos.`
+            toast.success("¡Operación Exitosa!", {
+                description: `Se creó la Factura ID: ${nuevoComprobante.id} agrupando ${idsParaAgrupar.length} movimientos.`
             });
 
             table.resetRowSelection();
@@ -205,39 +182,24 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
         getPaginationRowModel: getPaginationRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
-        enableRowSelection: (row: Row<TData>): boolean => { // <--- AÑADE EL TIPO AQUÍ
-            const facturada = row.original.venta?.facturada;
+        enableRowSelection: (row) => {
             const tipo = row.original.tipo;
+            const facturada = row.original.venta?.facturada;
+            const tipoSolicitado = row.original.venta?.tipo_comprobante_solicitado;
 
-            // Condición base: No se puede seleccionar si ya está facturado o no es una VENTA
-            if (facturada === true || tipo !== 'VENTA') {
-                return false;
-            }
+            // No permitir selección que no sea VENTA o ya facturada
+            if (tipo !== "VENTA" || facturada === true) return false;
 
-            const selectedRows = table.getSelectedRowModel().flatRows;
-            // Si es el primer item a seleccionar, es válido
-            if (selectedRows.length === 0) {
-                return true;
-            }
+            const selectedKeys = Object.keys(rowSelection);
+            if (selectedKeys.length === 0) return true;
 
-            // Si ya hay algo seleccionado, aplicamos las reglas de consistencia
-            const primerItem = selectedRows[0].original;
-            const primerClienteId = primerItem.venta?.cliente?.id ?? null;
-            const clienteActualId = row.original.venta?.cliente?.id ?? null;
+            const primeraSeleccionada = data.find((item) =>
+                selectedKeys.includes(String(item.id))
+            );
+            if (!primeraSeleccionada) return true;
 
-            // Regla #1: El cliente DEBE ser el mismo
-            if (clienteActualId !== primerClienteId) {
-                return false;
-            }
-
-            // Regla #2: No se pueden mezclar Presupuestos/Remitos con otros comprobantes
-            const primerTipo = primerItem.venta?.tipo_comprobante_solicitado?.toLowerCase();
-            const esPrimerItemAgrupable = primerTipo === 'presupuesto' || primerTipo === 'remito';
-
-            const tipoActual = row.original.venta?.tipo_comprobante_solicitado?.toLowerCase();
-            const esItemActualAgrupable = tipoActual === 'presupuesto' || tipoActual === 'remito';
-
-            return esPrimerItemAgrupable === esItemActualAgrupable;
+            const tipoSolicitadoBase = primeraSeleccionada.venta?.tipo_comprobante_solicitado;
+            return tipoSolicitado === tipoSolicitadoBase;
         },
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
