@@ -19,6 +19,7 @@ import {
   SelectTrigger, SelectValue
 } from "@/components/ui/select"
 
+
 // Stores
 import { useFacturacionStore } from "@/lib/facturacionStore";
 import { useAuthStore } from "@/lib/authStore"
@@ -128,7 +129,11 @@ function FormVentas({
   const [tipoFacturacion, setTipoFacturacion] = useState("factura");
   const { recargoTransferenciaActivo, recargoTransferencia, recargoBancarioActivo, recargoBancario } = useFacturacionStore();
   const [codigo, setCodigoEscaneado] = useState("");
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const [productoEscaneado, setProductoEscaneado] = useState<ProductoSeleccionado | null>(null);
+  const [cantidadEscaneada, setCantidadEscaneada] = useState(1);
   const inputRef = useRef<HTMLInputElement>(null);
+  const cantidadInputRef = useRef<HTMLInputElement>(null); 
   const empresa = useEmpresaStore((state) => state.empresa);
 
   // Estados para Venta a Granel
@@ -315,29 +320,72 @@ useEffect(() => {
     if (e.key === 'Enter') {
       e.preventDefault();
       if (!codigo) return;
+
       try {
         const res = await fetch(`https://sistema-ima.sistemataup.online/api/articulos/codigos/buscar/${codigo}`, {
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         });
-        if (!res.ok) throw new Error('Producto no encontrado');
+
+        if (!res.ok) {
+          throw new Error('Producto no encontrado');
+        }
+        
         const data = await res.json();
-        onAgregarProducto({
-          tipo: data.descripcion,
-          cantidad: 1, // Barcode always adds 1 unit
-          precioTotal: data.precio_venta,
-          descuentoAplicado: false,
-          porcentajeDescuento: 0,
-          descuentoNominal: 0
-        });
-        toast.success(`Producto agregado: ${data.descripcion}`);
+        
+        // --- INICIO DE LA MODIFICACIÓN ---
+        
+        // 1. "Traducimos" el objeto de la API al formato que nuestro frontend espera.
+        //    El backend envía 'descripcion', el frontend usa 'nombre'.
+        const productoAdaptado: ProductoSeleccionado = {
+          id: data.id.toString(),
+          nombre: data.descripcion || "Producto sin nombre", // <-- LA LÍNEA CLAVE
+          precio_venta: data.precio_venta,
+          venta_negocio: data.venta_negocio,
+          stock_actual: data.stock_actual,
+          unidad_venta: data.unidad_venta || 'Unidad'
+        };
+
+        // 2. Guardamos el objeto ADAPTADO en el estado.
+        setProductoEscaneado(productoAdaptado);
+        
+        // --- FIN DE LA MODIFICACIÓN ---
+
+        // El resto de la lógica no cambia
+        setCantidadEscaneada(1);
+        setPopoverOpen(true);
+        // Limpiamos el código de barras, pero NO el producto escaneado
+        setCodigoEscaneado('');
+
       } catch (error) {
         console.error(error);
-        toast.error(`Producto no encontrado: ${codigo}`);
-      } finally {
+        toast.error(error instanceof Error ? error.message : `Producto no encontrado: ${codigo}`);
         setCodigoEscaneado('');
         inputRef.current?.focus();
       }
     }
+  };
+
+  const handleAgregarDesdePopover = () => {
+    if (!productoEscaneado || cantidadEscaneada <= 0) {
+      return;
+    }
+
+    // Usamos la misma función onAgregarProducto que ya tienes, pero con los datos del popover
+    onAgregarProducto({
+      tipo: productoEscaneado.nombre,
+      cantidad: cantidadEscaneada,
+      precioTotal: productoEscaneado.precio_venta * cantidadEscaneada, // Cálculo simple
+      descuentoAplicado: false,
+      porcentajeDescuento: 0,
+      descuentoNominal: 0
+    });
+
+    // --- Limpieza y Reset ---
+    setPopoverOpen(false);
+    setCodigoEscaneado('');
+    setProductoEscaneado(null);
+    inputRef.current?.focus(); // Devolvemos el foco al input principal
+    toast.success(`'${productoEscaneado.nombre}' x${cantidadEscaneada} agregado.`);
   };
 
   useEffect(() => {
@@ -531,7 +579,7 @@ const handleSubmit = async (e: React.FormEvent) => {
   
   
   /* Renderizado del Componente */
-  return (
+ return (
     <form onSubmit={handleSubmit} className="flex flex-col w-full lg:w-1/2 rounded-xl bg-white shadow-md">
 
       <div className="w-full flex flex-row justify-between items-center p-6 bg-green-700 rounded-t-xl">
@@ -558,72 +606,93 @@ const handleSubmit = async (e: React.FormEvent) => {
         />
         <span className="block w-full h-0.5 bg-green-900"></span>
 
-        <SeccionProducto
-          inputRef={inputRef}
-          codigo={codigo}
-          setCodigoEscaneado={setCodigoEscaneado}
-          handleKeyDown={handleKeyDown}
-          productos={productos}
-          productoSeleccionado={productoSeleccionado}
-          setProductoSeleccionado={setProductoSeleccionado}
-          open={open}
-          setOpen={setOpen}
-          tipoClienteSeleccionadoId={tipoClienteSeleccionado.id}
-        />
+        {/* --- CONTENEDOR GRID PARA PRODUCTO Y CANTIDAD --- */}
+        <div className="flex flex-col gap-6">
 
-        <SeccionCantidad
-          modoVenta={modoVenta}
-          cantidadUnidad={cantidad}
-          setCantidadUnidad={setCantidad}
-          stockActual={productoSeleccionado?.stock_actual ?? 9999}
-          unidadDeVenta={productoSeleccionado?.unidad_venta || ''}
-          inputCantidadGranel={inputCantidadGranel}
-          handleCantidadGranelChange={handleCantidadGranelChange}
-          inputPrecioGranel={inputPrecioGranel}
-          handlePrecioGranelChange={handlePrecioGranelChange}
-        />
-        <span className="block w-full h-0.5 bg-green-900"></span>
-
-        <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
-          <Label className="text-2xl font-semibold text-green-900">Descuento a Aplicar (%)</Label>
-          <Input
-            type="number"
-            onWheel={(e) => (e.target as HTMLInputElement).blur()}
-            min={0}
-            max={100}
-            value={descuentoPorcentual === 0 ? "" : descuentoPorcentual}
-            onChange={(e) => setDescuentoPorcentual(Math.min(parseInt(e.target.value, 10) || 0, 100))}
-            className="w-full md:max-w-2/3 text-black"
+          {/* Sección de Producto */}
+          <SeccionProducto
+            inputRef={inputRef}
+            codigo={codigo}
+            setCodigoEscaneado={setCodigoEscaneado}
+            handleKeyDown={handleKeyDown}
+            productos={productos}
+            productoSeleccionado={productoSeleccionado}
+            setProductoSeleccionado={setProductoSeleccionado}
+            open={open}
+            setOpen={setOpen}
+            tipoClienteSeleccionadoId={tipoClienteSeleccionado.id}
+            popoverOpen={popoverOpen}
+            setPopoverOpen={setPopoverOpen}
+            productoEscaneado={productoEscaneado}
+            cantidadEscaneada={cantidadEscaneada}
+            setCantidadEscaneada={setCantidadEscaneada}
+            handleAgregarDesdePopover={handleAgregarDesdePopover}
           />
-        </div>
-
-        <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
-          <Label className="text-2xl font-semibold text-green-900">Descuento a Aplicar ($)</Label>
-          <Input
-            type="number"
-            onWheel={(e) => (e.target as HTMLInputElement).blur()}
-            min={0}
-            value={descuentoNominal === 0 ? "" : descuentoNominal}
-            onChange={(e) => setDescuentoNominal(Math.min(parseFloat(e.target.value) || 0, totalProducto))}
-            className="w-full md:max-w-2/3 text-black"
+        
+          {/* Sección de Cantidad */}
+          <SeccionCantidad
+            cantidadInputRef={cantidadInputRef}
+            modoVenta={modoVenta}
+            cantidadUnidad={cantidad}
+            setCantidadUnidad={setCantidad}
+            stockActual={productoSeleccionado?.stock_actual ?? 9999}
+            unidadDeVenta={productoSeleccionado?.unidad_venta || ''}
+            inputCantidadGranel={inputCantidadGranel}
+            handleCantidadGranelChange={handleCantidadGranelChange}
+            inputPrecioGranel={inputPrecioGranel}
+            handlePrecioGranelChange={handlePrecioGranelChange}
           />
+          
         </div>
         <span className="block w-full h-0.5 bg-green-900"></span>
 
-        <div className="flex flex-col md:flex-row gap-4 justify-between items-start mt-4">
-          <Label className="text-2xl font-semibold text-green-900">Total Producto Seleccionado:</Label>
-          <p className="text-2xl font-semibold text-green-900">${productoConDescuento.toFixed(2)}</p>
+        {/* --- SECCIÓN DE DESCUENTOS POR PRODUCTO CON GRID --- */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-6">
+          <div className="grid grid-cols-1 gap-2 items-start">
+            <Label htmlFor="descuento-porcentual" className="text-xl font-semibold text-green-900">Descuento por Producto (%)</Label>
+            <Input
+              id="descuento-porcentual"
+              type="number"
+              onWheel={(e) => (e.target as HTMLInputElement).blur()}
+              min={0}
+              max={100}
+              value={descuentoPorcentual === 0 ? "" : descuentoPorcentual}
+              onChange={(e) => setDescuentoPorcentual(Math.min(parseInt(e.target.value, 10) || 0, 100))}
+              className="w-full text-black"
+              disabled={!productoSeleccionado}
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-2 items-start">
+            <Label htmlFor="descuento-nominal" className="text-xl font-semibold text-green-900">Descuento por Producto ($)</Label>
+            <Input
+              id="descuento-nominal"
+              type="number"
+              onWheel={(e) => (e.target as HTMLInputElement).blur()}
+              min={0}
+              value={descuentoNominal === 0 ? "" : descuentoNominal}
+              onChange={(e) => setDescuentoNominal(Math.min(parseFloat(e.target.value) || 0, totalProducto))}
+              className="w-full text-black"
+              disabled={!productoSeleccionado}
+            />
+          </div>
+        </div>
+        <span className="block w-full h-0.5 bg-green-900"></span>
+
+        <div className="flex flex-col md:flex-row gap-4 justify-between items-center mt-4">
+          <p className="text-xl font-semibold text-green-900">Total del Producto:</p>
+          <p className="text-2xl font-bold text-green-900">${productoConDescuento.toFixed(2)}</p>
         </div>
 
         <Button
           variant="success"
-          className="!py-6"
+          className="!py-6 mt-2"
           type="button"
           onClick={handleAgregarProducto}
         >
-          + Agregar producto
+          + Agregar producto 
         </Button>
         <hr className="p-0.75 bg-green-900 my-8"/>
+
 
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-4 items-start justify-between md:flex-row">
@@ -667,12 +736,17 @@ const handleSubmit = async (e: React.FormEvent) => {
           )}
         </div>
 
-        <div className="flex flex-col gap-2 mt-1">
-          <div className="flex items-center space-x-2">
-            <input id="pagoDividido" type="checkbox" checked={pagoDividido} onChange={(e) => setPagoDividido(e.target.checked)} className="h-5 w-5 text-green-700 border-gray-300 rounded focus:ring-green-600 cursor-pointer" />
-            <Label htmlFor="pagoDividido" className="text-green-950 text-md font-medium">¿Paga de dos o mas formas?</Label>
-          </div>
-          {pagoDividido && ( <Input placeholder="Detalle del pago..." value={detallePagoDividido} onChange={(e) => setDetallePagoDividido(e.target.value)} className="mt-2 text-black" /> )}
+        <div className="flex items-center">
+          <Label htmlFor="pagoDividido" className="flex items-center gap-2 text-green-950 text-md font-medium cursor-pointer">
+            <Input
+              id="pagoDividido"
+              type="checkbox"
+              checked={pagoDividido}
+              onChange={(e) => setPagoDividido(e.target.checked)}
+              className="h-5 w-5 text-green-700 border-gray-300 rounded focus:ring-green-600 cursor-pointer"
+            />
+            <span>¿Paga de dos o mas formas?</span>
+          </Label>
         </div>
         <span className="block w-full h-0.5 bg-green-900"></span>
         
