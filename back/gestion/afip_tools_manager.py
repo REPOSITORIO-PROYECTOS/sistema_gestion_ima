@@ -27,9 +27,9 @@ def generar_csr_y_guardar_clave_temporal(cuit_empresa: str, razon_social: str) -
         key_size=2048,
     )
     private_key_pem = private_key.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption(),
+    encoding=serialization.Encoding.PEM,
+    format=serialization.PrivateFormat.TraditionalOpenSSL,
+    encryption_algorithm=serialization.NoEncryption(),
     ).decode('utf-8')
 
     # 3. Guardar la clave privada en un archivo nombrado con el CUIT.
@@ -42,7 +42,7 @@ def generar_csr_y_guardar_clave_temporal(cuit_empresa: str, razon_social: str) -
     subject = x509.Name([
         x509.NameAttribute(NameOID.COUNTRY_NAME, u"AR"),
         x509.NameAttribute(NameOID.ORGANIZATION_NAME, razon_social),
-        x509.NameAttribute(NameOID.COMMON_NAME, "Sistema Gestion IMA"), # Puedes personalizar esto
+        x509.NameAttribute(NameOID.COMMON_NAME, cuit_empresa), # Puedes personalizar esto
         x509.NameAttribute(NameOID.SERIAL_NUMBER, f"CUIT {cuit_empresa}")
     ])
     
