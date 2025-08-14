@@ -19,7 +19,6 @@ import {
   SelectTrigger, SelectValue
 } from "@/components/ui/select"
 
-
 // Stores
 import { useFacturacionStore } from "@/lib/facturacionStore";
 import { useAuthStore } from "@/lib/authStore"
@@ -30,7 +29,8 @@ import { useProductoStore } from "@/lib/productoStore";
 import { SeccionCliente } from "./SeccionCliente";
 import { SeccionProducto } from "./SeccionProducto";
 import { SeccionCantidad } from "./SeccionCantidad";
-
+import { Accordion, AccordionItem } from "@/components/ui/accordion"
+import { AccordionContent, AccordionTrigger } from "@/components/ui/accordion"
 
 // --- Interfaces y Tipos ---
 interface ItemComprobante {
@@ -77,6 +77,7 @@ interface FormVentasProps {
     precioTotal: number;
     descuentoAplicado: boolean;
     porcentajeDescuento: number;
+
     descuentoNominal: number;
   }) => void;
   totalVenta: number;
@@ -89,6 +90,17 @@ interface FormVentasProps {
     descuentoNominal?: number;
   }[];
   onLimpiarResumen: () => void;
+  // Props para mover la lógica del total al padre
+  descuentoSobreTotal: number;
+  setDescuentoSobreTotal: (value: number) => void;
+  descuentoNominalTotal: number;
+  setDescuentoNominalTotal: (value: number) => void;
+  metodoPago: string;
+  setMetodoPago: (value: string) => void;
+  totalVentaFinal: number;
+  vuelto: number;
+  montoPagado: number;
+  setMontoPagado: (value: number) => void;
 }
 
 
@@ -97,7 +109,17 @@ function FormVentas({
   onAgregarProducto,
   totalVenta,
   productosVendidos,
-  onLimpiarResumen
+  onLimpiarResumen,
+  descuentoSobreTotal,
+  setDescuentoSobreTotal,
+  descuentoNominalTotal,
+  setDescuentoNominalTotal,
+  metodoPago,
+  setMetodoPago,
+  totalVentaFinal,
+  vuelto,
+  montoPagado,
+  setMontoPagado,
 }: FormVentasProps) {
 
   /* Estados */
@@ -113,13 +135,8 @@ function FormVentas({
   const [cantidad, setCantidad] = useState(1); // Representa la cantidad final a agregar
   const [descuentoPorcentual, setDescuentoPorcentual] = useState(0);
   const [descuentoNominal, setDescuentoNominal] = useState(0);
-  const [descuentoNominalTotal, setDescuentoNominalTotal] = useState(0);
-  const [descuentoSobreTotal, setDescuentoSobreTotal] = useState(0);
   const [open, setOpen] = useState(false);
   const [tipoClienteSeleccionado, setTipoClienteSeleccionado] = useState(tipoCliente[0]);
-  const [metodoPago, setMetodoPago] = useState("efectivo");
-  const [montoPagado, setMontoPagado] = useState<number>(0);
-  const [vuelto, setVuelto] = useState<number>(0);
   const [inputEfectivo, setInputEfectivo] = useState("");
   const [pagoDividido, setPagoDividido] = useState(false);
   const [detallePagoDividido, setDetallePagoDividido] = useState("");
@@ -127,7 +144,6 @@ function FormVentas({
   const [isLoading, setIsLoading] = useState(false);
   const { habilitarExtras } = useFacturacionStore();
   const [tipoFacturacion, setTipoFacturacion] = useState("factura");
-  const { recargoTransferenciaActivo, recargoTransferencia, recargoBancarioActivo, recargoBancario } = useFacturacionStore();
   const [codigo, setCodigoEscaneado] = useState("");
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [productoEscaneado, setProductoEscaneado] = useState<ProductoSeleccionado | null>(null);
@@ -135,85 +151,45 @@ function FormVentas({
   const inputRef = useRef<HTMLInputElement>(null);
   const cantidadInputRef = useRef<HTMLInputElement>(null); 
   const empresa = useEmpresaStore((state) => state.empresa);
+  const [checkoutVisible, setCheckoutVisible] = useState(false); 
+  const checkoutSectionRef = useRef<HTMLDivElement>(null);
+
 
   // Estados para Venta a Granel
   const [modoVenta, setModoVenta] = useState<'unidad' | 'granel'>('unidad');
   const [inputCantidadGranel, setInputCantidadGranel] = useState("1");
   const [inputPrecioGranel, setInputPrecioGranel] = useState("");
 
-  
-
   /* Lógica y Hooks */
   const getPrecioProducto = useCallback((producto: ProductoSeleccionado | null): number => {
-  if (!producto) return 0;
-  if (tipoClienteSeleccionado.id === "0") return producto.precio_venta;
-  return producto.venta_negocio;
-}, [tipoClienteSeleccionado]);
+    if (!producto) return 0;
+    if (tipoClienteSeleccionado.id === "0") return producto.precio_venta;
+    return producto.venta_negocio;
+  }, [tipoClienteSeleccionado]);
 
 
   const totalProducto = productoSeleccionado ? getPrecioProducto(productoSeleccionado) * cantidad : 0;
   const subtotal = totalProducto * (1 - descuentoPorcentual / 100);
   const productoConDescuento = Math.max(0, subtotal - descuentoNominal);
-  const totalConDescuento = Math.max(0, totalVenta * (1 - descuentoSobreTotal / 100) - descuentoNominalTotal);
-
-  const totalVentaFinal = (() => {
-    let total = totalConDescuento; // Usamos la variable que acabamos de definir
-    if (metodoPago === "transferencia" && recargoTransferenciaActivo) {
-      total += total * (recargoTransferencia / 100);
-    } else if (metodoPago === "bancario" && recargoBancarioActivo) {
-      total += total * (recargoBancario / 100);
-    }
-    return Math.round(total * 100) / 100;
-  })();
 
   // Hook para cambiar el modo de venta según el producto seleccionado
-useEffect(() => {
-    // --- INICIO DEL CÓDIGO DE DEPURACIÓN ---
-    console.clear(); // Limpia la consola para ver solo el resultado importante
-    console.log("===================================");
-    console.log(" disparado. Producto actual:", productoSeleccionado);
-    
-    if (productoSeleccionado) {
-      console.log("1. ¿El objeto tiene 'unidad_venta'?", productoSeleccionado.hasOwnProperty('unidad_venta'));
-      console.log("   Valor de 'unidad_venta':", productoSeleccionado.unidad_venta);
-
-      // 2. Ejecutamos la condición
-      const esVentaPorUnidad = !productoSeleccionado.unidad_venta || productoSeleccionado.unidad_venta.toLowerCase() === 'unidad';
-      console.log("2. ¿El producto es por unidad?", esVentaPorUnidad);
-
-      // 3. Vemos la decisión final
-      if (!esVentaPorUnidad) {
-        console.log("3. DECISIÓN: Cambiar a modo GRANEL.");
-        setModoVenta('granel');
-        // ... (resto de la lógica)
-      } else {
-        console.log("3. DECISIÓN: Mantener/Cambiar a modo UNIDAD.");
-        setModoVenta('unidad');
-        // ... (resto de la lógica)
-      }
-    } else {
-      setModoVenta('unidad');
-    }
-    console.log("===================================");
-    // --- FIN DEL CÓDIGO DE DEPURACIÓN ---
-
-    // El resto de tu lógica del useEffect va aquí...
-    if (productoSeleccionado) {
-      const esVentaPorUnidad = !productoSeleccionado.unidad_venta || productoSeleccionado.unidad_venta.toLowerCase() === 'unidad';
-      if (!esVentaPorUnidad) {
-        setModoVenta('granel');
-        const precioUnitario = getPrecioProducto(productoSeleccionado);
-        setInputCantidadGranel("1");
-        setInputPrecioGranel(precioUnitario.toFixed(2));
-        setCantidad(1);
+  useEffect(() => {
+      if (productoSeleccionado) {
+        const esVentaPorUnidad = !productoSeleccionado.unidad_venta || productoSeleccionado.unidad_venta.toLowerCase() === 'unidad';
+        if (!esVentaPorUnidad) {
+          setModoVenta('granel');
+          const precioUnitario = getPrecioProducto(productoSeleccionado);
+          setInputCantidadGranel("1");
+          setInputPrecioGranel(precioUnitario.toFixed(2));
+          setCantidad(1);
+        } else {
+          setModoVenta('unidad');
+          setCantidad(1);
+        }
       } else {
         setModoVenta('unidad');
-        setCantidad(1);
       }
-    } else {
-      setModoVenta('unidad');
-    }
-  }, [productoSeleccionado, tipoClienteSeleccionado, getPrecioProducto]);
+    }, [productoSeleccionado, tipoClienteSeleccionado, getPrecioProducto]);
 
   // Handlers para los inputs de venta a granel
   const handleCantidadGranelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -280,21 +256,12 @@ useEffect(() => {
     setObservaciones("");
     setCantidad(1);
     setInputEfectivo("");
-    setVuelto(0);
     setOpen(false);
     setCodigoEscaneado("");
     setProductoSeleccionado(null);
     setModoVenta('unidad');
+    setCheckoutVisible(false); // <-- Ocultar la sección de checkout al resetear
   };
-
-  useEffect(() => {
-    if (metodoPago === "efectivo" && typeof montoPagado === "number" && !isNaN(montoPagado)) {
-      const cambio = montoPagado - totalVentaFinal;
-      setVuelto(cambio >= 0 ? cambio : 0);
-    } else {
-      setVuelto(0);
-    }
-  }, [montoPagado, metodoPago, totalVentaFinal]);
 
   const formatearMoneda = (valor: string): string => {
     const limpio = valor.replace(/[^\d]/g, "");
@@ -332,28 +299,18 @@ useEffect(() => {
         
         const data = await res.json();
         
-        // --- INICIO DE LA MODIFICACIÓN ---
-        
-        // 1. "Traducimos" el objeto de la API al formato que nuestro frontend espera.
-        //    El backend envía 'descripcion', el frontend usa 'nombre'.
         const productoAdaptado: ProductoSeleccionado = {
           id: data.id.toString(),
-          nombre: data.descripcion || "Producto sin nombre", // <-- LA LÍNEA CLAVE
+          nombre: data.descripcion || "Producto sin nombre",
           precio_venta: data.precio_venta,
           venta_negocio: data.venta_negocio,
           stock_actual: data.stock_actual,
           unidad_venta: data.unidad_venta || 'Unidad'
         };
 
-        // 2. Guardamos el objeto ADAPTADO en el estado.
         setProductoEscaneado(productoAdaptado);
-        
-        // --- FIN DE LA MODIFICACIÓN ---
-
-        // El resto de la lógica no cambia
         setCantidadEscaneada(1);
         setPopoverOpen(true);
-        // Limpiamos el código de barras, pero NO el producto escaneado
         setCodigoEscaneado('');
 
       } catch (error) {
@@ -370,23 +327,33 @@ useEffect(() => {
       return;
     }
 
-    // Usamos la misma función onAgregarProducto que ya tienes, pero con los datos del popover
     onAgregarProducto({
       tipo: productoEscaneado.nombre,
       cantidad: cantidadEscaneada,
-      precioTotal: productoEscaneado.precio_venta * cantidadEscaneada, // Cálculo simple
+      precioTotal: productoEscaneado.precio_venta * cantidadEscaneada,
       descuentoAplicado: false,
       porcentajeDescuento: 0,
       descuentoNominal: 0
     });
 
-    // --- Limpieza y Reset ---
     setPopoverOpen(false);
     setCodigoEscaneado('');
     setProductoEscaneado(null);
-    inputRef.current?.focus(); // Devolvemos el foco al input principal
+    inputRef.current?.focus();
     toast.success(`'${productoEscaneado.nombre}' x${cantidadEscaneada} agregado.`);
   };
+
+  // Efecto de Scroll al abrir la seccion de metodos de pago
+  useEffect(() => {
+    // Si la sección de checkout se hizo visible y la referencia al elemento existe...
+    if (checkoutVisible && checkoutSectionRef.current) {
+      // ...hacemos un scroll suave hasta ese elemento.
+      checkoutSectionRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start' 
+      });
+    }
+  }, [checkoutVisible]); // Este efecto se ejecuta cada vez que 'checkoutVisible' cambia.
 
   useEffect(() => {
     const fetchClientes = async () => {
@@ -405,11 +372,10 @@ useEffect(() => {
     fetchClientes();
   }, [token]);
 
-const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // --- 1. VALIDACIONES INICIALES ---
     if (productosVendidos.length === 0) {
       toast.error("❌ No hay productos cargados en la venta.");
       setIsLoading(false);
@@ -441,11 +407,10 @@ const handleSubmit = async (e: React.FormEvent) => {
       }
     }
     
-    // --- 2. CONSTRUCCIÓN DEL PAYLOAD PARA REGISTRAR LA VENTA ---
     const ventaPayload = {
       id_cliente: tipoClienteSeleccionado.id === "0" ? 0 : clienteSeleccionado?.id ?? 0,
       metodo_pago: metodoPago.toUpperCase(),
-      total_venta: totalVenta, // Se envía el total sin descuentos/recargos finales
+      total_venta: totalVenta,
       paga_con: montoPagado,
       pago_separado: pagoDividido,
       detalles_pago_separado: detallePagoDividido,
@@ -458,7 +423,7 @@ const handleSubmit = async (e: React.FormEvent) => {
           nombre: productoReal?.nombre ?? p.tipo,
           cantidad: p.cantidad,
           precio_unitario: productoReal ? getPrecioProducto(productoReal) : 0,
-          subtotal: p.precioTotal, // Este es el subtotal con descuentos por item
+          subtotal: p.precioTotal,
           tasa_iva: 21.0
         };
       })
@@ -471,7 +436,6 @@ const handleSubmit = async (e: React.FormEvent) => {
         return;
       }
       
-      // --- 3. LLAMADA A LA API PARA REGISTRAR LA VENTA ---
       const response = await fetch("https://sistema-ima.sistemataup.online/api/caja/ventas/registrar", {
         method: "POST",
         headers: {
@@ -488,11 +452,9 @@ const handleSubmit = async (e: React.FormEvent) => {
         return;
       }
 
-      // Venta registrada con éxito, ahora se genera el comprobante
       const data = await response.json();
       toast.success(`✅ Venta registrada: ${data.message}`);
       
-      // --- 4. FUNCIÓN ANIDADA PARA GENERAR Y DESCARGAR EL COMPROBANTE ---
       const generarComprobante = async () => {
         try {
           const itemsBase = productosVendidos.map((p): ItemComprobante => {
@@ -565,7 +527,6 @@ const handleSubmit = async (e: React.FormEvent) => {
 
       await generarComprobante();
       
-      // --- 5. LIMPIEZA FINAL DEL FORMULARIO ---
       resetFormularioVenta();
       window.scrollTo({ top: 0, behavior: "smooth" });
 
@@ -579,31 +540,66 @@ const handleSubmit = async (e: React.FormEvent) => {
   
   
   /* Renderizado del Componente */
- return (
+  return (
     <form onSubmit={handleSubmit} className="flex flex-col w-full lg:w-1/2 rounded-xl bg-white shadow-md">
 
-      <div className="w-full flex flex-row justify-between items-center p-6 bg-green-700 rounded-t-xl">
-        <h4 className="text-2xl font-semibold text-white">Cajero</h4>
-        <p className="text-2xl font-semibold text-white md:hidden">${totalVenta.toFixed(2)}</p>
+      {/* Header del Form */}
+      <div className="w-full flex flex-row justify-between items-center px-6 py-4 bg-green-700 rounded-t-xl">
+        <h4 className="text-xl font-semibold text-white">Cajero</h4>
+        <p className="text-xl font-semibold text-white md:hidden">${totalVenta.toFixed(2)}</p>
       </div>
 
+      {/* Cuerpo del Form */}
       <div className="flex flex-col justify-between w-full gap-6 p-8">
 
-        <SeccionCliente
-          tipoClienteSeleccionado={tipoClienteSeleccionado}
-          setTipoClienteSeleccionado={setTipoClienteSeleccionado}
-          tiposDeCliente={tipoCliente}
-          cuitManual={cuitManual}
-          setCuitManual={setCuitManual}
-          totalVenta={totalVenta}
-          clientes={clientes}
-          clienteSeleccionado={clienteSeleccionado}
-          setClienteSeleccionado={setClienteSeleccionado}
-          openCliente={openCliente}
-          setOpenCliente={setOpenCliente}
-          busquedaCliente={busquedaCliente}
-          setBusquedaCliente={setBusquedaCliente}
-        />
+        {/* Desplegable */}
+        <Accordion type="single" collapsible className="w-full">
+          <AccordionItem value="item-1">
+            <AccordionTrigger className="cursor-pointer text-md">Configuración de Cliente y Descuentos</AccordionTrigger>
+            <AccordionContent className="flex flex-col gap-4">
+              <SeccionCliente
+                tipoClienteSeleccionado={tipoClienteSeleccionado}
+                setTipoClienteSeleccionado={setTipoClienteSeleccionado}
+                tiposDeCliente={tipoCliente}
+                cuitManual={cuitManual}
+                setCuitManual={setCuitManual}
+                totalVenta={totalVenta}
+                clientes={clientes}
+                clienteSeleccionado={clienteSeleccionado}
+                setClienteSeleccionado={setClienteSeleccionado}
+                openCliente={openCliente}
+                setOpenCliente={setOpenCliente}
+                busquedaCliente={busquedaCliente}
+                setBusquedaCliente={setBusquedaCliente}
+              />
+              <span className="block w-full h-0.5 bg-green-900"></span>
+              <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
+                <Label className="text-lg font-semibold text-green-900">Descuento por Producto (%)</Label>
+                <Input
+                  type="number"
+                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                  min={0}
+                  max={100}
+                  value={descuentoPorcentual === 0 ? "" : descuentoPorcentual}
+                  onChange={(e) => setDescuentoPorcentual(Math.min(parseInt(e.target.value, 10) || 0, 100))}
+                  className="w-full md:max-w-2/3 text-black"
+                />
+              </div>
+
+              <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
+                <Label className="text-lg font-semibold text-green-900">Descuento por Producto ($)</Label>
+                <Input
+                  type="number"
+                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                  min={0}
+                  value={descuentoNominal === 0 ? "" : descuentoNominal}
+                  onChange={(e) => setDescuentoNominal(Math.min(parseFloat(e.target.value) || 0, totalProducto))}
+                  className="w-full md:max-w-2/3 text-black"
+                />
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
         <span className="block w-full h-0.5 bg-green-900"></span>
 
         {/* --- CONTENEDOR GRID PARA PRODUCTO Y CANTIDAD --- */}
@@ -642,39 +638,6 @@ const handleSubmit = async (e: React.FormEvent) => {
             inputPrecioGranel={inputPrecioGranel}
             handlePrecioGranelChange={handlePrecioGranelChange}
           />
-          
-        </div>
-        <span className="block w-full h-0.5 bg-green-900"></span>
-
-        {/* --- SECCIÓN DE DESCUENTOS POR PRODUCTO CON GRID --- */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-6">
-          <div className="grid grid-cols-1 gap-2 items-start">
-            <Label htmlFor="descuento-porcentual" className="text-xl font-semibold text-green-900">Descuento por Producto (%)</Label>
-            <Input
-              id="descuento-porcentual"
-              type="number"
-              onWheel={(e) => (e.target as HTMLInputElement).blur()}
-              min={0}
-              max={100}
-              value={descuentoPorcentual === 0 ? "" : descuentoPorcentual}
-              onChange={(e) => setDescuentoPorcentual(Math.min(parseInt(e.target.value, 10) || 0, 100))}
-              className="w-full text-black"
-              disabled={!productoSeleccionado}
-            />
-          </div>
-          <div className="grid grid-cols-1 gap-2 items-start">
-            <Label htmlFor="descuento-nominal" className="text-xl font-semibold text-green-900">Descuento por Producto ($)</Label>
-            <Input
-              id="descuento-nominal"
-              type="number"
-              onWheel={(e) => (e.target as HTMLInputElement).blur()}
-              min={0}
-              value={descuentoNominal === 0 ? "" : descuentoNominal}
-              onChange={(e) => setDescuentoNominal(Math.min(parseFloat(e.target.value) || 0, totalProducto))}
-              className="w-full text-black"
-              disabled={!productoSeleccionado}
-            />
-          </div>
         </div>
         <span className="block w-full h-0.5 bg-green-900"></span>
 
@@ -683,6 +646,7 @@ const handleSubmit = async (e: React.FormEvent) => {
           <p className="text-2xl font-bold text-green-900">${productoConDescuento.toFixed(2)}</p>
         </div>
 
+        {/* Agrega producto al resumen */}
         <Button
           variant="success"
           className="!py-6 mt-2"
@@ -691,133 +655,140 @@ const handleSubmit = async (e: React.FormEvent) => {
         >
           + Agregar producto 
         </Button>
-        <hr className="p-0.75 bg-green-900 my-8"/>
 
-
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-4 items-start justify-between md:flex-row">
-            <Label className="text-2xl font-semibold text-green-900">Método de Pago</Label>
-            <Select value={metodoPago} onValueChange={setMetodoPago}>
-              <SelectTrigger className="w-full md:max-w-1/2 cursor-pointer text-black">
-                <SelectValue placeholder="Seleccionar método" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="efectivo">Efectivo</SelectItem>
-                <SelectItem value="transferencia">Transferencia</SelectItem>
-                <SelectItem value="bancario">POS</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-          {metodoPago === 'efectivo' && (
-            <div className="flex flex-col gap-4 p-4 bg-green-800 rounded-lg mt-2">
-              <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
-                <Label className="text-2xl font-semibold text-white">Costo del Pedido:</Label>
-                <Input type="text" value={formatearMoneda(totalVentaFinal.toString())} disabled className="w-full md:max-w-1/2 font-semibold text-white" />
-              </div>
-              <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
-                <Label className="text-2xl font-semibold text-white">Con cuánto abona:</Label>
-                <Input
-                  inputMode="numeric"
-                  value={inputEfectivo}
-                  onChange={(e) => {
-                    const valorInput = e.target.value;
-                    setInputEfectivo(formatearMoneda(valorInput));
-                    setMontoPagado(limpiarMoneda(valorInput));
-                  }}
-                  className="w-full md:max-w-1/2 font-semibold text-white"
-                />
-              </div>
-              <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
-                <Label className="text-2xl font-semibold text-white">Vuelto:</Label>
-                <Input type="text" value={formatearMoneda(vuelto.toString())} disabled className="w-full md:max-w-1/2 font-semibold text-white" />
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center">
-          <Label htmlFor="pagoDividido" className="flex items-center gap-2 text-green-950 text-md font-medium cursor-pointer">
-            <Input
-              id="pagoDividido"
-              type="checkbox"
-              checked={pagoDividido}
-              onChange={(e) => setPagoDividido(e.target.checked)}
-              className="h-5 w-5 text-green-700 border-gray-300 rounded focus:ring-green-600 cursor-pointer"
-            />
-            <span>¿Paga de dos o mas formas?</span>
-          </Label>
-        </div>
-        <span className="block w-full h-0.5 bg-green-900"></span>
-        
-        <RadioGroup value={tipoFacturacion} onValueChange={setTipoFacturacion} className="flex flex-col gap-4 md:flex-row flex-wrap">
-          <Label htmlFor="factura" className="flex flex-row items-center w-full md:w-[48%] lg:flex-row cursor-pointer text-black border-green-900 hover:bg-green-400 dark:hover:bg-green-700 gap-3 rounded-lg border p-3 transition-colors duration-200 data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900">
-            <RadioGroupItem value="factura" id="factura" className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
-            <span className="text-sm leading-none font-medium">Factura</span>
-          </Label>
-          <Label htmlFor="comprobante" className="flex flex-row items-center w-full md:w-[48%] lg:flex-row cursor-pointer text-black border-green-900 hover:bg-green-400 dark:hover:bg-green-700 gap-3 rounded-lg border p-3 transition-colors duration-200 data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900">
-            <RadioGroupItem value="recibo" id="comprobante" className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
-            <span className="text-sm leading-none font-medium">Comprobante</span>
-          </Label>
-          <TooltipProvider>
-            <div className="flex flex-wrap gap-4 w-full">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Label htmlFor="remito" className={`flex flex-row items-center w-full md:w-[48%] lg:flex-row text-black border-green-900 gap-3 rounded-lg border p-3 transition-colors duration-200 ${!habilitarExtras ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-green-400 dark:hover:bg-green-700"} data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900`}>
-                    <RadioGroupItem value="remito" id="remito" disabled={!habilitarExtras} className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
-                    <span className="text-sm leading-none font-medium">Remito</span>
-                  </Label>
-                </TooltipTrigger>
-                {!habilitarExtras && ( <TooltipContent><p>Contactá al administrador</p></TooltipContent> )}
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Label htmlFor="presupuesto" className={`flex flex-row items-center w-full md:w-[48%] lg:flex-row text-black border-green-900 gap-3 rounded-lg border p-3 transition-colors duration-200 ${!habilitarExtras ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-green-400 dark:hover:bg-green-700"} data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900`}>
-                    <RadioGroupItem value="presupuesto" id="presupuesto" disabled={!habilitarExtras} className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
-                    <span className="text-sm leading-none font-medium">Presupuesto</span>
-                  </Label>
-                </TooltipTrigger>
-                {!habilitarExtras && ( <TooltipContent><p>Contactá al administrador</p></TooltipContent> )}
-              </Tooltip>
-            </div>
-          </TooltipProvider>
-        </RadioGroup>
-        <span className="block w-full h-0.5 bg-green-900"></span>
-        
-        <div className="flex flex-col w-full gap-2">
-          <Label className="text-green-900 text-xl" htmlFor="message-2">Observaciones</Label>
-          <Textarea placeholder="Observaciones de la venta..." id="message-2" value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
-        </div>
         <span className="block w-full h-0.5 bg-green-900"></span>
 
-        <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
-          <Label className="text-2xl font-semibold text-green-900">Descuento Sobre Total (%)</Label>
-          <Input type="number" min={0} max={100} value={descuentoSobreTotal === 0 ? "" : descuentoSobreTotal} onWheel={(e) => (e.target as HTMLInputElement).blur()} onChange={(e) => setDescuentoSobreTotal(Math.min(parseInt(e.target.value, 10) || 0, 100))} className="w-full md:max-w-2/3 text-black" />
-        </div>
-        <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
-          <Label className="text-2xl font-semibold text-green-900">Descuento Sobre Total ($)</Label>
-          <Input type="number" min={0} value={descuentoNominalTotal === 0 ? "" : descuentoNominalTotal} onWheel={(e) => (e.target as HTMLInputElement).blur()} onChange={(e) => setDescuentoNominalTotal(Math.min(parseFloat(e.target.value) || 0, totalVenta))} className="w-full md:max-w-2/3 text-black" />
-        </div>
-        <span className="block w-full h-0.5 bg-green-900"></span>
-        
-        <div className="flex flex-col gap-4 p-6 border border-green-900 rounded-lg">
-          <Label className="text-2xl font-semibold text-green-900">Resumen del Pedido</Label>
-          <p className="text-xl text-green-900"><span className="font-semibold">Total sin descuento:</span> ${totalVenta.toFixed(2)}</p>
-          <p className="text-xl text-green-400"><span className="font-semibold">Descuento sobre total (%):</span> {descuentoSobreTotal}%</p>
-          <p className="text-xl text-green-400"><span className="font-semibold">Descuento sobre total ($):</span> ${descuentoNominalTotal}</p>
-          {metodoPago === "transferencia" && recargoTransferenciaActivo && ( <p className="text-xl text-red-500"><span className="font-semibold">Recargo por Transferencia:</span> {recargoTransferencia}% (${(totalConDescuento * recargoTransferencia / 100).toFixed(2)})</p> )}
-          {metodoPago === "bancario" && recargoBancarioActivo && ( <p className="text-xl text-red-500"><span className="font-semibold">Recargo por POS:</span> {recargoBancario}% (${(totalConDescuento * recargoBancario / 100).toFixed(2)})</p> )}
-          <span className="block w-full h-0.5 bg-green-900 my-2"></span>
-          <p className="text-2xl font-bold text-green-900"><span className="font-semibold">Valor Final del Pedido:</span> ${totalVentaFinal.toFixed(2)}</p>
-          {metodoPago === "efectivo" && montoPagado > 0 && ( <p className="text-xl text-emerald-700 font-semibold">Vuelto para el cliente: ${vuelto.toFixed(2)}</p> )}
-        </div>
-        
-        <Button type="submit" disabled={isLoading} className={`!py-6 bg-green-900 flex items-center justify-center gap-2 ${isLoading ? "cursor-not-allowed opacity-50" : "hover:bg-green-700 cursor-pointer"}`}>
-          {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-          {isLoading ? "Registrando..." : "Registrar Venta"}
+        {/* Sección para Finalizar compra */}
+        <Button
+            className="!py-6 !bg-emerald-800"
+            type="button"
+            onClick={() => setCheckoutVisible(!checkoutVisible)}
+        >
+            {checkoutVisible ? 'Ocultar Opciones de Pago' : 'Finalizar Compra'}
         </Button>
+
+        {checkoutVisible && (
+            <div ref={checkoutSectionRef} className="flex flex-col gap-6 mt-6 animate-in fade-in-0 duration-300">
+                <div className="flex flex-col gap-4 mt-4">
+                    <div className="flex flex-col gap-4 items-start justify-between md:flex-row">
+                        <Label className="text-2xl font-semibold text-green-900">Método de Pago</Label>
+                        <Select value={metodoPago} onValueChange={setMetodoPago}>
+                        <SelectTrigger className="w-full md:max-w-1/2 cursor-pointer text-black">
+                            <SelectValue placeholder="Seleccionar método" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="efectivo">Efectivo</SelectItem>
+                            <SelectItem value="transferencia">Transferencia</SelectItem>
+                            <SelectItem value="bancario">POS</SelectItem>
+                        </SelectContent>
+                        </Select>
+                    </div>
+                    
+                    {metodoPago === 'efectivo' && (
+                        <div className="flex flex-col gap-4 p-4 bg-green-800 rounded-lg mt-2">
+                        <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
+                            <Label className="text-2xl font-semibold text-white">Costo del Pedido:</Label>
+                            <Input type="text" value={`$${totalVentaFinal.toLocaleString('es-AR')}`} disabled className="w-full md:max-w-1/2 font-semibold text-white" />
+                        </div>
+                        <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
+                            <Label className="text-2xl font-semibold text-white">Con cuánto abona:</Label>
+                            <Input
+                            inputMode="numeric"
+                            value={inputEfectivo}
+                            onChange={(e) => {
+                                const valorInput = e.target.value;
+                                setInputEfectivo(formatearMoneda(valorInput));
+                                setMontoPagado(limpiarMoneda(valorInput));
+                            }}
+                            className="w-full md:max-w-1/2 font-semibold text-white"
+                            />
+                        </div>
+                        <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
+                            <Label className="text-2xl font-semibold text-white">Vuelto:</Label>
+                            <Input type="text" value={`$${vuelto.toLocaleString('es-AR')}`} disabled className="w-full md:max-w-1/2 font-semibold text-white" />
+                        </div>
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex items-center">
+                <Label htmlFor="pagoDividido" className="flex items-center gap-2 text-green-950 text-md font-medium cursor-pointer">
+                    <Input
+                    id="pagoDividido"
+                    type="checkbox"
+                    checked={pagoDividido}
+                    onChange={(e) => setPagoDividido(e.target.checked)}
+                    className="h-5 w-5 text-green-700 border-gray-300 rounded focus:ring-green-600 cursor-pointer"
+                    />
+                    <span>¿Paga de dos o mas formas?</span>
+                </Label>
+                </div>
+                <span className="block w-full h-0.5 bg-green-900"></span>
+                
+                <RadioGroup value={tipoFacturacion} onValueChange={setTipoFacturacion} className="flex flex-col gap-4 md:flex-row flex-wrap">
+                <Label htmlFor="factura" className="flex flex-row items-center w-full md:w-[48%] lg:flex-row cursor-pointer text-black border-green-900 hover:bg-green-400 dark:hover:bg-green-700 gap-3 rounded-lg border p-3 transition-colors duration-200 data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900">
+                    <RadioGroupItem value="factura" id="factura" className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
+                    <span className="text-sm leading-none font-medium">Factura</span>
+                </Label>
+                <Label htmlFor="comprobante" className="flex flex-row items-center w-full md:w-[48%] lg:flex-row cursor-pointer text-black border-green-900 hover:bg-green-400 dark:hover:bg-green-700 gap-3 rounded-lg border p-3 transition-colors duration-200 data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900">
+                    <RadioGroupItem value="recibo" id="comprobante" className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
+                    <span className="text-sm leading-none font-medium">Comprobante</span>
+                </Label>
+                <TooltipProvider>
+                    <div className="flex flex-wrap gap-4 w-full">
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                        <Label htmlFor="remito" className={`flex flex-row items-center w-full md:w-[48%] lg:flex-row text-black border-green-900 gap-3 rounded-lg border p-3 transition-colors duration-200 ${!habilitarExtras ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-green-400 dark:hover:bg-green-700"} data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900`}>
+                            <RadioGroupItem value="remito" id="remito" disabled={!habilitarExtras} className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
+                            <span className="text-sm leading-none font-medium">Remito</span>
+                        </Label>
+                        </TooltipTrigger>
+                        {!habilitarExtras && ( <TooltipContent><p>Contactá al administrador</p></TooltipContent> )}
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                        <Label htmlFor="presupuesto" className={`flex flex-row items-center w-full md:w-[48%] lg:flex-row text-black border-green-900 gap-3 rounded-lg border p-3 transition-colors duration-200 ${!habilitarExtras ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-green-400 dark:hover:bg-green-700"} data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900`}>
+                            <RadioGroupItem value="presupuesto" id="presupuesto" disabled={!habilitarExtras} className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
+                            <span className="text-sm leading-none font-medium">Presupuesto</span>
+                        </Label>
+                        </TooltipTrigger>
+                        {!habilitarExtras && ( <TooltipContent><p>Contactá al administrador</p></TooltipContent> )}
+                    </Tooltip>
+                    </div>
+                </TooltipProvider>
+                </RadioGroup>
+                
+                <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="item-1">
+                    <AccordionTrigger className="cursor-pointer text-md">Observaciones y Descuentos Globales</AccordionTrigger>
+                    <AccordionContent className="flex flex-col gap-4 pt-4">
+                    <div className="flex flex-col w-full gap-2">
+                        <Label className="text-green-900 text-xl" htmlFor="message-2">Observaciones</Label>
+                        <Textarea placeholder="Observaciones de la venta..." id="message-2" value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
+                    </div>
+                    <span className="block w-full h-0.5 bg-green-900"></span>
+
+                    <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
+                        <Label className="text-lg font-semibold text-green-900">Descuento Sobre Total (%)</Label>
+                        <Input type="number" min={0} max={100} value={descuentoSobreTotal === 0 ? "" : descuentoSobreTotal} onWheel={(e) => (e.target as HTMLInputElement).blur()} onChange={(e) => setDescuentoSobreTotal(Math.min(parseInt(e.target.value, 10) || 0, 100))} className="w-full md:max-w-2/3 text-black" />
+                    </div>
+                    <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
+                        <Label className="text-lg font-semibold text-green-900">Descuento Sobre Total ($)</Label>
+                        <Input type="number" min={0} value={descuentoNominalTotal === 0 ? "" : descuentoNominalTotal} onWheel={(e) => (e.target as HTMLInputElement).blur()} onChange={(e) => setDescuentoNominalTotal(Math.min(parseFloat(e.target.value) || 0, totalVenta))} className="w-full md:max-w-2/3 text-black" />
+                    </div>
+                    </AccordionContent>
+                </AccordionItem>
+                </Accordion>
+                
+                <Button type="submit" disabled={isLoading} className={`!py-6 bg-green-900 flex items-center justify-center gap-2 ${isLoading ? "cursor-not-allowed opacity-50" : "hover:bg-green-700 cursor-pointer"}`}>
+                {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isLoading ? "Registrando..." : "Registrar Venta"}
+                </Button>
+            </div>
+        )}
       </div>
     </form>
   );
 }
+
 export default FormVentas;

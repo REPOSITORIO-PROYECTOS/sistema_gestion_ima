@@ -53,7 +53,7 @@ return (
       
       {/* --- CÓDIGO DE BARRAS ALINEADO --- */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 items-center">
-        <Label htmlFor="codigo-barras" className="text-xl font-semibold text-green-900 md:text-right">
+        <Label htmlFor="codigo-barras" className="text-lg font-semibold text-green-900 md:text-right">
           Código de Barras
         </Label>
         <div className="md:col-span-2">

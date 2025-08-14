@@ -82,6 +82,7 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
         console.error('Error al cargar datos de empresa:', error);
         setNavbarColor('bg-green-800'); 
         setLogoUrl('/default-logo.png');
+        
       } finally {
         setEmpresaCargada(true); 
       }
