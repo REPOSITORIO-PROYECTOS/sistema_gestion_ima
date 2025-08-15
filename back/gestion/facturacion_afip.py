@@ -51,24 +51,30 @@ class TipoDocumento(Enum):
     CONSUMIDOR_FINAL = 99
 
 
-
-
 def determinar_datos_factura_segun_iva(
     condicion_emisor: CondicionIVA,
     condicion_receptor: CondicionIVA,
     total: float
 ) -> Dict[str, Any]:
     if condicion_emisor == CondicionIVA.RESPONSABLE_INSCRIPTO:
+        # --- LÓGICA CORREGIDA ---
+        # Para un RI, el IVA se calcula siempre. La única diferencia es el tipo de comprobante.
+        neto = round(total / (1 + TASA_IVA_21), 2)
+        iva = round(total - neto, 2)
+        
         if condicion_receptor == CondicionIVA.RESPONSABLE_INSCRIPTO:
-            neto = round(total / (1 + TASA_IVA_21), 2)
-            iva = round(total - neto, 2)
+            # Si el receptor es RI, es Factura A
             return {"tipo_afip": 1, "neto": neto, "iva": iva}
         else:
-            return {"tipo_afip": 6, "neto": total, "iva": 0.0}
+            # Si el receptor es CF, Monotributista, etc., es Factura B
+            return {"tipo_afip": 6, "neto": neto, "iva": iva}
+
     elif condicion_emisor in [CondicionIVA.MONOTRIBUTO, CondicionIVA.EXENTO]:
+        # La lógica para Factura C está bien
         return {"tipo_afip": 11, "neto": total, "iva": 0.0}
     else:
         raise ValueError(f"Condición de IVA del emisor no soportada: {condicion_emisor.name}")
+
 
 # --- FUNCIÓN PRINCIPAL COMPLETA (ADAPTADA PARA STRINGS) ---
 
