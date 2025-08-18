@@ -3,7 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field, EmailStr, validator
 from typing import Optional
 
-CONDICIONES_IVA_VALIDAS = ["IVA Responsable Inscripto", "IVA Sujeto Exento", "Consumidor Final", "Responsable Monotributo", "IVA no Alcanzado"]
+CONDICIONES_IVA_VALIDAS = ["RESPONSABLE_INSCRIPTO", "EXENTO", "CONSUMIDOR_FINAL", "MONOTRIBUTO", "NO_CATEGORIZADO"]
 
 class ClienteBase(BaseModel):
     id: int = Field(primary_key=True)
