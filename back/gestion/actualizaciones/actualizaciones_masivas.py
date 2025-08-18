@@ -79,7 +79,7 @@ def sincronizar_clientes_desde_sheets(db: Session, id_empresa_actual: int) -> Di
                 "direccion": str(cliente_sheet.get("direccion", "")).strip(),
                 "notas": str(cliente_sheet.get("observaciones", "")).strip(),
                 "cuit": cuit_sheet,
-                "condicion_iva": str(cliente_sheet.get("condicion-iva", "")).strip() or "CONSUMIDOR-FINAL",
+                "condicion_iva": str(cliente_sheet.get("condicion-iva", "")).strip() or "CONSUMIDOR_FINAL",
                 "id_empresa": id_empresa_actual,
                 "es_cliente": True,
             }
