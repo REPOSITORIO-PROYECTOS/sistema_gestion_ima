@@ -168,6 +168,8 @@ def registrar_venta_y_movimiento_caja(
                 if id_cliente!= 0:
                     cliente = clientes_manager.obtener_cliente_por_id(usuario_actual.id_empresa,db, id_cliente)
                     cliente_sheets_data = obtener_cliente_por_id(db,id_empresa=usuario_actual.id_empresa,id_cliente=cliente.codigo_interno) # Asumo que esta función devuelve un dict
+                else : 
+                    cliente_sheets_data = None
                 print("LA DATA DE CLIENTE_SHEETS_DATA ES   :  ")
                 print(cliente_sheets_data)
                 nombre_cliente_para_sheets = "Público General"
