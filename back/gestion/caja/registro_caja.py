@@ -174,7 +174,7 @@ def registrar_venta_y_movimiento_caja(
                 razon_social_para_sheets = "N/A"
 
                 # Si cliente_sheets_data NO es None (es decir, encontramos un diccionario)
-                if cliente_sheets_data:
+                if id_cliente!= 0 and cliente_sheets_data:
                     nombre_cliente_para_sheets = cliente_sheets_data.get("nombre-usuario", "Cliente sin nombre")
                     cuit_cliente_para_sheets = cliente_sheets_data.get("CUIT-CUIL", "N/A")
                     razon_social_para_sheets = cliente_sheets_data.get("Nombre de Contacto", "N/A")
