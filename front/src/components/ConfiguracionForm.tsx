@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/lib/authStore";
-import { AfipToolsPanel } from "./AfipToolsPanel"; // Importamos el panel revisado
+import { AfipToolsPanel } from "./AfipToolsPanel";
 
-// Schema de Zod para el formulario, incluyendo todos los campos
+// Schema de Zod para el formulario (sin cambios)
 const formSchema = z.object({
   nombre_negocio: z.string().min(1, "Requerido").nullable(),
   direccion_negocio: z.string().optional().nullable(),
@@ -23,7 +23,7 @@ const formSchema = z.object({
   link_google_sheets: z.string().optional().nullable(),
 });
 
-// Inferimos el tipo para los valores del formulario, esto nos da 100% de seguridad de tipos
+// Inferimos el tipo para los valores del formulario
 type FormValues = z.infer<typeof formSchema>;
 
 interface Props {
@@ -33,32 +33,63 @@ interface Props {
 export function ConfiguracionForm({ empresaId }: Props) {
   const token = useAuthStore((state) => state.token);
   const [isLoading, setIsLoading] = React.useState(true);
-  const form = useForm<FormValues>({ resolver: zodResolver(formSchema) });
+  
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+        nombre_negocio: "",
+        direccion_negocio: "",
+        telefono_negocio: "",
+        mail_negocio: "",
+        cuit: "",
+        afip_punto_venta_predeterminado: "",
+        afip_condicion_iva: "",
+        link_google_sheets: "",
+    },
+  });
 
-  const API_URL = `https://sistema-ima.sistemataup.online/api/empresas/admin/${empresaId}/configuracion`;
+  // --- LÓGICA REFACTORIZADA Y CORREGIDA ---
+
+const fetchConfig = React.useCallback(async () => {
+    const { reset } = form; // Desestructuramos reset aquí adentro
+    if (!token || !empresaId) return;
+    setIsLoading(true);
+    try {
+        const API_URL = `https://sistema-ima.sistemataup.online/api/empresas/admin/${empresaId}/configuracion`;
+        const res = await fetch(API_URL, { 
+            headers: { Authorization: `Bearer ${token}` },
+            cache: 'no-store'
+        });
+        if (!res.ok) throw new Error("No se pudo cargar la configuración de la empresa.");
+        
+        const data = await res.json();
+        
+        const transformedData = {
+            ...data,
+            cuit: data.cuit ? String(data.cuit) : "",
+            afip_punto_venta_predeterminado: data.afip_punto_venta_predeterminado 
+            ? String(data.afip_punto_venta_predeterminado) 
+            : "",
+        };
+        
+        reset(transformedData); // Usamos la función desestructurada
+
+    } catch (err) {
+        if (err instanceof Error) toast.error("Error al cargar datos", { description: err.message });
+    } finally {
+        setIsLoading(false);
+    }
+}, [token, empresaId, form]);
 
   React.useEffect(() => {
-    const fetchConfig = async () => {
-      if (!token || !empresaId) return;
-      setIsLoading(true);
-      try {
-        const res = await fetch(API_URL, { headers: { Authorization: `Bearer ${token}` } });
-        if (!res.ok) throw new Error("No se pudo cargar la configuración de la empresa.");
-        // Aserción de tipo para la respuesta del fetch
-        const data = await res.json() as FormValues;
-        form.reset(data);
-      } catch (err) {
-        if (err instanceof Error) toast.error("Error al cargar datos", { description: err.message });
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchConfig();
-  }, [token, empresaId, form, API_URL]);
+  }, [fetchConfig]);
 
   const onSubmit = async (values: FormValues) => {
-    toast.info("Guardando cambios en la configuración general...");
+    setIsLoading(true);
+    toast.info("Guardando cambios...");
     try {
+      const API_URL = `https://sistema-ima.sistemataup.online/api/empresas/admin/${empresaId}/configuracion`;
       const res = await fetch(API_URL, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -68,13 +99,21 @@ export function ConfiguracionForm({ empresaId }: Props) {
         const errorData = await res.json() as { detail: string };
         throw new Error(errorData.detail || "Error al guardar los cambios.");
       }
-      toast.success("Configuración general guardada con éxito.");
+      toast.success("Configuración guardada con éxito.");
+      
+      // Se resincroniza el formulario con los datos actualizados del servidor
+      await fetchConfig();
+
     } catch (err) {
       if (err instanceof Error) toast.error("Error al guardar", { description: err.message });
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  if (isLoading) return <p>Cargando formulario de configuración...</p>;
+  if (isLoading && !form.formState.isDirty) {
+      return <p>Cargando formulario de configuración...</p>;
+  }
 
   return (
     <div className="space-y-12">
@@ -121,8 +160,8 @@ export function ConfiguracionForm({ empresaId }: Props) {
                 )} />
             </div>
             <div className="flex justify-end">
-                <Button type="submit" disabled={form.formState.isSubmitting}>
-                    {form.formState.isSubmitting ? "Guardando..." : "Guardar Cambios Generales"}
+                <Button type="submit" disabled={isLoading || form.formState.isSubmitting}>
+                    {isLoading ? "Actualizando..." : "Guardar Cambios Generales"}
                 </Button>
             </div>
           </form>
@@ -131,7 +170,7 @@ export function ConfiguracionForm({ empresaId }: Props) {
 
       {/* --- SECCIÓN 2: Panel Integrado de Herramientas AFIP --- */}
       <div>
-        <h3 className="text-lg font-semibold border-b pb-2 mb-6">Herramientas Fiscales (AFIP)</h3>
+        <h3 className="text-xl text-green-950 font-semibold border-b pb-2 mb-6">Herramientas Fiscales (AFIP)</h3>
         <AfipToolsPanel empresaId={empresaId} />
       </div>
     </div>
