@@ -50,6 +50,7 @@ def registrar_venta_y_movimiento_caja(
     monto_recargo = 0.0
     metodo_pago_upper = metodo_pago.upper()
 
+
     # PASO A: Buscamos la configuración específica de la empresa del usuario actual.
     print(f"Buscando configuración para la Empresa ID: {usuario_actual.id_empresa}...")
     config_empresa = db.get(ConfiguracionEmpresa, usuario_actual.id_empresa)
@@ -188,7 +189,7 @@ def registrar_venta_y_movimiento_caja(
                         "cuit": cuit_cliente_para_sheets,
                         "razon_social": razon_social_para_sheets,
                         "Tipo_movimiento": f"[{tipo_comprobante_solicitado}] Venta en {metodo_pago}",
-                        "descripcion": f"Venta de {', '.join(f'(articulo id = {item.id_articulo}, cantidad = {item.cantidad})' for item in articulos_vendidos)}",
+                        "descripcion": f"Venta de {', '.join(f'(articulo id = {db.get(Articulo, item.id_articulo).codigo_interno}, cantidad = {item.cantidad})' for item in articulos_vendidos)}",
                         "monto": total_final_con_recargo,
                         "Repartidor": usuario_actual.nombre_usuario
                     }
@@ -207,7 +208,7 @@ def registrar_venta_y_movimiento_caja(
                         "cuit": "-",
                         "razon_social": "-",
                          "Tipo_movimiento": f"[{tipo_comprobante_solicitado}] Venta en {metodo_pago}",
-                        "descripcion": f"Venta de {', '.join(f'(articulo id = {item.id_articulo}, cantidad = {item.cantidad})' for item in articulos_vendidos)}",
+                        "descripcion": f"Venta de {', '.join(f'(articulo id = {db.get(Articulo, item.id_articulo).codigo_interno}, cantidad = {item.cantidad})' for item in articulos_vendidos)}",
                         "monto": total_final_con_recargo,
                         "Repartidor": usuario_actual.nombre_usuario
                     }

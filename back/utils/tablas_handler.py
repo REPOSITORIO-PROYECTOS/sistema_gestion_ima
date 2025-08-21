@@ -1,7 +1,7 @@
 import os
 
 from requests import Session
-from back.modelos import ConfiguracionEmpresa
+from back.modelos import Articulo, ConfiguracionEmpresa
 from back.schemas.caja_schemas import ArticuloVendido
 import gspread
 from google.oauth2.service_account import Credentials
@@ -142,7 +142,7 @@ class TablasHandler:
         
 
 
-    def restar_stock(self, lista_items: List[ArticuloVendido]) -> bool:
+    def restar_stock(self, db: Session, lista_items: List[ArticuloVendido]) -> bool:
         if not self.client:
             print("❌ ERROR [STOCK]: Cliente de Google Sheets no disponible.")
             return False
@@ -152,15 +152,15 @@ class TablasHandler:
             sheet = self.client.open_by_key(self.google_sheet_id)
             worksheet = sheet.worksheet("stock")
             datos_stock = worksheet.get_all_records()
-            columna_id = "id producto"
+            columna_id = "Código"
             columna_stock = "cantidad"
-
+   
             if not datos_stock or columna_id not in datos_stock[0] or columna_stock not in datos_stock[0]:
                 print(f"❌ ERROR [STOCK]: La hoja 'stock' no tiene las columnas requeridas '{columna_id}' y '{columna_stock}'.")
                 return False
 
             for item_a_restar in lista_items:
-                id_producto = item_a_restar.id_articulo
+                id_producto = db.get(Articulo, item_a_restar.id_articulo).codigo_interno
                 cantidad_a_restar = item_a_restar.cantidad
 
                 if not id_producto or cantidad_a_restar is None:
