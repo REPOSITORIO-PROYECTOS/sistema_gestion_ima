@@ -169,7 +169,7 @@ class TablasHandler:
 
                 print(f"  -> Procesando ID: {id_producto}, Cantidad a restar: {cantidad_a_restar}")
                 encontrado = False
-                for i, fila in enumerate(datos_stock):
+                for i, fila in enumerate(datos_stock): #fija
                     if str(fila.get(columna_id)) == str(id_producto):
                         encontrado = True
                         numero_fila_gspread = i + 2  # +2 por encabezado y base 1

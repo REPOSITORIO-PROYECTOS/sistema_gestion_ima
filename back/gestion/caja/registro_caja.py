@@ -197,7 +197,7 @@ def registrar_venta_y_movimiento_caja(
                     caller = TablasHandler(id_empresa=usuario_actual.id_empresa, db=db)
                     if not caller.registrar_movimiento(datos_para_sheets):
                         print("⚠️ [DRIVE] La función registrar_movimiento devolvió False.")
-                    if afectar_stock and not caller.restar_stock(articulos_vendidos): # Solo resta stock si afectar_stock es True
+                    if afectar_stock and not caller.restar_stock(db,articulos_vendidos): # Solo resta stock si afectar_stock es True
                         print("⚠️ [DRIVE] Ocurrió un error al intentar actualizar el stock en Google Sheets.")
                     # --- FIN DE LA LÓGICA CORREGIDA ---
                     print("ESTAMOS SALIENDO DE LA FUNCION REGISTRAR_VENTA_Y _MOVIMIENTO")
@@ -215,7 +215,7 @@ def registrar_venta_y_movimiento_caja(
                     caller = TablasHandler(id_empresa=usuario_actual.id_empresa, db=db)
                     if not caller.registrar_movimiento(datos_para_sheets):
                         print("⚠️ [DRIVE] La función registrar_movimiento devolvió False.")
-                    if afectar_stock and not caller.restar_stock(articulos_vendidos): # Solo resta stock si afectar_stock es True
+                    if afectar_stock and not caller.restar_stock(db,articulos_vendidos): # Solo resta stock si afectar_stock es True
                         print("⚠️ [DRIVE] Ocurrió un error al intentar actualizar el stock en Google Sheets.")
 
         except Exception as e_sheets:
