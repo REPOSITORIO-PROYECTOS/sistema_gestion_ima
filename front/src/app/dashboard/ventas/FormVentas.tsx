@@ -124,6 +124,7 @@ function FormVentas({
 
   /* Estados */
   const productos = useProductoStore((state) => state.productos);
+  const setProductos = useProductoStore((state) => state.setProductos);
   const [productoSeleccionado, setProductoSeleccionado] = useState<ProductoSeleccionado | null>(null);
   const token = useAuthStore((state) => state.token);
   const { formatoComprobante } = useFacturacionStore();
@@ -372,6 +373,60 @@ function FormVentas({
     fetchClientes();
   }, [token]);
 
+  // Funcion que refresca el stock en el store despues de cada venta
+  const refrescarProductos = async () => {
+    // Usamos el token que ya tienes disponible en el componente
+    if (!token) {
+      console.error("No hay token para refrescar productos.");
+      return;
+    }
+
+    try {
+      console.log("🔄 Refrescando catálogo de productos...");
+      const res = await fetch("https://sistema-ima.sistemataup.online/api/articulos/obtener_todos", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) {
+        throw new Error("Error al refrescar productos desde el servidor");
+      }
+
+      // Reutilizamos el tipado que definiste en el login
+      type ProductoAPI = {
+        id: number | string;
+        nombre?: string;
+        descripcion?: string;
+        precio_venta: number;
+        venta_negocio: number;
+        stock_actual: number;
+        unidad_venta: string;
+      };
+
+      const data: ProductoAPI[] = await res.json();
+      const adaptados = data.map((p) => ({
+        id: String(p.id),
+        nombre: p.nombre ?? p.descripcion ?? "",
+        precio_venta: p.precio_venta,
+        venta_negocio: p.venta_negocio,
+        stock_actual: p.stock_actual,
+        unidad_venta: p.unidad_venta || 'Unidad',
+      }));
+
+      // Usamos la acción del store para actualizar el estado global
+      setProductos(adaptados);
+      // Opcional: También puedes actualizar el localStorage si lo necesitas síncrono
+      localStorage.setItem("productos", JSON.stringify(adaptados));
+      
+      console.log("✅ Catálogo de productos actualizado.");
+
+    } catch (err) {
+      // Usamos un toast para notificar el error de forma no invasiva
+      toast.error("No se pudo actualizar el stock de productos en tiempo real.");
+      console.error("Error actualizando productos post-venta:", err);
+    }
+  };
+
+  // POST - Venta, Genera Comprobante y Actualiza Stock en cada una
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -454,7 +509,11 @@ function FormVentas({
 
       const data = await response.json();
       toast.success(`✅ Venta registrada: ${data.message}`);
+
+      // Actualizamos el Store despues de cada venta..
+      await refrescarProductos();
       
+      // Funcion que genera el comprobante
       const generarComprobante = async () => {
         try {
           const itemsBase = productosVendidos.map((p): ItemComprobante => {
