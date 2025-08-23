@@ -1,7 +1,7 @@
 # back/api/blueprints/comprobantes_router.py
 # VERSIÓN FINAL, LIMPIA Y COMPLETA
 
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from starlette.responses import Response
@@ -30,6 +30,10 @@ from back.schemas.comprobante_schemas import (
 class AgruparRequest(BaseModel):
     ids_comprobantes: List[int]
     nuevo_tipo_comprobante: str # Ej: "Factura A"
+
+class AnularFacturaRequest(BaseModel):
+    id_movimiento: int
+    motivo: Optional[str]
 
 router = APIRouter(
     prefix="/comprobantes",
@@ -137,3 +141,48 @@ def endpoint_agrupar_comprobantes(
     db.refresh(comprobante_final)
     
     return comprobante_final
+
+@router.post("/anular-factura", summary="Anula una factura existente mediante una Nota de Crédito")
+def api_anular_factura_con_nc(
+    req: AnularFacturaRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(obtener_usuario_actual)
+):
+    """
+    Recibe el ID de un movimiento de venta ya facturado, invoca la lógica
+    de negocio para generar la Nota de Crédito correspondiente en AFIP,
+    y actualiza el estado de la venta original en la base de datos.
+    La operación es atómica.
+    """
+    try:
+        # Llamamos a la función "hermana" que ya creamos en el manager
+        resultado_nc = facturacion_lotes_manager.crear_nota_credito_para_anular(
+            db=db,
+            usuario_actual=current_user,
+            id_movimiento_a_anular=req.id_movimiento_a_anular
+        )
+        
+        # Si la lógica del manager no lanzó ninguna excepción, hacemos commit
+        db.commit()
+        
+        return {
+            "status": "success",
+            "mensaje": "La factura ha sido anulada con éxito mediante la Nota de Crédito.",
+            "datos_nota_credito": resultado_nc
+        }
+    except (ValueError, RuntimeError) as e:
+        # Capturamos errores de negocio (ej: "ya fue anulada", "no es una factura")
+        db.rollback() # Revertimos cualquier cambio parcial en la sesión de la DB
+        raise HTTPException(
+            status_code=409, # 409 Conflict es un buen código para errores de lógica de negocio
+            detail=str(e)
+        )
+    except Exception as e:
+        # Capturamos cualquier otro error inesperado (ej: fallo de red con la bóveda)
+        db.rollback()
+        # En producción, deberías loguear el error 'e' para poder depurarlo
+        print(f"ERROR INESPERADO al anular factura: {e}")
+        raise HTTPException(
+            status_code=500, # 500 Internal Server Error
+            detail="Ocurrió un error interno inesperado al intentar anular la factura."
+        )

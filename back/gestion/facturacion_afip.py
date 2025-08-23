@@ -191,3 +191,116 @@ def generar_factura_para_venta(
     except Exception as e:
         print(f"ERROR: Ocurrió un error inesperado durante la facturación. Detalle: {e}")
         raise RuntimeError(f"Error inesperado durante la facturación: {e}")
+    
+
+
+# --- NUEVA FUNCIÓN PARA NOTAS DE CRÉDITO ---
+def determinar_tipo_nota_credito(
+    condicion_emisor: CondicionIVA,
+    condicion_receptor: CondicionIVA,
+) -> int:
+    """
+    Determina el código AFIP para el tipo de Nota de Crédito (A, B, o C).
+    """
+    if condicion_emisor == CondicionIVA.RESPONSABLE_INSCRIPTO:
+        if condicion_receptor == CondicionIVA.RESPONSABLE_INSCRIPTO:
+            return 3  # Nota de Crédito A
+        else:
+            return 8  # Nota de Crédito B
+    elif condicion_emisor in [CondicionIVA.MONOTRIBUTO, CondicionIVA.EXENTO]:
+        return 13 # Nota de Crédito C
+    else:
+        raise ValueError(f"Condición de IVA del emisor no soportada: {condicion_emisor.name}")
+
+def generar_nota_credito_para_venta(
+    total: float,
+    cliente_data: Optional[ReceptorData],
+    emisor_data: EmisorData,
+    comprobante_asociado: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Genera una Nota de Crédito en AFIP, referenciando a una factura original.
+    Esta función es independiente y no modifica la de generar facturas.
+    """
+    print(f"Iniciando proceso de NOTA DE CRÉDITO para Emisor CUIT: {emisor_data.cuit}")
+
+    # --- PASO 1: Obtener Credenciales (Lógica Reutilizada) ---
+    try:
+        secreto_emisor = cliente_boveda.obtener_secreto(emisor_data.cuit)
+        if not secreto_emisor:
+            raise ValueError(f"No se encontraron credenciales en la bóveda para el CUIT {emisor_data.cuit}.")
+        credenciales = {
+            "cuit": emisor_data.cuit,
+            "certificado": secreto_emisor.certificado,
+            "clave_privada": secreto_emisor.clave_privada
+        }
+    except Exception as e:
+        raise RuntimeError(f"El servicio de bóveda no está disponible: {e}")
+
+    # --- PASO 2: Preparar Datos del Comprobante (Lógica Adaptada) ---
+    try:
+        cond_emisor_str = emisor_data.condicion_iva.upper().replace(' ', '_')
+        condicion_emisor = CondicionIVA[cond_emisor_str]
+    except (KeyError, AttributeError):
+        raise ValueError(f"La condición de IVA del emisor '{emisor_data.condicion_iva}' no es válida.")
+
+    if cliente_data and cliente_data.cuit_o_dni and cliente_data.cuit_o_dni != "0":
+        documento = cliente_data.cuit_o_dni
+        tipo_documento_receptor = TipoDocumento.CUIT if len(documento) == 11 else TipoDocumento.DNI
+        try:
+            cond_receptor_str = cliente_data.condicion_iva.upper().replace(' ', '_')
+            condicion_receptor = CondicionIVA[cond_receptor_str]
+        except (KeyError, AttributeError):
+            condicion_receptor = CondicionIVA.CONSUMIDOR_FINAL
+    else: 
+        documento = "0"
+        tipo_documento_receptor = TipoDocumento.CONSUMIDOR_FINAL
+        condicion_receptor = CondicionIVA.CONSUMIDOR_FINAL
+    
+    # --- CAMBIO CLAVE 1: Determinar el tipo de NC ---
+    tipo_nota_credito = determinar_tipo_nota_credito(
+        condicion_emisor=condicion_emisor,
+        condicion_receptor=condicion_receptor,
+    )
+    
+    # La lógica de neto/iva es la misma que para una factura
+    neto, iva = (round(total / (1 + TASA_IVA_21), 2), round(total - (total / (1 + TASA_IVA_21)), 2)) if condicion_emisor == CondicionIVA.RESPONSABLE_INSCRIPTO else (total, 0.0)
+
+    datos_nota_credito = {
+        "tipo_afip": tipo_nota_credito,
+        "punto_venta": emisor_data.punto_venta,
+        "tipo_documento": tipo_documento_receptor.value,
+        "documento": documento,
+        "total": total,
+        "neto": neto,
+        "iva": iva,
+        # --- CAMBIO CLAVE 2: Añadir la referencia a la factura original ---
+        "comprobantes_asociados": [
+            {
+                "tipo": comprobante_asociado.get("tipo_afip"),
+                "punto_venta": comprobante_asociado.get("punto_venta"),
+                "numero": comprobante_asociado.get("numero_comprobante")
+            }
+        ]
+    }
+    
+    payload = {
+        "credenciales": credenciales,
+        "datos_factura": datos_nota_credito, # El microservicio espera este nombre de clave
+    }
+
+    # --- PASO 3: Enviar al Microservicio (Lógica Reutilizada) ---
+    print(f"Enviando petición de Nota de Crédito al microservicio...")
+    try:
+        response = requests.post(
+            FACTURACION_API_URL,
+            json=payload,
+            timeout=20,
+        )
+        response.raise_for_status() 
+        return response.json()
+    except requests.exceptions.HTTPError as e:
+        error_detalle = e.response.json().get('detail', e.response.text) if e.response else str(e)
+        raise RuntimeError(f"Error en el servicio de facturación: {error_detalle}")
+    except requests.exceptions.RequestException as e:
+        raise RuntimeError(f"El servicio de facturación no está disponible: {e}")

@@ -9,7 +9,7 @@ from typing import List, Dict, Any
 # --- Módulos del Proyecto ---
 from back.modelos import Usuario, Tercero, Venta, CajaMovimiento, VentaDetalle, Articulo
 # Importamos el especialista de AFIP refactorizado
-from back.gestion.facturacion_afip import generar_factura_para_venta
+from back.gestion.facturacion_afip import generar_factura_para_venta, generar_nota_credito_para_venta
 # Importamos los schemas que vamos a construir
 from back.schemas.comprobante_schemas import EmisorData, ReceptorData, TransaccionData, ItemData
 # Importamos la configuración para obtener las URLs y API Keys
@@ -123,3 +123,84 @@ def facturar_lote_de_ventas(
     # El commit se hará en el router, después de que esta función termine exitosamente.
     return resultado_afip
 
+def crear_nota_credito_para_anular(
+    db: Session,
+    usuario_actual: Usuario,
+    id_movimiento_a_anular: int
+) -> Dict[str, Any]:
+    """
+    Crea una Nota de Crédito para anular una factura/venta existente.
+    1. Busca la venta original.
+    2. Valida que se pueda anular.
+    3. Llama al especialista de AFIP para generar la NC.
+    4. Actualiza la DB: crea un movimiento de caja negativo y marca la venta como anulada.
+    """
+    # 1. Búsqueda y Validación de la Venta Original
+    movimiento_original = db.get(CajaMovimiento, id_movimiento_a_anular)
+    
+    if not (movimiento_original and 
+            movimiento_original.venta and 
+            movimiento_original.venta.facturada and
+            movimiento_original.venta.id_empresa == usuario_actual.id_empresa):
+        raise ValueError("El movimiento a anular es inválido, no corresponde a una factura o no pertenece a su empresa.")
+        
+    if movimiento_original.venta.estado == "ANULADA":
+        raise ValueError("Esta factura ya ha sido anulada previamente.")
+
+    venta_original = movimiento_original.venta
+    
+    # 2. Preparación de datos para el especialista de AFIP
+    # (Esta lógica de obtener credenciales y datos es similar a la de facturación)
+    try:
+        cuit_emisor = usuario_actual.empresa.cuit
+        headers = {"X-API-KEY": API_KEY_INTERNA}
+        respuesta_boveda = requests.get(f"{URL_BOVEDA}/secretos/{cuit_emisor}", headers=headers, timeout=10)
+        respuesta_boveda.raise_for_status()
+        credenciales = respuesta_boveda.json()
+    except requests.RequestException as e:
+        raise RuntimeError(f"No se pudo comunicar con la Bóveda de Secretos: {e}")
+
+    # Construimos los schemas que necesita el especialista
+    emisor_data = EmisorData(
+        cuit=cuit_emisor,
+        razon_social=usuario_actual.empresa.nombre_legal,
+        domicilio="...", # Obtener de config
+        punto_venta=1,   # Obtener de config
+        condicion_iva="Monotributo", # Obtener de config
+        afip_certificado=credenciales.get("certificado"),
+        afip_clave_privada=credenciales.get("clave_privada")
+    )
+    
+    cliente_db = db.get(Tercero, venta_original.id_cliente)
+    receptor_data = ReceptorData.model_validate(cliente_db) if cliente_db else ReceptorData(nombre_razon_social="Consumidor Final", cuit_o_dni="0", domicilio="", condicion_iva="Consumidor Final")
+    
+    # 3. Llamada al especialista de facturación para generar la NOTA DE CRÉDITO
+    # (Asumimos que tu facturacion_afip.py tiene una función para esto)
+    from back.gestion.facturacion_afip import generar_nota_credito_para_venta
+    
+    resultado_afip_nc = generar_nota_credito_para_venta(
+        total=venta_original.total,
+        cliente_data=receptor_data,
+        emisor_data=emisor_data,
+        comprobante_asociado=venta_original.datos_factura
+    )
+
+    if not resultado_afip_nc or not resultado_afip_nc.get("cae"):
+        raise RuntimeError("La generación de la Nota de Crédito en AFIP falló.")
+
+    # 4. Actualización de la Base de Datos
+    # Creamos un movimiento de caja negativo para reflejar la devolución
+    movimiento_caja_nc = CajaMovimiento(
+        id_caja=movimiento_original.id_caja,
+        tipo="NOTA_CREDITO",
+        monto=-venta_original.total, # Monto en negativo
+        descripcion=f"Anulación Factura N° {venta_original.datos_factura.get('numero_comprobante', 'S/N')}"
+    )
+    db.add(movimiento_caja_nc)
+    
+    # Marcamos la venta original como anulada para que no pueda ser procesada de nuevo
+    venta_original.estado = "ANULADA"
+    venta_original.nota_credito_asociada = resultado_afip_nc
+    db.add(venta_original)
+
+    return resultado_afip_nc

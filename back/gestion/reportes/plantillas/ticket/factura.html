@@ -13,22 +13,33 @@
         .factura-info { display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; }
         hr { border: none; border-top: 1px dashed black; margin: 5px 0; }
         .cliente-info p { margin-bottom: 3px; }
-
         .item-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
         .item-table th, .item-table td { padding: 2px 0; }
         .col-cant { width: 15%; text-align: left; }
         .col-desc { width: 45%; text-align: left; }
         .col-pu { width: 20%; text-align: right; }
         .col-subt { width: 20%; text-align: right; }
-        
         .item-discount td { font-size: 9px; color: #555; border-top: none; padding-top: 0; }
-        
         .totals-section { margin-top: 8px; border-top: 1px dashed black; padding-top: 5px; }
         .totals-section .item { display: flex; justify-content: space-between; font-weight: bold; }
         .totals-section .discount { color: #555; }
         .total-final { font-size: 13px; }
-        .afip-footer { margin-top: 15px; }
+        .membrete-section {
+            text-align: center;
+            font-size: 9px;
+            padding: 4px 0;
+            border-top: 1px dashed black;
+            border-bottom: 1px dashed black;
+            margin: 5px 0;
+        }
+        .observaciones-venta {
+            margin-top: 8px;
+            font-size: 9px;
+            word-wrap: break-word;
+        }
+        .afip-footer { margin-top: 10px; }
         .afip-footer p { margin: 1px 0; font-weight: bold; }
+        .afip-footer img { max-width: 100px; height: auto; margin-top: 5px; }
     </style>
 </head>
 <body>
@@ -53,7 +64,6 @@
             <p><strong>CUIT/DNI:</strong> {{ receptor.cuit_o_dni or 'S/D' }}</p>
             <p><strong>IVA:</strong> {{ receptor.condicion_iva or 'Consumidor Final' }}</p>
         </div>
-
         <hr>
         
         <table class="item-table">
@@ -102,6 +112,28 @@
                 <span>${{ "%.2f"|format(transaccion.total) }}</span>
             </div>
         </div>
+
+        <!-- INICIO: LÓGICA DE OBSERVACIONES Y MEMBRETE -->
+        {% if transaccion.observaciones and '---' in transaccion.observaciones %}
+            {% set partes = transaccion.observaciones.split('---', 1) %}
+            {% set membrete = partes[0] | trim %}
+            {% set notas_venta = partes[1] | trim %}
+            
+            <div class="membrete-section">
+                {{ membrete }}
+            </div>
+            
+            {% set observaciones_finales = notas_venta %}
+        {% else %}
+            {% set observaciones_finales = transaccion.observaciones %}
+        {% endif %}
+        
+        {% if observaciones_finales %}
+            <div class="observaciones-venta">
+                <strong>Obs:</strong> {{ observaciones_finales }}
+            </div>
+        {% endif %}
+        <!-- FIN: LÓGICA DE OBSERVACIONES Y MEMBRETE -->
         
         <hr>
 
@@ -109,7 +141,9 @@
             {% if afip and afip.cae %}
                 <p>CAE N°: {{ afip.cae }}</p>
                 <p>Vto. CAE: {{ afip.vencimiento_cae }}</p>
-                <!-- Aquí podrías renderizar un código de barras si tu impresora lo soporta -->
+                {% if qr_base64 %}
+                    <img src="data:image/png;base64,{{ qr_base64 }}" alt="Código QR AFIP">
+                {% endif %}
                 <p>Comprobante Autorizado</p>
             {% endif %}
         </div>
