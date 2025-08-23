@@ -1,7 +1,25 @@
-# /back/schemas/proveedor_schemas.py
-
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, List
+
+# === Schemas para las Plantillas de Mapeo (Sin cambios, pero necesarios para la relación) ===
+class PlantillaMapeoBase(BaseModel):
+    nombre_plantilla: str
+    mapeo_columnas: Dict[str, str] = Field(
+        ..., 
+        example={"CODIGO_PROV": "codigo_articulo_proveedor", "PRECIO_COSTO": "precio_costo"}
+    )
+    nombre_hoja_excel: Optional[str] = None
+    fila_inicio: int = 2
+
+class PlantillaMapeoCreate(PlantillaMapeoBase):
+    id_proveedor: int
+
+class PlantillaMapeoRead(PlantillaMapeoBase):
+    id: int
+    id_proveedor: int
+    
+    class Config:
+        from_attributes = True
 
 # === Schemas para Tercero (Proveedor) ===
 class ProveedorBase(BaseModel):
@@ -24,30 +42,17 @@ class ProveedorRead(ProveedorBase):
     class Config:
         from_attributes = True
 
-# === Schemas para la Asociación Artículo-Proveedor ===
+class ProveedorReadConPlantilla(ProveedorRead):
+    """
+    Schema para leer un proveedor incluyendo su plantilla de mapeo, si existe.
+    """
+    plantilla_mapeo: Optional[PlantillaMapeoRead] = None
+    class Config:
+        from_attributes = True
+        
 class ArticuloProveedorLink(BaseModel):
     id_articulo: int
     codigo_articulo_proveedor: str
 
 class ProveedorConArticulos(ProveedorRead):
     articulos_asociados: List[ArticuloProveedorLink] = []
-
-# === Schemas para las Plantillas de Mapeo ===
-class PlantillaMapeoBase(BaseModel):
-    nombre_plantilla: str
-    mapeo_columnas: Dict[str, str] = Field(
-        ..., 
-        example={"CODIGO_PROV": "codigo_articulo_proveedor", "PRECIO_COSTO": "precio_costo"}
-    )
-    nombre_hoja_excel: Optional[str] = None
-    fila_inicio: int = 2
-
-class PlantillaMapeoCreate(PlantillaMapeoBase):
-    id_proveedor: int
-
-class PlantillaMapeoRead(PlantillaMapeoBase):
-    id: int
-    id_proveedor: int
-    
-    class Config:
-        from_attributes = True
