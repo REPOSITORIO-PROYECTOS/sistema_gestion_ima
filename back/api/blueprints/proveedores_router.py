@@ -7,7 +7,7 @@ from typing import List
 # Dependencias y modelos
 from back.database import get_db
 from back.security import obtener_usuario_actual # Dependencia clave para multi-empresa
-from back.modelos import Usuario
+from back.modelos import Usuario, Tercero
 from back.schemas.caja_schemas import RespuestaGenerica
 
 # Lógica de negocio (Managers)
@@ -82,3 +82,28 @@ def asociar_articulo_con_proveedor(
     except HTTPException as e:
         # Re-lanza las excepciones HTTP que vienen del manager (ej: 404)
         raise e
+    
+    
+@router.get("/{id_proveedor}", response_model=ProveedorRead)
+def obtener_proveedor_por_id(
+    id_proveedor: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(obtener_usuario_actual)
+):
+    """Obtiene los datos de un proveedor específico por su ID."""
+    # Se renombra la función del manager para evitar conflicto de nombres
+    from back.gestion.contabilidad import proveedores_manager as manager
+    
+    proveedor = manager.obtener_proveedor_por_id(
+        db, 
+        id_proveedor=id_proveedor, 
+        id_empresa=current_user.id_empresa
+    )
+    
+    if not proveedor:
+        raise HTTPException(
+            status_code=404, 
+            detail="Proveedor no encontrado o no pertenece a tu empresa."
+        )
+        
+    return proveedor

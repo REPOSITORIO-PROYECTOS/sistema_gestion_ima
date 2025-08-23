@@ -78,3 +78,18 @@ def asociar_articulo_a_proveedor(db: Session, link_data: ArticuloProveedorLink, 
     db.commit()
     db.refresh(merged_asociacion)
     return merged_asociacion
+
+    
+def obtener_proveedor_por_id(db: Session, id_proveedor: int, id_empresa: int) -> Tercero | None:
+    """
+    Busca un proveedor por su ID, asegurando que pertenezca a la empresa del usuario.
+    Usa la sintaxis de SQLModel para consistencia.
+    """
+    # Esta es la forma consistente con el resto de tu código
+    statement = select(Tercero).where(
+        Tercero.id == id_proveedor,
+        Tercero.id_empresa == id_empresa,
+        Tercero.es_proveedor == True # Buena práctica añadir esto también
+    )
+    proveedor = db.exec(statement).first()
+    return proveedor
