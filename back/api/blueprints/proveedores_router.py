@@ -19,7 +19,8 @@ from back.schemas.proveedor_schemas import (
     ProveedorRead, 
     PlantillaMapeoCreate, 
     PlantillaMapeoRead,
-    ArticuloProveedorLink
+    ArticuloProveedorLink,
+    ProveedorReadConPlantilla
 )
 
 # Creamos el router con prefijo y tag para la documentación
@@ -84,17 +85,14 @@ def asociar_articulo_con_proveedor(
         raise e
     
     
-@router.get("/{id_proveedor}", response_model=ProveedorRead)
+@router.get("/{id_proveedor}", response_model=ProveedorReadConPlantilla) # <-- Usa el nuevo schema
 def obtener_proveedor_por_id(
     id_proveedor: int,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(obtener_usuario_actual)
 ):
     """Obtiene los datos de un proveedor específico por su ID."""
-    # Se renombra la función del manager para evitar conflicto de nombres
-    from back.gestion.contabilidad import proveedores_manager as manager
-    
-    proveedor = manager.obtener_proveedor_por_id(
+    proveedor = proveedores_manager.obtener_proveedor_por_id(
         db, 
         id_proveedor=id_proveedor, 
         id_empresa=current_user.id_empresa
