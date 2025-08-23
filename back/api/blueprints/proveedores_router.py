@@ -7,7 +7,7 @@ from typing import List
 # Dependencias y modelos
 from back.database import get_db
 from back.security import obtener_usuario_actual # Dependencia clave para multi-empresa
-from back.modelos import Usuario, Tercero
+from back.modelos import Usuario
 from back.schemas.caja_schemas import RespuestaGenerica
 
 # Lógica de negocio (Managers)
