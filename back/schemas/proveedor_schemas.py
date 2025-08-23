@@ -1,7 +1,9 @@
+# Archivo: /back/schemas/proveedor_schemas.py
+
 from pydantic import BaseModel, Field, computed_field
 from typing import Optional, Dict, List
 
-# === Schemas para las Plantillas de Mapeo (Sin cambios, pero necesarios para la relación) ===
+# === Schemas para las Plantillas de Mapeo ===
 class PlantillaMapeoBase(BaseModel):
     nombre_plantilla: str
     mapeo_columnas: Dict[str, str] = Field(
@@ -21,7 +23,7 @@ class PlantillaMapeoRead(PlantillaMapeoBase):
     class Config:
         from_attributes = True
 
-# === Schemas para Tercero (Proveedor) (Sin cambios) ===
+# === Schemas para Tercero (Proveedor) ===
 class ProveedorBase(BaseModel):
     nombre_razon_social: str
     nombre_fantasia: Optional[str] = None
@@ -41,13 +43,13 @@ class ProveedorRead(ProveedorBase):
     class Config:
         from_attributes = True
 
-# --- INICIO DE LA SOLUCIÓN ---
-# Este es el schema que "traduce" la estructura del modelo a la estructura que el frontend necesita.
+# --- INICIO DE LA SOLUCIÓN CLAVE ---
+# Este es el schema que "traduce" la estructura del modelo a la que el frontend necesita.
 
 class ProveedorReadConPlantilla(ProveedorRead):
     """
     Schema para leer un proveedor que inteligentemente extrae la plantilla única
-    de la lista de plantillas que tiene el modelo.
+    de la lista de plantillas que tiene el modelo, sin crashear si no existe.
     """
     
     # Usamos @computed_field para crear un campo en el JSON de salida que no existe
@@ -62,13 +64,14 @@ class ProveedorReadConPlantilla(ProveedorRead):
         Esto soluciona el mismatch entre el modelo (uno-a-muchos) y la lógica de negocio (uno-a-uno).
         """
         # 'self' aquí es la instancia del modelo 'Tercero' que FastAPI está procesando.
-        if self.plantillas_mapeo:  # Comprueba si la lista no está vacía
-            return self.plantillas_mapeo[0]  # Devuelve el primer y único elemento
-        return None  # Si la lista está vacía, devuelve null en el JSON
+        # hasattr() comprueba si el objeto tiene el atributo 'plantillas_mapeo' para evitar errores.
+        if hasattr(self, 'plantillas_mapeo') and self.plantillas_mapeo:
+            return self.plantillas_mapeo[0]  # Devuelve el primer elemento
+        return None  # Si no hay plantillas, devuelve null en el JSON
 
-# --- FIN DE LA SOLUCIÓN ---
+# --- FIN DE LA SOLUCIÓN CLAVE ---
 
-# === Schemas para la Asociación Artículo-Proveedor (Sin cambios) ===
+# === Schemas para la Asociación Artículo-Proveedor ===
 class ArticuloProveedorLink(BaseModel):
     id_articulo: int
     codigo_articulo_proveedor: str
