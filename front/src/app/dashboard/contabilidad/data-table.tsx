@@ -30,9 +30,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+
 import { MovimientoAPI } from "./columns";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input"
+import { Loader2 } from "lucide-react";
+
+import { ModalConfirmacionAccion } from "./ModalConfirmacionAccion";
+import { ResumenItemsModal, ItemParaResumen } from "./ResumenItemsModal";
+import { useProductoStore } from "@/lib/productoStore";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
@@ -54,327 +60,300 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
     const [rowSelection, setRowSelection] = useState({});
     const [isLoading, setIsLoading] = useState(false);
 
-    // Agrupar Movimientos
-    const handleAgrupar = async () => {
-        setIsLoading(true);
+    const [accionActual, setAccionActual] = useState<'agrupar' | 'facturar' | 'anular' | null>(null);
+    const [itemsResumen, setItemsResumen] = useState<ItemParaResumen[]>([]);
+    const [totalResumen, setTotalResumen] = useState(0);
+    const [tipoComprobanteAgrupado, setTipoComprobanteAgrupado] = useState("recibo");
+    const productos = useProductoStore((state) => state.productos);
 
+    // --- LÓGICA DE VALIDACIÓN Y PREPARACIÓN (ON-CLICK) ---
+
+    const prepararYAbrirModal = (accion: 'agrupar' | 'facturar') => {
         const selectedRows = table.getSelectedRowModel().flatRows;
-        const idsParaAgrupar = selectedRows.map(row => row.original.id);
         
-        const yaFacturado = selectedRows.some(row => row.original.venta?.facturada === true);
-        if (yaFacturado) {
-            toast.error("Error de selección", {
-                description: "No puedes agrupar movimientos que ya han sido facturados.",
-            });
-            setIsLoading(false);
+        // 1. Validación: Selección Mínima
+        if (selectedRows.length === 0) {
+            toast.info("Por favor, seleccione uno o más movimientos para continuar.");
             return;
         }
 
-        try {
-            const response = await fetch('/api/comprobantes/agrupar', {
-                method: 'POST',
-                headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                ids_comprobantes: idsParaAgrupar,
-                nuevo_tipo_comprobante: 'Factura A'
-                })
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'Ocurrió un error en el servidor.');
+        // 2. Validación: Consistencia de la Selección
+        const primerItem = selectedRows[0].original;
+        const idClienteBase = primerItem.venta?.cliente?.id;
+        
+        for (const row of selectedRows) {
+            if (row.original.venta?.cliente?.id !== idClienteBase) {
+                toast.error("Selección inválida", { description: "Todos los movimientos deben pertenecer al mismo cliente." });
+                return;
             }
-
-            const nuevoComprobante = await response.json();
-            
-            toast.success("¡Operación Exitosa!", {
-                description: `Se creó la Factura ID: ${nuevoComprobante.id} agrupando ${idsParaAgrupar.length} movimientos.`
-            });
-
-            table.resetRowSelection();
-            onActionComplete();
-
-        } catch (error) {
-            if (error instanceof Error) {
-                toast.error("Error al agrupar", {
-                    description: error.message
-                });
+            if (row.original.venta?.facturada) {
+                toast.error("Selección inválida", { description: "No se pueden incluir movimientos que ya han sido facturados." });
+                return;
             }
-        } finally {
-            setIsLoading(false);
+            const tipoActual = row.original.venta?.tipo_comprobante_solicitado?.toLowerCase();
+            if (accion === 'agrupar' && (tipoActual !== 'presupuesto' && tipoActual !== 'remito')) {
+                toast.error("Selección inválida para agrupar", { description: "Solo se pueden agrupar 'Presupuestos' o 'Remitos'." });
+                return;
+            }
+            if (accion === 'facturar' && tipoActual !== 'recibo') {
+                toast.error("Selección inválida para facturar", { description: "Solo se pueden facturar 'Recibos'." });
+                return;
+            }
         }
+        
+        // 3. Si todas las validaciones pasan, proceder a preparar los datos
+        const itemsConsolidados: ItemParaResumen[] = [];
+        let totalFinal = 0;
+        selectedRows.forEach(row => {
+            row.original.venta?.articulos_vendidos?.forEach(itemVendido => {
+                const productoActual = productos.find(p => String(p.id) === String(itemVendido.id_articulo));
+                const precioUnitarioActualizado = productoActual?.precio_venta ?? itemVendido.precio_unitario;
+                const subtotalActualizado = itemVendido.cantidad * precioUnitarioActualizado;
+                itemsConsolidados.push({
+                    descripcion: itemVendido.nombre,
+                    cantidad: itemVendido.cantidad,
+                    precio_unitario_antiguo: itemVendido.precio_unitario,
+                    precio_unitario_nuevo: precioUnitarioActualizado,
+                    subtotal_nuevo: subtotalActualizado,
+                });
+                totalFinal += subtotalActualizado;
+            });
+        });
+        
+        setItemsResumen(itemsConsolidados);
+        setTotalResumen(totalFinal);
+        setAccionActual(accion);
     };
+    
+    const handleAnularClick = () => {
+        const selectedRows = table.getSelectedRowModel().flatRows;
+        
+        if (selectedRows.length !== 1) {
+            toast.error("Selección inválida", { description: "Para anular, debe seleccionar una única factura." });
+            return;
+        }
 
-    // POST para facturar movimientos (ventas) en el back
-    const handleFacturarLote = async () => {
+        const rowToAnul = selectedRows[0].original;
+        
+        if (!rowToAnul.venta || !rowToAnul.venta.facturada) {
+            toast.error("Acción no permitida", { description: "Solo se pueden anular movimientos que ya han sido facturados fiscalmente." });
+            return;
+        }
+        
+        setAccionActual('anular');
+    };
+    
+    const handleConfirmarAccion = async () => {
+        if (!accionActual) return;
+        
         setIsLoading(true);
+        const selectedRows = table.getSelectedRowModel().flatRows;
+        
+        let url = '';
+        let successMessage = "";
+
+        interface ItemPayload { id_articulo: number; cantidad: number; precio_unitario: number; subtotal: number; nombre: string; }
+        interface BodyType { ids_comprobantes?: number[]; ids_movimientos?: number[]; id_movimiento_a_anular?: number; id_cliente_final?: number | null; items?: ItemPayload[]; total_final?: number; nuevo_tipo_comprobante?: string; }
+        let body: BodyType = {};
+
+        if (accionActual === 'agrupar' || accionActual === 'facturar') {
+            const ids_para_procesar = selectedRows.map(row => row.original.id);
+            const id_cliente_final = selectedRows[0]?.original.venta?.cliente?.id ?? null;
+            const payloadItems: ItemPayload[] = itemsResumen.map(item => ({
+                id_articulo: Number(productos.find(p => p.nombre === item.descripcion)?.id) || 0,
+                cantidad: item.cantidad,
+                precio_unitario: item.precio_unitario_nuevo,
+                subtotal: item.subtotal_nuevo,
+                nombre: item.descripcion
+            }));
+            
+            if (accionActual === 'agrupar') {
+                url = 'https://sistema-ima.sistemataup.online/api/comprobantes/agrupar';
+                body = { ids_comprobantes: ids_para_procesar, id_cliente_final, items: payloadItems, total_final: totalResumen, nuevo_tipo_comprobante: tipoComprobanteAgrupado };
+                successMessage = `Se creó el nuevo Comprobante a partir de ${ids_para_procesar.length} movimientos.`;
+            } else {
+                url = "https://sistema-ima.sistemataup.online/api/comprobantes/facturar-lote";
+                body = { ids_movimientos: ids_para_procesar, id_cliente_final, items: payloadItems, total_final: totalResumen };
+                successMessage = `Se facturaron con éxito ${ids_para_procesar.length} movimientos.`;
+            }
+        } else if (accionActual === 'anular') {
+            url = 'https://sistema-ima.sistemataup.online/api/comprobantes/anular-factura';
+            body = { id_movimiento_a_anular: selectedRows[0].original.id };
+            successMessage = "La factura ha sido anulada con éxito.";
+        }
 
         try {
-            const selectedRows = table.getSelectedRowModel().flatRows;
-
-            if (selectedRows.length === 0) {
-                toast.error("Selección inválida", {
-                    description: "Debes seleccionar al menos una venta."
-                });
-                setIsLoading(false);
-                return;
-            }
-
-            // Validar que todos los clientes sean iguales
-            const clientes = selectedRows.map(row => row.original.venta?.cliente?.id ?? null);
-            const todosIguales = clientes.every(id => id === clientes[0]);
-
-            if (!todosIguales) {
-                toast.error("Error de selección", {
-                    description: "Todas las ventas seleccionadas deben pertenecer al mismo cliente."
-                });
-                setIsLoading(false);
-                return;
-            }
-
-            const ids_movimientos = selectedRows.map(row => row.original.id);
-            const id_cliente_final = clientes[0] && clientes[0] !== 0 ? clientes[0] : null;
-
-            const response = await fetch(
-                "https://sistema-ima.sistemataup.online/api/comprobantes/facturar-lote",
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`,
-                    },
-                    body: JSON.stringify({
-                        ids_movimientos,
-                        id_cliente_final,
-                    }),
-                }
-            );
-
+            if (!url) throw new Error("Acción no reconocida.");
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify(body)
+            });
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.detail || "Error en la facturación del lote.");
+                throw new Error(errorData.detail || `Error en la operación: ${accionActual}`);
             }
-
-            toast.success("¡Facturación exitosa!", {
-                description: `Se facturaron ${ids_movimientos.length} movimientos correctamente.`
-            });
-
+            toast.success("¡Operación Exitosa!", { description: successMessage });
             table.resetRowSelection();
             onActionComplete();
-
         } catch (error) {
-            toast.error("Error al facturar", {
-                description: error instanceof Error ? error.message : "Ocurrió un error inesperado."
-            });
+            if (error instanceof Error) toast.error(`Error al ${accionActual}`, { description: error.message });
         } finally {
             setIsLoading(false);
+            setAccionActual(null);
         }
     };
 
-    // Generador de tabla
+    // --- CONFIGURACIÓN DE LA TABLA (SIMPLIFICADA) ---
     const table = useReactTable<TData>({
         data,
         columns,
+        state: { sorting, columnFilters, rowSelection },
+        // 'enableRowSelection' se elimina para que todas las casillas estén siempre habilitadas.
+        onSortingChange: setSorting,
+        onColumnFiltersChange: setColumnFilters,
+        onRowSelectionChange: setRowSelection,
         getCoreRowModel: getCoreRowModel(),
         getPaginationRowModel: getPaginationRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
-        enableRowSelection: (row) => {
-            const tipo = row.original.tipo;
-            const facturada = row.original.venta?.facturada;
-            const tipoSolicitado = row.original.venta?.tipo_comprobante_solicitado;
-
-            // No permitir selección que no sea VENTA o ya facturada
-            if (tipo !== "VENTA" || facturada === true) return false;
-
-            const selectedKeys = Object.keys(rowSelection);
-            if (selectedKeys.length === 0) return true;
-
-            const primeraSeleccionada = data.find((item) =>
-                selectedKeys.includes(String(item.id))
-            );
-            if (!primeraSeleccionada) return true;
-
-            const tipoSolicitadoBase = primeraSeleccionada.venta?.tipo_comprobante_solicitado;
-            return tipoSolicitado === tipoSolicitadoBase;
-        },
-        onSortingChange: setSorting,
-        onColumnFiltersChange: setColumnFilters,
-        onRowSelectionChange: setRowSelection,
-        state: {
-        sorting,
-        columnFilters,
-        rowSelection,
-        },
     });
 
     return (
         <div>
-            {/* Opciones de la Tavla */}
-            <div className="flex flex-col md:flex-row-reverse justify-between gap-2 pb-4">
-                <div className="flex flex-col md:flex-row justify-between items-center gap-4 w-full">
-
-                    {/* Selectores y Filtrados */}
-                    <div className="flex flex-col md:flex-row w-full md:w-auto gap-4">
-
-                        {/* Input de busqueda por nombre de cliente para facturarle */}
-                        <Input
-                            placeholder="Buscar cliente..."
-                            value={(table.getColumn("id_cliente")?.getFilterValue() as string) ?? ""}
-                            onChange={(event) =>
-                                table.getColumn("id_cliente")?.setFilterValue(event.target.value)
-                            }
-                            className="w-full md:w-1/3"
-                        />
-
-                        {/* Elegir por tipo de movimiento */}
-                        <Select
-                            value={(table.getColumn("tipo")?.getFilterValue() as string) ?? "all"}
-                            onValueChange={(value) => {
-                                table.getColumn("tipo")?.setFilterValue(value === "all" ? undefined : value);
-                            }}
-                            >
-                            <SelectTrigger className="w-full md:w-[180px] cursor-pointer">
-                                <SelectValue placeholder="Tipo de Movimiento" />
-                            </SelectTrigger>
-
-                            <SelectContent>
-                                <SelectGroup>
-                                <SelectLabel>Tipo de Movimiento</SelectLabel>
-                                <SelectItem value="all">Movimientos</SelectItem>
-                                <SelectItem value="APERTURA">APERTURA</SelectItem>
-                                <SelectItem value="CIERRE">CIERRE</SelectItem>
-                                <SelectItem value="VENTA">VENTA</SelectItem>
-                                <SelectItem value="EGRESO">EGRESO</SelectItem>
-                                </SelectGroup>
-                            </SelectContent>
-                        </Select>
-
-                        {/* Si esta facturado o no el movimiento.. */}
-                        <Select
-                            value={facturadoFilter}
-                            onValueChange={(value) => {
-                                setFacturadoFilter(value);
-                                table.getColumn("facturado")?.setFilterValue(
-                                    value === "all" ? undefined : value
-                                );
-                            }}
-                            >
-                            <SelectTrigger className="w-full md:w-[180px] cursor-pointer">
-                                <SelectValue placeholder="Facturado" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectGroup>
-                                    <SelectLabel>Movimientos Facturados</SelectLabel>
-                                    <SelectItem value="all">Facturados S/N</SelectItem>
-                                    <SelectItem value="true">Facturados</SelectItem>
-                                    <SelectItem value="false">No Facturados</SelectItem>
-                                </SelectGroup>
-                            </SelectContent>
-                        </Select>
-                    </div>
-            
-                    {/* --- Botones de Facturación --- */}
-                    <div className="flex flex-col md:flex-row w-full md:w-1/3 md:px-4 gap-4">
-                        <Button
-                            className="w-full md:w-1/2"
-                            variant="outline"
-                            onClick={handleFacturarLote}
-                            disabled={!table.getIsSomeRowsSelected() || isLoading}
-                        >
-                            Facturar Lote ({table.getFilteredSelectedRowModel().rows.length})
-                        </Button>
-                        <Button
-                            className="w-full md:w-1/2"
-                            variant="default"
-                            disabled={!table.getIsSomeRowsSelected() || isLoading}
-                            onClick={handleAgrupar} 
-                            >
-                            {isLoading 
-                                ? "Procesando..." 
-                                : `Agrupar (${table.getFilteredSelectedRowModel().rows.length})`
-                            }
-                        </Button>
-                    </div>
-
+            {/* Contenedor de controles */}
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4">
+                
+                {/* Grupo de Filtros */}
+                <div className="flex flex-col sm:flex-row gap-2 w-full md:flex-grow">
+                    <Input
+                        placeholder="Buscar por cliente..."
+                        value={(table.getColumn("id_cliente")?.getFilterValue() as string) ?? ""}
+                        onChange={(event) => table.getColumn("id_cliente")?.setFilterValue(event.target.value)}
+                        className="w-full sm:max-w-xs"
+                    />
+                    <Select
+                        value={(table.getColumn("tipo")?.getFilterValue() as string) ?? "all"}
+                        onValueChange={(value) => table.getColumn("tipo")?.setFilterValue(value === "all" ? undefined : value)}
+                    >
+                        <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Tipo Movimiento" /></SelectTrigger>
+                        <SelectContent><SelectGroup><SelectLabel>Tipo</SelectLabel><SelectItem value="all">Todos</SelectItem><SelectItem value="VENTA">Venta</SelectItem><SelectItem value="APERTURA">Apertura</SelectItem><SelectItem value="CIERRE">Cierre</SelectItem><SelectItem value="EGRESO">Egreso</SelectItem></SelectGroup></SelectContent>
+                    </Select>
+                    <Select
+                        value={facturadoFilter}
+                        onValueChange={(value) => { setFacturadoFilter(value); table.getColumn("facturado")?.setFilterValue(value === "all" ? undefined : value); }}
+                    >
+                        <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Facturación" /></SelectTrigger>
+                        <SelectContent><SelectGroup><SelectLabel>Facturación</SelectLabel><SelectItem value="all">Todos</SelectItem><SelectItem value="true">Facturados</SelectItem><SelectItem value="false">No Facturados</SelectItem></SelectGroup></SelectContent>
+                    </Select>
+                </div>
+        
+                {/* Grupo de Botones de Acción - Siempre Visibles */}
+                <div className="flex w-full md:w-auto md:flex-shrink-0 gap-2">
+                    <Button 
+                        className="flex-1 md:flex-initial" 
+                        variant="outline" 
+                        onClick={() => prepararYAbrirModal('facturar')}
+                        disabled={isLoading}
+                    >
+                        {isLoading ? <Loader2 className="animate-spin h-4 w-4" /> : `Facturar Lote`}
+                    </Button>
+                    <Button 
+                        className="flex-1 md:flex-initial" 
+                        variant="outline"
+                        onClick={() => prepararYAbrirModal('agrupar')}
+                        disabled={isLoading}
+                    >
+                         {isLoading ? <Loader2 className="animate-spin h-4 w-4" /> : `Agrupar`}
+                    </Button>
+                    <Button 
+                        className="flex-1 md:flex-initial" 
+                        variant="destructive"
+                        onClick={handleAnularClick}
+                        disabled={isLoading}
+                    >
+                        {isLoading ? <Loader2 className="animate-spin h-4 w-4" /> : `Anular`}
+                    </Button>
                 </div>
             </div>
 
-            {/* Tabla */}
+            {/* Tabla Principal */}
             <div className="rounded-md border">
                 <Table>
-                    <TableHeader>
+                  <TableHeader>
                     {table.getHeaderGroups().map((headerGroup) => (
-                        <TableRow key={headerGroup.id}>
+                      <TableRow key={headerGroup.id}>
                         {headerGroup.headers.map((header) => (
-                            <TableHead className="px-4" key={header.id}>
-                                {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                            </TableHead>
+                          <TableHead key={header.id}>
+                            {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                          </TableHead>
                         ))}
-                        </TableRow>
+                      </TableRow>
                     ))}
-                    </TableHeader>
-                    <TableBody>
+                  </TableHeader>
+                  <TableBody>
                     {table.getRowModel().rows?.length ? (
-                        table.getRowModel().rows.map((row) => (
+                      table.getRowModel().rows.map((row) => (
                         <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
-                            {row.getVisibleCells().map((cell) => (
+                          {row.getVisibleCells().map((cell) => (
                             <TableCell key={cell.id} className="px-4">
-                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
                             </TableCell>
-                            ))}
+                          ))}
                         </TableRow>
-                        ))
+                      ))
                     ) : (
-                        <TableRow>
+                      <TableRow>
                         <TableCell colSpan={columns.length} className="h-24 text-center">
-                            No hay resultados que coincidan con la búsqueda.
+                          No hay resultados.
                         </TableCell>
-                        </TableRow>
+                      </TableRow>
                     )}
-                    </TableBody>
+                  </TableBody>
                 </Table>
             </div>
 
-            {/* Footer Tabla */}
-            <div className="flex flex-col sm:flex-row justify-between items-center m-2">
-                <Select onValueChange={(value) => table.setPageSize(+value)}>
-                    <SelectTrigger className="w-[100px] m-2 cursor-pointer">
-                        <SelectValue placeholder="10 filas" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectGroup>
-                            <SelectLabel>Filas por Página</SelectLabel>
-                            <SelectItem value="10">10</SelectItem>
-                            <SelectItem value="20">20</SelectItem>
-                            <SelectItem value="30">30</SelectItem>
-                            <SelectItem value="40">40</SelectItem>
-                            <SelectItem value="50">50</SelectItem>
-                        </SelectGroup>
-                    </SelectContent>
-                </Select>
-                <div className="flex items-center justify-end space-x-2 py-4 mx-2">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => table.previousPage()}
-                        disabled={!table.getCanPreviousPage()}
-                    >
-                        Anterior
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => table.nextPage()}
-                        disabled={!table.getCanNextPage()}
-                    >
-                        Siguiente
-                    </Button>
+            {/* Paginación y Footer */}
+            <div className="flex items-center justify-between space-x-2 py-4">
+                <div className="flex-1 text-sm text-muted-foreground">
+                    {table.getFilteredSelectedRowModel().rows.length} de {table.getFilteredRowModel().rows.length} fila(s) seleccionadas.
+                </div>
+                <div>
+                    <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>Anterior</Button>
+                    <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>Siguiente</Button>
                 </div>
             </div>
+
+            {/* Modal Reutilizable */}
+            <ModalConfirmacionAccion
+                isOpen={accionActual !== null}
+                onClose={() => setAccionActual(null)}
+                onConfirm={handleConfirmarAccion}
+                isLoading={isLoading}
+                titulo={
+                    accionActual === 'agrupar' ? "Agrupar a Comprobante" :
+                    accionActual === 'facturar' ? "Facturar Lote" : "Anular Factura"
+                }
+                descripcion={
+                    accionActual === 'anular' 
+                    ? `Estás a punto de emitir una Nota de Crédito para anular la factura seleccionada. Esta acción es irreversible. ¿Deseas continuar?`
+                    : `Revisa los detalles antes de confirmar. Los precios han sido actualizados a la fecha.`
+                }
+                textoBotonConfirmar={
+                    accionActual === 'anular' ? "Sí, Anular Factura" : "Confirmar"
+                }
+                mostrarSelector={accionActual === 'agrupar'}
+                valorSelector={tipoComprobanteAgrupado}
+                onSelectorChange={setTipoComprobanteAgrupado}
+                opcionesSelector={[
+                    { value: 'recibo', label: 'Recibo (No Fiscal)' },
+                    { value: 'factura', label: 'Factura (Fiscal)' }
+                ]}
+            >
+                {accionActual !== 'anular' && (
+                    <ResumenItemsModal items={itemsResumen} totalFinal={totalResumen} />
+                )}
+            </ModalConfirmacionAccion>
         </div>
-    )
+    );
 }

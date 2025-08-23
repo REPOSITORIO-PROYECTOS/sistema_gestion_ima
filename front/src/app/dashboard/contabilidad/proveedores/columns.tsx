@@ -1,67 +1,91 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
+import Link from "next/link";
+import { ArrowUpDown, MoreHorizontal, FileCog } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown } from "lucide-react";
-import { ProveedorExcelUpload } from "./ModalExcelUploader";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-// Importamos el tipo RowData para la declaración del módulo, requerido por TypeScript
-import type { RowData } from '@tanstack/react-table';
-
+// Este es el tipo de dato para una fila de la tabla.
+// Asegúrate de que coincida con lo que devuelve tu API.
 export type Proveedor = {
   id: number;
   nombre_razon_social: string;
-  nombre_fantasia?: string;
-  cuit?: string;
+  cuit: string | null;
   condicion_iva: string;
-  email?: string;
-  telefono?: string;
-  direccion?: string;
-  notas?: string;
+  activo: boolean;
 };
 
 export const columns: ColumnDef<Proveedor>[] = [
   {
     accessorKey: "nombre_razon_social",
-    header: ({ column }) => (
-      <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-        Razón Social
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
+    header: ({ column }) => {
+      return (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        >
+          Razón Social
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      );
+    },
   },
   {
     accessorKey: "cuit",
     header: "CUIT",
   },
   {
-    id: "acciones",
-    header: () => <div className="text-right">Acciones</div>,
-    cell: ({ row, table }) => {
+    accessorKey: "condicion_iva",
+    header: "Condición IVA",
+  },
+  {
+    accessorKey: "activo",
+    header: "Estado",
+    cell: ({ row }) => {
+      const activo = row.getValue("activo");
+      return activo ? "Activo" : "Inactivo";
+    },
+  },
+  // --- INICIO DE LA COLUMNA CLAVE ---
+  // Esta es la nueva columna que añade la funcionalidad que necesitas.
+  {
+    id: "actions",
+    cell: ({ row }) => {
       const proveedor = row.original;
-      const onActionComplete = table.options.meta?.onActionComplete as () => void;
 
       return (
         <div className="text-right">
-          <ProveedorExcelUpload 
-            proveedor={proveedor} 
-            onUploadComplete={onActionComplete} 
-          />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Abrir menú</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+              {/* 
+                Este es el enlace que te lleva a la página de detalles/configuración 
+                del proveedor, usando el ID de la fila actual.
+              */}
+              <Link href={`/dashboard/contabilidad/proveedores/${proveedor.id}`} passHref>
+                <DropdownMenuItem className="cursor-pointer">
+                  <FileCog className="mr-2 h-4 w-4" />
+                  Gestionar Plantilla y Precios
+                </DropdownMenuItem>
+              </Link>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       );
     },
   },
+  // --- FIN DE LA COLUMNA CLAVE ---
 ];
-
-// Extendemos la definición de tipos de TanStack Table
-declare module '@tanstack/react-table' {
-  // =========================================================================
-  // === CORRECCIÓN FINAL: Deshabilitamos la regla de ESLint para esta línea ===
-  // =========================================================================
-  // Le decimos a ESLint que ignore el error de "variable no usada" para 'TData',
-  // porque TypeScript nos obliga a declararla aquí.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  interface TableMeta<TData extends RowData> {
-    onActionComplete?: () => void
-  }
-}

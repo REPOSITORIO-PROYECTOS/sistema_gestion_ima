@@ -7,6 +7,15 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatDateArgentina } from "@/utils/formatDate";
 
+// 1. (Recomendado) Define el tipo para un ítem individual dentro de una venta.
+type ArticuloVendido = {
+  id_articulo: number;
+  nombre: string;
+  cantidad: number;
+  precio_unitario: number;
+};
+
+// 2. Esta es la modificación principal: enriquecemos la interfaz MovimientoAPI.
 export interface MovimientoAPI {
   id: number;
   id_sesion_caja: number;
@@ -17,7 +26,7 @@ export interface MovimientoAPI {
   monto: number;
   metodo_pago?: string;
   fecha_hora: string;
-  facturado: boolean;
+  facturado: boolean; // Este campo parece estar duplicado, pero lo mantenemos si lo usas
   venta?: {
     id: number;
     facturada: boolean;
@@ -26,8 +35,13 @@ export interface MovimientoAPI {
     cliente: {
       id: number;
       nombre_razon_social: string;
-    };
-  };
+    } | null; // El cliente puede ser nulo (Consumidor Final)
+    
+    // ¡AÑADIMOS LA PROPIEDAD QUE FALTABA!
+    articulos_vendidos: ArticuloVendido[];
+  } | null; // La venta puede ser nula
+  
+  // Este campo parece ser redundante si ya tienes venta.tipo_comprobante_solicitado
   tipo_comprobante: "comprobante" | "remito" | "presupuesto" | "factura";
 }
 
