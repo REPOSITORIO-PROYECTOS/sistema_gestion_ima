@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 from typing import List, Dict, Any
 
 # --- Módulos del Proyecto ---
-from back.modelos import Usuario, Tercero, Venta, CajaMovimiento, VentaDetalle, Articulo
+from back.modelos import ConfiguracionEmpresa, Usuario, Tercero, Venta, CajaMovimiento, VentaDetalle, Articulo
 # Importamos el especialista de AFIP refactorizado
 from back.gestion.facturacion_afip import generar_factura_para_venta, generar_nota_credito_para_venta
 # Importamos los schemas que vamos a construir
@@ -101,11 +101,14 @@ def facturar_lote_de_ventas(
         condicion_iva="Consumidor Final"
     )
     
-    transaccion_data = TransaccionData(items=items_consolidados, total=total_a_facturar)
 
-    # 3.3. Llamar al especialista de facturación con los datos completos
+    venta_consolidada_para_afip = Venta(total=total_a_facturar)
+
+    # 4. Llamar al especialista con la firma CORRECTA
     resultado_afip = generar_factura_para_venta(
-        venta_data=transaccion_data,
+        db=db, # Le pasamos la sesión de la base de datos
+        venta_a_facturar=venta_consolidada_para_afip, # Le pasamos la venta "virtual"
+        total=total_a_facturar,
         cliente_data=receptor_data,
         emisor_data=emisor_data
     )
@@ -113,11 +116,11 @@ def facturar_lote_de_ventas(
     if not resultado_afip or not resultado_afip.get("cae"):
         raise RuntimeError("La facturación en AFIP falló. La operación ha sido cancelada.")
 
-    # --- FASE 4: ACTUALIZACIÓN DE LA BASE DE DATOS ---
-    # Si la facturación fue exitosa, marcamos todas las ventas como facturadas.
+    # 5. ACTUALIZACIÓN DE LA BASE DE DATOS
+    # Ahora que tenemos el resultado de AFIP, lo aplicamos a TODAS las ventas del lote.
     for venta in ventas_a_actualizar:
         venta.facturada = True
-        venta.datos_factura = resultado_afip # Guardamos el mismo resultado de factura en todas las ventas del lote
+        venta.datos_factura = resultado_afip # Guardamos el mismo resultado en todas las ventas
         db.add(venta)
 
     # El commit se hará en el router, después de que esta función termine exitosamente.
@@ -130,12 +133,8 @@ def crear_nota_credito_para_anular(
 ) -> Dict[str, Any]:
     """
     Crea una Nota de Crédito para anular una factura/venta existente.
-    1. Busca la venta original.
-    2. Valida que se pueda anular.
-    3. Llama al especialista de AFIP para generar la NC.
-    4. Actualiza la DB: crea un movimiento de caja negativo y marca la venta como anulada.
     """
-    # 1. Búsqueda y Validación de la Venta Original
+    # 1. Búsqueda y Validación de la Venta Original (sin cambios)
     movimiento_original = db.get(CajaMovimiento, id_movimiento_a_anular)
     
     if not (movimiento_original and 
@@ -149,10 +148,15 @@ def crear_nota_credito_para_anular(
 
     venta_original = movimiento_original.venta
     
-    # 2. Preparación de datos para el especialista de AFIP
-    # (Esta lógica de obtener credenciales y datos es similar a la de facturación)
+    # 2. Preparación de datos del Emisor desde la base de datos (corregido)
+    id_empresa_actual = usuario_actual.id_empresa
+    config_empresa_db = db.query(ConfiguracionEmpresa).filter(ConfiguracionEmpresa.id_empresa == id_empresa_actual).first()
+    
+    if not config_empresa_db or not usuario_actual.empresa.cuit or not config_empresa_db.afip_punto_venta_predeterminado:
+        raise ValueError(f"La configuración del emisor para la empresa ID {id_empresa_actual} es incompleta.")
+
+    cuit_emisor = usuario_actual.empresa.cuit
     try:
-        cuit_emisor = usuario_actual.empresa.cuit
         headers = {"X-API-KEY": API_KEY_INTERNA}
         respuesta_boveda = requests.get(f"{URL_BOVEDA}/secretos/{cuit_emisor}", headers=headers, timeout=10)
         respuesta_boveda.raise_for_status()
@@ -160,25 +164,25 @@ def crear_nota_credito_para_anular(
     except requests.RequestException as e:
         raise RuntimeError(f"No se pudo comunicar con la Bóveda de Secretos: {e}")
 
-    # Construimos los schemas que necesita el especialista
     emisor_data = EmisorData(
         cuit=cuit_emisor,
         razon_social=usuario_actual.empresa.nombre_legal,
-        domicilio="...", # Obtener de config
-        punto_venta=1,   # Obtener de config
-        condicion_iva="Monotributo", # Obtener de config
+        domicilio=config_empresa_db.direccion_negocio,
+        punto_venta=config_empresa_db.afip_punto_venta_predeterminado,
+        condicion_iva=config_empresa_db.afip_condicion_iva,
         afip_certificado=credenciales.get("certificado"),
         afip_clave_privada=credenciales.get("clave_privada")
     )
     
-    cliente_db = db.get(Tercero, venta_original.id_cliente)
-    receptor_data = ReceptorData.model_validate(cliente_db) if cliente_db else ReceptorData(nombre_razon_social="Consumidor Final", cuit_o_dni="0", domicilio="", condicion_iva="Consumidor Final")
+    cliente_db = db.get(Tercero, venta_original.id_cliente) if venta_original.id_cliente else None
+    receptor_data = ReceptorData.model_validate(cliente_db, from_attributes=True) if cliente_db else ReceptorData(
+        nombre_razon_social="Consumidor Final", cuit_o_dni="0", domicilio="", condicion_iva="CONSUMIDOR_FINAL"
+    )
     
-    # 3. Llamada al especialista de facturación para generar la NOTA DE CRÉDITO
-    # (Asumimos que tu facturacion_afip.py tiene una función para esto)
-    from back.gestion.facturacion_afip import generar_nota_credito_para_venta
-    
+    # 3. Llamada al especialista de facturación para generar la NC (sin cambios)
     resultado_afip_nc = generar_nota_credito_para_venta(
+        db=db,
+        venta_a_anular=venta_original,
         total=venta_original.total,
         cliente_data=receptor_data,
         emisor_data=emisor_data,
@@ -188,19 +192,36 @@ def crear_nota_credito_para_anular(
     if not resultado_afip_nc or not resultado_afip_nc.get("cae"):
         raise RuntimeError("La generación de la Nota de Crédito en AFIP falló.")
 
+    # --- INICIO DE LA CORRECCIÓN CLAVE ---
+
     # 4. Actualización de la Base de Datos
     # Creamos un movimiento de caja negativo para reflejar la devolución
     movimiento_caja_nc = CajaMovimiento(
-        id_caja=movimiento_original.id_caja,
+        id_caja_sesion=movimiento_original.id_caja_sesion,
+        id_usuario=usuario_actual.id,
         tipo="NOTA_CREDITO",
-        monto=-venta_original.total, # Monto en negativo
-        descripcion=f"Anulación Factura N° {venta_original.datos_factura.get('numero_comprobante', 'S/N')}"
+        concepto=f"Anulación Factura N° {venta_original.datos_factura.get('numero_comprobante', 'S/N')}",
+        monto=-venta_original.total,
+        metodo_pago=movimiento_original.metodo_pago,
+        id_venta=venta_original.id
     )
     db.add(movimiento_caja_nc)
     
-    # Marcamos la venta original como anulada para que no pueda ser procesada de nuevo
+    # Marcamos la venta original como anulada
     venta_original.estado = "ANULADA"
-    venta_original.nota_credito_asociada = resultado_afip_nc
+    
+    # Obtenemos el diccionario actual de datos_factura (si existe) o creamos uno nuevo
+    datos_factura_actuales = venta_original.datos_factura or {}
+    
+    # Añadimos una nueva clave 'nota_credito' al diccionario con los datos de la NC
+    datos_factura_actuales['nota_credito'] = resultado_afip_nc
+    
+    # Volvemos a asignar el diccionario modificado al campo JSON
+    venta_original.datos_factura = datos_factura_actuales
+    
     db.add(venta_original)
 
+    # --- FIN DE LA CORRECCIÓN CLAVE ---
+
+    # El commit se hará en el router que llama a esta función.
     return resultado_afip_nc
