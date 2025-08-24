@@ -198,6 +198,13 @@ def generar_factura_para_venta(
                 "cuit_emisor": int(emisor_data.cuit),
                 "tipo_doc_receptor": datos_factura.get("tipo_documento"),
                 "nro_doc_receptor": int(datos_factura.get("documento")),
+                "tipo_documento": datos_factura.get("tipo_documento"),
+                "documento": datos_factura.get("documento"),
+                "tipo_afip": datos_factura.get("tipo_afip"),
+                "total": total,
+                "neto": datos_factura.get("neto"),
+                "iva": datos_factura.get("iva"),
+                "id_condicion_iva": datos_factura.get("id_condicion_iva")
             }
             
             # 3. Asignamos el diccionario al campo JSON y actualizamos el estado
@@ -211,8 +218,12 @@ def generar_factura_para_venta(
             print(f"Venta ID: {venta_a_facturar.id} actualizada correctamente en la base de datos.")
         
         # 4. Devolvemos el resultado original del microservicio, como antes
-        return resultado_afip
-    
+            return datos_completos_para_guardar
+        else:
+            # Si el estado no es exitoso, lanzamos un error
+            error_msg = resultado_afip.get('errores') or resultado_afip.get('error', 'Error desconocido de AFIP.')
+            raise RuntimeError(f"AFIP devolvió un error: {error_msg}")
+
     except requests.exceptions.HTTPError as e:
         error_detalle = "Sin detalles adicionales"
         try:
