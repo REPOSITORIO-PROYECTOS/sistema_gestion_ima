@@ -10,7 +10,7 @@ from starlette.responses import Response
 # --- Módulos del Proyecto ---
 from back.database import get_db
 from back.security import obtener_usuario_actual, es_admin, es_cajero
-from back.modelos import ConfiguracionEmpresa, Empresa, Usuario, Tercero, Venta, CajaMovimiento
+from back.modelos import ConfiguracionEmpresa, Empresa, Usuario, Tercero
 
 # Especialistas de la capa de gestión
 from back.gestion.caja import apertura_cierre, registro_caja, consultas_caja
@@ -23,7 +23,7 @@ from back.schemas.caja_schemas import (
     RegistrarVentaRequest, InformeCajasResponse, RespuestaGenerica,
     MovimientoSimpleRequest, TipoMovimiento, MovimientoContableResponse
 )
-from back.schemas.comprobante_schemas import EmisorData, TransaccionData, ReceptorData, ItemData
+from back.schemas.comprobante_schemas import EmisorData, ReceptorData
 
 router = APIRouter(
     prefix="/caja",
@@ -160,19 +160,21 @@ def api_registrar_venta(
             print("ANTES DE LA FUNCION GENERAR FACTURA")
             # Llamar al especialista de facturación
             factura_generada = generar_factura_para_venta(
+                db=db,                      # <-- AÑADIDO: Pasa la sesión de la BD
+                venta_a_facturar=venta_creada, # <-- AÑADIDO: Pasa el objeto Venta que acabas de crear
                 total=req.total_venta, 
                 cliente_data=cliente_data_schema,
                 emisor_data=emisor_data_schema
             )
             print("DESPUES DE LA FUNCION GENERAR FACTURA")
             # === FIN DE LA LÓGICA DE FACTURACIÓN CORREGIDA ===
+            #IMPORTANTE, GUARDADA DENTRO DE FACTURACION.PY
+            #venta_creada.facturada = True
+            #venta_creada.datos_factura = factura_generada
+            #db.add(venta_creada)
+            #db.commit()
             
-            venta_creada.facturada = True
-            venta_creada.datos_factura = factura_generada
-            db.add(venta_creada)
-            db.commit()
-            
-            resultado_afip = {"estado": "EXITOSO", **factura_generada}
+            resultado_afip = factura_generada
 
         except (ValueError, RuntimeError) as e:
             # Imprime el error completo en la consola para ver el detalle

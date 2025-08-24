@@ -4,13 +4,15 @@ import os
 import requests
 from dotenv import load_dotenv
 from typing import Dict, Any, Optional
+from sqlmodel import Session # <-- PASO 1: Importar Session
+from datetime import datetime
 
 from enum import Enum
 # --- Importaciones de la aplicación ---
 from back.cliente_boveda import ClienteBoveda
 from back.schemas.comprobante_schemas import TransaccionData, ReceptorData, EmisorData
 from typing import Dict, Any
-
+from back.modelos import Venta
 
 TASA_IVA_21 = 0.21
 # --- Carga de Configuración ---
@@ -79,7 +81,9 @@ def determinar_datos_factura_segun_iva(
 # --- FUNCIÓN PRINCIPAL COMPLETA (ADAPTADA PARA STRINGS) ---
 
 def generar_factura_para_venta(
-    total: float,
+    db: Session,
+    venta_a_facturar: Venta,
+    total: float, 
     cliente_data: Optional[ReceptorData],
     emisor_data: EmisorData
 ) -> Dict[str, Any]:
@@ -171,8 +175,44 @@ def generar_factura_para_venta(
         
         resultado_afip = response.json()
         print(f"Respuesta exitosa del microservicio de facturación: {resultado_afip}")
-        return resultado_afip
+        if resultado_afip.get("estado") == "EXITOSO":
+            
+            # 1. Obtenemos la venta de la base de datos
+            venta_a_actualizar = db.get(Venta, venta_a_facturar.id)
+            if not venta_a_actualizar:
+                print(f"ERROR: No se encontró la Venta con ID {venta_a_facturar.id} para actualizar.")
+                # Aunque no se guarde, devolvemos el resultado para no romper el flujo
+                return resultado_afip
 
+            # 2. Construimos el diccionario completo que se guardará
+            datos_completos_para_guardar = {
+                "estado": "EXITOSO",
+                "resultado": resultado_afip.get("resultado", "A"),
+                "cae": resultado_afip.get("cae"),
+                "vencimiento_cae": resultado_afip.get("vencimiento_cae"),
+                "numero_comprobante": resultado_afip.get("numero_comprobante"),
+                "punto_venta": datos_factura.get("punto_venta"),
+                "tipo_comprobante": datos_factura.get("tipo_afip"),
+                "fecha_comprobante": datetime.now().strftime('%Y-%m-%d'),
+                "importe_total": total,
+                "cuit_emisor": int(emisor_data.cuit),
+                "tipo_doc_receptor": datos_factura.get("tipo_documento"),
+                "nro_doc_receptor": int(datos_factura.get("documento")),
+            }
+            
+            # 3. Asignamos el diccionario al campo JSON y actualizamos el estado
+            venta_a_actualizar.datos_factura = datos_completos_para_guardar
+            venta_a_actualizar.facturada = True
+            
+            db.add(venta_a_actualizar)
+            db.commit()
+            db.refresh(venta_a_actualizar)
+            
+            print(f"Venta ID: {venta_a_facturar.id} actualizada correctamente en la base de datos.")
+        
+        # 4. Devolvemos el resultado original del microservicio, como antes
+        return resultado_afip
+    
     except requests.exceptions.HTTPError as e:
         error_detalle = "Sin detalles adicionales"
         try:
