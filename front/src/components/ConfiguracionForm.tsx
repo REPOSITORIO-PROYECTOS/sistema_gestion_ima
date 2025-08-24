@@ -10,8 +10,18 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/lib/authStore";
 import { AfipToolsPanel } from "./AfipToolsPanel";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2 } from "lucide-react";
 
-// Schema de Zod para el formulario (sin cambios)
+
+const opcionesCondicionIVA = [
+  "RESPONSABLE_INSCRIPTO",
+  "EXENTO",
+  "CONSUMIDOR_FINAL",
+  "MONOTRIBUTO",
+  "NO_CATEGORIZADO",
+] as const;
+
 const formSchema = z.object({
   nombre_negocio: z.string().min(1, "Requerido").nullable(),
   direccion_negocio: z.string().optional().nullable(),
@@ -19,11 +29,12 @@ const formSchema = z.object({
   mail_negocio: z.string().email("Debe ser un email válido.").optional().or(z.literal("")).nullable(),
   cuit: z.string().length(11, "CUIT debe tener 11 dígitos.").optional().nullable(),
   afip_punto_venta_predeterminado: z.string().min(1, "Requerido.").max(5, "Máximo 5 dígitos.").optional().nullable(),
-  afip_condicion_iva: z.string().optional().nullable(), 
+  afip_condicion_iva: z.enum(opcionesCondicionIVA, {
+    required_error: "Debe seleccionar una condición de IVA.",
+}).nullable(),
   link_google_sheets: z.string().optional().nullable(),
 });
 
-// Inferimos el tipo para los valores del formulario
 type FormValues = z.infer<typeof formSchema>;
 
 interface Props {
@@ -43,43 +54,34 @@ export function ConfiguracionForm({ empresaId }: Props) {
         mail_negocio: "",
         cuit: "",
         afip_punto_venta_predeterminado: "",
-        afip_condicion_iva: "",
+        afip_condicion_iva: null,
         link_google_sheets: "",
     },
   });
 
-  // --- LÓGICA REFACTORIZADA Y CORREGIDA ---
-
-const fetchConfig = React.useCallback(async () => {
-    const { reset } = form; // Desestructuramos reset aquí adentro
+  // --- Lógica de carga y envío (sin cambios) ---
+  const fetchConfig = React.useCallback(async () => {
+    const { reset } = form;
     if (!token || !empresaId) return;
     setIsLoading(true);
     try {
         const API_URL = `https://sistema-ima.sistemataup.online/api/empresas/admin/${empresaId}/configuracion`;
-        const res = await fetch(API_URL, { 
-            headers: { Authorization: `Bearer ${token}` },
-            cache: 'no-store'
-        });
-        if (!res.ok) throw new Error("No se pudo cargar la configuración de la empresa.");
+        const res = await fetch(API_URL, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+        if (!res.ok) throw new Error("No se pudo cargar la configuración.");
         
         const data = await res.json();
-        
         const transformedData = {
             ...data,
             cuit: data.cuit ? String(data.cuit) : "",
-            afip_punto_venta_predeterminado: data.afip_punto_venta_predeterminado 
-            ? String(data.afip_punto_venta_predeterminado) 
-            : "",
+            afip_punto_venta_predeterminado: data.afip_punto_venta_predeterminado ? String(data.afip_punto_venta_predeterminado) : "",
         };
-        
-        reset(transformedData); // Usamos la función desestructurada
-
+        reset(transformedData);
     } catch (err) {
         if (err instanceof Error) toast.error("Error al cargar datos", { description: err.message });
     } finally {
         setIsLoading(false);
     }
-}, [token, empresaId, form]);
+  }, [token, empresaId, form]);
 
   React.useEffect(() => {
     fetchConfig();
@@ -100,10 +102,7 @@ const fetchConfig = React.useCallback(async () => {
         throw new Error(errorData.detail || "Error al guardar los cambios.");
       }
       toast.success("Configuración guardada con éxito.");
-      
-      // Se resincroniza el formulario con los datos actualizados del servidor
       await fetchConfig();
-
     } catch (err) {
       if (err instanceof Error) toast.error("Error al guardar", { description: err.message });
     } finally {
@@ -112,7 +111,7 @@ const fetchConfig = React.useCallback(async () => {
   };
 
   if (isLoading && !form.formState.isDirty) {
-      return <p>Cargando formulario de configuración...</p>;
+      return <p className="p-6 text-center text-muted-foreground">Cargando formulario de configuración...</p>;
   }
 
   return (
@@ -138,15 +137,34 @@ const fetchConfig = React.useCallback(async () => {
                 <FormField control={form.control} name="cuit" render={({ field }) => (
                     <FormItem><FormLabel>CUIT</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                 )} />
-                <FormField control={form.control} name="afip_condicion_iva" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Condición frente al IVA</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value ?? ''} placeholder="Ej. Responsable Inscripto" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+
+                {/* --- PASO 4: Reemplazar el Input por el componente Select --- */}
+                <FormField
+                  control={form.control}
+                  name="afip_condicion_iva"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Condición frente al IVA</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccione una condición..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {opcionesCondicionIVA.map((opcion) => (
+                            <SelectItem key={opcion} value={opcion}>
+                              {/* Simple transformación para hacerlo más legible */}
+                              {opcion.replace(/_/g, ' ').charAt(0).toUpperCase() + opcion.replace(/_/g, ' ').slice(1).toLowerCase()}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 <FormField control={form.control} name="afip_punto_venta_predeterminado" render={({ field }) => (
                     <FormItem><FormLabel>Punto de Venta</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                 )} />
@@ -161,7 +179,8 @@ const fetchConfig = React.useCallback(async () => {
             </div>
             <div className="flex justify-end">
                 <Button type="submit" disabled={isLoading || form.formState.isSubmitting}>
-                    {isLoading ? "Actualizando..." : "Guardar Cambios Generales"}
+                    {form.formState.isSubmitting ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}
+                    Guardar Cambios Generales
                 </Button>
             </div>
           </form>

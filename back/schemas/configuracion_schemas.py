@@ -2,7 +2,15 @@
 
 from pydantic import BaseModel, Field
 from typing import Optional
+from enum import Enum
 
+class CondicionIVAEnum(str, Enum):
+    RESPONSABLE_INSCRIPTO = "RESPONSABLE_INSCRIPTO"
+    EXENTO = "EXENTO"
+    CONSUMIDOR_FINAL = "CONSUMIDOR_FINAL"
+    MONOTRIBUTO = "MONOTRIBUTO"
+    NO_CATEGORIZADO = "NO_CATEGORIZADO"
+    
 class ConfiguracionUpdate(BaseModel):
     """
     Schema para actualizar la configuración. Todos los campos son opcionales
@@ -10,7 +18,7 @@ class ConfiguracionUpdate(BaseModel):
     """
     nombre_negocio: Optional[str] = None
     color_principal: Optional[str] = None # Valida que sea un color hex
-    afip_condicion_iva: Optional[str] = None
+    afip_condicion_iva: Optional[CondicionIVAEnum] = None
     afip_punto_venta_predeterminado: Optional[int] = None
     direccion_negocio: Optional[str] = None
     telefono_negocio: Optional[str] = None
@@ -25,7 +33,7 @@ class ConfiguracionResponse(BaseModel):
     color_principal: str
     ruta_logo: Optional[str]
     ruta_icono: Optional[str]
-    afip_condicion_iva: Optional[str]
+    afip_condicion_iva: Optional[CondicionIVAEnum] = None
     afip_punto_venta_predeterminado: Optional[int]
     direccion_negocio: Optional[str]
     telefono_negocio: Optional[str]
@@ -50,3 +58,4 @@ class ColorUpdateRequest(BaseModel):
 
 class ColorResponse(BaseModel):
     color_principal: str
+
