@@ -175,7 +175,7 @@ def generar_factura_para_venta(
         
         resultado_afip = response.json()
         print(f"Respuesta exitosa del microservicio de facturación: {resultado_afip}")
-        if resultado_afip.get("estado") == "EXITOSO":
+        if resultado_afip.get("cae"):
             
             # 1. Obtenemos la venta de la base de datos
             venta_a_actualizar = db.get(Venta, venta_a_facturar.id)

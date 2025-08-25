@@ -178,7 +178,7 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
             }
         } else if (accionActual === 'anular') {
             url = 'https://sistema-ima.sistemataup.online/api/comprobantes/anular-factura';
-            body = { id_movimiento_a_anular: selectedRows[0].original.id };
+            body = { id_movimiento: selectedRows[0].original.id, };
             successMessage = "La factura ha sido anulada con éxito.";
         }
 
