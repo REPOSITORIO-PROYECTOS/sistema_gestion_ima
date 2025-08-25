@@ -372,7 +372,7 @@ class ConfiguracionEmpresa(SQLModel, table=True):
     limite_consumidor_final: float = Field(default=211026.15)
     aclaraciones_legales: Optional[Dict[str, str]] = Field(
         default_factory=dict, 
-        sa_column=Column(JSON, server_default='{}')
+        sa_column=Column(JSON)
     )
     # --- Datos de Contacto del Negocio ---
     direccion_negocio: Optional[str] = Field(default=None)
