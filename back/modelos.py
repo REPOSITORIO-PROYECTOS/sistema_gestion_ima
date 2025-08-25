@@ -96,8 +96,11 @@ class Marca(SQLModel, table=True):
 
 class Articulo(SQLModel, table=True):
     __tablename__ = "articulos"
+    __table_args__ = (
+        UniqueConstraint("codigo_interno", "id_empresa", name="uq_codigo_interno_empresa"),
+    )
     id: Optional[int] = Field(default=None, primary_key=True)
-    codigo_interno: Optional[str] = Field(index=True, unique=True, nullable=True)
+    codigo_interno: Optional[str] = Field(index=True, nullable=True)
     descripcion: str
     unidad_compra: str = Field(default="Unidad")
     unidad_venta: str = Field(default="Unidad")
