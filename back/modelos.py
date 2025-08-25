@@ -338,7 +338,7 @@ class Empresa(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     nombre_legal: str = Field(index=True, unique=True) # Razón Social
     nombre_fantasia: Optional[str]
-    cuit: str = Field(unique=True, index=True)
+    cuit: str = Field(index=True)
     activa: bool = Field(default=True)
     creada_en: datetime = Field(default_factory=datetime.utcnow)
 
