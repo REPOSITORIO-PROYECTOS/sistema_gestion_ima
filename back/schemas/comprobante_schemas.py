@@ -20,6 +20,8 @@ class EmisorData(BaseModel):
     domicilio: Optional[str] = None
     punto_venta: int
     condicion_iva: Optional[str] = None
+    aclaraciones_legales: Optional[Dict[str, str]] = None
+
 
 class ReceptorData(BaseModel):
     nombre_razon_social: Optional[str] = None # Hacemos opcional para "Consumidor Final" genérico

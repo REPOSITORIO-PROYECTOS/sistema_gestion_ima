@@ -370,7 +370,10 @@ class ConfiguracionEmpresa(SQLModel, table=True):
     afip_condicion_iva: Optional[str] = Field(default=None) # Ej: Monotributo, Responsable Inscripto
     afip_punto_venta_predeterminado: Optional[int] = Field(default=None)
     limite_consumidor_final: float = Field(default=211026.15)
-    
+    aclaraciones_legales: Optional[Dict[str, str]] = Field(
+        default_factory=dict, 
+        sa_column=Column(JSON, server_default='{}')
+    )
     # --- Datos de Contacto del Negocio ---
     direccion_negocio: Optional[str] = Field(default=None)
     telefono_negocio: Optional[str] = Field(default=None)

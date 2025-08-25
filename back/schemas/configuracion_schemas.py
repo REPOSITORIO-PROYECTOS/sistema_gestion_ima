@@ -1,7 +1,7 @@
 # back/schemas/configuracion_schemas.py
 
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Dict
 from enum import Enum
 
 class CondicionIVAEnum(str, Enum):
@@ -30,6 +30,7 @@ class ConfiguracionUpdate(BaseModel):
     link_google_sheets: Optional[str] = None
     cuit: Optional[int] = None
     formato_comprobante_predeterminado: Optional[FormatoComprobanteEnum] = None
+    aclaraciones_legales: Optional[Dict[str, str]] = None
 
 class ConfiguracionResponse(BaseModel):
     """Schema completo para devolver la configuración de una empresa."""
@@ -45,6 +46,8 @@ class ConfiguracionResponse(BaseModel):
     mail_negocio: Optional[str]
     link_google_sheets: Optional[str]
     cuit: Optional[int]
+    aclaraciones_legales: Optional[Dict[str, str]]
+
     class Config:
         from_attributes = True
         
