@@ -31,7 +31,6 @@ STATIC_DIR.mkdir(parents=True, exist_ok=True) # Asegura que el directorio exista
 
 @router.get("/mi-empresa", response_model=ConfiguracionResponse)
 def obtener_mi_configuracion(
-    config_data: ConfiguracionUpdate,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(obtener_usuario_actual)
 ):
