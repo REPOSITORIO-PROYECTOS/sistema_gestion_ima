@@ -279,6 +279,7 @@ class Venta(SQLModel, table=True):
     facturada: bool = Field(default=False, index=True)
     datos_factura: Optional[Dict[str, str]] = Field(default=None, sa_column=Column(JSON))
     estado: str = Field(default="COMPLETADA")
+    id_venta_lote_padre: Optional[int] = Field(default=None, foreign_key="ventas.id", index=True)
     id_cliente: Optional[int] = Field(default=None, foreign_key="terceros.id")
     id_usuario: int = Field(foreign_key="usuarios.id")
     id_caja_sesion: int = Field(foreign_key="caja_sesiones.id")
@@ -360,9 +361,11 @@ class ConfiguracionEmpresa(SQLModel, table=True):
     concepto_recargo_transferencia: str = Field(default="Recargo por Transferencia")
     recargo_banco: float = Field(default=0.0)
     concepto_recargo_banco: str = Field(default="Recargo por Pago con Banco")
+    formato_comprobante_predeterminado: str = Field(default="ticket")
     # --- Configuración Fiscal (AFIP) ---
     afip_condicion_iva: Optional[str] = Field(default=None) # Ej: Monotributo, Responsable Inscripto
     afip_punto_venta_predeterminado: Optional[int] = Field(default=None)
+    limite_consumidor_final: float = Field(default=211026.15)
     
     # --- Datos de Contacto del Negocio ---
     direccion_negocio: Optional[str] = Field(default=None)
