@@ -18,6 +18,9 @@ import { useEmpresaStore } from '@/lib/empresaStore';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import eventBus from "@/utils/eventBus";
 import { Button } from '@/components/ui/button';
+import { ConfiguracionLegalesForm } from "@/components/ConfiguracionLegalesForm";
+
+
 
 const API_URL = "https://sistema-ima.sistemataup.online";
 
@@ -266,6 +269,13 @@ const handleFormatoChange = async (nuevoFormato: 'ticket' | 'pdf') => {
           <h2 className="text-xl font-bold text-green-950">Recargos asociados a métodos de pago.</h2>
           <p className="text-muted-foreground md:max-w-1/2">Desde acá podes asignar recargos a las opciones de transferencia o pago bancario.</p>
         </div>
+        
+        <hr className="my-4" />
+        
+        <ConfiguracionLegalesForm />
+
+        <hr className="my-4" />
+
 
         <div className="flex flex-col gap-2">
           <div className="flex flex-col sm:flex-row items-center gap-4">

@@ -6,7 +6,8 @@
     <title>Factura</title>
     <style>
         body { font-family: 'Courier New', Courier, monospace; font-size: 10px; margin: 0; padding: 0; color: #000; }
-        .ticket { width: 56mm; padding: 1mm; }
+        /* Medida ajustada para impresoras de 58mm */
+        .ticket { width: 48mm; padding: 1mm; }
         .header, .afip-footer { text-align: center; }
         .header h1 { margin: 0; font-size: 14px; font-weight: bold; word-wrap: break-word; }
         .header p { margin: 2px 0; }
@@ -32,10 +33,11 @@
             border-bottom: 1px dashed black;
             margin: 5px 0;
         }
-        .observaciones-venta {
+        .observaciones-finales-section {
             margin-top: 8px;
             font-size: 9px;
             word-wrap: break-word;
+            margin-bottom: 5px; 
         }
         .afip-footer { margin-top: 10px; }
         .afip-footer p { margin: 1px 0; font-weight: bold; }
@@ -113,7 +115,6 @@
             </div>
         </div>
 
-        <!-- INICIO: LÓGICA DE OBSERVACIONES Y MEMBRETE -->
         {% if transaccion.observaciones and '---' in transaccion.observaciones %}
             {% set partes = transaccion.observaciones.split('---', 1) %}
             {% set membrete = partes[0] | trim %}
@@ -123,17 +124,16 @@
                 {{ membrete }}
             </div>
             
-            {% set observaciones_finales = notas_venta %}
+            {% set observaciones_para_mostrar = notas_venta %}
         {% else %}
-            {% set observaciones_finales = transaccion.observaciones %}
+            {% set observaciones_para_mostrar = transaccion.observaciones %}
         {% endif %}
         
-        {% if observaciones_finales %}
-            <div class="observaciones-venta">
-                <strong>Obs:</strong> {{ observaciones_finales }}
+        {% if observaciones_para_mostrar %}
+            <div class="observaciones-finales-section">
+                <pre style="font-family: 'Courier New', Courier, monospace; margin: 0; white-space: pre-wrap; word-wrap: break-word;">{{ observaciones_para_mostrar }}</pre>
             </div>
         {% endif %}
-        <!-- FIN: LÓGICA DE OBSERVACIONES Y MEMBRETE -->
         
         <hr>
 
