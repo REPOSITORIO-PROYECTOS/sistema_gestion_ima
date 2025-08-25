@@ -65,9 +65,6 @@ def api_cerrar_caja(req: CerrarCajaRequest, db: Session = Depends(get_db), curre
 # === ENDPOINTS DE OPERACIONES REFACTORIZADOS ===
 # =================================================================
 
-# back/routers/ventas_router.py (o donde esté tu endpoint)
-
-
 
 @router.post("/ventas/registrar", response_model=RespuestaGenerica, tags=["Caja - Operaciones"])
 def api_registrar_venta(
