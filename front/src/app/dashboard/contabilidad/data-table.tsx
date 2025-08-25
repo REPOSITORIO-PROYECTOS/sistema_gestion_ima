@@ -153,7 +153,7 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
         let successMessage = "";
 
         interface ItemPayload { id_articulo: number; cantidad: number; precio_unitario: number; subtotal: number; nombre: string; }
-        interface BodyType { ids_comprobantes?: number[]; ids_movimientos?: number[]; id_movimiento_a_anular?: number; id_cliente_final?: number | null; items?: ItemPayload[]; total_final?: number; nuevo_tipo_comprobante?: string; }
+        interface BodyType { ids_comprobantes?: number[]; ids_movimientos?: number[]; id_movimiento_a_anular?: number; id_cliente_final?: number | null; items?: ItemPayload[]; total_final?: number; nuevo_tipo_comprobante?: string; id_movimiento?: number; }
         let body: BodyType = {};
 
         if (accionActual === 'agrupar' || accionActual === 'facturar') {
