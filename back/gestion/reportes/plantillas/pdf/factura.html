@@ -119,11 +119,16 @@
             margin-top: 25px; 
             page-break-inside: avoid;
         }
+        /* --- NUEVOS ESTILOS PARA LA LÓGICA DEL QR --- */
+        .afip-footer .qr-code {
+            flex-shrink: 0; /* Evita que el QR se encoja */
+        }
         .afip-footer .qr-code img { 
             max-width: 110px;
             height: auto;
         }
-        .afip-footer .cae-data {
+        .afip-footer .cae-data-wrapper {
+            flex-grow: 1; /* Permite que ocupe el espacio sobrante */
             text-align: right;
             font-size: 10px;
         }
@@ -131,6 +136,7 @@
 </head>
 <body>
     <div class="container">
+        <!-- ... Toda la sección del header, cliente e items de la factura (sin cambios) ... -->
         <div class="header">
             <div class="empresa-info">
                 <div class="empresa-nombre">{{ emisor.razon_social }}</div>
@@ -199,8 +205,8 @@
                 </tr>
             </tfoot>
         </table>
-
-        <!-- INICIO: LÓGICA DE OBSERVACIONES Y MEMBRETE -->
+        
+        <!-- ... Toda la sección de observaciones y membrete (sin cambios) ... -->
         {% if transaccion.observaciones and '---' in transaccion.observaciones %}
             {% set partes = transaccion.observaciones.split('---', 1) %}
             {% set membrete = partes[0] | trim %}
@@ -214,7 +220,6 @@
         {% else %}
             {% set observaciones_finales = transaccion.observaciones %}
         {% endif %}
-        <!-- FIN: LÓGICA DE OBSERVACIONES Y MEMBRETE -->
 
         <div class="footer">
             {% if observaciones_finales %}
@@ -223,22 +228,27 @@
                 </div>
             {% endif %}
 
-            <!-- INICIO: PIE DE PÁGINA CON QR Y DATOS DE AFIP -->
+            <!-- ########## INICIO: SECCIÓN DE AFIP MODIFICADA ########## -->
             {% if afip and afip.cae %}
             <div class="afip-footer">
+                
+                <!-- El QR solo se muestra si la variable qr_base64 existe -->
+                {% if qr_base64 %}
                 <div class="qr-code">
-                    {% if qr_base64 %}
-                        <img src="data:image/png;base64,{{ qr_base64 }}" alt="Código QR AFIP">
-                    {% endif %}
+                    <img src="data:image/png;base64,{{ qr_base64 }}" alt="Código QR AFIP">
                 </div>
-                <div class="cae-data">
+                {% endif %}
+                
+                <!-- Los datos del CAE siempre se muestran si hay CAE, con o sin QR -->
+                <div class="cae-data-wrapper">
                     <p><strong>CAE N°:</strong> {{ afip.cae }}</p>
                     <p><strong>Vto. CAE:</strong> {{ afip.vencimiento_cae }}</p>
                     <p>Comprobante Autorizado</p>
                 </div>
+
             </div>
             {% endif %}
-            <!-- FIN: PIE DE PÁGINA CON QR Y DATOS DE AFIP -->
+            <!-- ########## FIN: SECCIÓN DE AFIP MODIFICADA ########## -->
         </div>
     </div>
 </body>
