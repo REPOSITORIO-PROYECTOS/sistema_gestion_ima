@@ -38,9 +38,6 @@ class Usuario(SQLModel, table=True):
 
 class Tercero(SQLModel, table=True):
     __tablename__ = "terceros"
-    __table_args__ = (
-        UniqueConstraint("cuit", "id_empresa", name="uq_cuit_empresa"),
-    )
     id: int = Field(primary_key=True)
     codigo_interno: Optional[str] = Field(index=True)
     es_cliente: bool = Field(default=False)
