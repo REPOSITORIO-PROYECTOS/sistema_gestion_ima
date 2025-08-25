@@ -19,9 +19,13 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import eventBus from "@/utils/eventBus";
 import { Button } from '@/components/ui/button';
 
-export default function GestionNegocio() {
+const API_URL = "https://sistema-ima.sistemataup.online";
 
+export default function GestionNegocio() {
   const token = useAuthStore((state) => state.token);
+  const usuario = useAuthStore((state) => state.usuario);
+  const empresaId = usuario?.id_empresa;
+
   const {
     habilitarExtras,
     toggleExtras,
@@ -33,136 +37,121 @@ export default function GestionNegocio() {
     toggleRecargoBancario,
     recargoBancario,
     setRecargoBancario,
-    formatoComprobante, 
-    setFormatoComprobante
   } = useFacturacionStore();
+
+  const [formatoComprobante, setFormatoComprobante] = useState<'ticket' | 'pdf' | string>('ticket');
   const [navbarColor, setNavbarColor] = useState("bg-sky-600");
-
-  // Formatos de impresión de ticket - escalable a mas opciones 
-  const formatosDisponibles = ["PDF", "Ticket"];  
-
-  /* Edición y manejo de empresas - obtenemos la empresa a partir del user para una cosa*/
-  const usuario = useAuthStore((state) => state.usuario);
-  const empresaId = usuario?.id_empresa;
-
-  // Edición de UI de empresa
-  /* const [navbarColor, setNavbarColor] = useState("default"); */
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  /* const logoUrl = empresa?.ruta_logo || '/default-logo.png'; */
-  
-
-  /* Manejo de Negocio y Ventas */
-
-  // GET Recargos transferencia y banco
   useEffect(() => {
     if (!token) return;
-
-    const fetchRecargos = async () => {
+    const fetchConfiguracionCompleta = async () => {
       try {
-        const [resTransferencia, resBancario] = await Promise.all([
-          fetch("https://sistema-ima.sistemataup.online/api/configuracion/mi-empresa/recargo/transferencia", {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch("https://sistema-ima.sistemataup.online/api/configuracion/mi-empresa/recargo/banco", {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-        ]);
-
-        const dataTransferencia = await resTransferencia.json();
-        const dataBancario = await resBancario.json();
-
-        setRecargoTransferencia(dataTransferencia.porcentaje || 0);
-        setRecargoBancario(dataBancario.porcentaje || 0);
+        const res = await fetch(`${API_URL}/api/configuracion/mi-empresa`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error("No se pudo cargar la configuración.");
+        
+        const data = await res.json();
+        setFormatoComprobante(data.formato_comprobante_predeterminado || 'ticket');
+        setRecargoTransferencia(data.recargo_transferencia || 0);
+        setRecargoBancario(data.recargo_bancario || 0);
+        setNavbarColor(data.color_principal || 'bg-sky-600');
 
       } catch (error) {
-        console.error("Error al obtener recargos:", error);
+        console.error("Error al obtener configuración:", error);
       }
     };
-
-    fetchRecargos();
+    fetchConfiguracionCompleta();
   }, [token, setRecargoBancario, setRecargoTransferencia]);
 
-  // PATCH Recargos transferencia
-  const actualizarRecargoTransferencia = async () => {
-    try {
-      const res = await fetch(
-        "https://sistema-ima.sistemataup.online/api/configuracion/mi-empresa/recargo/transferencia",
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            porcentaje: recargoTransferencia,
-            concepto: "Actualización recargo transferencia" 
-          }),
-        }
-      );
+const handleFormatoChange = async (nuevoFormato: 'ticket' | 'pdf') => {
+    if (!token) return;
 
-      if (!res.ok) throw new Error("Error en el PATCH");
-      toast.success("Recargo por transferencia actualizado correctamente");
+    const valorAnterior = formatoComprobante;
+    setFormatoComprobante(nuevoFormato); // Actualización optimista
+    
+    try {
+      const res = await fetch(`${API_URL}/api/configuracion/mi-empresa`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          formato_comprobante_predeterminado: nuevoFormato
+        }),
+      });
+      if (!res.ok) throw new Error("Error al guardar el formato.");
+      
+      toast.success("Formato de comprobante actualizado.");
+      eventBus.emit("empresa_actualizada");
 
     } catch (error) {
-      console.error(error);
+      // La línea corregida:
+      console.error("Error al guardar formato:", error);
+      toast.error("Error al guardar.", { description: "Revertiendo cambio." });
+      setFormatoComprobante(valorAnterior);
+    }
+  };
+
+
+  const actualizarRecargoTransferencia = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/configuracion/mi-empresa/recargo/transferencia`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          porcentaje: recargoTransferencia,
+          concepto: "Actualización recargo transferencia" 
+        }),
+      });
+      if (!res.ok) throw new Error("Error en el PATCH");
+      toast.success("Recargo por transferencia actualizado correctamente");
+    } catch (error) {
+      console.error("Error al actualizar recargo por transferencia:", error);
       toast.error("Error al actualizar el recargo por transferencia");
     }
   };
 
-  // PATCH Recargos banco
   const actualizarRecargoBancario = async () => {
     try {
-      const res = await fetch(
-        "https://sistema-ima.sistemataup.online/api/configuracion/mi-empresa/recargo/banco",
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            porcentaje: recargoBancario,
-            concepto: "Actualización recargo bancario"
-          }),
-        }
-      );
-
+      const res = await fetch(`${API_URL}/api/configuracion/mi-empresa/recargo/banco`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          porcentaje: recargoBancario,
+          concepto: "Actualización recargo bancario"
+        }),
+      });
       if (!res.ok) throw new Error("Error en el PATCH");
-
       toast.success("Recargo por banco actualizado correctamente");
-      
     } catch (error) {
-      console.error(error);
+      console.error("Error al actualizar recargo bancario:", error);
       toast.error("Error al actualizar el recargo por banco");
     }
   };
 
-  /* UI */
-
-  /* Utilizamos el empresaStore para otras, como editar la UI */
-  // Subir LOGO al Back para personalización
   const subirArchivo = async (file: File) => {
     if (!token) throw new Error("Token no disponible");
-
     const formData = new FormData();
     formData.append("archivo", file);
-
-    const res = await fetch("https://sistema-ima.sistemataup.online/api/configuracion/upload-logo", {
+    const res = await fetch(`${API_URL}/api/configuracion/upload-logo`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { Authorization: `Bearer ${token}` },
       body: formData,
     });
-
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || "Error al subir el archivo");
-
     return data;
   };
 
-  // Handler para cambiar el LOGO de la empresa
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -182,14 +171,9 @@ export default function GestionNegocio() {
       const { message } = await subirArchivo(file);
       console.log(message);
 
-      // Refrescar datos actualizados desde el backend
-      const res = await fetch("https://sistema-ima.sistemataup.online/api/configuracion/mi-empresa",
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-      );
+      const res = await fetch(`${API_URL}/api/configuracion/mi-empresa`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const data = await res.json();
       useEmpresaStore.getState().setEmpresa(data);
 
@@ -199,19 +183,16 @@ export default function GestionNegocio() {
 
       toast.success("Logo subido correctamente.");
       eventBus.emit("empresa_actualizada");
-
       window.location.reload();
-
     } catch (error) {
       console.error(error);
       toast.error("Error al subir el logo");
     }
   };
 
-  // Funcion para cambiar de color
   const actualizarColorNavbar = async (nuevoColor: string) => {
     try {
-      const res = await fetch("https://sistema-ima.sistemataup.online/api/configuracion/mi-empresa/color", {
+      const res = await fetch(`${API_URL}/api/configuracion/mi-empresa/color`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -219,14 +200,11 @@ export default function GestionNegocio() {
         },
         body: JSON.stringify({ color_principal: nuevoColor }),
       });
-
       if (!res.ok) throw new Error("Error en el PATCH");
-
       toast.success("Color de navbar actualizado correctamente.");
       eventBus.emit("empresa_actualizada");
-
     } catch (error) {
-      console.error(error);
+      console.error("Error al actualizar el color de navbar:", error);
       toast.error("Error al actualizar el color de navbar");
     }
   };
@@ -235,49 +213,40 @@ export default function GestionNegocio() {
     <ProtectedRoute allowedRoles={["Admin", "Soporte"]}>
       <div className="flex flex-col gap-6 p-2">
 
-        {/* Gestión de datos de empresa */}
-        {empresaId && (
-          <ConfiguracionForm empresaId={empresaId} />
-        )}
+        {empresaId && <ConfiguracionForm empresaId={empresaId} />}
 
-        <hr className="h-0.25 my-4" />  {/* --------------------------------------------------------------- */}
+        <hr className="h-0.25 my-4" />
 
-        {/* Header para método de pago y recargos*/}
         <div className="space-y-2">
-          <h2 className="text-xl font-bold text-green-950">Configuración sobre métodos de pago</h2>
-          <p className="text-muted-foreground">Administrá el tipo de ticket para imprimir.</p>
+          <h2 className="text-xl font-bold text-green-950">Configuración de Impresión</h2>
+          <p className="text-muted-foreground">Administra el formato predeterminado para los comprobantes de esta empresa.</p>
         </div>
 
-        {/* Toggle de Facturación en Caja */}
         <div>
           <label className="text-sm font-medium text-gray-700 mb-1 block">Formato del Comprobante</label>
           <Select
             value={formatoComprobante}
-            onValueChange={setFormatoComprobante}
+            onValueChange={(value: 'ticket' | 'pdf') => handleFormatoChange(value)}
           >
-            <SelectTrigger className="w-[180px] cursor-pointer">
+            <SelectTrigger className="w-[220px] cursor-pointer">
               <SelectValue placeholder="Seleccionar formato" />
             </SelectTrigger>
             <SelectContent>
-              {formatosDisponibles.map((formato) => (
-                <SelectItem key={formato} value={formato}>
-                  {formato}
-                </SelectItem>
-              ))}
+              <SelectItem value="ticket">Ticket (Impresora Térmica)</SelectItem>
+              <SelectItem value="pdf">PDF (Hoja A4)</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        {/* Toggle de Facturación en Caja */}
         <div className="flex flex-col sm:flex-row items-center gap-4">
           <Switch.Root
-            disabled={formatoComprobante !== "PDF"}
+            disabled={formatoComprobante !== "pdf"} // Lógica corregida a minúsculas
             checked={habilitarExtras}
             onCheckedChange={toggleExtras}
             className={`relative w-16 h-8 rounded-full ${
               habilitarExtras ? "bg-green-900" : "bg-gray-300"
             } cursor-pointer transition-colors ${
-              formatoComprobante !== "PDF" ? "opacity-50 cursor-not-allowed" : ""
+              formatoComprobante !== "pdf" ? "opacity-50 cursor-not-allowed" : "" // Lógica corregida a minúsculas
             }`}
           >
             <Switch.Thumb
@@ -286,42 +255,29 @@ export default function GestionNegocio() {
               }`}
             />
           </Switch.Root>
-
           <h3 className="text-lg font-semibold text-green-950">
             Habilitar Remito / Presupuesto
           </h3>
         </div>
 
-        <hr className="h-0.25 my-4" />  {/* --------------------------------------------------------------- */}
+        <hr className="h-0.25 my-4" />
 
-        {/* Header para método de pago y recargos*/}
         <div className="space-y-2">
           <h2 className="text-xl font-bold text-green-950">Recargos asociados a métodos de pago.</h2>
-          <p className="text-muted-foreground md:max-w-1/2">Desde acá podes asignar recargos a las opciones de transferencia o pago bancario. El valor que ves es el recargo actual, podes reemplazarlo y setear uno nuevo.</p>
+          <p className="text-muted-foreground md:max-w-1/2">Desde acá podes asignar recargos a las opciones de transferencia o pago bancario.</p>
         </div>
 
-        {/* Recargo por Transferencia */}
         <div className="flex flex-col gap-2">
           <div className="flex flex-col sm:flex-row items-center gap-4">
             <Switch.Root
               checked={recargoTransferenciaActivo}
               onCheckedChange={toggleRecargoTransferencia}
-              className={`relative w-16 h-8 rounded-full ${
-                recargoTransferenciaActivo ? "bg-green-900" : "bg-gray-300"
-              } cursor-pointer transition-colors`}
+              className={`relative w-16 h-8 rounded-full ${recargoTransferenciaActivo ? "bg-green-900" : "bg-gray-300"} cursor-pointer transition-colors`}
             >
-              <Switch.Thumb
-                className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-300 ${
-                  recargoTransferenciaActivo ? "translate-x-8" : "translate-x-0"
-                }`}
-              />
+              <Switch.Thumb className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-300 ${recargoTransferenciaActivo ? "translate-x-8" : "translate-x-0"}`} />
             </Switch.Root>
-
-            <h3 className="text-lg font-semibold text-green-950">
-              Habilitar Recargo por Transferencia
-            </h3>
+            <h3 className="text-lg font-semibold text-green-950">Habilitar Recargo por Transferencia</h3>
           </div>
-
           <Input
             type="number"
             placeholder="Ej: 10"
@@ -335,7 +291,6 @@ export default function GestionNegocio() {
             }}
             className="w-full md:w-1/3 mt-2"
           />
-
           <Button
             onClick={actualizarRecargoTransferencia}
             disabled={!recargoTransferenciaActivo}
@@ -345,30 +300,19 @@ export default function GestionNegocio() {
           </Button>
         </div>
 
-        <hr className="p-0.25 bg-green-900 my-8"/> {/* --------------------------------------- */}
+        <hr className="p-0.25 bg-green-900 my-8"/>
 
-        {/* Recargo por Bancario */}
         <div className="flex flex-col gap-2">
           <div className="flex flex-col sm:flex-row items-center gap-4">
             <Switch.Root
               checked={recargoBancarioActivo}
               onCheckedChange={toggleRecargoBancario}
-              className={`relative w-16 h-8 rounded-full ${
-                recargoBancarioActivo ? "bg-green-900" : "bg-gray-300"
-              } cursor-pointer transition-colors`}
+              className={`relative w-16 h-8 rounded-full ${recargoBancarioActivo ? "bg-green-900" : "bg-gray-300"} cursor-pointer transition-colors`}
             >
-              <Switch.Thumb
-                className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-300 ${
-                  recargoBancarioActivo ? "translate-x-8" : "translate-x-0"
-                }`}
-              />
+              <Switch.Thumb className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-300 ${recargoBancarioActivo ? "translate-x-8" : "translate-x-0"}`} />
             </Switch.Root>
-
-            <h3 className="text-lg font-semibold text-green-950">
-              Habilitar Recargo por Bancario
-            </h3>
+            <h3 className="text-lg font-semibold text-green-950">Habilitar Recargo por Bancario</h3>
           </div>
-
           <Input
             type="number"
             placeholder="Ej: 10"
@@ -382,7 +326,6 @@ export default function GestionNegocio() {
             }}
             className="w-full md:w-1/3 mt-2"
           />
-
           <Button
             onClick={actualizarRecargoBancario}
             disabled={!recargoBancarioActivo}
@@ -392,18 +335,13 @@ export default function GestionNegocio() {
           </Button>
         </div>
 
-        <hr className="h-0.25 my-4" />  {/* --------------------------------------------------------------- */}
+        <hr className="h-0.25 my-4" />
 
-        {/* Configuración de Negocios - UI */}
         <div className="flex flex-col items-start gap-8 p-4">
-
-          {/* Header para personalización */}
           <div className="space-y-2">
             <h2 className="text-xl font-bold text-green-950">Configuración de la Apariencia.</h2>
             <p className="text-muted-foreground">Administrá la apariencia de tu aplicación.</p>
           </div>
-
-          {/* Color del Nav */}
           <div className="flex flex-col sm:flex-row w-full md:w-1/2 items-start gap-8 mb-6">
             <label className="text-lg font-semibold text-green-950">🖌️ Personalizá el color de tu empresa:</label>
             <Select
@@ -413,9 +351,7 @@ export default function GestionNegocio() {
                 actualizarColorNavbar(val); 
               }}
             >
-              <SelectTrigger className="w-full cursor-pointer">
-                <SelectValue placeholder="Color del Navbar" />
-              </SelectTrigger>
+              <SelectTrigger className="w-full cursor-pointer"><SelectValue placeholder="Color del Navbar" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="bg-sky-600">Colores:</SelectItem>
                 <SelectItem value="bg-green-800">Verde</SelectItem>
@@ -429,8 +365,6 @@ export default function GestionNegocio() {
               </SelectContent>
             </Select>
           </div>
-
-          {/* LOGO */}
           <div className="flex flex-col sm:flex-row w-full md:w-1/2 items-start gap-8 mb-6">
             <label className="text-lg font-semibold text-green-950">🎨 Cambiar logo de empresa:</label>
             <Input
@@ -441,7 +375,6 @@ export default function GestionNegocio() {
               className="max-w-sm"
             />
           </div>
-
         </div>
       </div>
     </ProtectedRoute>

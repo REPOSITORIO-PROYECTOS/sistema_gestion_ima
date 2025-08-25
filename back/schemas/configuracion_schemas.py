@@ -11,6 +11,10 @@ class CondicionIVAEnum(str, Enum):
     MONOTRIBUTO = "MONOTRIBUTO"
     NO_CATEGORIZADO = "NO_CATEGORIZADO"
     
+class FormatoComprobanteEnum(str, Enum):
+    ticket = "ticket"
+    pdf = "pdf"
+    
 class ConfiguracionUpdate(BaseModel):
     """
     Schema para actualizar la configuración. Todos los campos son opcionales
@@ -24,7 +28,8 @@ class ConfiguracionUpdate(BaseModel):
     telefono_negocio: Optional[str] = None
     mail_negocio: Optional[str] = None
     link_google_sheets: Optional[str] = None
-    cuit: Optional[int]
+    cuit: Optional[int] = None
+    formato_comprobante_predeterminado: Optional[FormatoComprobanteEnum] = None
 
 class ConfiguracionResponse(BaseModel):
     """Schema completo para devolver la configuración de una empresa."""

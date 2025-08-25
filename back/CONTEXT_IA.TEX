@@ -401,3 +401,70 @@ Cuando el usuario selecciona un producto en el dropdown, el componente debe leer
 Si es "Unidad", el input de cantidad debe seguir funcionando como ahora (aceptando solo enteros o redondeando).
 Si es "Kg", "Mt", etc., el mismo input debe cambiar su comportamiento para aceptar números decimales (ej: step="0.001"). El Label junto al input también debería actualizarse para mostrar la unidad (ej: "Cantidad (Kg)").
 Importante: Se descartó la idea de usar un modal extra para no añadir pasos al cajero. La modificación debe ser directamente en el campo de cantidad existente.
+
+
+Documento de Contexto y Traspaso: Proyecto "Sistema de Gestión IMA"
+Misión del Proyecto: Desarrollar el backend y frontend de un Sistema de Gestión (ERP) multi-empresa (multi-tenant) robusto, seguro y escalable. El proyecto partió de una base de código que fue estabilizada y ha evolucionado hacia una arquitectura moderna basada en componentes y servicios.
+Stack Tecnológico:
+Backend: Python con FastAPI, SQLModel (ORM), Alembic (migraciones), MySQL.
+Frontend: Next.js con App Router, TypeScript, Zustand (gestión de estado), Shadcn/UI (componentes), TanStack Table (tablas).
+1. Arquitectura y Decisiones Clave (Reglas Inquebrantables)
+Arquitectura de Backend por Capas:
+modelos.py: Define las tablas de la BD (SQLModel). Es la única fuente de la verdad sobre la estructura de los datos.
+schemas/: Define los "contratos de datos" (DTOs) con Pydantic. Valida toda la información que entra y sale de la API.
+gestion/ (Managers/Especialistas): Contiene toda la lógica de negocio pura. No sabe nada de HTTP. Es transaccional (hace db.commit() si tiene éxito).
+api/blueprints/ (Routers): La capa externa. Define las rutas HTTP, maneja la seguridad (Depends), llama a los "managers" y gestiona las respuestas y errores HTTP.
+Multi-Tenancy (Multi-Empresa):
+Regla de Oro: Toda consulta en los "managers" debe filtrar obligatoriamente por el id_empresa del usuario autenticado para garantizar el aislamiento de datos.
+Índices Únicos Compuestos: Se ha establecido que la unicidad de ciertos campos (como cuit en terceros o codigo_interno en articulos) debe ser por id_empresa, permitiendo duplicados a nivel global pero no dentro de la misma empresa.
+Bóveda de Secretos y Microservicio de Facturación:
+Las credenciales de AFIP se almacenan en un microservicio "Bóveda" seguro.
+La lógica de comunicación con AFIP está encapsulada en un microservicio "Facturador" (http://localhost:8002/afipws/facturador). La API principal hace una llamada HTTP a este servicio.
+Importante: Se ha diagnosticado que este microservicio es propenso a fallos de red temporales (inestabilidad de AFIP).
+2. Logros Recientes y Problemas Solucionados
+Corrección del Flujo de Facturación y Guardado de Datos (Crítico):
+Problema: El sistema obtenía un CAE de AFIP, pero no guardaba los datos completos en la base de datos, lo que impedía generar el QR. La columna datos_factura de la tabla ventas quedaba en NULL.
+Causa: Una combinación de manejo de errores incorrecto en el router y una validación de respuesta fallida en el manager.
+Solución Implementada:
+Se refactorizó la función generar_factura_para_venta (facturacion_afip.py) para que sea transaccional: ahora recibe la db: Session y el objeto Venta, y es responsable de hacer db.commit() tras una facturación exitosa.
+Esta función ahora construye un diccionario completo con todos los datos necesarios para el QR y lo guarda en el campo datos_factura (tipo JSON) del modelo Venta.
+El router /ventas/registrar (caja_router.py) fue modificado para llamar a esta nueva función, delegando la responsabilidad del guardado.
+Proceso de Migración con Alembic Reparado y Completado:
+Problema: alembic upgrade head fallaba repetidamente debido a errores de IntegrityError (datos duplicados) y OperationalError (índices o columnas ya existentes).
+Solución Implementada:
+Se corrigió la configuración de Alembic (alembic.ini).
+Se diagnosticaron y corrigieron inconsistencias de datos directamente en la base de datos (CUITs y nombres de empresa duplicados).
+Se ajustaron los modelos (modelos.py) para reflejar la lógica de negocio multi-empresa, cambiando índices únicos simples por índices únicos compuestos (ej: UniqueConstraint("cuit", "id_empresa") en la tabla terceros).
+Se limpió y regeneró el script de migración, que finalmente se aplicó con éxito.
+Nuevos Campos Añadidos a la Base de Datos:
+Aprovechando la migración, se añadieron 3 nuevos campos para dar soporte a futuras funcionalidades:
+configuracion_empresa.formato_comprobante_predeterminado
+configuracion_empresa.limite_consumidor_final
+ventas.id_venta_lote_padre
+3. Tareas Pendientes y Próximos Pasos
+Ahora que el backend y la base de datos son estables, estas son las tareas pendientes para completar las funcionalidades:
+Implementar Generación del Código QR (Frontend):
+Objetivo: Mostrar el QR oficial de AFIP en los tickets/facturas.
+Plan:
+Instalar la librería qrcode.react en el proyecto de frontend.
+Crear un nuevo componente (GeneradorQR.tsx) que reciba el objeto facturacion_afip (que ahora viene completo desde el backend).
+Este componente debe construir el JSON requerido por AFIP, codificarlo en Base64 y renderizar el QR.
+Integrar el componente <GeneradorQR /> en la vista final del comprobante.
+Implementar Configuración por Empresa (Frontend):
+Objetivo: Permitir que cada empresa configure sus propias preferencias.
+Plan:
+Modificar el formulario de configuración (ConfiguracionForm.tsx).
+Reemplazar el Input de "Condición IVA" por un <Select> con las opciones fijas.
+Añadir un <Select> para el nuevo campo formato_comprobante_predeterminado (Ticket / PDF).
+Añadir un <Input> para el nuevo campo limite_consumidor_final.
+Asegurarse de que el formulario haga un PATCH a la API para guardar estos nuevos campos en la tabla configuracion_empresa.
+Implementar Trazabilidad de Facturación en Lote (Backend):
+Objetivo: Conectar los comprobantes originales con la factura de lote que los agrupa.
+Plan:
+Modificar la función facturar_lote_de_ventas en /back/gestion/facturacion_lotes_manager.py.
+Después de generar la factura de lote y obtener su nuevo venta.id, iterar sobre los comprobantes originales y asignarles ese ID en el campo id_venta_lote_padre.
+Hacer la Facturación más Resiliente (Backend - Opcional pero Recomendado):
+Objetivo: Manejar automáticamente los fallos de red temporales con AFIP.
+Plan:
+Modificar la función generar_factura_para_venta en /back/gestion/facturacion_afip.py.
+Envolver la llamada requests.post en un bucle que reintente la operación 2 o 3 veces si falla con una excepción de red (ej: requests.exceptions.RequestException), con una pequeña pausa (time.sleep) entre intentos.

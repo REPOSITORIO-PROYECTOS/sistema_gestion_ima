@@ -13,7 +13,7 @@ from back.schemas.caja_schemas import RespuestaGenerica
 
 # Lógica de negocio y Schemas
 from back.gestion import configuracion_manager
-from back.schemas.configuracion_schemas import ConfiguracionResponse, ConfiguracionUpdate, RecargoData, RecargoUpdate, ColorResponse, ColorUpdateRequest
+from back.schemas.configuracion_schemas import ConfiguracionResponse, ConfiguracionUpdate, RecargoData, RecargoUpdate, ColorResponse, ColorUpdateRequest, ConfiguracionUpdate 
 
 router = APIRouter(prefix="/configuracion", tags=["Configuración de Empresa"])
 
@@ -31,6 +31,7 @@ STATIC_DIR.mkdir(parents=True, exist_ok=True) # Asegura que el directorio exista
 
 @router.get("/mi-empresa", response_model=ConfiguracionResponse)
 def obtener_mi_configuracion(
+    config_data: ConfiguracionUpdate,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(obtener_usuario_actual)
 ):
