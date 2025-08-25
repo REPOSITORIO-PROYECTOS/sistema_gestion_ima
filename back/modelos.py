@@ -6,6 +6,7 @@ from sqlmodel import Field, Relationship, SQLModel, JSON, Column
 from sqlalchemy import UniqueConstraint
 from sqlmodel import Column  # Importante
 from sqlalchemy import String,JSON   # Importante
+
 # ===================================================================
 # === MODELOS DE ENTIDADES PRINCIPALES
 # ===================================================================
@@ -37,13 +38,16 @@ class Usuario(SQLModel, table=True):
 
 class Tercero(SQLModel, table=True):
     __tablename__ = "terceros"
+    __table_args__ = (
+        UniqueConstraint("cuit", "id_empresa", name="uq_cuit_empresa"),
+    )
     id: int = Field(primary_key=True)
     codigo_interno: Optional[str] = Field(index=True)
     es_cliente: bool = Field(default=False)
     es_proveedor: bool = Field(default=False)
     nombre_razon_social: str = Field(index=True)
     nombre_fantasia: Optional[str]
-    cuit: Optional[str] = Field(unique=True, index=True)
+    cuit: Optional[str] = Field(default=None, index=True) 
     identificacion_fiscal: Optional[str] = Field(index=True)
     condicion_iva: str
     direccion: Optional[str]
