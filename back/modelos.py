@@ -408,32 +408,29 @@ class ArticuloProveedor(SQLModel, table=True):
 class FacturaElectronica(SQLModel, table=True):
     __tablename__ = "facturas_electronicas"
 
-    # === Columnas de Identificación y Auditoría ===
     id: Optional[int] = Field(default=None, primary_key=True)
+    # --- CAMBIO AQUÍ: El índice se define de forma estándar en el Field ---
     ingreso_id: str = Field(index=True, description="El 'ID Ingresos' que vincula esta factura a la venta original.")
 
-    # === Datos del Comprobante AFIP ===
     cae: str = Field(max_length=14, unique=True, description="Código de Autorización Electrónico.")
     numero_comprobante: int = Field(sa_column=Column(BigInteger), description="Número de la factura (ej. 1234).")
     punto_venta: int = Field(description="Punto de venta (ej. 1, 2).")
     tipo_comprobante: int = Field(description="Código del tipo de comprobante (1=A, 6=B, 11=C).")
-    fecha_comprobante: date = Field(index=True, sa_column=Column(Date), description="Fecha de emisión del comprobante.")
+    
+    # --- CAMBIO AQUÍ: El índice se mueve DENTRO del Column ---
+    fecha_comprobante: date = Field(sa_column=Column(Date, index=True), description="Fecha de emisión del comprobante.")
+    
     vencimiento_cae: date = Field(sa_column=Column(Date), description="Fecha de vencimiento del CAE.")
     resultado_afip: Optional[str] = Field(default=None, max_length=1, description="'A' (Aprobado), 'R' (Rechazado).")
-
-    # === Datos del Emisor ===
     cuit_emisor: str = Field(max_length=11)
-
-    # === Datos del Receptor ===
     tipo_doc_receptor: int = Field(description="Código del tipo de documento del receptor (80=CUIT, 96=DNI).")
+    
+    # --- CAMBIO AQUÍ: El índice se define de forma estándar en el Field (si no usas sa_column) ---
     nro_doc_receptor: str = Field(max_length=11, index=True)
-
-    # === Datos de los Importes (usando Decimal para precisión) ===
+    
     importe_total: Decimal = Field(sa_column=Column(DECIMAL(15, 2)))
     importe_neto: Decimal = Field(sa_column=Column(DECIMAL(15, 2)))
     importe_iva: Decimal = Field(sa_column=Column(DECIMAL(15, 2)))
-
-    # === Metadatos y Timestamps ===
     raw_response: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSON))
     
     created_at: Optional[datetime] = Field(
