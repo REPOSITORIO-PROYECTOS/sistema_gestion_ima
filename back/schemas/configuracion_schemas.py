@@ -28,6 +28,10 @@ class ConfiguracionUpdate(BaseModel):
     telefono_negocio: Optional[str] = None
     mail_negocio: Optional[str] = None
     link_google_sheets: Optional[str] = None
+    # Tres enlaces adicionales para visualizadores/dashboard públicos
+    link_visual_1: Optional[str] = None
+    link_visual_2: Optional[str] = None
+    link_visual_3: Optional[str] = None
     cuit: Optional[int] = None
     formato_comprobante_predeterminado: Optional[FormatoComprobanteEnum] = None
     aclaraciones_legales: Optional[Dict[str, str]] = None
@@ -45,6 +49,9 @@ class ConfiguracionResponse(BaseModel):
     telefono_negocio: Optional[str]
     mail_negocio: Optional[str]
     link_google_sheets: Optional[str]
+    link_visual_1: Optional[str]
+    link_visual_2: Optional[str]
+    link_visual_3: Optional[str]
     cuit: Optional[int]
     aclaraciones_legales: Optional[Dict[str, str]]
 

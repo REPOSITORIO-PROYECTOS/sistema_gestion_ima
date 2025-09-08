@@ -355,6 +355,11 @@ class ConfiguracionEmpresa(SQLModel, table=True):
     cuit: str = Field(index=True)
     id_empresa: int = Field(foreign_key="empresas.id", primary_key=True)
     link_google_sheets: Optional[str] = Field(default=None) # Enlace a Google Sheets para reportes
+    # --- Tres enlaces públicos/visualizadores asociables a la empresa ---
+    # Pueden usarse para dashboards, reportes externos, vistas embed, etc.
+    link_visual_1: Optional[str] = Field(default=None)
+    link_visual_2: Optional[str] = Field(default=None)
+    link_visual_3: Optional[str] = Field(default=None)
     
     # --- Configuración de Apariencia ---
     nombre_negocio: Optional[str] # Nombre a mostrar en los tickets
