@@ -64,6 +64,32 @@ def guardar_archivo_configuracion(db: Session, id_empresa: int, file: UploadFile
     db.refresh(config_db)
     return config_db
 
+def guardar_links_empresa(db: Session, id_empresa: int, link1: str | None = None, link2: str | None = None, link3: str | None = None) -> ConfiguracionEmpresa:
+    """
+    Guarda o actualiza los tres links visuales (link_visual_1/2/3) en la configuración de la empresa.
+
+    Args:
+        db: Session activa de DB.
+        id_empresa: ID de la empresa cuya configuración se actualizará.
+        link1/link2/link3: URLs (o None) a guardar.
+
+    Devuelve:
+        La instancia actualizada de `ConfiguracionEmpresa`.
+    """
+    config_db = obtener_configuracion_empresa(db, id_empresa)
+
+    if link1 is not None:
+        config_db.link_visual_1 = link1
+    if link2 is not None:
+        config_db.link_visual_2 = link2
+    if link3 is not None:
+        config_db.link_visual_3 = link3
+
+    db.add(config_db)
+    db.commit()
+    db.refresh(config_db)
+    return config_db
+
 def actualizar_configuracion_parcial(db: Session, id_empresa: int, data: ConfiguracionUpdate) -> ConfiguracionEmpresa:
     config_db = obtener_configuracion_por_id_empresa(db, id_empresa)
     update_data = data.model_dump(exclude_unset=True) # Solo los campos que envía el frontend

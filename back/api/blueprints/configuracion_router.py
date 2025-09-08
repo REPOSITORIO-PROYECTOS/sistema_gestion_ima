@@ -14,6 +14,7 @@ from back.schemas.caja_schemas import RespuestaGenerica
 # Lógica de negocio y Schemas
 from back.gestion import configuracion_manager
 from back.schemas.configuracion_schemas import ConfiguracionResponse, ConfiguracionUpdate, RecargoData, RecargoUpdate, ColorResponse, ColorUpdateRequest, ConfiguracionUpdate 
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/configuracion", tags=["Configuración de Empresa"])
 
@@ -163,6 +164,55 @@ def actualizar_mi_configuracion(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error interno: {e}")
+
+ 
+class LinkUpdate(BaseModel):
+    link: str | None
+
+
+@router.get("/mi-empresa/link/{num}")
+def get_link_mi_empresa(
+    num: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(obtener_usuario_actual)
+):
+    """Devuelve uno de los tres links configurados para la empresa (1,2 o 3)."""
+    if not current_user.id_empresa:
+        raise HTTPException(status_code=404, detail="El usuario actual no está asociado a ninguna empresa.")
+
+    if num not in (1, 2, 3):
+        raise HTTPException(status_code=400, detail="Número de link inválido. Debe ser 1, 2 o 3.")
+
+    config = configuracion_manager.obtener_configuracion_empresa(db, current_user.id_empresa)
+    mapping = {1: config.link_visual_1, 2: config.link_visual_2, 3: config.link_visual_3}
+    return {"link": mapping[num]}
+
+
+@router.patch("/mi-empresa/link/{num}")
+def patch_link_mi_empresa(
+    num: int,
+    payload: LinkUpdate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(obtener_usuario_actual)
+):
+    """Actualiza uno de los tres links visuales (requiere rol Admin)."""
+    verificar_permiso_admin(current_user)
+
+    if not current_user.id_empresa:
+        raise HTTPException(status_code=404, detail="El usuario actual no está asociado a ninguna empresa.")
+
+    if num not in (1, 2, 3):
+        raise HTTPException(status_code=400, detail="Número de link inválido. Debe ser 1, 2 o 3.")
+
+    # Llamamos al manager para guardar solo el link correspondiente
+    if num == 1:
+        config_actualizada = configuracion_manager.guardar_links_empresa(db, current_user.id_empresa, link1=payload.link)
+    elif num == 2:
+        config_actualizada = configuracion_manager.guardar_links_empresa(db, current_user.id_empresa, link2=payload.link)
+    else:
+        config_actualizada = configuracion_manager.guardar_links_empresa(db, current_user.id_empresa, link3=payload.link)
+
+    return {"link": (payload.link)}
     
 @router.get("/mi-empresa/recargo/transferencia", response_model=RecargoData)
 def get_recargo_transferencia(
