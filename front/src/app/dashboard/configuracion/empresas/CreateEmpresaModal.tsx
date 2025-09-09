@@ -47,9 +47,11 @@ const formSchema = z.object({
   mail_negocio: z.string().email("Debe ser un email válido.").optional().or(z.literal("")),
   afip_punto_venta_predeterminado: z.coerce.number({invalid_type_error: "Debe ser un número"}).positive("Debe ser un número positivo").optional(),
   afip_condicion_iva: z.enum([
-    "Responsable Inscripto",
-    "Monotributista",
-    "Exento",
+    "RESPONSABLE_INSCRIPTO",
+    "EXENTO",
+    "CONSUMIDOR_FINAL",
+    "MONOTRIBUTO",
+    "NO_CATEGORIZADO",
   ], { required_error: "La condición fiscal es requerida." }),
   link_google_sheets: z.string().optional(),
   
@@ -84,7 +86,7 @@ export function CreateEmpresaModal({ isOpen, onClose, onSuccess }: Props) {
       telefono_negocio: "",
       mail_negocio: "",
       afip_punto_venta_predeterminado: undefined,
-      afip_condicion_iva: "Responsable Inscripto",
+      afip_condicion_iva: "RESPONSABLE_INSCRIPTO",
       link_google_sheets: "",
       admin_username: "",
       admin_password: "",
