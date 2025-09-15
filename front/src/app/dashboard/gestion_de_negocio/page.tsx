@@ -259,9 +259,9 @@ export default function GestionNegocio() {
         const dataLink2 = await resLink2.json();
         const dataLink3 = await resLink3.json();
 
-        setLink1(dataLink1.url || '');
-        setLink2(dataLink2.url || '');
-        setLink3(dataLink3.url || '');
+        setLink1(dataLink1.link || '');
+        setLink2(dataLink2.link || '');
+        setLink3(dataLink3.link || '');
 
       } catch (error) {
         console.error("Error al obtener los enlaces:", error);
@@ -272,44 +272,8 @@ export default function GestionNegocio() {
     fetchLinks();
   }, [token]);
 
-  // Handler para enviar un nuevo link (POST)
-  const handleLinkSubmit = async (linkNumber: number, url: string) => {
-    if (!token) {
-      toast.error("No hay token de sesión, vuelva a iniciar sesión");
-      return;
-    }
-    if (!url.trim()) {
-      toast.error("El enlace no puede estar vacío.");
-      return;
-    }
-
-    try {
-      const res = await fetch(`https://sistema-ima.sistemataup.online/api/configuracion/mi-empresa/link/${linkNumber}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ url }),
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Error al agregar el enlace");
-      }
-
-      toast.success(`Enlace ${linkNumber} agregado correctamente.`);
-      // Opcional: Recargar los links para asegurar la consistencia si el backend no devuelve el valor actualizado
-      // fetchLinks(); 
-
-    } catch (error) {
-      console.error(`Error al agregar el enlace ${linkNumber}:`, error);
-      toast.error(`Error al agregar el enlace ${linkNumber}`);
-    }
-  };
-
-  // Handler para modificar un link existente (PATCH)
-  const handleLinkEdit = async (linkNumber: number, url: string) => {
+  // Handler para guardar/actualizar un link (PATCH)
+  const handleLinkSave = async (linkNumber: number, url: string) => {
     if (!token) {
       toast.error("No hay token de sesión, vuelva a iniciar sesión");
       return;
@@ -326,21 +290,19 @@ export default function GestionNegocio() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ link: url }),
       });
 
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(errorData.message || "Error al modificar el enlace");
+        throw new Error(errorData.message || "Error al guardar el enlace");
       }
 
-      toast.success(`Enlace ${linkNumber} modificado correctamente.`);
-      // Opcional: Recargar los links para asegurar la consistencia si el backend no devuelve el valor actualizado
-      // fetchLinks(); 
+      toast.success(`Enlace ${linkNumber} guardado correctamente.`);
 
     } catch (error) {
-      console.error(`Error al modificar el enlace ${linkNumber}:`, error);
-      toast.error(`Error al modificar el enlace ${linkNumber}`);
+      console.error(`Error al guardar el enlace ${linkNumber}:`, error);
+      toast.error(`Error al guardar el enlace ${linkNumber}`);
     }
   };
 
@@ -526,11 +488,8 @@ export default function GestionNegocio() {
               className="w-full"
             />
             <div className="flex gap-2 mt-2">
-              <Button onClick={() => handleLinkSubmit(1, link1)} className="bg-green-800 text-white px-4 py-1 rounded transition">
-                Agregar Enlace 1
-              </Button>
-              <Button onClick={() => handleLinkEdit(1, link1)} className="bg-yellow-600 text-white px-4 py-1 rounded transition">
-                Editar Enlace 1
+              <Button onClick={() => handleLinkSave(1, link1)} className="bg-green-800 text-white px-4 py-1 rounded transition">
+                Guardar Enlace 1
               </Button>
             </div>
           </div>
@@ -546,11 +505,8 @@ export default function GestionNegocio() {
               className="w-full"
             />
             <div className="flex gap-2 mt-2">
-              <Button onClick={() => handleLinkSubmit(2, link2)} className="bg-green-800 text-white px-4 py-1 rounded transition">
-                Agregar Enlace 2
-              </Button>
-              <Button onClick={() => handleLinkEdit(2, link2)} className="bg-yellow-600 text-white px-4 py-1 rounded transition">
-                Editar Enlace 2
+              <Button onClick={() => handleLinkSave(2, link2)} className="bg-green-800 text-white px-4 py-1 rounded transition">
+                Guardar Enlace 2
               </Button>
             </div>
           </div>
@@ -566,11 +522,8 @@ export default function GestionNegocio() {
               className="w-full"
             />
             <div className="flex gap-2 mt-2">
-              <Button onClick={() => handleLinkSubmit(3, link3)} className="bg-green-800 text-white px-4 py-1 rounded transition">
-                Agregar Enlace 3
-              </Button>
-              <Button onClick={() => handleLinkEdit(3, link3)} className="bg-yellow-600 text-white px-4 py-1 rounded transition">
-                Editar Enlace 3
+              <Button onClick={() => handleLinkSave(3, link3)} className="bg-green-800 text-white px-4 py-1 rounded transition">
+                Guardar Enlace 3
               </Button>
             </div>
           </div>
