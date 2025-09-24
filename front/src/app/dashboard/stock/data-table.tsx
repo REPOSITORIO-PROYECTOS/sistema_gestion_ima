@@ -1,5 +1,7 @@
+
 "use client"
 
+import { useProductoStore } from "@/lib/productoStore";
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,13 +25,13 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectLabel,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select"
 import { toast } from "sonner";
 import { useAuthStore } from "@/lib/authStore"
@@ -47,6 +49,7 @@ export function DataTable<TData, TValue>({
     const [sorting, setSorting] = useState<SortingState>([])
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
     const token = useAuthStore((state) => state.token);
+    const setProductos = useProductoStore((state) => state.setProductos);
 
     const table = useReactTable({
         data,
@@ -58,30 +61,39 @@ export function DataTable<TData, TValue>({
         onColumnFiltersChange: setColumnFilters,
         getFilteredRowModel: getFilteredRowModel(),
         state: {
-        sorting,
-        columnFilters,
+            sorting,
+            columnFilters,
         },
     })
 
-    /* Sync tabla de articulos en backend */
-    const handleSyncArticulos = async () => {
-        
-        toast("Sincronizando artículos... Por favor espera");
 
+
+    const handleSyncArticulos = async () => {
+        toast("Sincronizando artículos... Por favor espera");
         try {
             const response = await fetch("https://sistema-ima.sistemataup.online/api/sincronizar/articulos", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({}),
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({}),
             });
-
             if (!response.ok) throw new Error("Fallo en la respuesta del servidor");
 
+            // Obtener la lista actualizada de productos
+            const productosResponse = await fetch("https://sistema-ima.sistemataup.online/api/productos", {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+            if (!productosResponse.ok) throw new Error("No se pudo obtener la lista actualizada de productos");
+            const productos = await productosResponse.json();
+            setProductos(productos);
+
             toast.success("Artículos sincronizados ✅");
-            
         } catch (error) {
             console.error("Error al sincronizar artículos:", error);
             toast.error("Error al sincronizar artículos ❌");
