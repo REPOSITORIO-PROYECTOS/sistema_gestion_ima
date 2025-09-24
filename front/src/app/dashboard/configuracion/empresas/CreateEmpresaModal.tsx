@@ -160,9 +160,11 @@ export function CreateEmpresaModal({ isOpen, onClose, onSuccess }: Props) {
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                   <SelectContent>
-                    <SelectItem value="Responsable Inscripto">Responsable Inscripto</SelectItem>
-                    <SelectItem value="Monotributista">Monotributista</SelectItem>
-                    <SelectItem value="Exento">Exento</SelectItem>
+                <SelectItem value="RESPONSABLE_INSCRIPTO">Responsable Inscripto</SelectItem>
+                <SelectItem value="MONOTRIBUTO">Monotributista</SelectItem>
+                <SelectItem value="EXENTO">Exento</SelectItem>
+                <SelectItem value="CONSUMIDOR_FINAL">Consumidor Final</SelectItem>
+                <SelectItem value="NO_CATEGORIZADO">No categorizado</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
