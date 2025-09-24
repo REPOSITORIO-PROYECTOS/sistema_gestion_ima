@@ -1,7 +1,6 @@
 
 "use client"
 
-import { useProductoStore } from "@/lib/productoStore";
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -37,19 +36,22 @@ import { toast } from "sonner";
 import { useAuthStore } from "@/lib/authStore"
 
 interface DataTableProps<TData, TValue> {
-  columns: ColumnDef<TData, TValue>[]
-  data: TData[]
+    columns: ColumnDef<TData, TValue>[]
+    data: TData[]
+    onProductosActualizados?: (productos: TData[]) => void
+    loading?: boolean
 }
 
 export function DataTable<TData, TValue>({
-  columns,
-  data,
+    columns,
+    data,
+    onProductosActualizados,
+    loading = false,
 }: DataTableProps<TData, TValue>) {
 
     const [sorting, setSorting] = useState<SortingState>([])
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
     const token = useAuthStore((state) => state.token);
-    const setProductos = useProductoStore((state) => state.setProductos);
 
     const table = useReactTable({
         data,
@@ -68,7 +70,9 @@ export function DataTable<TData, TValue>({
 
 
 
+    const [syncLoading, setSyncLoading] = useState(false);
     const handleSyncArticulos = async () => {
+        setSyncLoading(true);
         toast("Sincronizando artículos... Por favor espera");
         try {
             const response = await fetch("https://sistema-ima.sistemataup.online/api/sincronizar/articulos", {
@@ -82,7 +86,7 @@ export function DataTable<TData, TValue>({
             if (!response.ok) throw new Error("Fallo en la respuesta del servidor");
 
             // Obtener la lista actualizada de productos
-            const productosResponse = await fetch("https://sistema-ima.sistemataup.online/api/productos", {
+            const productosResponse = await fetch("https://sistema-ima.sistemataup.online/api/articulos/obtener_todos", {
                 method: "GET",
                 headers: {
                     "Content-Type": "application/json",
@@ -91,24 +95,31 @@ export function DataTable<TData, TValue>({
             });
             if (!productosResponse.ok) throw new Error("No se pudo obtener la lista actualizada de productos");
             const productos = await productosResponse.json();
-            setProductos(productos);
+            if (onProductosActualizados) onProductosActualizados(productos);
 
             toast.success("Artículos sincronizados ✅");
         } catch (error) {
             console.error("Error al sincronizar artículos:", error);
             toast.error("Error al sincronizar artículos ❌");
+        } finally {
+            setSyncLoading(false);
         }
     };
 
+    if (loading || syncLoading) {
+        return (
+            <div className="flex flex-col items-center justify-center py-10">
+                <span className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mb-4"></span>
+                <p className="text-green-900">Cargando productos...</p>
+            </div>
+        );
+    }
+
     return (
-
         <div>
-
             {/* Headers de la Tabla */}
             <div className="flex flex-col md:flex-row justify-between items-center gap-4 pb-4">
-
                 <h2 className="block sm:hidden text-start text-xl font-semibold text-green-950 my-4">Sección de Stock</h2>
-
                 {/* Input de Búsqueda por Producto */}
                 <Input
                     placeholder="Filtrar por producto"
@@ -118,7 +129,6 @@ export function DataTable<TData, TValue>({
                     }
                     className="w-full md:w-1/6"
                 />
-
                 {/* Input de Búsqueda por Código de Barras */}
                 <Input
                     placeholder="Filtrar por código de barras"
@@ -128,24 +138,19 @@ export function DataTable<TData, TValue>({
                     }
                     className="w-full md:w-1/6"
                 />
-
                 {/* Botones para sincronización */}
                 <div className="flex gap-2 w-full md:w-1/3 md:flex-row flex-col">
                     <Button variant="outline" onClick={handleSyncArticulos}>Sincronizar Artículos</Button>
                 </div>
-
                 <div className="flex justify-center items-center w-full md:w-1/3 p-4 text-sm bg-yellow-100 border border-yellow-300 rounded-lg text-yellow-800">
                     Para agregar nuevos productos dirigirse a la sección de contabilidad / proveedores.
                 </div>
-
             </div>
-
             {/* Tabla */}
             <div className="rounded-md border">
                 <Table>
                     <TableHeader>
                     {table.getHeaderGroups().map((headerGroup) => (
-
                         <TableRow key={headerGroup.id}>
                         {headerGroup.headers.map((header) => {
                             return (
@@ -162,21 +167,16 @@ export function DataTable<TData, TValue>({
                         </TableRow>
                     ))}
                     </TableHeader>
-
                     <TableBody>
                     {table.getRowModel().rows?.length ? (
-
                         table.getRowModel().rows.map((row) => (
-
                         <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
-
                             {/* Filas Tabla */}
                             {row.getVisibleCells().map((cell) => (
                             <TableCell key={cell.id} className="px-6">
                                 {flexRender(cell.column.columnDef.cell, cell.getContext())}
                             </TableCell>
                             ))}
-
                         </TableRow>
                         ))
                     ) : (
@@ -188,16 +188,13 @@ export function DataTable<TData, TValue>({
                     )}
                     </TableBody>
                 </Table>
-
                 {/* Footer Tabla */}
                 <div className="flex flex-col sm:flex-row justify-between items-center m-2">
-
                     {/* Control de Filas por Página */}
                     <Select onValueChange={(value) => {  table.setPageSize(+value) }}>
                         <SelectTrigger className="w-[100px] m-2 cursor-pointer">
                             <SelectValue placeholder="10 filas" />
                         </SelectTrigger>
-
                         <SelectContent>
                             <SelectGroup>
                                 <SelectLabel>Filas por Página</SelectLabel>
@@ -209,7 +206,6 @@ export function DataTable<TData, TValue>({
                             </SelectGroup>
                         </SelectContent>
                     </Select>
-
                     {/* Controles de Paginación */}
                     <div className="flex items-center justify-end space-x-2 py-4 mx-2">
                         <Button
@@ -229,7 +225,6 @@ export function DataTable<TData, TValue>({
                         Siguiente
                         </Button>
                     </div>
-
                 </div>
             </div>
         </div>

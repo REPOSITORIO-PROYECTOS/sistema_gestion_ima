@@ -41,7 +41,13 @@ export default function StockPage() {
 
   return (
     <ProtectedRoute allowedRoles={["Admin", "Soporte"]}>
-      <DataTable columns={columns} data={productos} />
+      <DataTable
+        key={productos.length}
+        columns={columns}
+        data={productos}
+        loading={loading}
+        onProductosActualizados={(nuevos) => setProductos(nuevos)}
+      />
     </ProtectedRoute>
   )
 }
