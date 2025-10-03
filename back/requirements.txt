@@ -53,3 +53,12 @@ uvloop ; sys_platform != "win32"
 watchfiles==1.1.0
 websockets==15.0.1
 qrcode==8.2
+Jinja2==3.1.6
+# Dependencias para generación de PDF con WeasyPrint (mismas versiones que en la raíz del proyecto)
+weasyprint==66.0
+cssselect2==0.8.0
+tinycss2==1.4.0
+pydyf==0.11.0
+pyphen==0.17.2
+webencodings==0.5.1
+pillow==11.3.0

@@ -6,14 +6,13 @@
     <title>Factura</title>
     <style>
         body { font-family: 'Courier New', Courier, monospace; font-size: 10px; margin: 0; padding: 0; color: #000; }
-        /* Medida ajustada para impresoras de 58mm */
         .ticket { width: 48mm; padding: 1mm; }
         .header, .afip-footer { text-align: center; }
         .header h1 { margin: 0; font-size: 14px; font-weight: bold; word-wrap: break-word; }
         .header p { margin: 2px 0; }
         .factura-info { display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; }
         hr { border: none; border-top: 1px dashed black; margin: 5px 0; }
-        .cliente-info p { margin-bottom: 3px; }
+        .cliente-info p, .pago-info p { margin-bottom: 3px; }
         .item-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
         .item-table th, .item-table td { padding: 2px 0; }
         .col-cant { width: 15%; text-align: left; }
@@ -22,23 +21,12 @@
         .col-subt { width: 20%; text-align: right; }
         .item-discount td { font-size: 9px; color: #555; border-top: none; padding-top: 0; }
         .totals-section { margin-top: 8px; border-top: 1px dashed black; padding-top: 5px; }
-        .totals-section .item { display: flex; justify-content: space-between; font-weight: bold; }
+        .totals-section .item { display: flex; justify-content: space-between; }
+        .totals-section .item.bold { font-weight: bold; }
         .totals-section .discount { color: #555; }
-        .total-final { font-size: 13px; }
-        .membrete-section {
-            text-align: center;
-            font-size: 9px;
-            padding: 4px 0;
-            border-top: 1px dashed black;
-            border-bottom: 1px dashed black;
-            margin: 5px 0;
-        }
-        .observaciones-finales-section {
-            margin-top: 8px;
-            font-size: 9px;
-            word-wrap: break-word;
-            margin-bottom: 5px; 
-        }
+        .total-final { font-size: 13px; font-weight: bold; }
+        .membrete-section { text-align: center; font-size: 9px; padding: 4px 0; border-top: 1px dashed black; border-bottom: 1px dashed black; margin: 5px 0; }
+        .observaciones-finales-section { margin-top: 8px; font-size: 9px; word-wrap: break-word; margin-bottom: 5px; }
         .afip-footer { margin-top: 10px; }
         .afip-footer p { margin: 1px 0; font-weight: bold; }
         .afip-footer img { max-width: 100px; height: auto; margin-top: 5px; }
@@ -47,13 +35,18 @@
 <body>
     <div class="ticket">
         <div class="header">
+            {% if emisor.logo_url %}
+                <img src="{{ emisor.logo_url }}" alt="Logo" style="max-width: 60%; height: auto; margin-bottom: 5px;">
+            {% endif %}
             <h1>{{ emisor.razon_social }}</h1>
             <p>{{ emisor.domicilio }}</p>
             <p>CUIT: {{ emisor.cuit }}</p>
+            <p>IIBB: {{ emisor.ingresos_brutos }}</p>
+            <p>Inicio Act.: {{ emisor.inicio_actividades }}</p>
             <p>IVA: {{ emisor.condicion_iva }}</p>
             <hr>
             <div class="factura-info">
-                <span>FACTURA</span>
+                <span>{{ afip.tipo_comprobante_nombre or 'FACTURA' }}</span>
                 <span>{{ afip.tipo_comprobante_letra or 'B' }}</span> 
             </div>
             <p>P.Venta: {{ '%05d'|format(emisor.punto_venta) }} - N°: {{ '%08d'|format(afip.numero_comprobante or 0) }}</p>
@@ -65,6 +58,7 @@
             <p><strong>Cliente:</strong> {{ receptor.nombre_razon_social or 'Consumidor Final' }}</p>
             <p><strong>CUIT/DNI:</strong> {{ receptor.cuit_o_dni or 'S/D' }}</p>
             <p><strong>IVA:</strong> {{ receptor.condicion_iva or 'Consumidor Final' }}</p>
+            <p><strong>Domicilio:</strong> {{ receptor.domicilio or 'S/D' }}</p>
         </div>
         <hr>
         
@@ -100,20 +94,41 @@
 
         <div class="totals-section">
             <div class="item">
-                <span>SUBTOTAL</span>
-                <span>${{ "%.2f"|format(transaccion.total + (transaccion.descuento_general or 0)) }}</span>
+                <span>Subtotal</span>
+                <span>${{ "%.2f"|format(transaccion.subtotal or (transaccion.total + (transaccion.descuento_general or 0))) }}</span>
             </div>
             {% if transaccion.descuento_general and transaccion.descuento_general > 0 %}
                 <div class="item discount">
-                    <span>DESC. GRAL. {% if transaccion.descuento_general_por > 0 %}({{ "%.0f"|format(transaccion.descuento_general_por) }}%){% endif %}</span>
+                    <span>Desc. Gral. {% if transaccion.descuento_general_por > 0 %}({{ "%.0f"|format(transaccion.descuento_general_por) }}%){% endif %}</span>
                     <span>-${{ "%.2f"|format(transaccion.descuento_general) }}</span>
                 </div>
+            {% endif %}
+            <hr>
+            {% if afip.neto is defined and afip.iva is defined %}
+            <div class="item">
+                <span>Neto Gravado</span>
+                <span>${{ "%.2f"|format(afip.neto) }}</span>
+            </div>
+            <div class="item">
+                <span>IVA (21%)</span>
+                <span>${{ "%.2f"|format(afip.iva) }}</span>
+            </div>
             {% endif %}
             <div class="item total-final">
                 <span>TOTAL</span>
                 <span>${{ "%.2f"|format(transaccion.total) }}</span>
             </div>
         </div>
+
+        {% if transaccion.pagos %}
+        <hr>
+        <div class="pago-info">
+            <p><strong>Forma de Pago:</strong></p>
+            {% for pago in transaccion.pagos %}
+            <p>{{ pago.forma_pago }}: ${{ "%.2f"|format(pago.monto) }}</p>
+            {% endfor %}
+        </div>
+        {% endif %}
 
         {% if transaccion.observaciones and '---' in transaccion.observaciones %}
             {% set partes = transaccion.observaciones.split('---', 1) %}
@@ -141,10 +156,12 @@
             {% if afip and afip.cae %}
                 <p>CAE N°: {{ afip.cae }}</p>
                 <p>Vto. CAE: {{ afip.vencimiento_cae }}</p>
-                {% if qr_base64 %}
-                    <img src="data:image/png;base64,{{ qr_base64 }}" alt="Código QR AFIP">
+                {% if afip.qr_base64 %}
+                    <img src="data:image/png;base64,{{ afip.qr_base64 }}" alt="Código QR AFIP">
                 {% endif %}
                 <p>Comprobante Autorizado</p>
+            {% else %}
+                <p>Documento no válido como factura</p>
             {% endif %}
         </div>
     </div>

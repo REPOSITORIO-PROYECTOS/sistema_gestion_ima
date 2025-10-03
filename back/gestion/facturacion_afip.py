@@ -78,7 +78,7 @@ def determinar_datos_factura_segun_iva(
         raise ValueError(f"Condición de IVA del emisor no soportada: {condicion_emisor.name}")
 
 
-# --- FUNCIÓN PRINCIPAL COMPLETA (ADAPTADA PARA STRINGS) ---
+    # --- FUNCIÓN PRINCIPAL COMPLETA (ADAPTADA PARA STRINGS) ---
 
 def generar_factura_para_venta(
     db: Session,
@@ -90,17 +90,16 @@ def generar_factura_para_venta(
     
     print(f"Iniciando proceso de facturación para Emisor CUIT: {emisor_data.cuit}")
 
+    # --- Verificación de URL de facturación ---
+    if not FACTURACION_API_URL:
+        raise ValueError("La URL del microservicio de facturación (FACTURACION_API_URL) no está configurada.")
+
     print(f"Obteniendo credenciales para el CUIT {emisor_data.cuit} desde la bóveda...")
     try:
-        # Asumimos que estas clases y funciones existen en tu código
-        # secreto_emisor = cliente_boveda.obtener_secreto(emisor_data.cuit)
-        # if not secreto_emisor:
-        #     raise ValueError(f"No se encontraron credenciales en la bóveda para el CUIT {emisor_data.cuit}.")
         secreto_emisor = cliente_boveda.obtener_secreto(emisor_data.cuit)
         if not secreto_emisor:
-            # Error de negocio: el emisor no tiene credenciales cargadas.
             raise ValueError(f"No se encontraron credenciales en la bóveda para el CUIT {emisor_data.cuit}.")
-        print("Credenciales obtenidas con éxito de la bóveda (simulado).")
+        print("Credenciales obtenidas con éxito de la bóveda.")
         
         credenciales = {
             "cuit": emisor_data.cuit,
@@ -115,7 +114,8 @@ def generar_factura_para_venta(
     print("Preparando datos de la factura con lógica dinámica...")
 
     try:
-        # Normalizamos el string: a mayúsculas y reemplazamos espacios por guiones bajos
+        if not emisor_data.condicion_iva:
+            raise ValueError("La condición de IVA del emisor es obligatoria.")
         cond_emisor_str = emisor_data.condicion_iva.upper().replace(' ', '_')
         condicion_emisor = CondicionIVA[cond_emisor_str]
     except (KeyError, AttributeError):
@@ -125,6 +125,8 @@ def generar_factura_para_venta(
         documento = cliente_data.cuit_o_dni
         tipo_documento_receptor = TipoDocumento.CUIT if len(documento) == 11 else TipoDocumento.DNI
         try:
+            if not cliente_data.condicion_iva:
+                raise ValueError("La condición de IVA del receptor es obligatoria para clientes identificados.")
             cond_receptor_str = cliente_data.condicion_iva.upper().replace(' ', '_')
             condicion_receptor = CondicionIVA[cond_receptor_str]
         except (KeyError, AttributeError):
@@ -159,6 +161,7 @@ def generar_factura_para_venta(
     payload = {
         "credenciales": credenciales,
         "datos_factura": datos_factura,
+        "generar_qr": True  # <-- PASO 1: Solicitar explícitamente el QR
     }
     
 
@@ -191,14 +194,15 @@ def generar_factura_para_venta(
                 "cae": resultado_afip.get("cae"),
                 "vencimiento_cae": resultado_afip.get("vencimiento_cae"),
                 "numero_comprobante": resultado_afip.get("numero_comprobante"),
+                "qr_base64": resultado_afip.get("qr_base64"), # <-- PASO 2: Guardar el QR
                 "punto_venta": datos_factura.get("punto_venta"),
                 "tipo_comprobante": datos_factura.get("tipo_afip"),
                 "fecha_comprobante": datetime.now().strftime('%Y-%m-%d'),
                 "importe_total": total,
                 "cuit_emisor": int(emisor_data.cuit),
                 "tipo_doc_receptor": datos_factura.get("tipo_documento"),
-                "nro_doc_receptor": int(datos_factura.get("documento")),
-                "tipo_documento": datos_factura.get("tipo_documento"),
+                "nro_doc_receptor": int(datos_factura.get("documento") or 0),
+                # --- Unificamos para consistencia ---
                 "documento": datos_factura.get("documento"),
                 "tipo_afip": datos_factura.get("tipo_afip"),
                 "total": total,
@@ -275,6 +279,10 @@ def generar_nota_credito_para_venta(
     """
     print(f"Iniciando proceso de NOTA DE CRÉDITO para Emisor CUIT: {emisor_data.cuit}")
 
+    # --- Verificación de URL de facturación ---
+    if not FACTURACION_API_URL:
+        raise ValueError("La URL del microservicio de facturación (FACTURACION_API_URL) no está configurada.")
+
     # --- PASO 1: Obtener Credenciales (Lógica Reutilizada) ---
     try:
         secreto_emisor = cliente_boveda.obtener_secreto(emisor_data.cuit)
@@ -290,6 +298,8 @@ def generar_nota_credito_para_venta(
 
     # --- PASO 2: Preparar Datos del Comprobante (Lógica Adaptada) ---
     try:
+        if not emisor_data.condicion_iva:
+            raise ValueError("La condición de IVA del emisor es obligatoria.")
         cond_emisor_str = emisor_data.condicion_iva.upper().replace(' ', '_')
         condicion_emisor = CondicionIVA[cond_emisor_str]
     except (KeyError, AttributeError):
@@ -299,8 +309,13 @@ def generar_nota_credito_para_venta(
         documento = cliente_data.cuit_o_dni
         tipo_documento_receptor = TipoDocumento.CUIT if len(documento) == 11 else TipoDocumento.DNI
         try:
-            cond_receptor_str = cliente_data.condicion_iva.upper().replace(' ', '_')
-            condicion_receptor = CondicionIVA[cond_receptor_str]
+            if not cliente_data.condicion_iva:
+                # Para NC, si no viene la condición, asumimos CF para no fallar
+                print("Advertencia: Condición de IVA del receptor no provista para NC. Asumiendo Consumidor Final.")
+                condicion_receptor = CondicionIVA.CONSUMIDOR_FINAL
+            else:
+                cond_receptor_str = cliente_data.condicion_iva.upper().replace(' ', '_')
+                condicion_receptor = CondicionIVA[cond_receptor_str]
         except (KeyError, AttributeError):
             condicion_receptor = CondicionIVA.CONSUMIDOR_FINAL
     else: 

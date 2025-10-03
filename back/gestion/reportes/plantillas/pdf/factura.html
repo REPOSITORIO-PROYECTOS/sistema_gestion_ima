@@ -8,10 +8,13 @@
         @page {
             size: A4;
             margin: 15mm;
+            @bottom-center {
+                content: "Página " counter(page) " de " counter(pages);
+                font-size: 9px;
+                color: #555;
+            }
         }
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
         body { 
             font-family: Helvetica, Arial, sans-serif; 
             font-size: 11px; 
@@ -19,12 +22,8 @@
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
         }
-        .container { 
-            width: 100%;
-        }
-        .header, .cliente-info, .footer, .afip-footer {
-            page-break-inside: avoid;
-        }
+        .container { width: 100%; }
+        .header, .cliente-info, .footer, .afip-footer { page-break-inside: avoid; }
         .header { 
             display: flex; 
             justify-content: space-between; 
@@ -32,15 +31,14 @@
             border-bottom: 2px solid #000; 
             padding-bottom: 10px; 
         }
+        .header .empresa-logo { max-width: 180px; max-height: 70px; margin-right: 20px; }
         .header .empresa-info { font-size: 12px; line-height: 1.4; }
-        .header .empresa-info .empresa-nombre { 
-            font-size: 18px; 
-            font-weight: bold; 
-        }
+        .header .empresa-info .empresa-nombre { font-size: 18px; font-weight: bold; }
         .header .comprobante-info { 
             text-align: left; 
             border: 2px solid #000; 
             padding: 5px 10px;
+            min-width: 220px;
         }
         .header .comprobante-info .letra { 
             font-size: 48px; 
@@ -48,70 +46,53 @@
             text-align: center; 
             line-height: 1;
         }
-        .comprobante-info div { 
-            margin-bottom: 4px; 
-        }
+        .comprobante-info div { margin-bottom: 4px; }
         .cliente-info { 
             border: 1px solid #ccc; 
             padding: 10px; 
             margin-top: 20px; 
             line-height: 1.5;
         }
-        .cliente-info strong { 
-            display: inline-block; 
-            width: 150px;
-        }
+        .cliente-info strong { display: inline-block; width: 120px; }
         table { 
             width: 100%; 
             border-collapse: collapse; 
             margin-top: 20px; 
         }
-        tr {
-            page-break-inside: avoid;
-        }
+        tr { page-break-inside: avoid; }
         th, td { 
             border: 1px solid #ccc; 
             padding: 6px 8px;
             text-align: left; 
         }
-        th { 
-            background-color: #f2f2f2 !important;
-        }
+        th { background-color: #f2f2f2 !important; }
         .text-right { text-align: right; }
         .text-center { text-align: center; }
-        .col-cantidad { width: 15%; }
-        .col-descripcion { width: 50%; }
+        .col-cantidad { width: 10%; }
+        .col-descripcion { width: 55%; }
         .col-precio { width: 17.5%; }
         .col-subtotal { width: 17.5%; }
-        tfoot td { 
-            border: none; 
-            font-weight: bold;
-            padding: 5px 8px;
+        .totals-wrapper {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 10px;
         }
-        tfoot .total-final td { 
+        .totals-table {
+            width: 45%;
+        }
+        .totals-table td {
+            border: none;
+            padding: 4px 8px;
+        }
+        .totals-table .total-final td { 
             border-top: 2px solid #000; 
             font-size: 14px; 
+            font-weight: bold;
         }
-        .item-discount td, .discount td {
-            color: #d9534f;
-            border-top: none;
-        }
-        .footer {
-            margin-top: 20px;
-        }
-        .membrete-section {
-            margin-top: 20px;
-            padding: 10px;
-            text-align: center;
-            font-style: italic;
-            color: #555;
-            border-top: 1px solid #eee;
-            border-bottom: 1px solid #eee;
-        }
-        .observaciones-venta p {
-            font-size: 10px;
-            color: #555;
-        }
+        .item-discount td, .discount td { color: #d9534f; border-top: none; }
+        .footer { margin-top: 20px; }
+        .membrete-section { margin-top: 20px; padding: 10px; text-align: center; font-style: italic; color: #555; border-top: 1px solid #eee; border-bottom: 1px solid #eee; }
+        .observaciones-venta p { font-size: 10px; color: #555; }
         .afip-footer { 
             display: flex;
             justify-content: space-between;
@@ -119,34 +100,30 @@
             margin-top: 25px; 
             page-break-inside: avoid;
         }
-        /* --- NUEVOS ESTILOS PARA LA LÓGICA DEL QR --- */
-        .afip-footer .qr-code {
-            flex-shrink: 0; /* Evita que el QR se encoja */
-        }
-        .afip-footer .qr-code img { 
-            max-width: 110px;
-            height: auto;
-        }
-        .afip-footer .cae-data-wrapper {
-            flex-grow: 1; /* Permite que ocupe el espacio sobrante */
-            text-align: right;
-            font-size: 10px;
-        }
+        .afip-footer .qr-code { flex-shrink: 0; }
+        .afip-footer .qr-code img { max-width: 110px; height: auto; }
+        .afip-footer .cae-data-wrapper { flex-grow: 1; text-align: right; font-size: 10px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- ... Toda la sección del header, cliente e items de la factura (sin cambios) ... -->
         <div class="header">
-            <div class="empresa-info">
-                <div class="empresa-nombre">{{ emisor.razon_social }}</div>
-                <div>{{ emisor.domicilio }}</div>
-                <div>Condición IVA: {{ emisor.condicion_iva }}</div>
-                <div>CUIT: {{ emisor.cuit }}</div>
+            <div style="display: flex; align-items: flex-start;">
+                {% if emisor.logo_url %}
+                    <img src="{{ emisor.logo_url }}" alt="Logo" class="empresa-logo">
+                {% endif %}
+                <div class="empresa-info">
+                    <div class="empresa-nombre">{{ emisor.razon_social }}</div>
+                    <div>{{ emisor.domicilio }}</div>
+                    <div>Condición IVA: {{ emisor.condicion_iva }}</div>
+                    <div>CUIT: {{ emisor.cuit }}</div>
+                    <div>Ingresos Brutos: {{ emisor.ingresos_brutos }}</div>
+                    <div>Inicio de Actividades: {{ emisor.inicio_actividades }}</div>
+                </div>
             </div>
             <div class="comprobante-info">
                 <div class="letra">{{ afip.tipo_comprobante_letra or 'X' }}</div>
-                <div><strong>FACTURA</strong></div>
+                <div><strong>{{ afip.tipo_comprobante_nombre or 'DOCUMENTO' }}</strong></div>
                 <div>N°: <strong>{{ '%05d'|format(emisor.punto_venta) }}-{{ '%08d'|format(afip.numero_comprobante or 0) }}</strong></div>
                 <div>Fecha: <strong>{{ fecha_emision | date('%d/%m/%Y') }}</strong></div>
             </div>
@@ -162,10 +139,10 @@
         <table>
             <thead>
                 <tr>
-                <th class="text-center col-cantidad">Cant.</th>
-                <th class="col-descripcion">Descripción</th>
-                <th class="text-right col-precio">P. Unit.</th>
-                <th class="text-right col-subtotal">Subtotal</th>
+                    <th class="text-center col-cantidad">Cant.</th>
+                    <th class="col-descripcion">Descripción</th>
+                    <th class="text-right col-precio">P. Unit.</th>
+                    <th class="text-right col-subtotal">Subtotal</th>
                 </tr>
             </thead>
             <tbody>
@@ -186,27 +163,41 @@
                 {% endif %}
                 {% endfor %}
             </tbody>
-            <tfoot>
-                <tr>
-                    <td colspan="3" class="text-right">SUBTOTAL</td>
-                    <td class="text-right">${{ "%.2f"|format(transaccion.total + (transaccion.descuento_general or 0)) }}</td>
-                </tr>
-                {% if transaccion.descuento_general and transaccion.descuento_general > 0 %}
-                <tr class="discount">
-                    <td colspan="3" class="text-right">
-                        DESCUENTO GRAL. {% if transaccion.descuento_general_por > 0 %}({{ "%.0f"|format(transaccion.descuento_general_por) }}%){% endif %}
-                    </td>
-                    <td class="text-right">-${{ "%.2f"|format(transaccion.descuento_general) }}</td>
-                </tr>
-                {% endif %}
-                <tr class="total-final">
-                    <td colspan="3" class="text-right">TOTAL</td>
-                    <td class="text-right">${{ "%.2f"|format(transaccion.total) }}</td>
-                </tr>
-            </tfoot>
         </table>
         
-        <!-- ... Toda la sección de observaciones y membrete (sin cambios) ... -->
+        <div class="totals-wrapper">
+            <table class="totals-table">
+                <tbody>
+                    <tr>
+                        <td class="text-right">Subtotal</td>
+                        <td class="text-right">${{ "%.2f"|format(transaccion.subtotal or (transaccion.total + (transaccion.descuento_general or 0))) }}</td>
+                    </tr>
+                    {% if transaccion.descuento_general and transaccion.descuento_general > 0 %}
+                    <tr class="discount">
+                        <td class="text-right">
+                            Descuento Gral. {% if transaccion.descuento_general_por > 0 %}({{ "%.0f"|format(transaccion.descuento_general_por) }}%){% endif %}
+                        </td>
+                        <td class="text-right">-${{ "%.2f"|format(transaccion.descuento_general) }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if afip.neto is defined and afip.iva is defined %}
+                    <tr>
+                        <td class="text-right">Neto Gravado</td>
+                        <td class="text-right">${{ "%.2f"|format(afip.neto) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-right">IVA (21%)</td>
+                        <td class="text-right">${{ "%.2f"|format(afip.iva) }}</td>
+                    </tr>
+                    {% endif %}
+                    <tr class="total-final">
+                        <td class="text-right">TOTAL</td>
+                        <td class="text-right">${{ "%.2f"|format(transaccion.total) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
         {% if transaccion.observaciones and '---' in transaccion.observaciones %}
             {% set partes = transaccion.observaciones.split('---', 1) %}
             {% set membrete = partes[0] | trim %}
@@ -222,33 +213,40 @@
         {% endif %}
 
         <div class="footer">
+            {% if transaccion.pagos %}
+                <div class="observaciones-venta">
+                    <p><strong>Forma de Pago:</strong> 
+                    {% for pago in transaccion.pagos %}
+                        {{ pago.forma_pago }} (${{ "%.2f"|format(pago.monto) }}){% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                    </p>
+                </div>
+            {% endif %}
+
             {% if observaciones_finales %}
                 <div class="observaciones-venta">
                     <p><strong>Observaciones:</strong> {{ observaciones_finales }}</p>
                 </div>
             {% endif %}
 
-            <!-- ########## INICIO: SECCIÓN DE AFIP MODIFICADA ########## -->
             {% if afip and afip.cae %}
             <div class="afip-footer">
-                
-                <!-- El QR solo se muestra si la variable qr_base64 existe -->
-                {% if qr_base64 %}
+                {% if afip.qr_base64 %}
                 <div class="qr-code">
-                    <img src="data:image/png;base64,{{ qr_base64 }}" alt="Código QR AFIP">
+                    <img src="data:image/png;base64,{{ afip.qr_base64 }}" alt="Código QR AFIP">
                 </div>
                 {% endif %}
-                
-                <!-- Los datos del CAE siempre se muestran si hay CAE, con o sin QR -->
                 <div class="cae-data-wrapper">
                     <p><strong>CAE N°:</strong> {{ afip.cae }}</p>
                     <p><strong>Vto. CAE:</strong> {{ afip.vencimiento_cae }}</p>
                     <p>Comprobante Autorizado</p>
                 </div>
-
+            </div>
+            {% else %}
+            <div class="afip-footer">
+                <p>Documento no válido como factura</p>
             </div>
             {% endif %}
-            <!-- ########## FIN: SECCIÓN DE AFIP MODIFICADA ########## -->
         </div>
     </div>
 </body>
