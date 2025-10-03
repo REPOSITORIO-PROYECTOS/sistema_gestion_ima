@@ -53,11 +53,19 @@ class TipoDocumento(Enum):
     CONSUMIDOR_FINAL = 99
 
 
-def determinar_datos_factura_segun_iva(
+def determinar_logica_comprobante(
     condicion_emisor: CondicionIVA,
     condicion_receptor: CondicionIVA,
-    total: float
+    total: float,
+    formato: str = "pdf",  # Nuevo parámetro para determinar si es ticket
+    TASA_IVA_21: float = 0.21
 ) -> Dict[str, Any]:
+    # Si es formato ticket, siempre es código 83 (Ticket Fiscal)
+    if formato == "ticket":
+        neto = round(total / (1 + TASA_IVA_21), 2)
+        iva = round(total - neto, 2)
+        return {"tipo_afip": 83, "neto": neto, "iva": iva}
+    
     if condicion_emisor == CondicionIVA.RESPONSABLE_INSCRIPTO:
         # --- LÓGICA CORREGIDA ---
         # Para un RI, el IVA se calcula siempre. La única diferencia es el tipo de comprobante.
@@ -65,10 +73,10 @@ def determinar_datos_factura_segun_iva(
         iva = round(total - neto, 2)
         
         if condicion_receptor == CondicionIVA.RESPONSABLE_INSCRIPTO:
-            # Si el receptor es RI, es Factura A
+            # Si el receptor es RI, es Factura A (001)
             return {"tipo_afip": 1, "neto": neto, "iva": iva}
         else:
-            # Si el receptor es CF, Monotributista, etc., es Factura B
+            # Si el receptor es CF, Monotributista, etc., es Factura B (006)
             return {"tipo_afip": 6, "neto": neto, "iva": iva}
 
     elif condicion_emisor in [CondicionIVA.MONOTRIBUTO, CondicionIVA.EXENTO]:
@@ -85,7 +93,8 @@ def generar_factura_para_venta(
     venta_a_facturar: Venta,
     total: float, 
     cliente_data: Optional[ReceptorData],
-    emisor_data: EmisorData
+    emisor_data: EmisorData,
+    formato_comprobante: str = "pdf"
 ) -> Dict[str, Any]:
     
     print(f"Iniciando proceso de facturación para Emisor CUIT: {emisor_data.cuit}")
@@ -138,10 +147,11 @@ def generar_factura_para_venta(
         
     print(f"Emisor: {condicion_emisor.name}, Receptor: {condicion_receptor.name}, Total: {total}")
 
-    logica_factura = determinar_datos_factura_segun_iva(
+    logica_factura = determinar_logica_comprobante(
         condicion_emisor=condicion_emisor,
         condicion_receptor=condicion_receptor,
-        total=total
+        total=total,
+        formato=formato_comprobante
     )
     print(f"Lógica determinada: {logica_factura}")
 
@@ -167,85 +177,150 @@ def generar_factura_para_venta(
 
 
     print(f"Enviando petición al microservicio de facturación en: {FACTURACION_API_URL}")
-    try:
-        response = requests.post(
-            FACTURACION_API_URL,
-            json=payload,
-            timeout=20,
-        )
-        
-        response.raise_for_status() 
-        
-        resultado_afip = response.json()
-        print(f"Respuesta exitosa del microservicio de facturación: {resultado_afip}")
-        if resultado_afip.get("cae"):
-            
-            # 1. Obtenemos la venta de la base de datos
-            venta_a_actualizar = db.get(Venta, venta_a_facturar.id)
-            if not venta_a_actualizar:
-                print(f"ERROR: No se encontró la Venta con ID {venta_a_facturar.id} para actualizar.")
-                # Aunque no se guarde, devolvemos el resultado para no romper el flujo
-                return resultado_afip
-
-            # 2. Construimos el diccionario completo que se guardará
-            datos_completos_para_guardar = {
-                "estado": "EXITOSO",
-                "resultado": resultado_afip.get("resultado", "A"),
-                "cae": resultado_afip.get("cae"),
-                "vencimiento_cae": resultado_afip.get("vencimiento_cae"),
-                "numero_comprobante": resultado_afip.get("numero_comprobante"),
-                "qr_base64": resultado_afip.get("qr_base64"), # <-- PASO 2: Guardar el QR
-                "punto_venta": datos_factura.get("punto_venta"),
-                "tipo_comprobante": datos_factura.get("tipo_afip"),
-                "fecha_comprobante": datetime.now().strftime('%Y-%m-%d'),
-                "importe_total": total,
-                "cuit_emisor": int(emisor_data.cuit),
-                "tipo_doc_receptor": datos_factura.get("tipo_documento"),
-                "nro_doc_receptor": int(datos_factura.get("documento") or 0),
-                # --- Unificamos para consistencia ---
-                "documento": datos_factura.get("documento"),
-                "tipo_afip": datos_factura.get("tipo_afip"),
-                "total": total,
-                "neto": datos_factura.get("neto"),
-                "iva": datos_factura.get("iva"),
-                "id_condicion_iva": datos_factura.get("id_condicion_iva")
-            }
-            
-            # 3. Asignamos el diccionario al campo JSON y actualizamos el estado
-            venta_a_actualizar.datos_factura = datos_completos_para_guardar
-            venta_a_actualizar.facturada = True
-            
-            db.add(venta_a_actualizar)
-            db.commit()
-            db.refresh(venta_a_actualizar)
-            
-            print(f"Venta ID: {venta_a_facturar.id} actualizada correctamente en la base de datos.")
-        
-        # 4. Devolvemos el resultado original del microservicio, como antes
-            return datos_completos_para_guardar
-        else:
-            # Si el estado no es exitoso, lanzamos un error
-            error_msg = resultado_afip.get('errores') or resultado_afip.get('error', 'Error desconocido de AFIP.')
-            raise RuntimeError(f"AFIP devolvió un error: {error_msg}")
-
-    except requests.exceptions.HTTPError as e:
-        error_detalle = "Sin detalles adicionales"
-        try:
-            # Intenta obtener un JSON del cuerpo de la respuesta de error
-            error_detalle = e.response.json().get('detail', e.response.text)
-        except requests.exceptions.JSONDecodeError:
-            error_detalle = e.response.text
-
-        print(f"ERROR: El microservicio de facturación rechazó la petición. Status: {e.response.status_code}. Detalle: {error_detalle}")
-        raise RuntimeError(f"Error en el servicio de facturación: {error_detalle}")
-
-    except requests.exceptions.RequestException as e:
-        print(f"ERROR: No se pudo conectar con el microservicio de facturación. Detalle: {e}")
-        raise RuntimeError("El servicio de facturación no está disponible en este momento.")
     
-    except Exception as e:
-        print(f"ERROR: Ocurrió un error inesperado durante la facturación. Detalle: {e}")
-        raise RuntimeError(f"Error inesperado durante la facturación: {e}")
+    # Sistema de reintentos para errores SSL de AFIP
+    max_intentos = 3
+    tiempo_espera = [2, 5, 10]  # Espera progresiva entre reintentos
+    
+    for intento in range(max_intentos):
+        try:
+            print(f"Intento {intento + 1} de {max_intentos}")
+            response = requests.post(
+                FACTURACION_API_URL,
+                json=payload,
+                timeout=30,  # Aumentamos timeout
+            )
+        
+            response.raise_for_status() 
+            
+            resultado_afip = response.json()
+            print(f"SERVICIO EXTERNO - Respuesta exitosa del microservicio de facturación: {resultado_afip}")
+            print(f"SERVICIO EXTERNO - Campos recibidos: {list(resultado_afip.keys())}")
+            
+            if resultado_afip.get("cae"):
+                print(f"SERVICIO EXTERNO - CAE obtenido: {resultado_afip.get('cae')}")
+                
+                # 1. Obtenemos la venta de la base de datos
+                venta_a_actualizar = db.get(Venta, venta_a_facturar.id) if venta_a_facturar.id else None
+                
+                if not venta_a_actualizar:
+                    print(f"ADVERTENCIA: No se encontró la Venta con ID {getattr(venta_a_facturar, 'id', 'TEMPORAL')} para actualizar en BD.")
+                    print("SERVICIO EXTERNO - Construyendo respuesta sin actualizar BD...")
+                    
+                    # Construimos el diccionario completo sin actualizar BD
+                    datos_completos_para_guardar = {
+                        "estado": "EXITOSO",
+                        "resultado": resultado_afip.get("resultado", "A"),
+                        "cae": resultado_afip.get("cae"),
+                        "vencimiento_cae": resultado_afip.get("vencimiento_cae"),
+                        "numero_comprobante": resultado_afip.get("numero_comprobante"),
+                        "qr_base64": resultado_afip.get("qr_base64"),
+                        "punto_venta": datos_factura.get("punto_venta"),
+                        "tipo_comprobante": datos_factura.get("tipo_afip"),
+                        "fecha_comprobante": datetime.now().strftime('%Y-%m-%d'),
+                        "importe_total": total,
+                        "cuit_emisor": int(emisor_data.cuit),
+                        "tipo_doc_receptor": datos_factura.get("tipo_documento"),
+                        "nro_doc_receptor": int(datos_factura.get("documento") or 0),
+                        "documento": datos_factura.get("documento"),
+                        "tipo_afip": datos_factura.get("tipo_afip"),
+                        "total": total,
+                        "neto": datos_factura.get("neto"),
+                        "iva": datos_factura.get("iva"),
+                        "id_condicion_iva": datos_factura.get("id_condicion_iva")
+                    }
+                    print(f"SERVICIO EXTERNO - Respuesta construida: {datos_completos_para_guardar}")
+                    return datos_completos_para_guardar
+
+                # 2. Construimos el diccionario completo que se guardará
+                datos_completos_para_guardar = {
+                    "estado": "EXITOSO",
+                    "resultado": resultado_afip.get("resultado", "A"),
+                    "cae": resultado_afip.get("cae"),
+                    "vencimiento_cae": resultado_afip.get("vencimiento_cae"),
+                    "numero_comprobante": resultado_afip.get("numero_comprobante"),
+                    "qr_base64": resultado_afip.get("qr_base64"), # <-- PASO 2: Guardar el QR
+                    "punto_venta": datos_factura.get("punto_venta"),
+                    "tipo_comprobante": datos_factura.get("tipo_afip"),
+                    "fecha_comprobante": datetime.now().strftime('%Y-%m-%d'),
+                    "importe_total": total,
+                    "cuit_emisor": int(emisor_data.cuit),
+                    "tipo_doc_receptor": datos_factura.get("tipo_documento"),
+                    "nro_doc_receptor": int(datos_factura.get("documento") or 0),
+                    # --- Unificamos para consistencia ---
+                    "documento": datos_factura.get("documento"),
+                    "tipo_afip": datos_factura.get("tipo_afip"),
+                    "total": total,
+                    "neto": datos_factura.get("neto"),
+                    "iva": datos_factura.get("iva"),
+                    "id_condicion_iva": datos_factura.get("id_condicion_iva")
+                }
+                
+                # 3. Asignamos el diccionario al campo JSON y actualizamos el estado
+                venta_a_actualizar.datos_factura = datos_completos_para_guardar
+                venta_a_actualizar.facturada = True
+                
+                db.add(venta_a_actualizar)
+                db.commit()
+                db.refresh(venta_a_actualizar)
+                
+                print(f"Venta ID: {venta_a_facturar.id} actualizada correctamente en la base de datos.")
+            
+                # 4. Devolvemos el resultado construido
+                print(f"SERVICIO EXTERNO - Devolviendo respuesta final: {datos_completos_para_guardar}")
+                return datos_completos_para_guardar
+            else:
+                # Si el estado no es exitoso, lanzamos un error
+                error_msg = resultado_afip.get('errores') or resultado_afip.get('error', 'Error desconocido de AFIP.')
+                raise RuntimeError(f"AFIP devolvió un error: {error_msg}")
+
+        except requests.exceptions.HTTPError as e:
+            error_detalle = "Sin detalles adicionales"
+            try:
+                # Intenta obtener un JSON del cuerpo de la respuesta de error
+                error_response = e.response.json()
+                error_detalle = error_response.get('message', error_response.get('detail', e.response.text))
+                
+                # Manejo específico para errores SSL/conexión de AFIP
+                if any(err in str(error_detalle) for err in ["ssl.SSLError", "Connection reset by peer", "TypeError: 'ssl.SSLError' object is not subscriptable"]):
+                    if intento < max_intentos - 1:  # Si no es el último intento
+                        print(f"Error SSL detectado. Esperando {tiempo_espera[intento]} segundos antes del siguiente intento...")
+                        import time
+                        time.sleep(tiempo_espera[intento])
+                        continue  # Continuar con el siguiente intento
+                    else:
+                        error_detalle = "Error de conexión SSL con AFIP. Los servidores de AFIP pueden estar temporalmente no disponibles. Se agotaron los reintentos."
+                    
+            except:
+                error_detalle = e.response.text if e.response else str(e)
+
+            if intento == max_intentos - 1:  # Si es el último intento
+                print(f"ERROR: El microservicio de facturación rechazó la petición después de {max_intentos} intentos. Status: {e.response.status_code}. Detalle: {error_detalle}")
+                raise RuntimeError(f"Error en el servicio de facturación: {error_detalle}")
+
+        except requests.exceptions.RequestException as e:
+            error_str = str(e)
+            if any(err in error_str for err in ["Connection reset by peer", "SSL", "ssl.SSLError", "UNEXPECTED_EOF_WHILE_READING"]):
+                if intento < max_intentos - 1:  # Si no es el último intento
+                    print(f"Error de conexión SSL detectado: {error_str}")
+                    print(f"Esperando {tiempo_espera[intento]} segundos antes del siguiente intento...")
+                    import time
+                    time.sleep(tiempo_espera[intento])
+                    continue  # Continuar con el siguiente intento
+                else:
+                    print(f"ERROR: Conexión SSL falló después de {max_intentos} intentos. Detalle: {e}")
+                    raise RuntimeError("Error de conexión con AFIP. Los servidores pueden estar temporalmente no disponibles. Se agotaron los reintentos.")
+            else:
+                print(f"ERROR: No se pudo conectar con el microservicio de facturación. Detalle: {e}")
+                raise RuntimeError("El servicio de facturación no está disponible en este momento.")
+        
+        except Exception as e:
+            print(f"ERROR: Ocurrió un error inesperado durante la facturación. Detalle: {e}")
+            if intento == max_intentos - 1:  # Si es el último intento
+                raise RuntimeError(f"Error inesperado durante la facturación: {e}")
+    
+    # Si llegamos aquí es porque se agotaron todos los reintentos
+    raise RuntimeError("Se agotaron todos los intentos de conexión con AFIP. Los servidores pueden estar temporalmente no disponibles.")
     
 
 
@@ -355,18 +430,46 @@ def generar_nota_credito_para_venta(
         "datos_factura": datos_nota_credito, # El microservicio espera este nombre de clave
     }
 
-    # --- PASO 3: Enviar al Microservicio (Lógica Reutilizada) ---
+    # --- PASO 3: Enviar al Microservicio con Reintentos ---
     print(f"Enviando petición de Nota de Crédito al microservicio...")
-    try:
-        response = requests.post(
-            FACTURACION_API_URL,
-            json=payload,
-            timeout=20,
-        )
-        response.raise_for_status() 
-        return response.json()
-    except requests.exceptions.HTTPError as e:
-        error_detalle = e.response.json().get('detail', e.response.text) if e.response else str(e)
-        raise RuntimeError(f"Error en el servicio de facturación: {error_detalle}")
-    except requests.exceptions.RequestException as e:
-        raise RuntimeError(f"El servicio de facturación no está disponible: {e}")
+    
+    max_intentos = 3
+    tiempo_espera = [2, 5, 10]
+    
+    for intento in range(max_intentos):
+        try:
+            print(f"Intento {intento + 1} de {max_intentos} para Nota de Crédito")
+            response = requests.post(
+                FACTURACION_API_URL,
+                json=payload,
+                timeout=30,
+            )
+            response.raise_for_status() 
+            return response.json()
+            
+        except requests.exceptions.HTTPError as e:
+            error_detalle = e.response.json().get('detail', e.response.text) if e.response else str(e)
+            
+            if any(err in str(error_detalle) for err in ["ssl.SSLError", "Connection reset by peer", "TypeError: 'ssl.SSLError' object is not subscriptable"]):
+                if intento < max_intentos - 1:
+                    print(f"Error SSL en NC. Esperando {tiempo_espera[intento]} segundos...")
+                    import time
+                    time.sleep(tiempo_espera[intento])
+                    continue
+                    
+            if intento == max_intentos - 1:
+                raise RuntimeError(f"Error en el servicio de facturación para NC: {error_detalle}")
+                
+        except requests.exceptions.RequestException as e:
+            if any(err in str(e) for err in ["Connection reset by peer", "SSL", "ssl.SSLError"]):
+                if intento < max_intentos - 1:
+                    print(f"Error de conexión SSL en NC: {e}")
+                    print(f"Esperando {tiempo_espera[intento]} segundos...")
+                    import time
+                    time.sleep(tiempo_espera[intento])
+                    continue
+                    
+            if intento == max_intentos - 1:
+                raise RuntimeError(f"El servicio de facturación no está disponible para NC: {e}")
+    
+    raise RuntimeError("Se agotaron todos los intentos de conexión con AFIP para Nota de Crédito.")

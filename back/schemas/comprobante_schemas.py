@@ -9,6 +9,17 @@ TipoComprobante = Literal["factura", "remito", "presupuesto", "recibo"]
 
 # --- Estructuras de Datos ---
 
+class AfipData(BaseModel):
+    """
+    Datos de AFIP para generar el QR y mostrar información de facturación electrónica.
+    """
+    fecha_emision: str
+    tipo_comprobante_afip: int
+    numero_comprobante: int
+    codigo_tipo_doc_receptor: int
+    cae: str
+    fecha_vencimiento_cae: Optional[str] = None
+
 class EmisorData(BaseModel):
     """
     Contiene los DATOS PÚBLICOS del emisor. 
@@ -40,19 +51,22 @@ class ItemData(BaseModel):
 class TransaccionData(BaseModel):
     items: List[ItemData]
     total: float
+    subtotal: Optional[float] = None
     descuento_general: Optional[float] = 0.0
     descuento_general_por:Optional[float] = 0.0
     impuestos: Optional[float] = 0.0
     observaciones: Optional[str] = None
     datos_factura_previa: Optional[Dict[str, Any]] = None
+    pagos: Optional[List[Dict[str, Any]]] = None
+    afip: Optional[AfipData] = None
 
 # --- El Schema Principal de la Petición ---
 
 class GenerarComprobanteRequest(BaseModel):
-    formato: TipoFormato
-    tipo: TipoComprobante
-    emisor: EmisorData
-    receptor: ReceptorData
+    tipo: str
+    numero: Optional[str] = None
+    empresa: EmpresaData
+    receptor: ReceptorData  
     transaccion: TransaccionData
     
 class FacturarLoteRequest(BaseModel):

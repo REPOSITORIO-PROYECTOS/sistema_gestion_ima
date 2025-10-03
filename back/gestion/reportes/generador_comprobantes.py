@@ -20,6 +20,7 @@ _MAP_TIPO_AFIP_LETRA = {
     3: 'A',    # Nota de Crédito A
     8: 'B',    # Nota de Crédito B
     13: 'C',   # Nota de Crédito C
+    83: 'T',   # Ticket Fiscal
 }
 _NC_TYPES = {3, 8, 13}
 
@@ -193,7 +194,19 @@ def generar_comprobante_stateless(data: GenerarComprobanteRequest) -> bytes:
     try:
         css_string = ""
         if data.formato == "ticket":
-            css_string = "@page { size: 80mm auto; margin: 2mm; }"
+            # CSS adaptable para impresoras de diferentes tamaños
+            css_string = """
+            @page { 
+                size: 80mm auto; 
+                margin: 1mm; 
+            }
+            @media (max-width: 60mm) {
+                @page { 
+                    size: 58mm auto; 
+                    margin: 0.5mm; 
+                }
+            }
+            """
         pdf_bytes = HTML(string=html_renderizado).write_pdf(stylesheets=[CSS(string=css_string)])
         print(f"-> PDF generado. Tamaño: {len(pdf_bytes)} bytes.")
     except Exception as e:
