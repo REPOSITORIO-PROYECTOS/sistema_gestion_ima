@@ -15,10 +15,12 @@ class AfipData(BaseModel):
     """
     fecha_emision: str
     tipo_comprobante_afip: int
+    tipo_comprobante_nombre: Optional[str] = None
     numero_comprobante: int
     codigo_tipo_doc_receptor: int
     cae: str
     fecha_vencimiento_cae: Optional[str] = None
+    qr_base64: Optional[str] = None
 
 class EmisorData(BaseModel):
     """
@@ -65,9 +67,11 @@ class TransaccionData(BaseModel):
 class GenerarComprobanteRequest(BaseModel):
     tipo: str
     numero: Optional[str] = None
-    empresa: EmpresaData
+    formato: Optional[str] = "pdf"
+    emisor: EmisorData
     receptor: ReceptorData  
     transaccion: TransaccionData
+    comprobante_asociado: Optional[Dict[str, Any]] = None  # Para notas de crédito
     
 class FacturarLoteRequest(BaseModel):
     # Una lista de IDs de CajaMovimiento (de tipo VENTA) que se quieren facturar.
