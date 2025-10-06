@@ -166,7 +166,8 @@ def api_registrar_venta(
                 total=req.total_venta, 
                 cliente_data=cliente_data_schema,
                 emisor_data=emisor_data_schema,
-                formato_comprobante=formato_comprobante
+                formato_comprobante=formato_comprobante,
+                tipo_solicitado=req.tipo_comprobante_solicitado
             )
             print("DESPUES DE LA FUNCION GENERAR FACTURA")
             # === FIN DE LA LÓGICA DE FACTURACIÓN CORREGIDA ===

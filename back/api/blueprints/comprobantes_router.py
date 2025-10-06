@@ -98,7 +98,8 @@ def api_generar_comprobante(
                         total=req.transaccion.total,
                         cliente_data=req.receptor,
                         emisor_data=req.emisor,
-                        formato_comprobante=req.formato
+                        formato_comprobante=req.formato,
+                        tipo_solicitado=req.tipo
                     )
                     tipo_comprobante_nombre = "FACTURA"
                     

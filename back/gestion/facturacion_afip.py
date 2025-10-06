@@ -58,6 +58,8 @@ def determinar_logica_comprobante(
     condicion_receptor: CondicionIVA,
     total: float,
     formato: str = "pdf",  # Nuevo parámetro para determinar si es ticket
+    receptor_tiene_cuit: bool = False,
+    tipo_solicitado: Optional[str] = None,
     TASA_IVA_21: float = 0.21
 ) -> Dict[str, Any]:
     # Si es formato ticket, siempre es código 83 (Ticket Fiscal)
@@ -65,18 +67,56 @@ def determinar_logica_comprobante(
         neto = round(total / (1 + TASA_IVA_21), 2)
         iva = round(total - neto, 2)
         return {"tipo_afip": 83, "neto": neto, "iva": iva}
+    # --- MAPEOS RÁPIDOS (Aceptar strings como 'factura_a', 'factura b', 'a', 'b', etc.) ---
+    TIPO_AFIP_MAP = {
+        # Facturas
+        'factura_a': 1, 'facturaa': 1, 'a': 1,
+        'factura_b': 6, 'facturab': 6, 'b': 6,
+        'factura_c': 11, 'facturac': 11, 'c': 11,
+        # Variantes con espacios/guiones
+        'factura b': 6, 'factura c': 11, 'factura a': 1,
+        'nota_credito_a': 3, 'nota_credito_b': 8, 'nota_credito_c': 13,
+        'nota-de-credito-a': 3, 'nota-de-credito-b': 8, 'nota-de-credito-c': 13,
+        'nota credito a': 3,
+        'nota_debito_a': 2, 'nota_debito_b': 7, 'nota_debito_c': 12,
+        'nota-de-debito-a': 2, 'nota-de-debito-b': 7, 'nota-de-debito-c': 12,
+        'nota debito a': 2,
+        # Ticket fiscal common alias
+        'ticket': 83, 't': 83
+    }
+
+    if tipo_solicitado:
+        key = tipo_solicitado.strip().lower().replace('-', '_')
+        # Normalize spaces to underscores as well
+        key = '_'.join(key.split())
+        if key in TIPO_AFIP_MAP:
+            tipo_map = TIPO_AFIP_MAP[key]
+            # Business rule: if someone requests Factura A but receptor lacks CUIT, downgrade to B
+            if tipo_map == 1 and not receptor_tiene_cuit and condicion_emisor == CondicionIVA.RESPONSABLE_INSCRIPTO:
+                tipo_map = 6
+            # Monotributo/Exento should map to 11 regardless
+            if condicion_emisor in [CondicionIVA.MONOTRIBUTO, CondicionIVA.EXENTO]:
+                tipo_map = 11
+
+            if tipo_map == 11:
+                return {"tipo_afip": 11, "neto": total, "iva": 0.0}
+            else:
+                neto = round(total / (1 + TASA_IVA_21), 2)
+                iva = round(total - neto, 2)
+                return {"tipo_afip": tipo_map, "neto": neto, "iva": iva}
     
     if condicion_emisor == CondicionIVA.RESPONSABLE_INSCRIPTO:
         # --- LÓGICA CORREGIDA ---
         # Para un RI, el IVA se calcula siempre. La única diferencia es el tipo de comprobante.
         neto = round(total / (1 + TASA_IVA_21), 2)
         iva = round(total - neto, 2)
-        
-        if condicion_receptor == CondicionIVA.RESPONSABLE_INSCRIPTO:
-            # Si el receptor es RI, es Factura A (001)
+        # Reglas solicitadas por el negocio:
+        # - Si el receptor tiene CUIT (identificado), emitir Factura A (1).
+        # - Si el receptor no tiene CUIT (consumidor final sin identificación), emitir Factura B (6).
+        # - Mantener Monotributo/Exento -> Factura C (11) en su propia rama más abajo.
+        if receptor_tiene_cuit:
             return {"tipo_afip": 1, "neto": neto, "iva": iva}
         else:
-            # Si el receptor es CF, Monotributista, etc., es Factura B (006)
             return {"tipo_afip": 6, "neto": neto, "iva": iva}
 
     elif condicion_emisor in [CondicionIVA.MONOTRIBUTO, CondicionIVA.EXENTO]:
@@ -94,7 +134,8 @@ def generar_factura_para_venta(
     total: float, 
     cliente_data: Optional[ReceptorData],
     emisor_data: EmisorData,
-    formato_comprobante: str = "pdf"
+    formato_comprobante: str = "pdf",
+    tipo_solicitado: Optional[str] = None
 ) -> Dict[str, Any]:
     
     print(f"Iniciando proceso de facturación para Emisor CUIT: {emisor_data.cuit}")
@@ -147,11 +188,21 @@ def generar_factura_para_venta(
         
     print(f"Emisor: {condicion_emisor.name}, Receptor: {condicion_receptor.name}, Total: {total}")
 
+    # Decide si el receptor está identificado con CUIT (longitud 11 en documento)
+    receptor_tiene_cuit = False
+    try:
+        if cliente_data and cliente_data.cuit_o_dni and cliente_data.cuit_o_dni != "0":
+            receptor_tiene_cuit = len(str(cliente_data.cuit_o_dni)) == 11
+    except Exception:
+        receptor_tiene_cuit = False
+
     logica_factura = determinar_logica_comprobante(
         condicion_emisor=condicion_emisor,
         condicion_receptor=condicion_receptor,
         total=total,
-        formato=formato_comprobante
+        formato=formato_comprobante,
+        receptor_tiene_cuit=receptor_tiene_cuit,
+        tipo_solicitado=tipo_solicitado
     )
     print(f"Lógica determinada: {logica_factura}")
 

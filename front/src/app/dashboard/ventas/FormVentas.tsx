@@ -55,12 +55,12 @@ type Cliente = {
 
 // Tipo para el producto que se selecciona del dropdown
 type ProductoSeleccionado = {
-    id: string;
-    nombre: string;
-    precio_venta: number;
-    venta_negocio: number;
-    stock_actual: number;
-    unidad_venta: string;
+  id: string;
+  nombre: string;
+  precio_venta: number;
+  venta_negocio: number;
+  stock_actual: number;
+  unidad_venta: string;
 };
 
 // --- Constantes ---
@@ -150,9 +150,9 @@ function FormVentas({
   const [productoEscaneado, setProductoEscaneado] = useState<ProductoSeleccionado | null>(null);
   const [cantidadEscaneada, setCantidadEscaneada] = useState(1);
   const inputRef = useRef<HTMLInputElement>(null);
-  const cantidadInputRef = useRef<HTMLInputElement>(null); 
+  const cantidadInputRef = useRef<HTMLInputElement>(null);
   const empresa = useEmpresaStore((state) => state.empresa);
-  const [checkoutVisible, setCheckoutVisible] = useState(false); 
+  const [checkoutVisible, setCheckoutVisible] = useState(false);
   const checkoutSectionRef = useRef<HTMLDivElement>(null);
 
 
@@ -175,22 +175,22 @@ function FormVentas({
 
   // Hook para cambiar el modo de venta según el producto seleccionado
   useEffect(() => {
-      if (productoSeleccionado) {
-        const esVentaPorUnidad = !productoSeleccionado.unidad_venta || productoSeleccionado.unidad_venta.toLowerCase() === 'unidad';
-        if (!esVentaPorUnidad) {
-          setModoVenta('granel');
-          const precioUnitario = getPrecioProducto(productoSeleccionado);
-          setInputCantidadGranel("1");
-          setInputPrecioGranel(precioUnitario.toFixed(2));
-          setCantidad(1);
-        } else {
-          setModoVenta('unidad');
-          setCantidad(1);
-        }
+    if (productoSeleccionado) {
+      const esVentaPorUnidad = !productoSeleccionado.unidad_venta || productoSeleccionado.unidad_venta.toLowerCase() === 'unidad';
+      if (!esVentaPorUnidad) {
+        setModoVenta('granel');
+        const precioUnitario = getPrecioProducto(productoSeleccionado);
+        setInputCantidadGranel("1");
+        setInputPrecioGranel(precioUnitario.toFixed(2));
+        setCantidad(1);
       } else {
         setModoVenta('unidad');
+        setCantidad(1);
       }
-    }, [productoSeleccionado, tipoClienteSeleccionado, getPrecioProducto]);
+    } else {
+      setModoVenta('unidad');
+    }
+  }, [productoSeleccionado, tipoClienteSeleccionado, getPrecioProducto]);
 
   // Handlers para los inputs de venta a granel
   const handleCantidadGranelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -227,7 +227,7 @@ function FormVentas({
       precioTotal: productoConDescuento,
       descuentoAplicado: descuentoPorcentual > 0 || descuentoNominal > 0,
       porcentajeDescuento: descuentoPorcentual, // Asignación explícita
-      descuentoNominal: descuentoNominal    
+      descuentoNominal: descuentoNominal
     });
     setProductoSeleccionado(null);
     setCantidad(1);
@@ -297,9 +297,9 @@ function FormVentas({
         if (!res.ok) {
           throw new Error('Producto no encontrado');
         }
-        
+
         const data = await res.json();
-        
+
         const productoAdaptado: ProductoSeleccionado = {
           id: data.id.toString(),
           nombre: data.descripcion || "Producto sin nombre",
@@ -351,7 +351,7 @@ function FormVentas({
       // ...hacemos un scroll suave hasta ese elemento.
       checkoutSectionRef.current.scrollIntoView({
         behavior: 'smooth',
-        block: 'start' 
+        block: 'start'
       });
     }
   }, [checkoutVisible]); // Este efecto se ejecuta cada vez que 'checkoutVisible' cambia.
@@ -416,7 +416,7 @@ function FormVentas({
       setProductos(adaptados);
       // Opcional: También puedes actualizar el localStorage si lo necesitas síncrono
       localStorage.setItem("productos", JSON.stringify(adaptados));
-      
+
       console.log("✅ Catálogo de productos actualizado.");
 
     } catch (err) {
@@ -450,7 +450,7 @@ function FormVentas({
     }
 
     if (tipoClienteSeleccionado.id === "0" && totalVenta > 200000) {
-      if(cuitManual.trim() === "") {
+      if (cuitManual.trim() === "") {
         toast.error("❌ Para montos mayores a $200.000, debe ingresar un CUIT.");
         setIsLoading(false);
         return;
@@ -461,7 +461,19 @@ function FormVentas({
         return;
       }
     }
-    
+
+    // Determinar un tipo_comprobante_solicitado más específico
+    let tipoSolicitadoPayload = tipoFacturacion.toLowerCase();
+    // Si es factura y hay información de CUIT (cliente registrado o cuit manual), intentar especificar A/B
+    const cuitReceptor = tipoClienteSeleccionado.id === "0" ? (cuitManual || "0") : (clienteSeleccionado?.cuit || clienteSeleccionado?.identificacion_fiscal || "0");
+    if (tipoFacturacion === "factura") {
+      if (cuitReceptor && cuitReceptor.toString().length === 11) {
+        tipoSolicitadoPayload = "factura_a";
+      } else {
+        tipoSolicitadoPayload = "factura_b";
+      }
+    }
+
     const ventaPayload = {
       id_cliente: tipoClienteSeleccionado.id === "0" ? 0 : clienteSeleccionado?.id ?? 0,
       metodo_pago: metodoPago.toUpperCase(),
@@ -469,7 +481,7 @@ function FormVentas({
       paga_con: montoPagado,
       pago_separado: pagoDividido,
       detalles_pago_separado: detallePagoDividido,
-      tipo_comprobante_solicitado: tipoFacturacion.toLowerCase(),
+      tipo_comprobante_solicitado: tipoSolicitadoPayload,
       quiere_factura: tipoFacturacion === "factura",
       articulos_vendidos: productosVendidos.map((p) => {
         const productoReal = productos.find(prod => prod.nombre === p.tipo);
@@ -483,14 +495,14 @@ function FormVentas({
         };
       })
     };
-    
+
     try {
       if (!empresa || !empresa.id_empresa) {
         toast.error("No se pudieron cargar los datos de la empresa. No se puede realizar la venta.");
         setIsLoading(false);
         return;
       }
-      
+
       const response = await fetch("https://sistema-ima.sistemataup.online/api/caja/ventas/registrar", {
         method: "POST",
         headers: {
@@ -512,7 +524,7 @@ function FormVentas({
 
       // Actualizamos el Store despues de cada venta..
       await refrescarProductos();
-      
+
       // Funcion que genera el comprobante
       const generarComprobante = async () => {
         try {
@@ -535,7 +547,7 @@ function FormVentas({
           const transaccion = tipoFacturacion === "factura"
             ? { items: itemsBase, total: totalVentaFinal, observaciones: observaciones || "" }
             : { items: itemsBase, total: totalVentaFinal, descuento_general: descuentoNominalTotal || 0, descuento_general_por: descuentoSobreTotal || 0, observaciones: observaciones || "" };
-          
+
           const reqPayload = {
             formato: formatoComprobante.toLowerCase(),
             tipo: tipoFacturacion.toLowerCase(),
@@ -585,7 +597,7 @@ function FormVentas({
       };
 
       await generarComprobante();
-      
+
       resetFormularioVenta();
       window.scrollTo({ top: 0, behavior: "smooth" });
 
@@ -596,8 +608,8 @@ function FormVentas({
       setIsLoading(false);
     }
   };
-  
-  
+
+
   /* Renderizado del Componente */
   return (
     <form onSubmit={handleSubmit} className="flex flex-col w-full lg:w-1/2 rounded-xl bg-white shadow-md">
@@ -683,7 +695,7 @@ function FormVentas({
             setCantidadEscaneada={setCantidadEscaneada}
             handleAgregarDesdePopover={handleAgregarDesdePopover}
           />
-        
+
           {/* Sección de Cantidad */}
           <SeccionCantidad
             cantidadInputRef={cantidadInputRef}
@@ -712,138 +724,138 @@ function FormVentas({
           type="button"
           onClick={handleAgregarProducto}
         >
-          + Agregar producto 
+          + Agregar producto
         </Button>
 
         <span className="block w-full h-0.5 bg-green-900"></span>
 
         {/* Sección para Finalizar compra */}
         <Button
-            className="!py-6 !bg-emerald-800"
-            type="button"
-            onClick={() => setCheckoutVisible(!checkoutVisible)}
+          className="!py-6 !bg-emerald-800"
+          type="button"
+          onClick={() => setCheckoutVisible(!checkoutVisible)}
         >
-            {checkoutVisible ? 'Ocultar Opciones de Pago' : 'Finalizar Compra'}
+          {checkoutVisible ? 'Ocultar Opciones de Pago' : 'Finalizar Compra'}
         </Button>
 
         {checkoutVisible && (
-            <div ref={checkoutSectionRef} className="flex flex-col gap-6 mt-6 animate-in fade-in-0 duration-300">
-                <div className="flex flex-col gap-4 mt-4">
-                    <div className="flex flex-col gap-4 items-start justify-between md:flex-row">
-                        <Label className="text-2xl font-semibold text-green-900">Método de Pago</Label>
-                        <Select value={metodoPago} onValueChange={setMetodoPago}>
-                        <SelectTrigger className="w-full md:max-w-1/2 cursor-pointer text-black">
-                            <SelectValue placeholder="Seleccionar método" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="efectivo">Efectivo</SelectItem>
-                            <SelectItem value="transferencia">Transferencia</SelectItem>
-                            <SelectItem value="bancario">POS</SelectItem>
-                        </SelectContent>
-                        </Select>
-                    </div>
-                    
-                    {metodoPago === 'efectivo' && (
-                        <div className="flex flex-col gap-4 p-4 bg-green-800 rounded-lg mt-2">
-                        <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
-                            <Label className="text-2xl font-semibold text-white">Costo del Pedido:</Label>
-                            <Input type="text" value={`$${totalVentaFinal.toLocaleString('es-AR')}`} disabled className="w-full md:max-w-1/2 font-semibold text-white" />
-                        </div>
-                        <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
-                            <Label className="text-2xl font-semibold text-white">Con cuánto abona:</Label>
-                            <Input
-                            inputMode="numeric"
-                            value={inputEfectivo}
-                            onChange={(e) => {
-                                const valorInput = e.target.value;
-                                setInputEfectivo(formatearMoneda(valorInput));
-                                setMontoPagado(limpiarMoneda(valorInput));
-                            }}
-                            className="w-full md:max-w-1/2 font-semibold text-white"
-                            />
-                        </div>
-                        <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
-                            <Label className="text-2xl font-semibold text-white">Vuelto:</Label>
-                            <Input type="text" value={`$${vuelto.toLocaleString('es-AR')}`} disabled className="w-full md:max-w-1/2 font-semibold text-white" />
-                        </div>
-                        </div>
-                    )}
-                </div>
+          <div ref={checkoutSectionRef} className="flex flex-col gap-6 mt-6 animate-in fade-in-0 duration-300">
+            <div className="flex flex-col gap-4 mt-4">
+              <div className="flex flex-col gap-4 items-start justify-between md:flex-row">
+                <Label className="text-2xl font-semibold text-green-900">Método de Pago</Label>
+                <Select value={metodoPago} onValueChange={setMetodoPago}>
+                  <SelectTrigger className="w-full md:max-w-1/2 cursor-pointer text-black">
+                    <SelectValue placeholder="Seleccionar método" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="efectivo">Efectivo</SelectItem>
+                    <SelectItem value="transferencia">Transferencia</SelectItem>
+                    <SelectItem value="bancario">POS</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-                <div className="flex items-center">
-                <Label htmlFor="pagoDividido" className="flex items-center gap-2 text-green-950 text-md font-medium cursor-pointer">
+              {metodoPago === 'efectivo' && (
+                <div className="flex flex-col gap-4 p-4 bg-green-800 rounded-lg mt-2">
+                  <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
+                    <Label className="text-2xl font-semibold text-white">Costo del Pedido:</Label>
+                    <Input type="text" value={`$${totalVentaFinal.toLocaleString('es-AR')}`} disabled className="w-full md:max-w-1/2 font-semibold text-white" />
+                  </div>
+                  <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
+                    <Label className="text-2xl font-semibold text-white">Con cuánto abona:</Label>
                     <Input
-                    id="pagoDividido"
-                    type="checkbox"
-                    checked={pagoDividido}
-                    onChange={(e) => setPagoDividido(e.target.checked)}
-                    className="h-5 w-5 text-green-700 border-gray-300 rounded focus:ring-green-600 cursor-pointer"
+                      inputMode="numeric"
+                      value={inputEfectivo}
+                      onChange={(e) => {
+                        const valorInput = e.target.value;
+                        setInputEfectivo(formatearMoneda(valorInput));
+                        setMontoPagado(limpiarMoneda(valorInput));
+                      }}
+                      className="w-full md:max-w-1/2 font-semibold text-white"
                     />
-                    <span>¿Paga de dos o mas formas?</span>
-                </Label>
+                  </div>
+                  <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
+                    <Label className="text-2xl font-semibold text-white">Vuelto:</Label>
+                    <Input type="text" value={`$${vuelto.toLocaleString('es-AR')}`} disabled className="w-full md:max-w-1/2 font-semibold text-white" />
+                  </div>
                 </div>
-                <span className="block w-full h-0.5 bg-green-900"></span>
-                
-                <RadioGroup value={tipoFacturacion} onValueChange={setTipoFacturacion} className="flex flex-col gap-4 md:flex-row flex-wrap">
-                <Label htmlFor="factura" className="flex flex-row items-center w-full md:w-[48%] lg:flex-row cursor-pointer text-black border-green-900 hover:bg-green-400 dark:hover:bg-green-700 gap-3 rounded-lg border p-3 transition-colors duration-200 data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900">
-                    <RadioGroupItem value="factura" id="factura" className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
-                    <span className="text-sm leading-none font-medium">Factura</span>
-                </Label>
-                <Label htmlFor="comprobante" className="flex flex-row items-center w-full md:w-[48%] lg:flex-row cursor-pointer text-black border-green-900 hover:bg-green-400 dark:hover:bg-green-700 gap-3 rounded-lg border p-3 transition-colors duration-200 data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900">
-                    <RadioGroupItem value="recibo" id="comprobante" className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
-                    <span className="text-sm leading-none font-medium">Comprobante</span>
-                </Label>
-                <TooltipProvider>
-                    <div className="flex flex-wrap gap-4 w-full">
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                        <Label htmlFor="remito" className={`flex flex-row items-center w-full md:w-[48%] lg:flex-row text-black border-green-900 gap-3 rounded-lg border p-3 transition-colors duration-200 ${!habilitarExtras ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-green-400 dark:hover:bg-green-700"} data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900`}>
-                            <RadioGroupItem value="remito" id="remito" disabled={!habilitarExtras} className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
-                            <span className="text-sm leading-none font-medium">Remito</span>
-                        </Label>
-                        </TooltipTrigger>
-                        {!habilitarExtras && ( <TooltipContent><p>Contactá al administrador</p></TooltipContent> )}
-                    </Tooltip>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                        <Label htmlFor="presupuesto" className={`flex flex-row items-center w-full md:w-[48%] lg:flex-row text-black border-green-900 gap-3 rounded-lg border p-3 transition-colors duration-200 ${!habilitarExtras ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-green-400 dark:hover:bg-green-700"} data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900`}>
-                            <RadioGroupItem value="presupuesto" id="presupuesto" disabled={!habilitarExtras} className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
-                            <span className="text-sm leading-none font-medium">Presupuesto</span>
-                        </Label>
-                        </TooltipTrigger>
-                        {!habilitarExtras && ( <TooltipContent><p>Contactá al administrador</p></TooltipContent> )}
-                    </Tooltip>
-                    </div>
-                </TooltipProvider>
-                </RadioGroup>
-                
-                <Accordion type="single" collapsible className="w-full">
-                <AccordionItem value="item-1">
-                    <AccordionTrigger className="cursor-pointer text-md">Observaciones y Descuentos Globales</AccordionTrigger>
-                    <AccordionContent className="flex flex-col gap-4 pt-4">
-                    <div className="flex flex-col w-full gap-2">
-                        <Label className="text-green-900 text-xl" htmlFor="message-2">Observaciones</Label>
-                        <Textarea placeholder="Observaciones de la venta..." id="message-2" value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
-                    </div>
-                    <span className="block w-full h-0.5 bg-green-900"></span>
-
-                    <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
-                        <Label className="text-lg font-semibold text-green-900">Descuento Sobre Total (%)</Label>
-                        <Input type="number" min={0} max={100} value={descuentoSobreTotal === 0 ? "" : descuentoSobreTotal} onWheel={(e) => (e.target as HTMLInputElement).blur()} onChange={(e) => setDescuentoSobreTotal(Math.min(parseInt(e.target.value, 10) || 0, 100))} className="w-full md:max-w-2/3 text-black" />
-                    </div>
-                    <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
-                        <Label className="text-lg font-semibold text-green-900">Descuento Sobre Total ($)</Label>
-                        <Input type="number" min={0} value={descuentoNominalTotal === 0 ? "" : descuentoNominalTotal} onWheel={(e) => (e.target as HTMLInputElement).blur()} onChange={(e) => setDescuentoNominalTotal(Math.min(parseFloat(e.target.value) || 0, totalVenta))} className="w-full md:max-w-2/3 text-black" />
-                    </div>
-                    </AccordionContent>
-                </AccordionItem>
-                </Accordion>
-                
-                <Button type="submit" disabled={isLoading} className={`!py-6 bg-green-900 flex items-center justify-center gap-2 ${isLoading ? "cursor-not-allowed opacity-50" : "hover:bg-green-700 cursor-pointer"}`}>
-                {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                {isLoading ? "Registrando..." : "Registrar Venta"}
-                </Button>
+              )}
             </div>
+
+            <div className="flex items-center">
+              <Label htmlFor="pagoDividido" className="flex items-center gap-2 text-green-950 text-md font-medium cursor-pointer">
+                <Input
+                  id="pagoDividido"
+                  type="checkbox"
+                  checked={pagoDividido}
+                  onChange={(e) => setPagoDividido(e.target.checked)}
+                  className="h-5 w-5 text-green-700 border-gray-300 rounded focus:ring-green-600 cursor-pointer"
+                />
+                <span>¿Paga de dos o mas formas?</span>
+              </Label>
+            </div>
+            <span className="block w-full h-0.5 bg-green-900"></span>
+
+            <RadioGroup value={tipoFacturacion} onValueChange={setTipoFacturacion} className="flex flex-col gap-4 md:flex-row flex-wrap">
+              <Label htmlFor="factura" className="flex flex-row items-center w-full md:w-[48%] lg:flex-row cursor-pointer text-black border-green-900 hover:bg-green-400 dark:hover:bg-green-700 gap-3 rounded-lg border p-3 transition-colors duration-200 data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900">
+                <RadioGroupItem value="factura" id="factura" className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
+                <span className="text-sm leading-none font-medium">Factura</span>
+              </Label>
+              <Label htmlFor="comprobante" className="flex flex-row items-center w-full md:w-[48%] lg:flex-row cursor-pointer text-black border-green-900 hover:bg-green-400 dark:hover:bg-green-700 gap-3 rounded-lg border p-3 transition-colors duration-200 data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900">
+                <RadioGroupItem value="recibo" id="comprobante" className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
+                <span className="text-sm leading-none font-medium">Comprobante</span>
+              </Label>
+              <TooltipProvider>
+                <div className="flex flex-wrap gap-4 w-full">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Label htmlFor="remito" className={`flex flex-row items-center w-full md:w-[48%] lg:flex-row text-black border-green-900 gap-3 rounded-lg border p-3 transition-colors duration-200 ${!habilitarExtras ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-green-400 dark:hover:bg-green-700"} data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900`}>
+                        <RadioGroupItem value="remito" id="remito" disabled={!habilitarExtras} className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
+                        <span className="text-sm leading-none font-medium">Remito</span>
+                      </Label>
+                    </TooltipTrigger>
+                    {!habilitarExtras && (<TooltipContent><p>Contactá al administrador</p></TooltipContent>)}
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Label htmlFor="presupuesto" className={`flex flex-row items-center w-full md:w-[48%] lg:flex-row text-black border-green-900 gap-3 rounded-lg border p-3 transition-colors duration-200 ${!habilitarExtras ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-green-400 dark:hover:bg-green-700"} data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900`}>
+                        <RadioGroupItem value="presupuesto" id="presupuesto" disabled={!habilitarExtras} className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
+                        <span className="text-sm leading-none font-medium">Presupuesto</span>
+                      </Label>
+                    </TooltipTrigger>
+                    {!habilitarExtras && (<TooltipContent><p>Contactá al administrador</p></TooltipContent>)}
+                  </Tooltip>
+                </div>
+              </TooltipProvider>
+            </RadioGroup>
+
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="item-1">
+                <AccordionTrigger className="cursor-pointer text-md">Observaciones y Descuentos Globales</AccordionTrigger>
+                <AccordionContent className="flex flex-col gap-4 pt-4">
+                  <div className="flex flex-col w-full gap-2">
+                    <Label className="text-green-900 text-xl" htmlFor="message-2">Observaciones</Label>
+                    <Textarea placeholder="Observaciones de la venta..." id="message-2" value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
+                  </div>
+                  <span className="block w-full h-0.5 bg-green-900"></span>
+
+                  <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
+                    <Label className="text-lg font-semibold text-green-900">Descuento Sobre Total (%)</Label>
+                    <Input type="number" min={0} max={100} value={descuentoSobreTotal === 0 ? "" : descuentoSobreTotal} onWheel={(e) => (e.target as HTMLInputElement).blur()} onChange={(e) => setDescuentoSobreTotal(Math.min(parseInt(e.target.value, 10) || 0, 100))} className="w-full md:max-w-2/3 text-black" />
+                  </div>
+                  <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
+                    <Label className="text-lg font-semibold text-green-900">Descuento Sobre Total ($)</Label>
+                    <Input type="number" min={0} value={descuentoNominalTotal === 0 ? "" : descuentoNominalTotal} onWheel={(e) => (e.target as HTMLInputElement).blur()} onChange={(e) => setDescuentoNominalTotal(Math.min(parseFloat(e.target.value) || 0, totalVenta))} className="w-full md:max-w-2/3 text-black" />
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+
+            <Button type="submit" disabled={isLoading} className={`!py-6 bg-green-900 flex items-center justify-center gap-2 ${isLoading ? "cursor-not-allowed opacity-50" : "hover:bg-green-700 cursor-pointer"}`}>
+              {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isLoading ? "Registrando..." : "Registrar Venta"}
+            </Button>
+          </div>
         )}
       </div>
     </form>
