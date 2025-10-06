@@ -62,8 +62,14 @@ def determinar_logica_comprobante(
     tipo_solicitado: Optional[str] = None,
     TASA_IVA_21: float = 0.21
 ) -> Dict[str, Any]:
+    # Normalizar formato
+    if isinstance(formato, str):
+        formato_norm = formato.strip().lower()
+    else:
+        formato_norm = str(formato)
+
     # Si es formato ticket, siempre es código 83 (Ticket Fiscal)
-    if formato == "ticket":
+    if formato_norm == "ticket":
         neto = round(total / (1 + TASA_IVA_21), 2)
         iva = round(total - neto, 2)
         return {"tipo_afip": 83, "neto": neto, "iva": iva}
@@ -89,6 +95,23 @@ def determinar_logica_comprobante(
         key = tipo_solicitado.strip().lower().replace('-', '_')
         # Normalize spaces to underscores as well
         key = '_'.join(key.split())
+
+        # Handle a generic "factura" request: decide A/B based on receptor identification
+        if key == 'factura':
+            # Monotributo/Exento del emisor siempre -> C (11)
+            if condicion_emisor in [CondicionIVA.MONOTRIBUTO, CondicionIVA.EXENTO]:
+                return {"tipo_afip": 11, "neto": total, "iva": 0.0}
+            # Para RI: si receptor tiene CUIT => A (1), si no => B (6)
+            if condicion_emisor == CondicionIVA.RESPONSABLE_INSCRIPTO:
+                if receptor_tiene_cuit:
+                    neto = round(total / (1 + TASA_IVA_21), 2)
+                    iva = round(total - neto, 2)
+                    return {"tipo_afip": 1, "neto": neto, "iva": iva}
+                else:
+                    neto = round(total / (1 + TASA_IVA_21), 2)
+                    iva = round(total - neto, 2)
+                    return {"tipo_afip": 6, "neto": neto, "iva": iva}
+
         if key in TIPO_AFIP_MAP:
             tipo_map = TIPO_AFIP_MAP[key]
             # Business rule: if someone requests Factura A but receptor lacks CUIT, downgrade to B
@@ -196,6 +219,9 @@ def generar_factura_para_venta(
     except Exception:
         receptor_tiene_cuit = False
 
+    # Normalizar formato localmente (usado por la lógica de fallback)
+    formato_norm = formato_comprobante.strip().lower() if isinstance(formato_comprobante, str) else str(formato_comprobante)
+
     logica_factura = determinar_logica_comprobante(
         condicion_emisor=condicion_emisor,
         condicion_receptor=condicion_receptor,
@@ -232,10 +258,14 @@ def generar_factura_para_venta(
     # Sistema de reintentos para errores SSL de AFIP
     max_intentos = 3
     tiempo_espera = [2, 5, 10]  # Espera progresiva entre reintentos
+    # Flag para intentar un fallback cuando AFIP rechaza el tipo de comprobante (CbteTipo no habilitado)
+    fallback_intentado = False
     
     for intento in range(max_intentos):
         try:
             print(f"Intento {intento + 1} de {max_intentos}")
+            # Log del tipo AFIP que estamos enviando
+            print(f"Enviando a microservicio con tipo_afip={datos_factura.get('tipo_afip')}")
             response = requests.post(
                 FACTURACION_API_URL,
                 json=payload,
@@ -341,8 +371,26 @@ def generar_factura_para_venta(
                         continue  # Continuar con el siguiente intento
                     else:
                         error_detalle = "Error de conexión SSL con AFIP. Los servidores de AFIP pueden estar temporalmente no disponibles. Se agotaron los reintentos."
+                # Manejo específico para rechazo por tipo de comprobante no habilitado (ej: 10007 / CbteTipo)
+                # A veces la respuesta viene en HTML/texto (500) en lugar de JSON, así que también comprobamos e.response.text
+                error_texto = e.response.text if e.response is not None else ''
+                combined_error = str(error_detalle) + '\n' + (error_texto or '')
+                if ("CbteTipo" in combined_error or "FEParamGetTiposCbte" in combined_error or "10007" in combined_error):
+                    # Si el cliente solicitó un ticket y AFIP no lo habilita para el punto de venta,
+                    # intentamos hacer un fallback a un tipo de factura compatible (B o A) una sola vez.
+                    if not fallback_intentado and formato_norm == "ticket":
+                        print("AFIP indicó que el tipo de comprobante no está habilitado. Intentando fallback a tipo distinto (no-ticket)...")
+                        # Decidir fallback: si receptor tiene CUIT -> A (1), si no -> B (6)
+                        fallback_tipo = 1 if receptor_tiene_cuit and condicion_emisor == CondicionIVA.RESPONSABLE_INSCRIPTO else 6
+                        datos_factura['tipo_afip'] = fallback_tipo
+                        payload['datos_factura'] = datos_factura
+                        fallback_intentado = True
+                        # Reintentar inmediatamente (no incrementar el intento extra)
+                        continue
+                # Si no era un caso de fallback, mantenemos el message ya extraído en error_detalle
                     
             except:
+                # Si no se pudo parsear JSON, usar el texto raw de la respuesta
                 error_detalle = e.response.text if e.response else str(e)
 
             if intento == max_intentos - 1:  # Si es el último intento
