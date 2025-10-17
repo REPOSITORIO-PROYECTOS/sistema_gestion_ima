@@ -9,6 +9,19 @@ TipoComprobante = Literal["factura", "remito", "presupuesto", "recibo"]
 
 # --- Estructuras de Datos ---
 
+class AfipData(BaseModel):
+    """
+    Datos de AFIP para generar el QR y mostrar información de facturación electrónica.
+    """
+    fecha_emision: str
+    tipo_comprobante_afip: int
+    tipo_comprobante_nombre: Optional[str] = None
+    numero_comprobante: int
+    codigo_tipo_doc_receptor: int
+    cae: str
+    fecha_vencimiento_cae: Optional[str] = None
+    qr_base64: Optional[str] = None
+
 class EmisorData(BaseModel):
     """
     Contiene los DATOS PÚBLICOS del emisor. 
@@ -40,20 +53,25 @@ class ItemData(BaseModel):
 class TransaccionData(BaseModel):
     items: List[ItemData]
     total: float
+    subtotal: Optional[float] = None
     descuento_general: Optional[float] = 0.0
     descuento_general_por:Optional[float] = 0.0
     impuestos: Optional[float] = 0.0
     observaciones: Optional[str] = None
     datos_factura_previa: Optional[Dict[str, Any]] = None
+    pagos: Optional[List[Dict[str, Any]]] = None
+    afip: Optional[AfipData] = None
 
 # --- El Schema Principal de la Petición ---
 
 class GenerarComprobanteRequest(BaseModel):
-    formato: TipoFormato
-    tipo: TipoComprobante
+    tipo: str
+    numero: Optional[str] = None
+    formato: Optional[str] = "pdf"
     emisor: EmisorData
-    receptor: ReceptorData
+    receptor: ReceptorData  
     transaccion: TransaccionData
+    comprobante_asociado: Optional[Dict[str, Any]] = None  # Para notas de crédito
     
 class FacturarLoteRequest(BaseModel):
     # Una lista de IDs de CajaMovimiento (de tipo VENTA) que se quieren facturar.

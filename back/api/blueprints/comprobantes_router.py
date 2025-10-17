@@ -16,6 +16,7 @@ from back.modelos import Usuario # <-- 2. IMPORTACIÓN AÑADIDA
 # Especialistas de la capa de Gestión
 from back.gestion.reportes.generador_comprobantes import generar_comprobante_stateless
 from back.gestion import facturacion_lotes_manager # <-- Importamos el módulo completo
+from back.gestion import facturacion_afip
 from back.schemas.venta_ciclo_de_vida_schemas import VentaResponse # Reutilizamos el schema de respuesta
 from back.gestion.reportes.ciclo_vida_comp import agrupar_comprobantes_en_uno_nuevo
 
@@ -48,14 +49,99 @@ router = APIRouter(
         503: {"description": "Servicio de AFIP no disponible."}
     }
 )
-def api_generar_comprobante(req: GenerarComprobanteRequest):
+def api_generar_comprobante(
+    req: GenerarComprobanteRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(obtener_usuario_actual)
+):
     """
     Recibe todos los datos necesarios en el cuerpo de la petición y genera
     un comprobante en PDF (factura, remito, presupuesto o recibo).
+    Si es una factura y no tiene datos de AFIP, la procesa primero por AFIP.
     """
     print("entramos a generar comprobante")
     try:
         print("entramos al try de generar comprobante")
+        
+        # Solo procesar por AFIP si:
+        # 1. Es una factura o nota de crédito (los otros tipos como presupuesto, remito, etc. no se procesan)
+        # 2. No tiene datos de AFIP ya cargados
+        # Las facturas y notas de crédito siempre se procesan por AFIP, incluso para consumidor final
+        es_factura = req.tipo.lower() == "factura"
+        es_nota_credito = req.tipo.lower() in ["nota_credito", "nota de credito", "nc"]
+        necesita_afip = ((es_factura or es_nota_credito) and req.transaccion.afip is None)
+        
+        if necesita_afip:
+            if es_factura:
+                print("Procesando factura por AFIP...")
+            else:
+                print("Procesando nota de crédito por AFIP...")
+            
+            # Importar las funciones reales de facturación
+            from back.gestion.facturacion_afip import generar_factura_para_venta, generar_nota_credito_para_venta
+            from back.schemas.comprobante_schemas import AfipData
+            from back.modelos import Venta
+            from datetime import datetime
+            
+            try:
+                if es_factura:
+                    # Crear una venta temporal para AFIP (sin guardar en DB aún)
+                    venta_temporal = Venta(
+                        total=req.transaccion.total,
+                        id_empresa=current_user.id_empresa
+                    )
+                    
+                    # Llamar a la función real de AFIP para facturas
+                    resultado_afip = generar_factura_para_venta(
+                        db=db,
+                        venta_a_facturar=venta_temporal,
+                        total=req.transaccion.total,
+                        cliente_data=req.receptor,
+                        emisor_data=req.emisor,
+                        formato_comprobante=req.formato,
+                        tipo_solicitado=req.tipo
+                    )
+                    tipo_comprobante_nombre = "FACTURA"
+                    
+                elif es_nota_credito:
+                    # Para nota de crédito necesitamos el comprobante asociado
+                    comprobante_asociado = req.comprobante_asociado or {
+                        "tipo_afip": 1,  # Factura A por defecto
+                        "punto_venta": req.emisor.punto_venta,
+                        "numero_comprobante": 1  # Valor por defecto si no se especifica
+                    }
+                    
+                    # Llamar a la función real de AFIP para notas de crédito
+                    resultado_afip = generar_nota_credito_para_venta(
+                        total=req.transaccion.total,
+                        cliente_data=req.receptor,
+                        emisor_data=req.emisor,
+                        comprobante_asociado=comprobante_asociado
+                    )
+                    tipo_comprobante_nombre = "NOTA DE CREDITO"
+                
+                # Debug: Log de la respuesta de AFIP
+                print(f"DEBUG - Respuesta de AFIP: {resultado_afip}")
+                
+                # Crear el objeto AfipData con los datos reales de AFIP con validaciones
+                req.transaccion.afip = AfipData(
+                    fecha_emision=resultado_afip.get("fecha_comprobante") or datetime.now().strftime("%Y-%m-%d"),
+                    tipo_comprobante_afip=resultado_afip.get("tipo_afip") or 1,
+                    tipo_comprobante_nombre=tipo_comprobante_nombre,
+                    numero_comprobante=resultado_afip.get("numero_comprobante") or 0,
+                    codigo_tipo_doc_receptor=resultado_afip.get("tipo_doc_receptor") or 99,
+                    cae=resultado_afip.get("cae") or "SIN_CAE",
+                    fecha_vencimiento_cae=resultado_afip.get("vencimiento_cae"),
+                    qr_base64=resultado_afip.get("qr_base64")
+                )
+                print(f"Procesamiento real por AFIP completado. CAE: {resultado_afip.get('cae')}")
+                
+            except Exception as e:
+                print(f"Error en procesamiento AFIP: {e}")
+                raise HTTPException(status_code=500, detail=f"Error en procesamiento AFIP: {str(e)}")
+        else:
+            print(f"Comprobante tipo '{req.tipo}' no requiere procesamiento AFIP")
+        
         pdf_bytes = generar_comprobante_stateless(req)
         print("salimos de genrerar comprobantes stateless")
         # Generamos un nombre de archivo más robusto

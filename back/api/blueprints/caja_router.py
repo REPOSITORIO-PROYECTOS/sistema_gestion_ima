@@ -156,12 +156,18 @@ def api_registrar_venta(
             )
             print("ANTES DE LA FUNCION GENERAR FACTURA")
             # Llamar al especialista de facturación
+            # Determinar formato basado en configuración de empresa o tipo de comprobante solicitado
+            formato_comprobante = "ticket" if (config_empresa_db.formato_comprobante_predeterminado == "ticket" or 
+                                             req.tipo_comprobante_solicitado == "ticket") else "pdf"
+            
             factura_generada = generar_factura_para_venta(
                 db=db,                      # <-- AÑADIDO: Pasa la sesión de la BD
                 venta_a_facturar=venta_creada, # <-- AÑADIDO: Pasa el objeto Venta que acabas de crear
                 total=req.total_venta, 
                 cliente_data=cliente_data_schema,
-                emisor_data=emisor_data_schema
+                emisor_data=emisor_data_schema,
+                formato_comprobante=formato_comprobante,
+                tipo_solicitado=req.tipo_comprobante_solicitado
             )
             print("DESPUES DE LA FUNCION GENERAR FACTURA")
             # === FIN DE LA LÓGICA DE FACTURACIÓN CORREGIDA ===

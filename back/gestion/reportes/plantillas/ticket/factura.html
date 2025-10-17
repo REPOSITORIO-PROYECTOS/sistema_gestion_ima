@@ -1,42 +1,213 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Factura</title>
     <style>
-        body { font-family: 'Courier New', Courier, monospace; font-size: 10px; margin: 0; padding: 0; color: #000; }
-        .ticket { width: 48mm; padding: 1mm; }
-        .header, .afip-footer { text-align: center; }
-        .header h1 { margin: 0; font-size: 14px; font-weight: bold; word-wrap: break-word; }
-        .header p { margin: 2px 0; }
-        .factura-info { display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; }
-        hr { border: none; border-top: 1px dashed black; margin: 5px 0; }
-        .cliente-info p, .pago-info p { margin-bottom: 3px; }
-        .item-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-        .item-table th, .item-table td { padding: 2px 0; }
-        .col-cant { width: 15%; text-align: left; }
-        .col-desc { width: 45%; text-align: left; }
-        .col-pu { width: 20%; text-align: right; }
-        .col-subt { width: 20%; text-align: right; }
-        .item-discount td { font-size: 9px; color: #555; border-top: none; padding-top: 0; }
-        .totals-section { margin-top: 8px; border-top: 1px dashed black; padding-top: 5px; }
-        .totals-section .item { display: flex; justify-content: space-between; }
-        .totals-section .item.bold { font-weight: bold; }
-        .totals-section .discount { color: #555; }
-        .total-final { font-size: 13px; font-weight: bold; }
-        .membrete-section { text-align: center; font-size: 9px; padding: 4px 0; border-top: 1px dashed black; border-bottom: 1px dashed black; margin: 5px 0; }
-        .observaciones-finales-section { margin-top: 8px; font-size: 9px; word-wrap: break-word; margin-bottom: 5px; }
-        .afip-footer { margin-top: 10px; }
-        .afip-footer p { margin: 1px 0; font-weight: bold; }
-        .afip-footer img { max-width: 100px; height: auto; margin-top: 5px; }
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 10px;
+            margin: 0;
+            padding: 0;
+            color: #000;
+        }
+
+        /* Responsive design for different printer widths */
+        .ticket {
+            width: 100%;
+            max-width: 80mm;
+            padding: 2mm;
+            box-sizing: border-box;
+        }
+
+        @media print {
+            @page {
+                size: 80mm auto;
+                margin: 0;
+            }
+
+            .ticket {
+                width: 76mm;
+                padding: 2mm;
+            }
+        }
+
+        /* For 58mm printers */
+        @media (max-width: 60mm) {
+            .ticket {
+                width: 54mm;
+                padding: 1mm;
+                font-size: 9px;
+            }
+
+            .header h1 {
+                font-size: 12px;
+            }
+
+            .factura-info {
+                font-size: 10px;
+            }
+
+            .total-final {
+                font-size: 11px;
+            }
+        }
+
+        .header,
+        .afip-footer {
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 14px;
+            font-weight: bold;
+            word-wrap: break-word;
+        }
+
+        .header p {
+            margin: 2px 0;
+        }
+
+        .factura-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .codigo-comprobante {
+            text-align: center;
+            font-size: 10px;
+            margin: 3px 0;
+            font-weight: bold;
+        }
+
+        hr {
+            border: none;
+            border-top: 1px dashed black;
+            margin: 5px 0;
+        }
+
+        .cliente-info p,
+        .pago-info p {
+            margin-bottom: 3px;
+        }
+
+        .item-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 8px;
+        }
+
+        .item-table th,
+        .item-table td {
+            padding: 2px 0;
+        }
+
+        .col-cant {
+            width: 15%;
+            text-align: left;
+        }
+
+        .col-desc {
+            width: 45%;
+            text-align: left;
+        }
+
+        .col-pu {
+            width: 20%;
+            text-align: right;
+        }
+
+        .col-subt {
+            width: 20%;
+            text-align: right;
+        }
+
+        .item-discount td {
+            font-size: 9px;
+            color: #555;
+            border-top: none;
+            padding-top: 0;
+        }
+
+        .totals-section {
+            margin-top: 8px;
+            border-top: 1px dashed black;
+            padding-top: 5px;
+        }
+
+        .totals-section .item {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .totals-section .item.bold {
+            font-weight: bold;
+        }
+
+        .totals-section .discount {
+            color: #555;
+        }
+
+        .total-final {
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        .membrete-section {
+            text-align: center;
+            font-size: 9px;
+            padding: 4px 0;
+            border-top: 1px dashed black;
+            border-bottom: 1px dashed black;
+            margin: 5px 0;
+        }
+
+        .observaciones-finales-section {
+            margin-top: 8px;
+            font-size: 9px;
+            word-wrap: break-word;
+            margin-bottom: 5px;
+        }
+
+        .afip-footer {
+            margin-top: 10px;
+        }
+
+        .afip-footer p {
+            margin: 1px 0;
+            font-weight: bold;
+        }
+
+        .afip-footer img {
+            max-width: 100px;
+            height: auto;
+            margin-top: 5px;
+        }
+
+        .leyendas-obligatorias {
+            margin-top: 8px;
+            font-size: 8px;
+            text-align: center;
+            border-top: 1px dashed black;
+            padding-top: 5px;
+        }
+
+        .leyendas-obligatorias p {
+            margin: 1px 0;
+        }
     </style>
 </head>
+
 <body>
     <div class="ticket">
         <div class="header">
             {% if emisor.logo_url %}
-                <img src="{{ emisor.logo_url }}" alt="Logo" style="max-width: 60%; height: auto; margin-bottom: 5px;">
+            <img src="{{ emisor.logo_url }}" alt="Logo" style="max-width: 60%; height: auto; margin-bottom: 5px;">
             {% endif %}
             <h1>{{ emisor.razon_social }}</h1>
             <p>{{ emisor.domicilio }}</p>
@@ -47,9 +218,17 @@
             <hr>
             <div class="factura-info">
                 <span>{{ afip.tipo_comprobante_nombre or 'FACTURA' }}</span>
-                <span>{{ afip.tipo_comprobante_letra or 'B' }}</span> 
+                <span>{{ afip.tipo_comprobante_letra or 'B' }}</span>
             </div>
-            <p>P.Venta: {{ '%05d'|format(emisor.punto_venta) }} - N°: {{ '%08d'|format(afip.numero_comprobante or 0) }}</p>
+            <div class="codigo-comprobante">
+                {% if afip and afip.tipo_afip %}
+                {% if afip.tipo_afip == 1 %}Cod. 001{% elif afip.tipo_afip == 6 %}Cod. 006{% else %}Cod. 083{% endif %}
+                {% else %}
+                Cod. 083
+                {% endif %}
+            </div>
+            <p>P.Venta: {{ '%05d'|format(emisor.punto_venta) }} - N°: {{ '%08d'|format(afip.numero_comprobante or 0) }}
+            </p>
             <p>Fecha: {{ fecha_emision | date }}</p>
             <hr>
         </div>
@@ -61,7 +240,7 @@
             <p><strong>Domicilio:</strong> {{ receptor.domicilio or 'S/D' }}</p>
         </div>
         <hr>
-        
+
         <table class="item-table">
             <thead>
                 <tr>
@@ -83,7 +262,8 @@
                 <tr class="item-discount">
                     <td></td>
                     <td colspan="2">
-                        Desc. {% if item.descuento_especifico_por > 0 %}({{ "%.0f"|format(item.descuento_especifico_por) }}%){% endif %}
+                        Desc. {% if item.descuento_especifico_por > 0 %}({{ "%.0f"|format(item.descuento_especifico_por)
+                        }}%){% endif %}
                     </td>
                     <td class="col-subt">-${{ "%.2f"|format(item.descuento_especifico) }}</td>
                 </tr>
@@ -95,13 +275,15 @@
         <div class="totals-section">
             <div class="item">
                 <span>Subtotal</span>
-                <span>${{ "%.2f"|format(transaccion.subtotal or (transaccion.total + (transaccion.descuento_general or 0))) }}</span>
+                <span>${{ "%.2f"|format(transaccion.subtotal or (transaccion.total + (transaccion.descuento_general or
+                    0))) }}</span>
             </div>
             {% if transaccion.descuento_general and transaccion.descuento_general > 0 %}
-                <div class="item discount">
-                    <span>Desc. Gral. {% if transaccion.descuento_general_por > 0 %}({{ "%.0f"|format(transaccion.descuento_general_por) }}%){% endif %}</span>
-                    <span>-${{ "%.2f"|format(transaccion.descuento_general) }}</span>
-                </div>
+            <div class="item discount">
+                <span>Desc. Gral. {% if transaccion.descuento_general_por > 0 %}({{
+                    "%.0f"|format(transaccion.descuento_general_por) }}%){% endif %}</span>
+                <span>-${{ "%.2f"|format(transaccion.descuento_general) }}</span>
+            </div>
             {% endif %}
             <hr>
             {% if afip.neto is defined and afip.iva is defined %}
@@ -131,39 +313,49 @@
         {% endif %}
 
         {% if transaccion.observaciones and '---' in transaccion.observaciones %}
-            {% set partes = transaccion.observaciones.split('---', 1) %}
-            {% set membrete = partes[0] | trim %}
-            {% set notas_venta = partes[1] | trim %}
-            
-            <div class="membrete-section">
-                {{ membrete }}
-            </div>
-            
-            {% set observaciones_para_mostrar = notas_venta %}
+        {% set partes = transaccion.observaciones.split('---', 1) %}
+        {% set membrete = partes[0] | trim %}
+        {% set notas_venta = partes[1] | trim %}
+
+        <div class="membrete-section">
+            {{ membrete }}
+        </div>
+
+        {% set observaciones_para_mostrar = notas_venta %}
         {% else %}
-            {% set observaciones_para_mostrar = transaccion.observaciones %}
+        {% set observaciones_para_mostrar = transaccion.observaciones %}
         {% endif %}
-        
+
         {% if observaciones_para_mostrar %}
-            <div class="observaciones-finales-section">
-                <pre style="font-family: 'Courier New', Courier, monospace; margin: 0; white-space: pre-wrap; word-wrap: break-word;">{{ observaciones_para_mostrar }}</pre>
-            </div>
+        <div class="observaciones-finales-section">
+            <pre
+                style="font-family: 'Courier New', Courier, monospace; margin: 0; white-space: pre-wrap; word-wrap: break-word;">{{ observaciones_para_mostrar }}</pre>
+        </div>
         {% endif %}
-        
+
         <hr>
 
         <div class="afip-footer">
             {% if afip and afip.cae %}
-                <p>CAE N°: {{ afip.cae }}</p>
-                <p>Vto. CAE: {{ afip.vencimiento_cae }}</p>
-                {% if afip.qr_base64 %}
-                    <img src="data:image/png;base64,{{ afip.qr_base64 }}" alt="Código QR AFIP">
-                {% endif %}
-                <p>Comprobante Autorizado</p>
-            {% else %}
-                <p>Documento no válido como factura</p>
+            <p>CAE N°: {{ afip.cae }}</p>
+            <p>Vto. CAE: {{ afip.vencimiento_cae }}</p>
+            {% if afip.qr_base64 %}
+            <img src="data:image/png;base64,{{ afip.qr_base64 }}" alt="Código QR AFIP">
             {% endif %}
+            <p>Comprobante Autorizado</p>
+            {% else %}
+            <p>Documento no válido como factura</p>
+            {% endif %}
+        </div>
+
+        <div class="leyendas-obligatorias">
+            <p>Defensa del Consumidor</p>
+            <p>0800-333-6634</p>
+            <p>Régimen de Transparencia</p>
+            <p>Fiscal al Consumidor</p>
+            <p>Ley 27.743</p>
         </div>
     </div>
 </body>
+
 </html>

@@ -88,7 +88,9 @@ def facturar_lote_de_ventas(
         venta_a_facturar=venta_consolidada_para_afip,
         total=total_a_facturar,
         cliente_data=receptor_data,
-        emisor_data=emisor_data
+        emisor_data=emisor_data,
+        formato_comprobante="pdf",  # Facturas de lotes siempre en PDF
+        tipo_solicitado=None
     )
 
     if not resultado_afip or not resultado_afip.get("cae"):
