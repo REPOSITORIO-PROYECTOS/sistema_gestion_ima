@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Factura N° 00005-00001234</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 15mm;
+            @bottom-center {
+                content: "Página " counter(page) " de " counter(pages);
+                font-size: 9px;
+                color: #555;
+            }
+        }
+        * { box-sizing: border-box; }
+        body { 
+            font-family: Helvetica, Arial, sans-serif; 
+            font-size: 11px; 
+            color: #333;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .container { width: 100%; }
+        .header, .cliente-info, .footer, .afip-footer { page-break-inside: avoid; }
+        .header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: flex-start; 
+            border-bottom: 2px solid #000; 
+            padding-bottom: 10px; 
+        }
+        .header .empresa-logo { max-width: 180px; max-height: 70px; margin-right: 20px; }
+        .header .empresa-info { font-size: 12px; line-height: 1.4; }
+        .header .empresa-info .empresa-nombre { font-size: 18px; font-weight: bold; }
+        .header .comprobante-info { 
+            text-align: left; 
+            border: 2px solid #000; 
+            padding: 5px 10px;
+            min-width: 220px;
+        }
+        .header .comprobante-info .letra { 
+            font-size: 48px; 
+            font-weight: bold; 
+            text-align: center; 
+            line-height: 1;
+        }
+        .comprobante-info div { margin-bottom: 4px; }
+        .cliente-info { 
+            border: 1px solid #ccc; 
+            padding: 10px; 
+            margin-top: 20px; 
+            line-height: 1.5;
+        }
+        .cliente-info strong { display: inline-block; width: 120px; }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 20px; 
+        }
+        tr { page-break-inside: avoid; }
+        th, td { 
+            border: 1px solid #ccc; 
+            padding: 6px 8px;
+            text-align: left; 
+        }
+        th { background-color: #f2f2f2 !important; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .col-cantidad { width: 10%; }
+        .col-descripcion { width: 55%; }
+        .col-precio { width: 17.5%; }
+        .col-subtotal { width: 17.5%; }
+        .totals-wrapper {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 10px;
+        }
+        .totals-table {
+            width: 45%;
+        }
+        .totals-table td {
+            border: none;
+            padding: 4px 8px;
+        }
+        .totals-table .total-final td { 
+            border-top: 2px solid #000; 
+            font-size: 14px; 
+            font-weight: bold;
+        }
+        .item-discount td, .discount td { color: #d9534f; border-top: none; }
+        .footer { margin-top: 20px; }
+        .membrete-section { margin-top: 20px; padding: 10px; text-align: center; font-style: italic; color: #555; border-top: 1px solid #eee; border-bottom: 1px solid #eee; }
+        .observaciones-venta p { font-size: 10px; color: #555; }
+        .afip-footer { 
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 25px; 
+            page-break-inside: avoid;
+        }
+        .afip-footer .qr-code { flex-shrink: 0; }
+        .afip-footer .qr-code img { max-width: 110px; height: auto; }
+        .afip-footer .cae-data-wrapper { flex-grow: 1; text-align: right; font-size: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div style="display: flex; align-items: flex-start;">
+                
+                    <img src="https://via.placeholder.com/150x60.png?text=LOGO" alt="Logo" class="empresa-logo">
+                
+                <div class="empresa-info">
+                    <div class="empresa-nombre">MI EMPRESA S.A.</div>
+                    <div>Av. Principal 123 - Ciudad</div>
+                    <div>Condición IVA: Responsable Inscripto</div>
+                    <div>CUIT: 30711223345</div>
+                    <div>Ingresos Brutos: CM 901-123456-7</div>
+                    <div>Inicio de Actividades: 01/01/2015</div>
+                </div>
+            </div>
+            <div class="comprobante-info">
+                <div class="letra">B</div>
+                <div><strong>FACTURA</strong></div>
+                <div>N°: <strong>00005-00001234</strong></div>
+                <div>Fecha: <strong>02/10/2025</strong></div>
+            </div>
+        </div>
+
+        <div class="cliente-info">
+            <strong>Cliente:</strong> Cliente Ejemplo SRL<br>
+            <strong>CUIT/DNI:</strong> 30777888999<br>
+            <strong>Condición IVA:</strong> Responsable Inscripto<br>
+            <strong>Dirección:</strong> Calle Falsa 742
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th class="text-center col-cantidad">Cant.</th>
+                    <th class="col-descripcion">Descripción</th>
+                    <th class="text-right col-precio">P. Unit.</th>
+                    <th class="text-right col-subtotal">Subtotal</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+                <tr>
+                    <td class="text-center">2</td>
+                    <td>Producto A Ultra Largo Para Testear Corte</td>
+                    <td class="text-right">$1250.50</td>
+                    <td class="text-right">$2501.00</td>
+                </tr>
+                
+                <tr class="item-discount">
+                    <td colspan="3" class="text-right">
+                        Descuento (4%)
+                    </td>
+                    <td class="text-right">-$100.00</td>
+                </tr>
+                
+                
+                <tr>
+                    <td class="text-center">1</td>
+                    <td>Servicio Técnico Especializado</td>
+                    <td class="text-right">$8000.00</td>
+                    <td class="text-right">$8000.00</td>
+                </tr>
+                
+                
+                <tr>
+                    <td class="text-center">3</td>
+                    <td>Repuesto XYZ</td>
+                    <td class="text-right">$499.90</td>
+                    <td class="text-right">$1499.70</td>
+                </tr>
+                
+                
+            </tbody>
+        </table>
+        
+        <div class="totals-wrapper">
+            <table class="totals-table">
+                <tbody>
+                    <tr>
+                        <td class="text-right">Subtotal</td>
+                        <td class="text-right">$11900.70</td>
+                    </tr>
+                    
+                    <tr class="discount">
+                        <td class="text-right">
+                            Descuento Gral. (5%)
+                        </td>
+                        <td class="text-right">-$595.03</td>
+                    </tr>
+                    
+                    
+                    <tr>
+                        <td class="text-right">Neto Gravado</td>
+                        <td class="text-right">$9343.53</td>
+                    </tr>
+                    <tr>
+                        <td class="text-right">IVA (21%)</td>
+                        <td class="text-right">$1962.14</td>
+                    </tr>
+                    
+                    <tr class="total-final">
+                        <td class="text-right">TOTAL</td>
+                        <td class="text-right">$11305.67</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        
+            
+            
+            
+            
+            <div class="membrete-section">
+                <p>Membrete Especial
+Linea 2</p>
+            </div>
+            
+            
+        
+
+        <div class="footer">
+            
+                <div class="observaciones-venta">
+                    <p><strong>Forma de Pago:</strong> 
+                    
+                        Efectivo ($4522.27), 
+                    
+                        Tarjeta Crédito ($6783.40)
+                    
+                    </p>
+                </div>
+            
+
+            
+                <div class="observaciones-venta">
+                    <p><strong>Observaciones:</strong> Observación interna para la venta. Gracias por su compra.</p>
+                </div>
+            
+
+            
+            <div class="afip-footer">
+                
+                <div class="qr-code">
+                    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGMAAQAABQABJ6kZ/wAAAABJRU5ErkJggg==" alt="Código QR AFIP">
+                </div>
+                
+                <div class="cae-data-wrapper">
+                    <p><strong>CAE N°:</strong> 71234567891234</p>
+                    <p><strong>Vto. CAE:</strong> 12/10/2025</p>
+                    <p>Comprobante Autorizado</p>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+</body>
+</html>

@@ -36,7 +36,9 @@ if config.config_file_name is not None:
 
 # --- INICIO DE LA CONFIGURACIÓN DE LA BASE DE DATOS ---
 # Construimos la URL de la DB y se la pasamos a Alembic.
-db_url = f"mysql+pymysql://{app_config.DB_USER}:{app_config.DB_PASSWORD}@{app_config.DB_HOST}/{app_config.DB_NAME}"
+# Incluimos el puerto (por defecto 3306 si no está especificado)
+db_port = getattr(app_config, 'DB_PORT', '3306')  # Usamos getattr para evitar errores si no existe
+db_url = f"mysql+pymysql://{app_config.DB_USER}:{app_config.DB_PASSWORD}@{app_config.DB_HOST}:{db_port}/{app_config.DB_NAME}"
 config.set_main_option('sqlalchemy.url', db_url)
 # --- FIN DE LA CONFIGURACIÓN DE LA BASE DE DATOS ---
 

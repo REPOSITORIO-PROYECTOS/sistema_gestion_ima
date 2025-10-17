@@ -5,12 +5,12 @@ from pathlib import Path  #
 # --- Carga de .env ---
 print("--- Cargando config.py (Versión Explícita) ---")
 
-# Definimos la ruta absoluta al archivo .env
-# Esto elimina cualquier ambigüedad sobre dónde buscarlo.
-dotenv_path = "/home/sgi_user/proyectos/sistema_gestion_ima/.env"
+# Buscamos el archivo .env desde el directorio padre (raíz del proyecto)
+project_root = Path(__file__).resolve().parent.parent  # Sube dos niveles desde back/
+dotenv_path = project_root / ".env"
 
 # Cargamos las variables desde esa ruta específica
-load_dotenv(dotenv_path=dotenv_path)
+load_dotenv(dotenv_path)
 
 print(f"DEBUG_CFG: Intentando cargar .env desde: '{dotenv_path}'")
 # --- Fin Carga .env ---
@@ -27,6 +27,7 @@ GOOGLE_SERVICE_ACCOUNT_FILE = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', "credenci
 DB_HOST = os.getenv("DB_HOST")
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_PORT = os.getenv("DB_PORT", "3306")  # Puerto por defecto MySQL
 DB_NAME = os.getenv("DB_NAME")
 # ===================================
 # --- Variables de Conexión ---

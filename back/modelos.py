@@ -236,10 +236,12 @@ class StockMovimiento(SQLModel, table=True):
     id_usuario: int = Field(foreign_key="usuarios.id")
     id_compra_detalle: Optional[int] = Field(default=None, foreign_key="compra_detalle.id")
     id_venta_detalle: Optional[int] = Field(default=None, foreign_key="venta_detalle.id")
+    id_consumo_mesa_detalle: Optional[int] = Field(default=None, foreign_key="consumo_mesa_detalle.id")  # Nueva relación
     articulo: Articulo = Relationship(back_populates="movimientos_stock")
     usuario: Usuario = Relationship(back_populates="movimientos_de_stock")
     compra_detalle: Optional["CompraDetalle"] = Relationship(back_populates="movimiento_stock")
     venta_detalle: Optional["VentaDetalle"] = Relationship(back_populates="movimiento_stock")
+    consumo_mesa_detalle: Optional["ConsumoMesaDetalle"] = Relationship(back_populates="movimiento_stock")  # Nueva relación
     id_empresa: int = Field(foreign_key="empresas.id")
     empresa: "Empresa" = Relationship()
     
@@ -288,6 +290,7 @@ class Venta(SQLModel, table=True):
     id_cliente: Optional[int] = Field(default=None, foreign_key="terceros.id")
     id_usuario: int = Field(foreign_key="usuarios.id")
     id_caja_sesion: int = Field(foreign_key="caja_sesiones.id")
+    id_mesa: Optional[int] = Field(default=None, foreign_key="mesas.id")  # Nueva relación con mesa
     pago_separado: Optional[bool] = None
     detalles_pago_separado: Optional[str] = None
     tipo_comprobante_solicitado: Optional[str] = Field(
@@ -297,6 +300,7 @@ class Venta(SQLModel, table=True):
     cliente: Optional[Tercero] = Relationship(back_populates="ventas_recibidas")
     usuario: Usuario = Relationship(back_populates="ventas_realizadas")
     caja_sesion: CajaSesion = Relationship(back_populates="ventas")
+    mesa: Optional["Mesa"] = Relationship(back_populates="ventas")  # Nueva relación
     items: List["VentaDetalle"] = Relationship(back_populates="venta")
     movimientos_de_caja: List[CajaMovimiento] = Relationship(back_populates="venta")
     id_empresa: int = Field(foreign_key="empresas.id")
@@ -446,3 +450,52 @@ class FacturaElectronica(SQLModel, table=True):
         default_factory=datetime.utcnow,
         sa_column=Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
     )
+
+# ===================================================================
+# === MODELO DE MESA (PARA GESTIÓN DE MESAS EN RESTAURANTES)
+# ===================================================================
+
+class Mesa(SQLModel, table=True):
+    __tablename__ = "mesas"
+    __table_args__ = (UniqueConstraint("numero", "id_empresa", name="uq_numero_empresa_mesa"),)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    numero: int = Field(index=True)  # Número de la mesa (ej. 1, 2, 3)
+    capacidad: int = Field(default=4)  # Número de personas que caben
+    estado: str = Field(default="LIBRE")  # LIBRE, OCUPADA, RESERVADA
+    activo: bool = Field(default=True)
+    id_empresa: int = Field(foreign_key="empresas.id")
+    empresa: "Empresa" = Relationship()
+    # Relaciones con consumos y ventas
+    consumos: List["ConsumoMesa"] = Relationship(back_populates="mesa")
+    ventas: List["Venta"] = Relationship(back_populates="mesa")
+
+# ===================================================================
+# === MODELOS DE CONSUMO EN MESAS (PARA PEDIDOS ABIERTOS)
+# ===================================================================
+
+class ConsumoMesa(SQLModel, table=True):
+    __tablename__ = "consumo_mesa"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    timestamp_inicio: datetime = Field(default_factory=datetime.utcnow)
+    timestamp_cierre: Optional[datetime] = None
+    total: float = Field(default=0.0)
+    estado: str = Field(default="ABIERTO")  # ABIERTO, CERRADO, FACTURADO
+    id_mesa: int = Field(foreign_key="mesas.id")
+    id_usuario: int = Field(foreign_key="usuarios.id")
+    id_empresa: int = Field(foreign_key="empresas.id")
+    mesa: "Mesa" = Relationship(back_populates="consumos")
+    usuario: "Usuario" = Relationship()
+    empresa: "Empresa" = Relationship()
+    detalles: List["ConsumoMesaDetalle"] = Relationship(back_populates="consumo")
+
+class ConsumoMesaDetalle(SQLModel, table=True):
+    __tablename__ = "consumo_mesa_detalle"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    cantidad: float
+    precio_unitario: float
+    descuento_aplicado: float = Field(default=0.0)
+    id_consumo_mesa: int = Field(foreign_key="consumo_mesa.id")
+    id_articulo: int = Field(foreign_key="articulos.id")
+    consumo: "ConsumoMesa" = Relationship(back_populates="detalles")
+    articulo: "Articulo" = Relationship()
+    movimiento_stock: Optional[StockMovimiento] = Relationship(back_populates="consumo_mesa_detalle")

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Factura</title>
+    <style>
+        body { font-family: 'Courier New', Courier, monospace; font-size: 10px; margin: 0; padding: 0; color: #000; }
+        .ticket { width: 48mm; padding: 1mm; }
+        .header, .afip-footer { text-align: center; }
+        .header h1 { margin: 0; font-size: 14px; font-weight: bold; word-wrap: break-word; }
+        .header p { margin: 2px 0; }
+        .factura-info { display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; }
+        hr { border: none; border-top: 1px dashed black; margin: 5px 0; }
+        .cliente-info p, .pago-info p { margin-bottom: 3px; }
+        .item-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        .item-table th, .item-table td { padding: 2px 0; }
+        .col-cant { width: 15%; text-align: left; }
+        .col-desc { width: 45%; text-align: left; }
+        .col-pu { width: 20%; text-align: right; }
+        .col-subt { width: 20%; text-align: right; }
+        .item-discount td { font-size: 9px; color: #555; border-top: none; padding-top: 0; }
+        .totals-section { margin-top: 8px; border-top: 1px dashed black; padding-top: 5px; }
+        .totals-section .item { display: flex; justify-content: space-between; }
+        .totals-section .item.bold { font-weight: bold; }
+        .totals-section .discount { color: #555; }
+        .total-final { font-size: 13px; font-weight: bold; }
+        .membrete-section { text-align: center; font-size: 9px; padding: 4px 0; border-top: 1px dashed black; border-bottom: 1px dashed black; margin: 5px 0; }
+        .observaciones-finales-section { margin-top: 8px; font-size: 9px; word-wrap: break-word; margin-bottom: 5px; }
+        .afip-footer { margin-top: 10px; }
+        .afip-footer p { margin: 1px 0; font-weight: bold; }
+        .afip-footer img { max-width: 100px; height: auto; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <div class="ticket">
+        <div class="header">
+            
+                <img src="https://via.placeholder.com/150x60.png?text=LOGO" alt="Logo" style="max-width: 60%; height: auto; margin-bottom: 5px;">
+            
+            <h1>MI EMPRESA S.A.</h1>
+            <p>Av. Principal 123 - Ciudad</p>
+            <p>CUIT: 30711223345</p>
+            <p>IIBB: CM 901-123456-7</p>
+            <p>Inicio Act.: 01/01/2015</p>
+            <p>IVA: Responsable Inscripto</p>
+            <hr>
+            <div class="factura-info">
+                <span>FACTURA</span>
+                <span>B</span> 
+            </div>
+            <p>P.Venta: 00005 - N°: 00001234</p>
+            <p>Fecha: 02/10/2025</p>
+            <hr>
+        </div>
+
+        <div class="cliente-info">
+            <p><strong>Cliente:</strong> Cliente Ejemplo SRL</p>
+            <p><strong>CUIT/DNI:</strong> 30777888999</p>
+            <p><strong>IVA:</strong> Responsable Inscripto</p>
+            <p><strong>Domicilio:</strong> Calle Falsa 742</p>
+        </div>
+        <hr>
+        
+        <table class="item-table">
+            <thead>
+                <tr>
+                    <th class="col-cant">Cant</th>
+                    <th class="col-desc">Desc</th>
+                    <th class="col-pu">P/U</th>
+                    <th class="col-subt">Subt</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+                <tr>
+                    <td class="col-cant">2</td>
+                    <td class="col-desc">Producto A Ultra Largo Para Testear Corte</td>
+                    <td class="col-pu">$1250.50</td>
+                    <td class="col-subt">$2501.00</td>
+                </tr>
+                
+                <tr class="item-discount">
+                    <td></td>
+                    <td colspan="2">
+                        Desc. (4%)
+                    </td>
+                    <td class="col-subt">-$100.00</td>
+                </tr>
+                
+                
+                <tr>
+                    <td class="col-cant">1</td>
+                    <td class="col-desc">Servicio Técnico Especializado</td>
+                    <td class="col-pu">$8000.00</td>
+                    <td class="col-subt">$8000.00</td>
+                </tr>
+                
+                
+                <tr>
+                    <td class="col-cant">3</td>
+                    <td class="col-desc">Repuesto XYZ</td>
+                    <td class="col-pu">$499.90</td>
+                    <td class="col-subt">$1499.70</td>
+                </tr>
+                
+                
+            </tbody>
+        </table>
+
+        <div class="totals-section">
+            <div class="item">
+                <span>Subtotal</span>
+                <span>$11900.70</span>
+            </div>
+            
+                <div class="item discount">
+                    <span>Desc. Gral. (5%)</span>
+                    <span>-$595.03</span>
+                </div>
+            
+            <hr>
+            
+            <div class="item">
+                <span>Neto Gravado</span>
+                <span>$9343.53</span>
+            </div>
+            <div class="item">
+                <span>IVA (21%)</span>
+                <span>$1962.14</span>
+            </div>
+            
+            <div class="item total-final">
+                <span>TOTAL</span>
+                <span>$11305.67</span>
+            </div>
+        </div>
+
+        
+        <hr>
+        <div class="pago-info">
+            <p><strong>Forma de Pago:</strong></p>
+            
+            <p>Efectivo: $4522.27</p>
+            
+            <p>Tarjeta Crédito: $6783.40</p>
+            
+        </div>
+        
+
+        
+            
+            
+            
+            
+            <div class="membrete-section">
+                Membrete Especial
+Linea 2
+            </div>
+            
+            
+        
+        
+        
+            <div class="observaciones-finales-section">
+                <pre style="font-family: 'Courier New', Courier, monospace; margin: 0; white-space: pre-wrap; word-wrap: break-word;">Observación interna para la venta. Gracias por su compra.</pre>
+            </div>
+        
+        
+        <hr>
+
+        <div class="afip-footer">
+            
+                <p>CAE N°: 71234567891234</p>
+                <p>Vto. CAE: 12/10/2025</p>
+                
+                    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGMAAQAABQABJ6kZ/wAAAABJRU5ErkJggg==" alt="Código QR AFIP">
+                
+                <p>Comprobante Autorizado</p>
+            
+        </div>
+    </div>
+</body>
+</html>
