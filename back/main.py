@@ -1,7 +1,7 @@
 # back/main.py
 
 import os
-from back.api.blueprints import admin_router, afip_tools_router, articulos_router, auth_router,actualizacion_masiva_router,clientes_router, configuracion_router, empresa_router, importaciones_router, proveedores_router, comprobantes_router, mesas_router
+from back.api.blueprints import admin_router, afip_tools_router, articulos_router, auth_router,actualizacion_masiva_router,clientes_router, configuracion_router, empresa_router, importaciones_router, proveedores_router, comprobantes_router, mesas_router, scanner_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -78,6 +78,7 @@ app.include_router(empresa_router.router)  # Asegúrate de importar el router de
 app.include_router(comprobantes_router.router)
 app.include_router(afip_tools_router.router)
 app.include_router(mesas_router.router)
+app.include_router(scanner_router.router)
 
 
 # --- Endpoint Raíz ---

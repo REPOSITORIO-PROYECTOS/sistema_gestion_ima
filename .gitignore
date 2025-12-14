@@ -82,3 +82,8 @@ coverage.xml
 boveda_microservicio/
 prueba_local_completa.py
 prueba_local_comprobantes.py
+
+# TypeScript Jest config
+tsconfig.jest.json
+jest.config.js
+node_modules/

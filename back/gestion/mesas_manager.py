@@ -165,10 +165,11 @@ def generar_ticket_consumo(db: Session, id_consumo: int, id_empresa: int, format
                 "articulo": detalle.articulo.descripcion,
                 "cantidad": detalle.cantidad,
                 "precio_unitario": detalle.precio_unitario,
-                "subtotal": detalle.cantidad * detalle.precio_unitario
+                "subtotal": detalle.cantidad * detalle.precio_unitario,
+                "categoria": (detalle.articulo.categoria.nombre if detalle.articulo and detalle.articulo.categoria else None),
             } for detalle in consumo.detalles
         ],
-        "total": consumo.total
+        "total": consumo.total,
     }
 
     return ticket_data
