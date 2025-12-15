@@ -21,6 +21,9 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image';
 import eventBus from "@/utils/eventBus";
 import { useEmpresaStore } from "@/lib/empresaStore";
+import { useCustomLinksStore } from "@/lib/customLinksStore";
+import { API_CONFIG } from "@/lib/api-config";
+import { useFeaturesStore } from "@/lib/featuresStore";
 
 type NavLink = {
   href: string
@@ -35,6 +38,8 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
   const router = useRouter();
   const usuario = useAuthStore((state) => state.usuario); 
   const token = useAuthStore((state) => state.token);
+  const customLinks = useCustomLinksStore((s) => s.links);
+  const mesasEnabled = useFeaturesStore((s) => s.mesasEnabled);
 
   // Scroll y ocultación del Nav
   const [show, setShow] = useState(true);
@@ -61,7 +66,7 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
   useEffect(() => {
     const obtenerEmpresa = async () => {
       try {
-        const res = await fetch('https://sistema-ima.sistemataup.online/api/configuracion/mi-empresa', {
+        const res = await fetch(`${API_CONFIG.BASE_URL}/configuracion/mi-empresa`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -73,7 +78,7 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
 
         // Actualizar visualmente logo y color
         setNavbarColor(data.color_principal || 'bg-green-800');
-        setLogoUrl(`https://sistema-ima.sistemataup.online/api${data.ruta_logo}`);
+        setLogoUrl(`${API_CONFIG.BASE_URL}${data.ruta_logo}`);
 
         // Actualizar la store global
         useEmpresaStore.getState().setEmpresa(data);
@@ -119,7 +124,7 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
       <div className={`${navbarColor} shadow px-4 py-4 flex justify-between items-center`}>
         
         {/* Logo */}
-        <a href="/dashboard" className="text-xl font-bold flex items-center gap-2">
+        <a href="/dashboard" title="Dashboard" className="text-xl font-bold flex items-center gap-2">
           <Image
             src={logoUrl}
             alt="Logo Empresa"
@@ -132,7 +137,7 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
         {/* Menú de secciones - responsivo */}
         <NavigationMenu className="hidden md:block">
           <NavigationMenuList className="flex space-x-4">
-            {links.map(({ href, name, roles }) => {
+            {links.filter(l => (mesasEnabled ? true : !l.href.startsWith('/dashboard/mesas'))).map(({ href, name, roles }) => {
               const isActive = pathname.startsWith(href);
               const isAllowed = roles.includes(role);
 
@@ -157,6 +162,21 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                 </NavigationMenuItem>
               );
             })}
+            {customLinks.filter((cl) => cl.visible && cl.url).map((cl) => (
+              <NavigationMenuItem key={`custom-${cl.id}`}>
+                <NavigationMenuLink
+                  href={cl.url || "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`text-md font-medium px-4 py-2 rounded-lg transition-colors
+                    ${cl.url ? 'text-white hover:bg-green-600 hover:text-white' : 'text-gray-400 cursor-not-allowed'}
+                  `}
+                  aria-disabled={!cl.url}
+                >
+                  {cl.name || `Enlace ${cl.id}`}
+                </NavigationMenuLink>
+              </NavigationMenuItem>
+            ))}
           </NavigationMenuList>
         </NavigationMenu>
 
@@ -238,7 +258,7 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
 
                 <DropdownMenuSeparator />
 
-                {links.map(({ href, name, roles }) => {
+                {links.filter(l => (mesasEnabled ? true : !l.href.startsWith('/dashboard/mesas'))).map(({ href, name, roles }) => {
                   const isAllowed = roles.includes(role);
                   return (
                     <DropdownMenuItem key={href} asChild>
@@ -258,6 +278,20 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                     </DropdownMenuItem>
                   );
                 })}
+                {customLinks.filter((cl) => cl.visible && cl.url).map((cl) => (
+                  <DropdownMenuItem key={`m-custom-${cl.id}`} asChild>
+                    <a
+                      href={cl.url || "#"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`block py-2 text-sm ${
+                        cl.url ? 'text-green-900 hover:bg-green-100' : 'text-gray-400 cursor-not-allowed'
+                      }`}
+                    >
+                      {cl.name || `Enlace ${cl.id}`}
+                    </a>
+                  </DropdownMenuItem>
+                ))}
 
                 <DropdownMenuSeparator />
 

@@ -14,6 +14,7 @@ interface Empresa {
   telefono_negocio?: string;
   mail_negocio?: string;
   link_google_sheets?: string;
+  aclaraciones_legales?: Record<string, string>;
 }
 
 interface EmpresaStore {

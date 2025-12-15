@@ -13,9 +13,11 @@ type NavLink = {
 
 // Lista de secciones (paths) y sus roles permitidos - revisar si no va en ssr
 const links: NavLink[] = [
-  { name: "Ventas", href: "/dashboard/ventas", roles: ["Admin", "Cajero"] },
-  { name: "Contabilidad", href: "/dashboard/contabilidad", roles: ["Admin"] },
-  { name: "Stock", href: "/dashboard/stock", roles: ["Admin"] },
+  { name: "Ventas", href: "/dashboard/ventas", roles: ["Admin", "Cajero","Gerente"] },
+  { name: "Mesas", href: "/dashboard/mesas", roles: ["Admin", "Cajero","Gerente"] },
+  { name: "Admin Mesas", href: "/dashboard/mesas/admin", roles: ["Admin","Gerente"] },
+  { name: "Contabilidad", href: "/dashboard/contabilidad", roles: ["Admin","Gerente"] },
+  { name: "Stock", href: "/dashboard/stock", roles: ["Admin","Gerente"] },
 ]
 
 function DashboardLayout({ children }: { children: React.ReactNode }) {

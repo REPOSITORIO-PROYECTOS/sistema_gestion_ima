@@ -24,6 +24,8 @@ import { useFacturacionStore } from "@/lib/facturacionStore";
 import { useAuthStore } from "@/lib/authStore"
 import { useEmpresaStore } from '@/lib/empresaStore';
 import { useProductoStore } from "@/lib/productoStore";
+import { API_CONFIG } from "@/lib/api-config";
+import { attachAutoScaleBridge } from "@/lib/scaleSerial";
 
 // --- Componentes Hijos ---
 import { SeccionCliente } from "./SeccionCliente";
@@ -154,6 +156,7 @@ function FormVentas({
   const empresa = useEmpresaStore((state) => state.empresa);
   const [checkoutVisible, setCheckoutVisible] = useState(false);
   const checkoutSectionRef = useRef<HTMLDivElement>(null);
+  const [autoSubmitFlag, setAutoSubmitFlag] = useState(false);
 
 
   // Estados para Venta a Granel
@@ -283,6 +286,248 @@ function FormVentas({
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    const cfg = empresa?.aclaraciones_legales ?? {};
+    const autoAgregar = (cfg?.balanza_auto_agregar ?? "false") === "true";
+    if (!autoAgregar) return;
+    if (!token) return;
+    let ctrl: { stop: () => Promise<void> } | null = null;
+    (async () => {
+      ctrl = await attachAutoScaleBridge(token);
+    })();
+    return () => {
+      if (ctrl) ctrl.stop();
+    };
+  }, [empresa, token]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'F5') {
+        e.preventDefault();
+        setTipoFacturacion('comprobante');
+        // Dispara impresión directa del comprobante (ticket/presupuesto)
+        // Aprovecha la función de generación dentro del flujo de submit usando el estado actual
+        (async () => {
+          try {
+            // Simula post-generación: reutiliza la ruta de generación con los datos actuales
+            const itemsBase = productosVendidos.map((p): ItemComprobante => {
+              const productoReal = productos.find((prod) => prod.nombre === p.tipo);
+              return {
+                descripcion: productoReal?.nombre || p.tipo,
+                cantidad: p.cantidad,
+                precio_unitario: productoReal ? getPrecioProducto(productoReal) : 0,
+                subtotal: p.precioTotal,
+                tasa_iva: 21,
+                descuento_especifico: p.descuentoNominal || 0,
+                descuento_especifico_por: p.porcentajeDescuento || 0,
+              };
+            });
+
+            const transaccion = { items: itemsBase, total: totalVentaFinal, descuento_general: descuentoNominalTotal || 0, descuento_general_por: descuentoSobreTotal || 0, observaciones: observaciones || "" };
+
+            const reqPayload = {
+              formato: formatoComprobante.toLowerCase(),
+              tipo: 'comprobante',
+              emisor: {
+                cuit: empresa?.cuit?.toString() || '0',
+                razon_social: empresa?.nombre_negocio || 'N/A',
+                domicilio: empresa?.direccion_negocio || 'N/A',
+                punto_venta: empresa?.afip_punto_venta_predeterminado || 1,
+                condicion_iva: empresa?.afip_condicion_iva || 'Responsable Inscripto',
+              },
+              receptor: {
+                nombre_razon_social: tipoClienteSeleccionado.id === '0' ? 'Consumidor Final' : clienteSeleccionado?.nombre_razon_social ?? 'N/A',
+                cuit_o_dni: tipoClienteSeleccionado.id === '0' ? cuitManual || '0' : clienteSeleccionado?.cuit || clienteSeleccionado?.identificacion_fiscal || '0',
+                domicilio: 'Sin especificar',
+                condicion_iva: tipoClienteSeleccionado.id === '0' ? 'Consumidor Final' : clienteSeleccionado?.condicion_iva ?? 'Consumidor Final'
+              },
+              transaccion
+            };
+
+            const respComp = await fetch('https://sistema-ima.sistemataup.online/api/comprobantes/generar', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify(reqPayload)
+            });
+
+            if (!respComp.ok) {
+              const errorComp = await respComp.json();
+              toast.error(`❌ Error al generar comprobante: ${errorComp.detail}`);
+              return;
+            }
+
+            const blob = await respComp.blob();
+            const url = URL.createObjectURL(blob);
+            const w = window.open(url);
+            if (w) {
+              setTimeout(() => { try { w.focus(); w.print(); } catch {} }, 500);
+              setTimeout(() => { URL.revokeObjectURL(url); }, 10000);
+            }
+            toast.success('✅ Comprobante enviado a impresión.');
+          } catch {
+            toast.error('❌ Fallo al imprimir el comprobante.');
+          }
+        })();
+      } else if (e.key === 'F6') {
+        e.preventDefault();
+        setTipoFacturacion('factura');
+        // Reutilizar el mismo mecanismo pero con tipo 'factura'
+        (async () => {
+          try {
+            const itemsBase = productosVendidos.map((p): ItemComprobante => {
+              const productoReal = productos.find((prod) => prod.nombre === p.tipo);
+              return {
+                descripcion: productoReal?.nombre || p.tipo,
+                cantidad: p.cantidad,
+                precio_unitario: productoReal ? getPrecioProducto(productoReal) : 0,
+                subtotal: p.precioTotal,
+                tasa_iva: 21,
+              };
+            });
+
+            const transaccion = { items: itemsBase, total: totalVentaFinal, observaciones: observaciones || '' };
+            const reqPayload = {
+              formato: formatoComprobante.toLowerCase(),
+              tipo: 'factura',
+              emisor: {
+                cuit: empresa?.cuit?.toString() || '0',
+                razon_social: empresa?.nombre_negocio || 'N/A',
+                domicilio: empresa?.direccion_negocio || 'N/A',
+                punto_venta: empresa?.afip_punto_venta_predeterminado || 1,
+                condicion_iva: empresa?.afip_condicion_iva || 'Responsable Inscripto',
+              },
+              receptor: {
+                nombre_razon_social: tipoClienteSeleccionado.id === '0' ? 'Consumidor Final' : clienteSeleccionado?.nombre_razon_social ?? 'N/A',
+                cuit_o_dni: tipoClienteSeleccionado.id === '0' ? cuitManual || '0' : clienteSeleccionado?.cuit || clienteSeleccionado?.identificacion_fiscal || '0',
+                domicilio: 'Sin especificar',
+                condicion_iva: tipoClienteSeleccionado.id === '0' ? 'Consumidor Final' : clienteSeleccionado?.condicion_iva ?? 'Consumidor Final'
+              },
+              transaccion
+            };
+
+            const respComp = await fetch('https://sistema-ima.sistemataup.online/api/comprobantes/generar', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify(reqPayload)
+            });
+
+            if (!respComp.ok) {
+              const errorComp = await respComp.json();
+              toast.error(`❌ Error al generar factura: ${errorComp.detail}`);
+              return;
+            }
+
+            const blob = await respComp.blob();
+            const url = URL.createObjectURL(blob);
+            const w = window.open(url);
+            if (w) {
+              setTimeout(() => { try { w.focus(); w.print(); } catch {} }, 500);
+              setTimeout(() => { URL.revokeObjectURL(url); }, 10000);
+            }
+            toast.success('✅ Factura enviada a impresión.');
+          } catch {
+            toast.error('❌ Fallo al imprimir la factura.');
+          }
+        })();
+      }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [productosVendidos, productos, getPrecioProducto, totalVentaFinal, descuentoNominalTotal, descuentoSobreTotal, observaciones, formatoComprobante, empresa, tipoClienteSeleccionado, clienteSeleccionado, cuitManual, token]);
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_CONFIG.BASE_URL}/scanner/evento/poll`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) return;
+        const payload = await res.json();
+        if (!payload?.has_event) return;
+        const ev = payload.event as { codigo?: string; id_articulo?: number; nombre?: string; precio?: number; peso?: number };
+        if (ev.id_articulo) {
+          const p = productos.find(pp => pp.id === String(ev.id_articulo));
+          if (p) {
+            const pUnit = typeof ev.precio === 'number' ? ev.precio : (tipoClienteSeleccionado.id === '0' ? p.precio_venta : p.venta_negocio);
+            const cantidadEv = typeof ev.peso === 'number' ? ev.peso : 1;
+            onAgregarProducto({
+              tipo: p.nombre,
+              cantidad: cantidadEv,
+              precioTotal: pUnit * cantidadEv,
+              descuentoAplicado: false,
+              porcentajeDescuento: 0,
+              descuentoNominal: 0
+            });
+            toast.success(`Se agregó '${p.nombre}' desde escáner`);
+            return;
+          }
+        }
+        const cfg = empresa?.aclaraciones_legales ?? {};
+        const autoAgregar = (cfg?.balanza_auto_agregar ?? "false") === "true";
+        const autoFacturar = (cfg?.balanza_auto_facturar ?? "false") === "true";
+        const precioFuente = (cfg?.balanza_precio_fuente ?? "producto") as 'producto' | 'evento';
+        const balanzaId = cfg?.balanza_articulo_id ?? "";
+        if (autoAgregar && typeof ev.peso === 'number') {
+          if (balanzaId) {
+            const p = productos.find(pp => pp.id === String(balanzaId));
+            if (p) {
+              const pUnit = precioFuente === 'evento' && typeof ev.precio === 'number'
+                ? ev.precio
+                : (tipoClienteSeleccionado.id === '0' ? p.precio_venta : p.venta_negocio);
+              const cantidadEv = ev.peso;
+              onAgregarProducto({
+                tipo: p.nombre,
+                cantidad: cantidadEv,
+                precioTotal: pUnit * cantidadEv,
+                descuentoAplicado: false,
+                porcentajeDescuento: 0,
+                descuentoNominal: 0
+              });
+              toast.success(`Se agregó '${p.nombre}' desde balanza`);
+              if (autoFacturar) {
+                setMetodoPago('efectivo');
+                setMontoPagado(totalVentaFinal);
+                setAutoSubmitFlag(true);
+              }
+              return;
+            }
+          }
+          if (typeof ev.precio === 'number') {
+            const nombre = ev.nombre || 'Producto escáner';
+            const cantidadEv = ev.peso;
+            const precioTotalEv = ev.precio * cantidadEv;
+            onAgregarProducto({
+              tipo: nombre,
+              cantidad: cantidadEv,
+              precioTotal: precioTotalEv,
+              descuentoAplicado: false,
+              porcentajeDescuento: 0,
+              descuentoNominal: 0
+            });
+            toast.success(`Se agregó '${nombre}' desde escáner`);
+            if (autoFacturar) {
+              setMetodoPago('efectivo');
+              setMontoPagado(totalVentaFinal);
+              setAutoSubmitFlag(true);
+            }
+          }
+        }
+      } catch {}
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [token, productos, productoSeleccionado, getPrecioProducto, onAgregarProducto]);
+
+  useEffect(() => {
+    if (autoSubmitFlag) {
+      setAutoSubmitFlag(false);
+      setTimeout(() => {
+        const e = { preventDefault: () => {} } as unknown as React.FormEvent;
+        handleSubmit(e);
+      }, 300);
+    }
+  }, [autoSubmitFlag]);
 
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -581,14 +826,19 @@ function FormVentas({
 
           const blob = await respComp.blob();
           const url = URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          link.href = url;
-          link.download = `${tipoFacturacion}-${Date.now()}.pdf`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-          toast.success("✅ Comprobante generado correctamente.");
+          const w = window.open(url);
+          if (w) {
+            setTimeout(() => {
+              try {
+                w.focus();
+                w.print();
+              } catch {}
+            }, 500);
+            setTimeout(() => {
+              URL.revokeObjectURL(url);
+            }, 10000);
+          }
+          toast.success("✅ Comprobante enviado a impresión.");
 
         } catch (error) {
           console.error("❌ Error en la generación del comprobante:", error);

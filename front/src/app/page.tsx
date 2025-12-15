@@ -9,8 +9,9 @@ import { toast } from "sonner";
 import { useAuthStore } from "@/lib/authStore";
 import { useEmpresaStore } from "@/lib/empresaStore";
 import { useProductoStore } from "@/lib/productoStore";
+import { API_CONFIG } from "@/lib/api-config";
 
-const API_URL = "https://sistema-ima.sistemataup.online/api";
+const API_URL = API_CONFIG.BASE_URL;
 
 // Tipado del producto que devuelve la API
 type ProductoAPI = {
@@ -92,11 +93,23 @@ function Login() {
       setLoading(true);
 
       // --- LOGIN ---
-      const response = await fetch(`${API_URL}/auth/token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ username, password }),
-      });
+      let response: Response;
+      try {
+        response = await fetch(`${API_URL}/auth/token`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ username, password }),
+          cache: "no-store",
+        });
+      } catch {
+        await new Promise((r) => setTimeout(r, 250));
+        response = await fetch(`${API_URL}/auth/token`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ username, password }),
+          cache: "no-store",
+        });
+      }
 
       if (!response.ok) throw new Error("Credenciales inválidas");
 
