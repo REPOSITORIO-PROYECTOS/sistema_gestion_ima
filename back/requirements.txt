@@ -62,3 +62,4 @@ pydyf==0.11.0
 pyphen==0.17.2
 webencodings==0.5.1
 pillow==11.3.0
+pyserial==3.5
