@@ -207,6 +207,7 @@ function FormVentas({
     }
   };
 
+
   const handlePrecioGranelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const nuevoValor = e.target.value;
     setInputPrecioGranel(nuevoValor);
@@ -285,7 +286,7 @@ function FormVentas({
 
   useEffect(() => {
     inputRef.current?.focus();
-  }, []);
+  }, [inputRef]);
 
   useEffect(() => {
     const cfg = empresa?.aclaraciones_legales ?? {};
@@ -301,141 +302,142 @@ function FormVentas({
     };
   }, [empresa, token]);
 
+  const handleF5 = useCallback(async () => {
+    setTipoFacturacion('comprobante');
+    try {
+      const itemsBase = productosVendidos.map((p): ItemComprobante => {
+        const productoReal = productos.find((prod) => prod.nombre === p.tipo);
+        return {
+          descripcion: productoReal?.nombre || p.tipo,
+          cantidad: p.cantidad,
+          precio_unitario: productoReal ? getPrecioProducto(productoReal) : 0,
+          subtotal: p.precioTotal,
+          tasa_iva: 21,
+          descuento_especifico: p.descuentoNominal || 0,
+          descuento_especifico_por: p.porcentajeDescuento || 0,
+        };
+      });
+
+      const transaccion = { items: itemsBase, total: totalVentaFinal, descuento_general: descuentoNominalTotal || 0, descuento_general_por: descuentoSobreTotal || 0, observaciones: observaciones || "" };
+
+      const reqPayload = {
+        formato: formatoComprobante.toLowerCase(),
+        tipo: 'comprobante',
+        emisor: {
+          cuit: empresa?.cuit?.toString() || '0',
+          razon_social: empresa?.nombre_negocio || 'N/A',
+          domicilio: empresa?.direccion_negocio || 'N/A',
+          punto_venta: empresa?.afip_punto_venta_predeterminado || 1,
+          condicion_iva: empresa?.afip_condicion_iva || 'Responsable Inscripto',
+        },
+        receptor: {
+          nombre_razon_social: tipoClienteSeleccionado.id === '0' ? 'Consumidor Final' : clienteSeleccionado?.nombre_razon_social ?? 'N/A',
+          cuit_o_dni: tipoClienteSeleccionado.id === '0' ? cuitManual || '0' : clienteSeleccionado?.cuit || clienteSeleccionado?.identificacion_fiscal || '0',
+          domicilio: 'Sin especificar',
+          condicion_iva: tipoClienteSeleccionado.id === '0' ? 'Consumidor Final' : clienteSeleccionado?.condicion_iva ?? 'Consumidor Final'
+        },
+        transaccion
+      };
+
+      const respComp = await fetch('https://sistema-ima.sistemataup.online/api/comprobantes/generar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(reqPayload)
+      });
+
+      if (!respComp.ok) {
+        const errorComp = await respComp.json();
+        toast.error(`❌ Error al generar comprobante: ${errorComp.detail}`);
+        return;
+      }
+
+      const blob = await respComp.blob();
+      const url = URL.createObjectURL(blob);
+      const w = window.open(url);
+      if (w) {
+        setTimeout(() => { try { w.focus(); w.print(); } catch {} }, 500);
+        setTimeout(() => { URL.revokeObjectURL(url); }, 10000);
+      }
+      toast.success('✅ Comprobante enviado a impresión.');
+    } catch {
+      toast.error('❌ Fallo al imprimir el comprobante.');
+    }
+  }, [productosVendidos, productos, getPrecioProducto, totalVentaFinal, descuentoNominalTotal, descuentoSobreTotal, observaciones, formatoComprobante, empresa, tipoClienteSeleccionado, clienteSeleccionado, cuitManual, token, setTipoFacturacion]);
+
+  const handleF6 = useCallback(async () => {
+    setTipoFacturacion('factura');
+    try {
+      const itemsBase = productosVendidos.map((p): ItemComprobante => {
+        const productoReal = productos.find((prod) => prod.nombre === p.tipo);
+        return {
+          descripcion: productoReal?.nombre || p.tipo,
+          cantidad: p.cantidad,
+          precio_unitario: productoReal ? getPrecioProducto(productoReal) : 0,
+          subtotal: p.precioTotal,
+          tasa_iva: 21,
+        };
+      });
+
+      const transaccion = { items: itemsBase, total: totalVentaFinal, observaciones: observaciones || '' };
+      const reqPayload = {
+        formato: formatoComprobante.toLowerCase(),
+        tipo: 'factura',
+        emisor: {
+          cuit: empresa?.cuit?.toString() || '0',
+          razon_social: empresa?.nombre_negocio || 'N/A',
+          domicilio: empresa?.direccion_negocio || 'N/A',
+          punto_venta: empresa?.afip_punto_venta_predeterminado || 1,
+          condicion_iva: empresa?.afip_condicion_iva || 'Responsable Inscripto',
+        },
+        receptor: {
+          nombre_razon_social: tipoClienteSeleccionado.id === '0' ? 'Consumidor Final' : clienteSeleccionado?.nombre_razon_social ?? 'N/A',
+          cuit_o_dni: tipoClienteSeleccionado.id === '0' ? cuitManual || '0' : clienteSeleccionado?.cuit || clienteSeleccionado?.identificacion_fiscal || '0',
+          domicilio: 'Sin especificar',
+          condicion_iva: tipoClienteSeleccionado.id === '0' ? 'Consumidor Final' : clienteSeleccionado?.condicion_iva ?? 'Consumidor Final'
+        },
+        transaccion
+      };
+
+      const respComp = await fetch('https://sistema-ima.sistemataup.online/api/comprobantes/generar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(reqPayload)
+      });
+
+      if (!respComp.ok) {
+        const errorComp = await respComp.json();
+        toast.error(`❌ Error al generar factura: ${errorComp.detail}`);
+        return;
+      }
+
+      const blob = await respComp.blob();
+      const url = URL.createObjectURL(blob);
+      const w = window.open(url);
+      if (w) {
+        setTimeout(() => { try { w.focus(); w.print(); } catch {} }, 500);
+        setTimeout(() => { URL.revokeObjectURL(url); }, 10000);
+      }
+      toast.success('✅ Factura enviada a impresión.');
+    } catch {
+      toast.error('❌ Fallo al imprimir la factura.');
+    }
+    }, [productosVendidos, productos, getPrecioProducto, totalVentaFinal, observaciones, formatoComprobante, empresa, tipoClienteSeleccionado, clienteSeleccionado, cuitManual, token, setTipoFacturacion]);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'F5') {
         e.preventDefault();
-        setTipoFacturacion('comprobante');
-        // Dispara impresión directa del comprobante (ticket/presupuesto)
-        // Aprovecha la función de generación dentro del flujo de submit usando el estado actual
-        (async () => {
-          try {
-            // Simula post-generación: reutiliza la ruta de generación con los datos actuales
-            const itemsBase = productosVendidos.map((p): ItemComprobante => {
-              const productoReal = productos.find((prod) => prod.nombre === p.tipo);
-              return {
-                descripcion: productoReal?.nombre || p.tipo,
-                cantidad: p.cantidad,
-                precio_unitario: productoReal ? getPrecioProducto(productoReal) : 0,
-                subtotal: p.precioTotal,
-                tasa_iva: 21,
-                descuento_especifico: p.descuentoNominal || 0,
-                descuento_especifico_por: p.porcentajeDescuento || 0,
-              };
-            });
-
-            const transaccion = { items: itemsBase, total: totalVentaFinal, descuento_general: descuentoNominalTotal || 0, descuento_general_por: descuentoSobreTotal || 0, observaciones: observaciones || "" };
-
-            const reqPayload = {
-              formato: formatoComprobante.toLowerCase(),
-              tipo: 'comprobante',
-              emisor: {
-                cuit: empresa?.cuit?.toString() || '0',
-                razon_social: empresa?.nombre_negocio || 'N/A',
-                domicilio: empresa?.direccion_negocio || 'N/A',
-                punto_venta: empresa?.afip_punto_venta_predeterminado || 1,
-                condicion_iva: empresa?.afip_condicion_iva || 'Responsable Inscripto',
-              },
-              receptor: {
-                nombre_razon_social: tipoClienteSeleccionado.id === '0' ? 'Consumidor Final' : clienteSeleccionado?.nombre_razon_social ?? 'N/A',
-                cuit_o_dni: tipoClienteSeleccionado.id === '0' ? cuitManual || '0' : clienteSeleccionado?.cuit || clienteSeleccionado?.identificacion_fiscal || '0',
-                domicilio: 'Sin especificar',
-                condicion_iva: tipoClienteSeleccionado.id === '0' ? 'Consumidor Final' : clienteSeleccionado?.condicion_iva ?? 'Consumidor Final'
-              },
-              transaccion
-            };
-
-            const respComp = await fetch('https://sistema-ima.sistemataup.online/api/comprobantes/generar', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-              body: JSON.stringify(reqPayload)
-            });
-
-            if (!respComp.ok) {
-              const errorComp = await respComp.json();
-              toast.error(`❌ Error al generar comprobante: ${errorComp.detail}`);
-              return;
-            }
-
-            const blob = await respComp.blob();
-            const url = URL.createObjectURL(blob);
-            const w = window.open(url);
-            if (w) {
-              setTimeout(() => { try { w.focus(); w.print(); } catch {} }, 500);
-              setTimeout(() => { URL.revokeObjectURL(url); }, 10000);
-            }
-            toast.success('✅ Comprobante enviado a impresión.');
-          } catch {
-            toast.error('❌ Fallo al imprimir el comprobante.');
-          }
-        })();
+        handleF5();
       } else if (e.key === 'F6') {
         e.preventDefault();
-        setTipoFacturacion('factura');
-        // Reutilizar el mismo mecanismo pero con tipo 'factura'
-        (async () => {
-          try {
-            const itemsBase = productosVendidos.map((p): ItemComprobante => {
-              const productoReal = productos.find((prod) => prod.nombre === p.tipo);
-              return {
-                descripcion: productoReal?.nombre || p.tipo,
-                cantidad: p.cantidad,
-                precio_unitario: productoReal ? getPrecioProducto(productoReal) : 0,
-                subtotal: p.precioTotal,
-                tasa_iva: 21,
-              };
-            });
-
-            const transaccion = { items: itemsBase, total: totalVentaFinal, observaciones: observaciones || '' };
-            const reqPayload = {
-              formato: formatoComprobante.toLowerCase(),
-              tipo: 'factura',
-              emisor: {
-                cuit: empresa?.cuit?.toString() || '0',
-                razon_social: empresa?.nombre_negocio || 'N/A',
-                domicilio: empresa?.direccion_negocio || 'N/A',
-                punto_venta: empresa?.afip_punto_venta_predeterminado || 1,
-                condicion_iva: empresa?.afip_condicion_iva || 'Responsable Inscripto',
-              },
-              receptor: {
-                nombre_razon_social: tipoClienteSeleccionado.id === '0' ? 'Consumidor Final' : clienteSeleccionado?.nombre_razon_social ?? 'N/A',
-                cuit_o_dni: tipoClienteSeleccionado.id === '0' ? cuitManual || '0' : clienteSeleccionado?.cuit || clienteSeleccionado?.identificacion_fiscal || '0',
-                domicilio: 'Sin especificar',
-                condicion_iva: tipoClienteSeleccionado.id === '0' ? 'Consumidor Final' : clienteSeleccionado?.condicion_iva ?? 'Consumidor Final'
-              },
-              transaccion
-            };
-
-            const respComp = await fetch('https://sistema-ima.sistemataup.online/api/comprobantes/generar', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-              body: JSON.stringify(reqPayload)
-            });
-
-            if (!respComp.ok) {
-              const errorComp = await respComp.json();
-              toast.error(`❌ Error al generar factura: ${errorComp.detail}`);
-              return;
-            }
-
-            const blob = await respComp.blob();
-            const url = URL.createObjectURL(blob);
-            const w = window.open(url);
-            if (w) {
-              setTimeout(() => { try { w.focus(); w.print(); } catch {} }, 500);
-              setTimeout(() => { URL.revokeObjectURL(url); }, 10000);
-            }
-            toast.success('✅ Factura enviada a impresión.');
-          } catch {
-            toast.error('❌ Fallo al imprimir la factura.');
-          }
-        })();
+        handleF6();
       }
     };
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [productosVendidos, productos, getPrecioProducto, totalVentaFinal, descuentoNominalTotal, descuentoSobreTotal, observaciones, formatoComprobante, empresa, tipoClienteSeleccionado, clienteSeleccionado, cuitManual, token]);
+  }, [handleF5, handleF6]);
+
 
   useEffect(() => {
     const interval = setInterval(async () => {
@@ -517,17 +519,10 @@ function FormVentas({
       } catch {}
     }, 1000);
     return () => clearInterval(interval);
-  }, [token, productos, productoSeleccionado, getPrecioProducto, onAgregarProducto]);
+  }, [token, productos, productoSeleccionado, getPrecioProducto, onAgregarProducto, empresa?.aclaraciones_legales, setMetodoPago, setMontoPagado, tipoClienteSeleccionado?.id, totalVentaFinal]);
 
-  useEffect(() => {
-    if (autoSubmitFlag) {
-      setAutoSubmitFlag(false);
-      setTimeout(() => {
-        const e = { preventDefault: () => {} } as unknown as React.FormEvent;
-        handleSubmit(e);
-      }, 300);
-    }
-  }, [autoSubmitFlag]);
+  // Efecto para auto-enviar cuando viene desde balanza/escáner
+  // Se posiciona después de la definición de handleSubmit para evitar uso antes de declaración
 
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -671,8 +666,7 @@ function FormVentas({
     }
   };
 
-  // POST - Venta, Genera Comprobante y Actualiza Stock en cada una
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
@@ -709,6 +703,8 @@ function FormVentas({
 
     // Determinar un tipo_comprobante_solicitado más específico
     let tipoSolicitadoPayload = tipoFacturacion.toLowerCase();
+
+          // POST - Venta, Genera Comprobante y Actualiza Stock en cada una
     // Si es factura y hay información de CUIT (cliente registrado o cuit manual), intentar especificar A/B
     const cuitReceptor = tipoClienteSeleccionado.id === "0" ? (cuitManual || "0") : (clienteSeleccionado?.cuit || clienteSeleccionado?.identificacion_fiscal || "0");
     if (tipoFacturacion === "factura") {
@@ -857,7 +853,39 @@ function FormVentas({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [
+    productosVendidos,
+    metodoPago,
+    montoPagado,
+    totalVentaFinal,
+    tipoClienteSeleccionado,
+    clienteSeleccionado,
+    totalVenta,
+    cuitManual,
+    productos,
+    getPrecioProducto,
+    descuentoNominalTotal,
+    descuentoSobreTotal,
+    observaciones,
+    formatoComprobante,
+    empresa,
+    token,
+    pagoDividido,
+    detallePagoDividido,
+    tipoFacturacion,
+    refrescarProductos,
+    resetFormularioVenta
+  ]);
+
+  useEffect(() => {
+    if (autoSubmitFlag) {
+      setAutoSubmitFlag(false);
+      setTimeout(() => {
+        const e = { preventDefault: () => {} } as unknown as React.FormEvent;
+        handleSubmit(e);
+      }, 300);
+    }
+  }, [autoSubmitFlag, handleSubmit]);
 
 
   /* Renderizado del Componente */
@@ -1109,7 +1137,7 @@ function FormVentas({
         )}
       </div>
     </form>
-  );
-}
+  )
+};
 
 export default FormVentas;

@@ -195,7 +195,7 @@ export default function EgresosForm() {
                     {/* Boton para enviar el egreso */}
                     
                     <div className="flex justify-end mt-4 gap-2">
-                    <Button type="button" variant="destructive" className="w-full" onClick={handleSubmit} disabled={isLoading}>
+                    <Button type="button" variant="destructive" className="w-full" onClick={handleSubmit} disabled={isLoading} aria-label="Enviar egreso">
                     {isLoading && <Loader2 className="animate-spin mr-2 h-4 w-4" />}
                         Enviar egreso
                     </Button>
@@ -204,7 +204,7 @@ export default function EgresosForm() {
             </form>
 
             <DialogClose asChild>
-                <button id="close-caja-modal" className="hidden" />
+                <button id="close-caja-modal" className="hidden" aria-label="Close modal" title="Close modal" />
             </DialogClose>
         </>
     );

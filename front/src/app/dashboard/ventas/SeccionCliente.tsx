@@ -92,7 +92,9 @@ export function SeccionCliente({
             ) : (
               <Popover open={openCliente} onOpenChange={setOpenCliente}>
                 <PopoverTrigger asChild>
-                  <button 
+                  <button
+                    type="button"
+                    title="Seleccionar cliente"
                     role="combobox" 
                     aria-expanded={openCliente} 
                     aria-controls="clientes-lista" // Este apunta al ID de abajo

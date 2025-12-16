@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useMesasStore } from '@/lib/mesasStore';
+import { useAuthStore } from '@/lib/authStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,16 +13,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, Plus, Edit, Trash2, Users, Eye, EyeOff, RefreshCw, Receipt, Printer } from 'lucide-react';
 import { TicketModal } from '@/components/TicketModal';
+import { ConsumoModal } from '@/components/ConsumoModal';
 import { routeToDepartments } from '@/lib/ticketRoutingService';
-import type { TicketResponse } from '@/lib/types/mesas';
+import { toast } from 'sonner';
+import type { ConsumoMesa, TicketResponse } from '@/lib/types/mesas';
 // ...existing imports...
 
 import type { Mesa } from '@/lib/types/mesas';
-import Link from 'next/link';
 
 export default function MesasPage() {
   const [ticketModalOpen, setTicketModalOpen] = useState(false);
   const [currentTicket, setCurrentTicket] = useState<TicketResponse | null>(null);
+  const [consumoModalOpen, setConsumoModalOpen] = useState(false);
+  const [selectedConsumo, setSelectedConsumo] = useState<ConsumoMesa | null>(null);
   const handleImprimirComanda = async (mesaId: number) => {
     const consumoActivo = consumos.find(c => c.id_mesa === mesaId && c.estado === 'abierto');
     if (!consumoActivo) return;
@@ -33,24 +37,35 @@ export default function MesasPage() {
     }
   };
   const [selectedMesas, setSelectedMesas] = useState<number[]>([]);
+  const [targetMesaId, setTargetMesaId] = useState<number | null>(null);
 
   // Alternar selección de una mesa
   const toggleSelectMesa = (id: number) => {
-    setSelectedMesas((prev) =>
-      prev.includes(id) ? prev.filter((mid) => mid !== id) : [...prev, id]
-    );
+    setSelectedMesas((prev) => {
+      const newSelected = prev.includes(id) ? prev.filter((mid) => mid !== id) : [...prev, id];
+      // Si la mesa de destino seleccionada ya no está en las mesas seleccionadas, resetearla
+      if (targetMesaId && !newSelected.includes(targetMesaId)) {
+        setTargetMesaId(null);
+      }
+      return newSelected;
+    });
     setTimeout(() => localStorage.setItem('mesas:selected', JSON.stringify(selectedMesas)), 0);
   };
 
   // Seleccionar todas
   const selectAllMesas = () => {
     setSelectedMesas(mesas.map((m) => m.id));
+    setTargetMesaId(null); // Resetear mesa de destino al seleccionar todas
   };
 
   // Deseleccionar todas
   const deselectAllMesas = () => {
     setSelectedMesas([]);
+    setTargetMesaId(null); // Resetear mesa de destino al deseleccionar todas
   };
+
+  const { usuario } = useAuthStore();
+
   const {
     mesas,
     mesaLogs,
@@ -63,8 +78,25 @@ export default function MesasPage() {
     deleteMesa,
     fetchMesaLogs,
     fetchConsumos,
-    generarTicket
+    createConsumo,
+    generarTicket,
+    unirMesas
   } = useMesasStore();
+
+  // Agrega esta función manejadora
+  const handleUnirMesas = async () => {
+    if (selectedMesas.length < 2) return;
+    
+    if (confirm(`¿Deseas unir las mesas ${selectedMesas.join(', ')}? Se creará un solo consumo compartido.`)) {
+      const success = await unirMesas(selectedMesas);
+      if (success) {
+        toast.success("Mesas unidas correctamente");
+        setSelectedMesas([]); // Limpiar selección
+      } else {
+        toast.error("Error al unir mesas");
+      }
+    }
+  };
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingMesa, setEditingMesa] = useState<Mesa | null>(null);
@@ -248,6 +280,34 @@ export default function MesasPage() {
     }
   };
 
+  const handleIniciarConsumo = async (mesaId: number) => {
+    if (!usuario?.id || !usuario?.id_empresa) {
+      toast.error("No se pudo iniciar el consumo: faltan datos de usuario o empresa.");
+      return;
+    }
+    if (confirm('¿Deseas iniciar un nuevo consumo para esta mesa?')) {
+      const newConsumo = await createConsumo({ id_mesa: mesaId, id_usuario: usuario.id, id_empresa: usuario.id_empresa });
+      if (newConsumo) {
+        // Opcional: Redirigir a la vista de consumo o abrir modal
+        console.log('Consumo iniciado:', newConsumo);
+        // Actualizar el estado de la mesa a OCUPADA
+        await updateMesa(mesaId, { estado: 'OCUPADA' });
+        fetchMesas(); // Actualizar estado de la mesa
+        fetchConsumos(); // Actualizar lista de consumos
+      }
+    }
+  };
+
+  const handleVerConsumo = (mesaId: number) => {
+    const consumoActivo = consumos.find(c => c.id_mesa === mesaId && c.estado === 'abierto');
+    if (consumoActivo) {
+      setSelectedConsumo(consumoActivo);
+      setConsumoModalOpen(true);
+    } else {
+      toast.error('No se encontró un consumo activo para esta mesa.');
+    }
+  };
+
   const getEstadoColor = (estado: string) => {
     switch (estado) {
       case 'LIBRE': return 'bg-green-100 text-green-800';
@@ -300,7 +360,7 @@ export default function MesasPage() {
 
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={handleOpenCreateDialog}>
+              <Button onClick={handleOpenCreateDialog} disabled={loading}>
                 <Plus className="h-4 w-4 mr-2" />
                 Nueva Mesa
               </Button>
@@ -345,7 +405,7 @@ export default function MesasPage() {
                 </div>
 
                 <div className="flex gap-2 pt-4">
-                  <Button onClick={handleCreate} disabled={loading} className="flex-1">
+                  <Button onClick={handleCreate} disabled={loading || !!numeroError || !!localError} className="flex-1">
                     {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     Crear Mesa
                   </Button>
@@ -466,19 +526,40 @@ export default function MesasPage() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-4 p-2">
+            {selectedMesas.length > 1 && (
+              <div className="w-full flex justify-end mb-4">
+                <Button onClick={handleUnirMesas} disabled={loading} variant="secondary">
+                  <Users className="h-4 w-4 mr-2" />
+                  Unir {selectedMesas.length} Mesas Seleccionadas
+                </Button>
+              </div>
+            )}
             {mesas.map((mesa) => (
               <div
                 key={mesa.id}
-                className={`flex flex-col items-center justify-center border rounded-lg p-4 cursor-pointer transition-all duration-150 shadow-sm w-28 h-28
-                  ${selectedMesas.includes(mesa.id) ? 'bg-blue-100 border-blue-400 ring-2 ring-blue-400' : 'bg-white hover:bg-blue-50'}
+                className={`relative group flex flex-col items-center justify-center border rounded-lg p-4 cursor-pointer transition-all duration-150 shadow-sm w-28 h-28 
+                  ${selectedMesas.includes(mesa.id) ? 'bg-blue-100 border-blue-400 ring-2 ring-blue-400' : 'bg-white hover:bg-blue-50'} 
                   ${!mesa.activo ? 'opacity-50 pointer-events-none' : ''}`}
                 onClick={() => mesa.activo && toggleSelectMesa(mesa.id)}
-                title={mesa.activo ? `Mesa ${mesa.numero}` : 'Mesa inactiva'}
               >
+                {/* Botón Flotante para ir directo al Consumo (SOLO si está ocupada) */}
+                {mesa.estado === 'OCUPADA' && (
+                  <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      size="icon"
+                      className="h-6 w-6 rounded-full"
+                      onClick={(e) => {
+                        e.stopPropagation(); // Evita seleccionar la mesa
+                        handleVerConsumo(mesa.id);
+                      }}
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+
                 <span className="text-2xl font-bold">{mesa.numero}</span>
-                <span className="text-xs text-gray-500">{mesa.capacidad} pers.</span>
-                <span className={`mt-2 text-xs px-2 py-1 rounded ${mesa.estado === 'LIBRE' ? 'bg-green-100 text-green-700' : mesa.estado === 'OCUPADA' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{getEstadoText(mesa.estado)}</span>
-                {selectedMesas.includes(mesa.id) && <span className="mt-1 text-blue-600 text-xs font-semibold">Seleccionada</span>}
+                {/* ... resto del contenido de la tarjeta ... */}
               </div>
             ))}
           </div>
@@ -588,47 +669,46 @@ export default function MesasPage() {
                       })()}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
+                      <div className="flex justify-end items-center gap-2">
                         {mesa.estado === 'LIBRE' && mesa.activo && (
-                          <Link href={`/dashboard/mesas/${mesa.id}/consumo`}>
-                            <Button variant="outline" size="sm">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </Link>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleIniciarConsumo(mesa.id)}
+                            disabled={loading}
+                          >
+                            Iniciar Consumo
+                          </Button>
                         )}
-
                         {mesa.estado === 'OCUPADA' && mesa.activo && (
-                          <Link href={`/dashboard/mesas/${mesa.id}/consumo`}>
-                            <Button variant="outline" size="sm">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </Link>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleVerConsumo(mesa.id)}
+                          >
+                            Ver Consumo
+                          </Button>
                         )}
-
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => toggleMesaStatus(mesa)}
-                          disabled={loading}
-                          title={mesa.activo ? 'Desactivar mesa' : 'Activar mesa'}
-                        >
-                          {mesa.activo ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
-
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleEdit(mesa)}
-                          disabled={loading}
+                          disabled={!mesa.activo}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-
                         <Button
                           variant="outline"
                           size="sm"
+                          onClick={() => toggleMesaStatus(mesa)}
+                          title={mesa.activo ? 'Desactivar Mesa' : 'Activar Mesa'}
+                        >
+                          {mesa.activo ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
                           onClick={() => handleDelete(mesa.id)}
-                          disabled={loading}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -778,6 +858,20 @@ export default function MesasPage() {
         ticket={currentTicket}
         isOpen={ticketModalOpen}
         onClose={() => setTicketModalOpen(false)}
+      />
+      <ConsumoModal
+        isOpen={consumoModalOpen}
+        onClose={() => {
+          setConsumoModalOpen(false);
+          setSelectedConsumo(null);
+          fetchMesas(); // Asegurar que el estado de la mesa se actualice
+          fetchConsumos(); // Asegurar que los consumos se actualicen
+        }}
+        consumo={selectedConsumo}
+        onTicketGenerated={(ticket) => {
+          setCurrentTicket(ticket);
+          setTicketModalOpen(true);
+        }}
       />
     </div>
   );

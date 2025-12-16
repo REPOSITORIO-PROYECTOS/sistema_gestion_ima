@@ -50,6 +50,9 @@ export default function GestionNegocio() {
   const usuario = useAuthStore((state) => state.usuario);
   const empresaId = usuario?.id_empresa;
 
+  console.log("Usuario:", usuario);
+  console.log("Empresa ID:", empresaId);
+
   // Edición de UI de empresa
   /* const [navbarColor, setNavbarColor] = useState("default"); */
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -387,7 +390,7 @@ export default function GestionNegocio() {
   };
 
 
-  const [activeTab, setActiveTab] = useState<'balanza' | 'negocio' | 'personalizacion' | 'integraciones'>('negocio');
+  const [activeTab, setActiveTab] = useState<'negocio' | 'personalizacion' | 'integraciones'>('negocio');
 
   return (
     <ProtectedRoute allowedRoles={["Admin", "Soporte"]}>
@@ -396,33 +399,36 @@ export default function GestionNegocio() {
         <NavigationMenu className="mb-4">
           <NavigationMenuList>
             <NavigationMenuItem>
-              <NavigationMenuLink data-active={activeTab === 'negocio'} onClick={() => setActiveTab('negocio')}>
+              <NavigationMenuLink
+                className={`px-4 py-2 rounded-t-md text-gray-700 hover:bg-gray-100 transition-colors duration-200
+                  ${activeTab === 'negocio' ? 'bg-gradient-to-b from-green-100 to-green-200 text-green-800 font-semibold border-b-4 border-green-800' : ''}`}
+                onClick={() => setActiveTab('negocio')}
+              >
                 Negocio y Fiscales
               </NavigationMenuLink>
             </NavigationMenuItem>
             <NavigationMenuItem>
-              <NavigationMenuLink data-active={activeTab === 'balanza'} onClick={() => setActiveTab('balanza')}>
-                Configuración de Balanza
-              </NavigationMenuLink>
-            </NavigationMenuItem>
-            <NavigationMenuItem>
-              <NavigationMenuLink data-active={activeTab === 'personalizacion'} onClick={() => setActiveTab('personalizacion')}>
+              <NavigationMenuLink
+                className={`px-4 py-2 rounded-t-md text-gray-700 hover:bg-gray-100 transition-colors duration-200
+                  ${activeTab === 'personalizacion' ? 'bg-gradient-to-b from-green-100 to-green-200 text-green-800 font-semibold border-b-4 border-green-800' : ''}`}
+                onClick={() => setActiveTab('personalizacion')}
+              >
                 Personalización
               </NavigationMenuLink>
             </NavigationMenuItem>
             <NavigationMenuItem>
-              <NavigationMenuLink data-active={activeTab === 'integraciones'} onClick={() => setActiveTab('integraciones')}>
+              <NavigationMenuLink
+                className={`px-4 py-2 rounded-t-md text-gray-700 hover:bg-gray-100 transition-colors duration-200
+                  ${activeTab === 'integraciones' ? 'bg-gradient-to-b from-green-100 to-green-200 text-green-800 font-semibold border-b-4 border-green-800' : ''}`}
+                onClick={() => setActiveTab('integraciones')}
+              >
                 Integraciones
               </NavigationMenuLink>
             </NavigationMenuItem>
           </NavigationMenuList>
         </NavigationMenu>
 
-        {activeTab === 'balanza' && (
-          <>
-            {empresaId && <ConfiguracionForm empresaId={empresaId} sections={{ general: true, balanza: true, afip: false }} />}
-          </>
-        )}
+
 
         {activeTab === 'negocio' && (
           <>
@@ -514,6 +520,8 @@ export default function GestionNegocio() {
             </div>
           </>
         )}
+
+
 
         {activeTab === 'personalizacion' && (
           <>
@@ -690,6 +698,7 @@ export default function GestionNegocio() {
                 </p>
               </div>
             </div>
+            {empresaId && <ConfiguracionForm empresaId={empresaId} sections={{ general: false, balanza: true, afip: false }} />}
           </>
         )}
 

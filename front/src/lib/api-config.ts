@@ -14,6 +14,7 @@ export const API_CONFIG = {
     MESA_CREATE: '/mesas/crear',
     MESA_UPDATE: (id: number) => `/mesas/actualizar/${id}`,
     MESA_DELETE: (id: number) => `/mesas/eliminar/${id}`,
+    MESA_MERGE: '/mesas/unir',
 
     // Consumos
     CONSUMOS_ABIERTOS: (mesaId: number) => `/mesas/${mesaId}/consumos_abiertos`,
@@ -21,6 +22,7 @@ export const API_CONFIG = {
     CONSUMO_ADD_DETALLE: (consumoId: number) => `/mesas/consumo/${consumoId}/agregar_detalle`,
     CONSUMO_CERRAR: (consumoId: number) => `/mesas/consumo/${consumoId}/cerrar`,
     CONSUMO_FACTURAR: (consumoId: number) => `/mesas/consumo/${consumoId}/facturar`,
+    CONSUMOS_GET_ALL_ACTIVE_BY_EMPRESA: '/consumos/activos_por_empresa',
 
     // Tickets
     TICKET_GENERAR: '/mesas/ticket/generar',

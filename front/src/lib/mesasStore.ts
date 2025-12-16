@@ -1,5 +1,7 @@
 import { create } from 'zustand';
+import { toast } from 'sonner';
 import { api } from '@/lib/api-client';
+import { useAuthStore } from '@/lib/authStore';
 import type {
   Mesa,
   MesaLog,
@@ -25,6 +27,7 @@ interface MesasStore {
   createMesa: (data: MesaCreate) => Promise<boolean>;
   updateMesa: (id: number, data: MesaUpdate) => Promise<boolean>;
   deleteMesa: (id: number) => Promise<boolean>;
+  unirMesas: (ids: number[]) => Promise<boolean>;
 
   // Acciones para Logs
   fetchMesaLogs: () => Promise<void>;
@@ -90,6 +93,7 @@ export const useMesasStore = create<MesasStore>((set, get) => ({
         }
 
         set({ error: processedError, loading: false });
+        toast.error(processedError); // Add toast notification
         return false;
       }
     } catch (error) {
@@ -102,6 +106,7 @@ export const useMesasStore = create<MesasStore>((set, get) => ({
         }
       }
       set({ error: errorMessage, loading: false });
+      toast.error(errorMessage); // Add toast notification
       return false;
     }
   },
@@ -150,6 +155,26 @@ export const useMesasStore = create<MesasStore>((set, get) => ({
     }
   },
 
+  unirMesas: async (ids: number[]) => {
+    set({ loading: true, error: null });
+    try {
+      // Asumimos que tienes este endpoint en tu backend
+      const response = await api.mesas.merge(ids, ids[0]);
+      if (response.success) {
+        await get().fetchMesas(); // Recargar estado de mesas
+        await get().fetchConsumos(); // Recargar consumos unificados
+        set({ loading: false });
+        return true;
+      } else {
+        set({ error: response.error || 'Error al unir mesas', loading: false });
+        return false;
+      }
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : 'Error de conexión', loading: false });
+      return false;
+    }
+  },
+
   // Logs de Mesas
   fetchMesaLogs: async () => {
     set({ loading: true, error: null });
@@ -169,6 +194,7 @@ export const useMesasStore = create<MesasStore>((set, get) => ({
         error: error instanceof Error ? error.message : 'Error desconocido',
         loading: false
       });
+      toast.error(error instanceof Error ? error.message : 'Error desconocido');
     }
   },
 
@@ -176,23 +202,22 @@ export const useMesasStore = create<MesasStore>((set, get) => ({
   fetchConsumos: async () => {
     set({ loading: true, error: null });
     try {
-      const mesas = get().mesas;
-      if (mesas.length === 0) {
-        await get().fetchMesas();
+      const { usuario } = useAuthStore.getState();
+      if (!usuario?.id_empresa) {
+        set({ error: 'ID de empresa no disponible', loading: false });
+        toast.error('ID de empresa no disponible para cargar consumos.');
+        return;
       }
-      const ids = get().mesas.map(m => m.id);
-      const results = await Promise.all(ids.map(id => api.consumos.getAbiertosByMesa(id)));
-      const agregados: ConsumoMesa[] = [];
-      results.forEach(r => {
-        if (r.success && r.data) {
-          const lista = (r.data as ConsumoMesa[]).map(c => ({
-            ...c,
-            estado: (typeof c.estado === 'string' ? c.estado.toLowerCase() : c.estado) as ConsumoMesa['estado'],
-          }));
-          agregados.push(...lista);
-        }
-      });
-      set({ consumos: agregados, loading: false });
+      const response = await api.consumos.getAllActiveByEmpresa(usuario.id_empresa);
+      if (response.success && response.data) {
+        const lista = (response.data as ConsumoMesa[]).map(c => ({
+          ...c,
+          estado: (typeof c.estado === 'string' ? c.estado.toLowerCase() : c.estado) as ConsumoMesa['estado'],
+        }));
+        set({ consumos: lista, loading: false });
+      } else {
+        set({ error: response.error || 'Error al cargar consumos', loading: false });
+      }
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Error desconocido',
