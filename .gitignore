@@ -87,3 +87,9 @@ prueba_local_comprobantes.py
 tsconfig.jest.json
 jest.config.js
 node_modules/
+
+# Ignorar archivos de imagen
+*.png
+*.jpg
+*.jpeg
+*.PNG
