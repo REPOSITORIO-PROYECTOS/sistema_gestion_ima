@@ -78,7 +78,9 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
 
         // Actualizar visualmente logo y color
         setNavbarColor(data.color_principal || 'bg-green-800');
-        setLogoUrl(`${API_CONFIG.BASE_URL}${data.ruta_logo}`);
+        const apiBase = API_CONFIG.BASE_URL;
+        const staticBase = apiBase.endsWith('/api') ? apiBase.slice(0, -4) : apiBase;
+        setLogoUrl(`${staticBase}${data.ruta_logo}`);
 
         // Actualizar la store global
         useEmpresaStore.getState().setEmpresa(data);
@@ -131,6 +133,7 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
             width={60}
             height={60}
             unoptimized
+            onError={() => setLogoUrl('/default-logo.png')}
           />
         </a>
 
