@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Plus, X, Receipt, Printer } from 'lucide-react';
+import { Loader2, Plus, X, Receipt, ChefHat, FileText } from 'lucide-react';
 import { useMesasStore } from '@/lib/mesasStore';
 import { useAuthStore } from '@/lib/authStore';
 import { api } from '@/lib/api-client';
@@ -68,21 +68,32 @@ export const ConsumoModal: React.FC<ConsumoModalProps> = ({ isOpen, onClose, con
       toast.error("Artículo no encontrado.");
       return;
     }
+    const latestRes = await api.articulos.getById(articulo.id);
+    if (!latestRes.success || !latestRes.data) {
+      toast.error(latestRes.error || "No se pudo verificar el artículo.");
+      return;
+    }
+    const latest = latestRes.data as Articulo;
+    if (latest.stock_actual < cantidad) {
+      toast.error(`Stock insuficiente: disponible ${latest.stock_actual}, solicitado ${cantidad}.`);
+      return;
+    }
 
     setSubmitting(true);
-    const success = await addDetalleConsumo(consumo.id, {
+    const result = await addDetalleConsumo(consumo.id, {
       id_articulo: parseInt(selectedArticuloId),
       cantidad,
-      precio_unitario: articulo.precio_venta,
+      precio_unitario: latest.precio_venta,
+      descuento_aplicado: 0,
     });
     setSubmitting(false);
-    if (success) {
+    if (result.ok) {
       toast.success('Artículo agregado al consumo.');
       setSelectedArticuloId('');
       setCantidad(1);
       fetchConsumos(); // Para actualizar el consumo en el store
     } else {
-      toast.error(error || 'Error al agregar artículo.');
+      toast.error(result.error || error || 'Error al agregar artículo.');
     }
   };
 
@@ -208,11 +219,11 @@ export const ConsumoModal: React.FC<ConsumoModalProps> = ({ isOpen, onClose, con
         {/* Grupo Izquierda: Acciones de Impresión */}
         <div className="flex gap-2">
           <Button variant="secondary" size="sm" onClick={handleImprimirComanda}>
-            <Printer className="h-4 w-4 mr-2" />
+            <ChefHat className="h-4 w-4 mr-2" />
             Marcha (Cocina)
           </Button>
           <Button variant="outline" size="sm" onClick={handleImprimirPrecuenta}>
-            <Receipt className="h-4 w-4 mr-2" />
+            <FileText className="h-4 w-4 mr-2" />
             Pre-cuenta
           </Button>
         </div>

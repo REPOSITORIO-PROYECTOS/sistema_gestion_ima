@@ -16,10 +16,7 @@ import { TicketModal } from '@/components/TicketModal';
 import { ConsumoModal } from '@/components/ConsumoModal';
 import { routeToDepartments } from '@/lib/ticketRoutingService';
 import { toast } from 'sonner';
-import type { ConsumoMesa, TicketResponse } from '@/lib/types/mesas';
-// ...existing imports...
-
-import type { Mesa } from '@/lib/types/mesas';
+import type { ConsumoMesa, TicketResponse, Mesa} from '@/lib/types/mesas';
 
 export default function MesasPage() {
   const [ticketModalOpen, setTicketModalOpen] = useState(false);
@@ -526,6 +523,7 @@ export default function MesasPage() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-4 p-2">
+            {/* Botón de Unir Mesas (solo aparece si hay seleccionadas) */}
             {selectedMesas.length > 1 && (
               <div className="w-full flex justify-end mb-4">
                 <Button onClick={handleUnirMesas} disabled={loading} variant="secondary">
@@ -534,45 +532,73 @@ export default function MesasPage() {
                 </Button>
               </div>
             )}
+
+            {/* Mapeo de Mesas */}
             {mesas.map((mesa) => (
               <div
                 key={mesa.id}
-                className={`relative group flex flex-col items-center justify-center border rounded-lg p-4 cursor-pointer transition-all duration-150 shadow-sm w-28 h-28 
-                  ${selectedMesas.includes(mesa.id) ? 'bg-blue-100 border-blue-400 ring-2 ring-blue-400' : 'bg-white hover:bg-blue-50'} 
-                  ${!mesa.activo ? 'opacity-50 pointer-events-none' : ''}`}
-                onClick={() => mesa.activo && toggleSelectMesa(mesa.id)}
+                className={`relative group flex flex-col items-center justify-center border rounded-lg p-4 transition-all duration-150 shadow-sm w-32 h-32 
+                  ${selectedMesas.includes(mesa.id) ? 'bg-blue-50 border-blue-400 ring-1 ring-blue-400' : 'bg-white hover:bg-gray-50'} 
+                  ${!mesa.activo ? 'opacity-50' : 'cursor-pointer'} 
+                  ${mesa.estado === 'OCUPADA' ? 'border-red-200 bg-red-50 hover:bg-red-100' : ''} 
+                  ${mesa.estado === 'LIBRE' ? 'border-green-200 hover:bg-green-50' : ''} 
+                `}
+                // El clic principal en la tarjeta ABRE la acción (Iniciar o Ver Consumo)
+                onClick={() => {
+                  if (!mesa.activo) return;
+                  if (mesa.estado === 'LIBRE') handleIniciarConsumo(mesa.id);
+                  if (mesa.estado === 'OCUPADA') handleVerConsumo(mesa.id);
+                }}
               >
-                {/* Botón Flotante para ir directo al Consumo (SOLO si está ocupada) */}
-                {mesa.estado === 'OCUPADA' && (
-                  <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button
-                      size="icon"
-                      className="h-6 w-6 rounded-full"
-                      onClick={(e) => {
-                        e.stopPropagation(); // Evita seleccionar la mesa
-                        handleVerConsumo(mesa.id);
-                      }}
-                    >
-                      <Plus className="h-3 w-3" />
-                    </Button>
+                {/* 1. Checkbox en la esquina para SELECCIONAR (Unir mesas) */}
+                {mesa.activo && (
+                  <div
+                    className="absolute top-2 left-2 z-10"
+                    onClick={(e) => e.stopPropagation()} // Evita abrir la mesa al marcar el check
+                  >
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      checked={selectedMesas.includes(mesa.id)}
+                      onChange={() => toggleSelectMesa(mesa.id)}
+                    />
                   </div>
                 )}
 
-                <span className="text-2xl font-bold">{mesa.numero}</span>
-                {/* ... resto del contenido de la tarjeta ... */}
+                {/* 2. Información de la Mesa */}
+                <span className="text-3xl font-bold mb-1">{mesa.numero}</span>
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-xs text-gray-500 flex items-center gap-1">
+                    <Users className="h-3 w-3" /> {mesa.capacidad}
+                  </span>
+                  
+                  {/* Badge de Estado */}
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase 
+                    ${mesa.estado === 'LIBRE' ? 'bg-green-200 text-green-800' : ''} 
+                    ${mesa.estado === 'OCUPADA' ? 'bg-red-200 text-red-800' : ''} 
+                    ${mesa.estado === 'RESERVADA' ? 'bg-yellow-200 text-yellow-800' : ''} 
+                  `}>
+                    {mesa.estado}
+                  </span>
+
+                  {/* Si tiene consumo, mostramos el total pequeño */}
+                  {mesa.estado === 'OCUPADA' && (() => {
+                     const info = getConsumoInfo(mesa.id);
+                     return info.tieneConsumo ? (
+                       <span className="text-xs font-semibold text-green-700 mt-1">
+                         ${info.total.toFixed(0)}
+                       </span>
+                     ) : null;
+                  })()}
+                </div>
               </div>
             ))}
           </div>
-          <div className="flex gap-2 mt-4">
-            <Button variant="outline" size="sm" onClick={selectAllMesas}>Seleccionar todas</Button>
-            <Button variant="outline" size="sm" onClick={deselectAllMesas}>Deseleccionar todas</Button>
-            <span className="text-sm text-gray-600 ml-2">{selectedMesas.length} mesa(s) seleccionada(s)</span>
-            {selectedMesas.length === 1 && (
-              <Button size="sm" className="ml-auto" onClick={() => handleImprimirComanda(selectedMesas[0])}>
-                <Printer className="h-4 w-4 mr-2" />
-                Confirmar y Ticket
-              </Button>
-            )}
+          
+          {/* Controles de selección masiva (Opcional, puedes dejarlo o quitarlo) */}
+          <div className="flex gap-2 mt-4 pt-4 border-t">
+            <Button variant="ghost" size="sm" onClick={selectAllMesas} className="text-xs">Seleccionar todas</Button>
+            <Button variant="ghost" size="sm" onClick={deselectAllMesas} className="text-xs">Deseleccionar</Button>
           </div>
         </CardContent>
       </Card>

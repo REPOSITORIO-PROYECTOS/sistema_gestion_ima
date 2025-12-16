@@ -8,7 +8,7 @@ from typing import List
 # --- Dependencias ---
 from back.database import get_db
 from back.security import obtener_usuario_actual
-from back.modelos import Usuario
+from back.modelos import Usuario, Articulo
 
 # --- Manager ---
 import back.gestion.mesas_manager as mesas_manager
@@ -124,6 +124,26 @@ def api_add_detalle_consumo(
     db: Session = Depends(get_db)
 ):
     """Agrega un detalle a un consumo."""
+    consumo = mesas_manager.obtener_consumo_por_id(db, consumo_id, current_user.id_empresa)
+    if not consumo:
+        raise HTTPException(status_code=404, detail="Consumo no encontrado")
+    if consumo.estado != "ABIERTO":
+        raise HTTPException(status_code=400, detail="El consumo no está abierto")
+
+    if detalle_data.cantidad <= 0:
+        raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a cero")
+
+    articulo = db.get(Articulo, detalle_data.id_articulo)
+    if not articulo:
+        raise HTTPException(status_code=404, detail="Artículo no encontrado")
+    if not articulo.activo:
+        raise HTTPException(status_code=400, detail="El artículo está inactivo")
+    if articulo.stock_actual < detalle_data.cantidad:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Stock insuficiente: disponible {articulo.stock_actual}, solicitado {detalle_data.cantidad}"
+        )
+
     detalle = mesas_manager.agregar_detalle_consumo(db, consumo_id, detalle_data, current_user.id_empresa)
     if not detalle:
         raise HTTPException(status_code=400, detail="No se pudo agregar el detalle")

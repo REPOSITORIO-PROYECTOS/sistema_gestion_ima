@@ -133,6 +133,7 @@ export const api = {
   // Articulos
   articulos: {
     getAll: (empresaId: number) => apiClient.get(`${API_CONFIG.ENDPOINTS.PRODUCTOS}?empres-id=${empresaId}`),
+    getById: (id: number) => apiClient.get(API_CONFIG.ENDPOINTS.ARTICULO_BY_ID(id)),
   },
 
   // Caja

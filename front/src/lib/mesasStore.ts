@@ -35,7 +35,7 @@ interface MesasStore {
   // Acciones para Consumos
   fetchConsumos: () => Promise<void>;
   createConsumo: (data: ConsumoCreate) => Promise<ConsumoMesa | null>;
-  addDetalleConsumo: (idConsumo: number, data: ConsumoDetalleCreate) => Promise<boolean>;
+  addDetalleConsumo: (idConsumo: number, data: ConsumoDetalleCreate) => Promise<{ ok: boolean; error?: string }>;
   cerrarConsumo: (idConsumo: number) => Promise<boolean>;
   facturarConsumo: (idConsumo: number) => Promise<boolean>;
 
@@ -208,16 +208,27 @@ export const useMesasStore = create<MesasStore>((set, get) => ({
         toast.error('ID de empresa no disponible para cargar consumos.');
         return;
       }
-      const response = await api.consumos.getAllActiveByEmpresa(usuario.id_empresa);
-      if (response.success && response.data) {
-        const lista = (response.data as ConsumoMesa[]).map(c => ({
-          ...c,
-          estado: (typeof c.estado === 'string' ? c.estado.toLowerCase() : c.estado) as ConsumoMesa['estado'],
-        }));
-        set({ consumos: lista, loading: false });
-      } else {
-        set({ error: response.error || 'Error al cargar consumos', loading: false });
+      const mesasRes = await api.mesas.getAll();
+      if (!mesasRes.success || !mesasRes.data) {
+        set({ error: mesasRes.error || 'Error al cargar mesas para consumos', loading: false });
+        return;
       }
+      const mesas = mesasRes.data as Mesa[];
+      const consumosPorMesaRes = await Promise.all(
+        mesas.map((m) => api.consumos.getAbiertosByMesa(m.id))
+      );
+      const acumulados: ConsumoMesa[] = [];
+      for (const r of consumosPorMesaRes) {
+        if (r.success && Array.isArray(r.data)) {
+          acumulados.push(
+            ...((r.data as ConsumoMesa[]).map(c => ({
+              ...c,
+              estado: (typeof c.estado === 'string' ? c.estado.toLowerCase() : c.estado) as ConsumoMesa['estado'],
+            })))
+          );
+        }
+      }
+      set({ consumos: acumulados, loading: false });
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Error desconocido',
@@ -256,17 +267,17 @@ export const useMesasStore = create<MesasStore>((set, get) => ({
         // Recargar consumos para actualizar detalles
         await get().fetchConsumos();
         set({ loading: false });
-        return true;
+        return { ok: true };
       } else {
         set({ error: response.error || 'Error al agregar detalle', loading: false });
-        return false;
+        return { ok: false, error: response.error };
       }
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Error desconocido',
         loading: false
       });
-      return false;
+      return { ok: false, error: error instanceof Error ? error.message : 'Error desconocido' };
     }
   },
 
@@ -275,6 +286,10 @@ export const useMesasStore = create<MesasStore>((set, get) => ({
     try {
       const response = await api.consumos.cerrar(idConsumo);
       if (response.success) {
+        const consumo = get().consumos.find(c => c.id === idConsumo);
+        if (consumo?.id_mesa) {
+          await get().updateMesa(consumo.id_mesa, { estado: 'LIBRE' });
+        }
         await get().fetchConsumos();
         set({ loading: false });
         return true;
@@ -296,6 +311,10 @@ export const useMesasStore = create<MesasStore>((set, get) => ({
     try {
       const response = await api.consumos.facturar(idConsumo);
       if (response.success) {
+        const consumo = get().consumos.find(c => c.id === idConsumo);
+        if (consumo?.id_mesa) {
+          await get().updateMesa(consumo.id_mesa, { estado: 'LIBRE' });
+        }
         await get().fetchConsumos();
         set({ loading: false });
         return true;
