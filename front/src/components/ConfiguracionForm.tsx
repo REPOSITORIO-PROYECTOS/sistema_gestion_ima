@@ -7,6 +7,7 @@ import * as z from "zod";
 import { toast } from "sonner";
 import { useAuthStore } from "@/lib/authStore";
 import { API_CONFIG } from "@/lib/api-config";
+import { attachAutoScaleBridge } from "@/lib/scaleSerial";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -25,7 +26,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import * as Switch from "@radix-ui/react-switch";
+
+// ... (resto de imports y type Articulo)
 
 type Articulo = {
   id: string;
@@ -49,7 +67,7 @@ const formSchema = z.object({
   afip_punto_venta_predeterminado: z.string().min(1, "Requerido.").max(5, "Máximo 5 dígitos.").optional().nullable(),
   afip_condicion_iva: z.enum(opcionesCondicionIVA, {
     required_error: "Debe seleccionar una condición de IVA.",
-}).nullable(),
+  }).nullable(),
   link_google_sheets: z.string().optional().nullable(),
   aclaraciones_legales: z.record(z.string()).optional(),
   balanza_articulo_id: z.string().optional(),
@@ -73,6 +91,46 @@ export const ConfiguracionForm = (props: Props) => {
   const { empresaId } = props;
   const token = useAuthStore((state) => state.token);
   const [articulos, setArticulos] = React.useState<Articulo[]>([]);
+  const [testBalanzaData, setTestBalanzaData] = React.useState<string | null>(null);
+  const [probandoBalanza, setProbandoBalanza] = React.useState(false);
+
+  // Función para probar balanza
+  const handleProbarBalanza = async () => {
+    if (!token) {
+      toast.error("No hay token disponible");
+      return;
+    }
+
+    setProbandoBalanza(true);
+    setTestBalanzaData("Conectando... por favor espere.");
+
+    try {
+      const bridge = await attachAutoScaleBridge(token, (data) => {
+        console.log("TEST BALANZA DATA:", data);
+        setTestBalanzaData(JSON.stringify(data, null, 2));
+      });
+
+      if (!bridge) {
+        setTestBalanzaData("No se pudo conectar (Web Serial no soportado o cancelado).");
+        setProbandoBalanza(false);
+        return;
+      }
+
+      // Desconectar automáticamente después de 15 segundos para no dejar el puerto tomado
+      setTimeout(() => {
+        bridge.stop();
+        setProbandoBalanza(false);
+        if (testBalanzaData === "Conectando... por favor espere.") {
+          setTestBalanzaData("Tiempo de espera agotado sin recibir datos.");
+        }
+      }, 15000);
+
+    } catch (error) {
+      console.error(error);
+      setTestBalanzaData("Error al intentar conectar.");
+      setProbandoBalanza(false);
+    }
+  };
 
   React.useEffect(() => {
     const fetchArticulos = async () => {
@@ -82,8 +140,13 @@ export const ConfiguracionForm = (props: Props) => {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) throw new Error("Error al cargar artículos.");
-        const data: Articulo[] = await res.json();
-        setArticulos(data.map(p => ({id: String(p.id), nombre: p.nombre ?? ""})));
+        const data: any[] = await res.json();
+        // Mapeo seguro, intentando obtener nombre o descripcion
+        const mapeados = data.map(p => ({
+          id: String(p.id),
+          nombre: p.nombre || p.descripcion || `Artículo #${p.id}`
+        }));
+        setArticulos(mapeados);
       } catch (err) {
         console.error("Error al obtener artículos:", err);
         toast.error("Error al cargar artículos para balanza.");
@@ -91,23 +154,23 @@ export const ConfiguracionForm = (props: Props) => {
     };
     fetchArticulos();
   }, [token]);
-  
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-        nombre_negocio: "",
-        direccion_negocio: "",
-        telefono_negocio: "",
-        mail_negocio: "",
-        cuit: "",
-        afip_punto_venta_predeterminado: "",
-        afip_condicion_iva: null,
-        link_google_sheets: "",
-        aclaraciones_legales: {},
-        balanza_articulo_id: "",
-        balanza_auto_agregar: false,
-        balanza_auto_facturar: false,
-        balanza_precio_fuente: "producto",
+      nombre_negocio: "",
+      direccion_negocio: "",
+      telefono_negocio: "",
+      mail_negocio: "",
+      cuit: "",
+      afip_punto_venta_predeterminado: "",
+      afip_condicion_iva: null,
+      link_google_sheets: "",
+      aclaraciones_legales: {},
+      balanza_articulo_id: "",
+      balanza_auto_agregar: false,
+      balanza_auto_facturar: false,
+      balanza_precio_fuente: "producto",
     },
   });
 
@@ -116,24 +179,24 @@ export const ConfiguracionForm = (props: Props) => {
     const { reset } = form;
     if (!token || !empresaId) return;
     try {
-        const API_URL = `${API_CONFIG.BASE_URL}/empresas/admin/${empresaId}/configuracion`;
-        const res = await fetch(API_URL, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
-        if (!res.ok) throw new Error("No se pudo cargar la configuración.");
-        
-        const data = await res.json();
-        const transformedData = {
-            ...data,
-            cuit: data.cuit ? String(data.cuit) : "",
-            afip_punto_venta_predeterminado: data.afip_punto_venta_predeterminado ? String(data.afip_punto_venta_predeterminado) : "",
-            aclaraciones_legales: data.aclaraciones_legales ?? {},
-            balanza_articulo_id: data.aclaraciones_legales?.balanza_articulo_id ?? "",
-            balanza_auto_agregar: (data.aclaraciones_legales?.balanza_auto_agregar ?? "false") === "true",
-            balanza_auto_facturar: (data.aclaraciones_legales?.balanza_auto_facturar ?? "false") === "true",
-            balanza_precio_fuente: (data.aclaraciones_legales?.balanza_precio_fuente ?? "producto"),
-        };
-        reset(transformedData);
+      const API_URL = `${API_CONFIG.BASE_URL}/empresas/admin/${empresaId}/configuracion`;
+      const res = await fetch(API_URL, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+      if (!res.ok) throw new Error("No se pudo cargar la configuración.");
+
+      const data = await res.json();
+      const transformedData = {
+        ...data,
+        cuit: data.cuit ? String(data.cuit) : "",
+        afip_punto_venta_predeterminado: data.afip_punto_venta_predeterminado ? String(data.afip_punto_venta_predeterminado) : "",
+        aclaraciones_legales: data.aclaraciones_legales ?? {},
+        balanza_articulo_id: data.aclaraciones_legales?.balanza_articulo_id ?? "",
+        balanza_auto_agregar: (data.aclaraciones_legales?.balanza_auto_agregar ?? "false") === "true",
+        balanza_auto_facturar: (data.aclaraciones_legales?.balanza_auto_facturar ?? "false") === "true",
+        balanza_precio_fuente: (data.aclaraciones_legales?.balanza_precio_fuente ?? "producto"),
+      };
+      reset(transformedData);
     } catch (err) {
-        if (err instanceof Error) toast.error("Error al cargar datos", { description: err.message });
+      if (err instanceof Error) toast.error("Error al cargar datos", { description: err.message });
     } finally {
     }
   }, [token, empresaId, form]);
@@ -258,6 +321,8 @@ export const ConfiguracionForm = (props: Props) => {
                 </FormItem>
               )}
             />
+
+
           </div>
         )}
 
@@ -322,6 +387,29 @@ export const ConfiguracionForm = (props: Props) => {
         {props.sections?.balanza && (
           <div className="space-y-4">
             <h2 className="text-xl font-bold text-green-950">Configuración Balanza</h2>
+
+            {/* Botón de Prueba */}
+            <div className="p-4 border border-blue-200 bg-blue-50 rounded-md">
+              <h3 className="font-semibold text-blue-800 mb-2">Prueba de Conexión</h3>
+              <p className="text-sm text-blue-600 mb-4">
+                Presiona el botón para intentar leer datos de la balanza directamente desde el navegador.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleProbarBalanza}
+                disabled={probandoBalanza}
+              >
+                {probandoBalanza ? "Escuchando puerto..." : "Probar Balanza Ahora"}
+              </Button>
+
+              {testBalanzaData && (
+                <div className="mt-4 p-2 bg-gray-900 text-green-400 font-mono text-xs rounded overflow-auto max-h-40">
+                  <pre>{testBalanzaData}</pre>
+                </div>
+              )}
+            </div>
+
             <FormField
               control={form.control}
               name="balanza_articulo_id"

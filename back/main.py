@@ -2,7 +2,7 @@
 
 import os
 from back.api.blueprints import admin_router, afip_tools_router, articulos_router, auth_router,actualizacion_masiva_router,clientes_router, configuracion_router, empresa_router, importaciones_router, proveedores_router, comprobantes_router, mesas_router, scanner_router
-from fastapi import FastAPI
+from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -90,3 +90,5 @@ async def read_root():
     return {"message": "Bienvenido a la API del Sistema de Gestión IMA v1.0. La arquitectura ha sido actualizada."}
 
 app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
+# Montamos también en /api/static para que coincida con next.config.ts images.remotePatterns
+app.mount("/api/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="api_static")

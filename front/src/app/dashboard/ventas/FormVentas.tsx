@@ -302,7 +302,7 @@ function FormVentas({
     };
   }, [empresa, token]);
 
-  const handleF5 = useCallback(async () => {
+  const handleF6 = useCallback(async () => {
     setTipoFacturacion('comprobante');
     try {
       const itemsBase = productosVendidos.map((p): ItemComprobante => {
@@ -355,7 +355,7 @@ function FormVentas({
       const url = URL.createObjectURL(blob);
       const w = window.open(url);
       if (w) {
-        setTimeout(() => { try { w.focus(); w.print(); } catch {} }, 500);
+        setTimeout(() => { try { w.focus(); w.print(); } catch { } }, 500);
         setTimeout(() => { URL.revokeObjectURL(url); }, 10000);
       }
       toast.success('✅ Comprobante enviado a impresión.');
@@ -364,7 +364,7 @@ function FormVentas({
     }
   }, [productosVendidos, productos, getPrecioProducto, totalVentaFinal, descuentoNominalTotal, descuentoSobreTotal, observaciones, formatoComprobante, empresa, tipoClienteSeleccionado, clienteSeleccionado, cuitManual, token, setTipoFacturacion]);
 
-  const handleF6 = useCallback(async () => {
+  const handleF7 = useCallback(async () => {
     setTipoFacturacion('factura');
     try {
       const itemsBase = productosVendidos.map((p): ItemComprobante => {
@@ -414,29 +414,98 @@ function FormVentas({
       const url = URL.createObjectURL(blob);
       const w = window.open(url);
       if (w) {
-        setTimeout(() => { try { w.focus(); w.print(); } catch {} }, 500);
+        setTimeout(() => { try { w.focus(); w.print(); } catch { } }, 500);
         setTimeout(() => { URL.revokeObjectURL(url); }, 10000);
       }
       toast.success('✅ Factura enviada a impresión.');
     } catch {
       toast.error('❌ Fallo al imprimir la factura.');
     }
-    }, [productosVendidos, productos, getPrecioProducto, totalVentaFinal, observaciones, formatoComprobante, empresa, tipoClienteSeleccionado, clienteSeleccionado, cuitManual, token, setTipoFacturacion]);
+  }, [productosVendidos, productos, getPrecioProducto, totalVentaFinal, observaciones, formatoComprobante, empresa, tipoClienteSeleccionado, clienteSeleccionado, cuitManual, token, setTipoFacturacion]);
+
+  const handleF4 = useCallback(async () => {
+    toast.info('⚖️ Probando balanza...', { duration: 2000 });
+
+    // Obtenemos configuración para saber qué artículo usar
+    const cfg = empresa?.aclaraciones_legales ?? {};
+    const balanzaId = cfg?.balanza_articulo_id ?? "";
+    const precioFuente = (cfg?.balanza_precio_fuente ?? "producto") as 'producto' | 'evento';
+
+    // Intentamos leer UNA vez del puerto
+    const ctrl = await attachAutoScaleBridge(token || '', async (data) => {
+      // Callback de "data" recibida
+      if (data?.peso) {
+        toast.success(`⚖️ Balanza leyó: ${data.peso} kg`);
+
+        // Lógica de agregado (similar al polling automático)
+        if (balanzaId) {
+          const p = productos.find(pp => pp.id === String(balanzaId));
+          if (p) {
+            const pUnit = precioFuente === 'evento' && typeof data.precio === 'number'
+              ? data.precio
+              : (tipoClienteSeleccionado.id === '0' ? p.precio_venta : p.venta_negocio);
+            const cantidadEv = data.peso;
+
+            onAgregarProducto({
+              tipo: p.nombre,
+              cantidad: cantidadEv,
+              precioTotal: pUnit * cantidadEv,
+              descuentoAplicado: false,
+              porcentajeDescuento: 0,
+              descuentoNominal: 0
+            });
+            toast.success(`✅ Agregado '${p.nombre}' (${cantidadEv}kg)`);
+          } else {
+            toast.warning('⚠️ Artículo de balanza configurado no encontrado en catálogo.');
+          }
+        } else {
+          // Caso genérico si no hay artículo configurado
+          const nombre = data.nombre || 'Producto Balanza';
+          const pUnit = data.precio || 0;
+          onAgregarProducto({
+            tipo: nombre,
+            cantidad: data.peso,
+            precioTotal: pUnit * data.peso,
+            descuentoAplicado: false,
+            porcentajeDescuento: 0,
+            descuentoNominal: 0
+          });
+          toast.success(`✅ Agregado '${nombre}' (${data.peso}kg)`);
+        }
+
+        // Detenemos la lectura tras el primer éxito para comportarse como "Petición única"
+        if (ctrl) await ctrl.stop();
+      }
+    });
+
+    if (!ctrl) {
+      toast.error("❌ No se pudo conectar con la balanza. Revise permisos o conexión USB.");
+    } else {
+      // Timeout de seguridad por si no llega nada
+      setTimeout(() => {
+        if (ctrl) ctrl.stop();
+      }, 5000);
+    }
+
+  }, [empresa, token, productos, tipoClienteSeleccionado, onAgregarProducto]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'F5') {
+      if (e.key === 'F4') {
         e.preventDefault();
-        handleF5();
+        handleF4();
       } else if (e.key === 'F6') {
         e.preventDefault();
         handleF6();
+      } else if (e.key === 'F7') {
+        e.preventDefault();
+        handleF7();
       }
     };
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleF5, handleF6]);
+  }, [handleF4, handleF6, handleF7]);
 
 
   useEffect(() => {
@@ -516,7 +585,7 @@ function FormVentas({
             }
           }
         }
-      } catch {}
+      } catch { }
     }, 1000);
     return () => clearInterval(interval);
   }, [token, productos, productoSeleccionado, getPrecioProducto, onAgregarProducto, empresa?.aclaraciones_legales, setMetodoPago, setMontoPagado, tipoClienteSeleccionado?.id, totalVentaFinal]);
@@ -704,7 +773,7 @@ function FormVentas({
     // Determinar un tipo_comprobante_solicitado más específico
     let tipoSolicitadoPayload = tipoFacturacion.toLowerCase();
 
-          // POST - Venta, Genera Comprobante y Actualiza Stock en cada una
+    // POST - Venta, Genera Comprobante y Actualiza Stock en cada una
     // Si es factura y hay información de CUIT (cliente registrado o cuit manual), intentar especificar A/B
     const cuitReceptor = tipoClienteSeleccionado.id === "0" ? (cuitManual || "0") : (clienteSeleccionado?.cuit || clienteSeleccionado?.identificacion_fiscal || "0");
     if (tipoFacturacion === "factura") {
@@ -828,7 +897,7 @@ function FormVentas({
               try {
                 w.focus();
                 w.print();
-              } catch {}
+              } catch { }
             }, 500);
             setTimeout(() => {
               URL.revokeObjectURL(url);
@@ -881,7 +950,7 @@ function FormVentas({
     if (autoSubmitFlag) {
       setAutoSubmitFlag(false);
       setTimeout(() => {
-        const e = { preventDefault: () => {} } as unknown as React.FormEvent;
+        const e = { preventDefault: () => { } } as unknown as React.FormEvent;
         handleSubmit(e);
       }, 300);
     }

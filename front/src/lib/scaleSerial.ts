@@ -9,49 +9,85 @@ type BridgeCtrl = {
 const baud = Number(process.env.NEXT_PUBLIC_SCALE_BAUD || "9600")
 const minIntervalMs = Number(process.env.NEXT_PUBLIC_SCALE_MIN_INTERVAL_MS || "400")
 
-export async function attachAutoScaleBridge(token: string): Promise<BridgeCtrl | null> {
-  if (typeof navigator === "undefined" || !("serial" in navigator)) return null
+export async function attachAutoScaleBridge(token: string, onData?: (data: any) => void): Promise<BridgeCtrl | null> {
+  console.log("⚖️ [Balanza] Intentando conectar...");
+  if (typeof navigator === "undefined" || !("serial" in navigator)) {
+    console.error("❌ [Balanza] Web Serial API no soportada en este navegador.");
+    return null;
+  }
+
   const opened: { port: SerialPort; reader: ReadableStreamDefaultReader<string> }[] = []
   let lastSent = 0
 
   async function openPort(port: SerialPort) {
+    console.log("🔌 [Balanza] Abriendo puerto serie...");
     try {
       await port.open({ baudRate: baud })
+      console.log("✅ [Balanza] Puerto abierto correctamente.");
       const decoder = new TextDecoderStream()
       const reader = port.readable!.pipeThrough(decoder).getReader()
       opened.push({ port, reader })
-      ;(async () => {
-        let buffer = ""
-        while (true) {
-          const { value, done } = await reader.read()
-          if (done) break
-          if (!value) continue
-          buffer += value
-          const parts = buffer.split(/\r?\n/)
-          buffer = parts.pop() || ""
-          for (const line of parts) {
-            const now = Date.now()
-            if (now - lastSent < minIntervalMs) continue
+        ; (async () => {
+          let buffer = ""
+          while (true) {
             try {
-              const o = JSON.parse(line)
-              if (typeof o?.peso === "number") {
-                lastSent = now
-                const body = {
-                  peso: o.peso,
-                  precio: typeof o?.precio === "number" ? o.precio : undefined,
-                  nombre: typeof o?.nombre === "string" ? o.nombre : "Balanza",
-                }
-                await fetch(`${API_CONFIG.BASE_URL}/scanner/evento`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                  body: JSON.stringify(body),
-                })
+              const { value, done } = await reader.read()
+              if (done) {
+                console.log("🔌 [Balanza] Lectura finalizada (done).");
+                break;
               }
-            } catch {}
+              if (!value) continue
+              // console.log("📥 [Balanza] Datos crudos recibidos:", value); // Comentado para no saturar si es mucho ruido
+              buffer += value
+              const parts = buffer.split(/\r?\n/)
+              buffer = parts.pop() || ""
+              for (const line of parts) {
+                const now = Date.now()
+
+                try {
+                  // console.log("📝 [Balanza] Línea procesada:", line);
+                  const o = JSON.parse(line)
+                  console.log("📦 [Balanza] Objeto JSON parseado:", o);
+
+                  // Callback para pruebas locales o visualización directa
+                  if (onData) {
+                    onData(o);
+                  }
+
+                  if (now - lastSent < minIntervalMs) continue
+
+                  if (typeof o?.peso === "number") {
+                    lastSent = now
+                    console.log(`🚀 [Balanza] Enviando evento al backend (Peso: ${o.peso})`);
+                    const body = {
+                      peso: o.peso,
+                      precio: typeof o?.precio === "number" ? o.precio : undefined,
+                      nombre: typeof o?.nombre === "string" ? o.nombre : "Balanza",
+                    }
+
+                    // Si hay callback, asumimos modo prueba y podríamos querer evitar el POST, 
+                    // pero por compatibilidad y para no romper lógica existente, lo mantenemos 
+                    // a menos que explícitamente se quiera evitar.
+                    // Por ahora, dejamos que siga enviando al backend.
+                    await fetch(`${API_CONFIG.BASE_URL}/scanner/evento`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                      body: JSON.stringify(body),
+                    })
+                  }
+                } catch (parseError) {
+                  console.warn("⚠️ [Balanza] Error parseando línea JSON:", line, parseError);
+                }
+              }
+            } catch (readError) {
+              console.error("❌ [Balanza] Error leyendo del puerto:", readError);
+              break;
+            }
           }
-        }
-      })()
-    } catch {}
+        })()
+    } catch (err) {
+      console.error("❌ [Balanza] Error al abrir el puerto:", err);
+    }
   }
 
   const ports = await navigator.serial.getPorts()
@@ -68,10 +104,10 @@ export async function attachAutoScaleBridge(token: string): Promise<BridgeCtrl |
     if (idx >= 0) {
       try {
         await opened[idx].reader.cancel()
-      } catch {}
+      } catch { }
       try {
         await p.close()
-      } catch {}
+      } catch { }
       opened.splice(idx, 1)
     }
   })
@@ -81,10 +117,10 @@ export async function attachAutoScaleBridge(token: string): Promise<BridgeCtrl |
       for (const { port, reader } of opened) {
         try {
           await reader.cancel()
-        } catch {}
+        } catch { }
         try {
           await port.close()
-        } catch {}
+        } catch { }
       }
       opened.splice(0, opened.length)
     },

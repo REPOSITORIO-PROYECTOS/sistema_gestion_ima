@@ -34,7 +34,7 @@ class ConfiguracionUpdate(BaseModel):
     link_visual_3: Optional[str] = None
     cuit: Optional[int] = None
     formato_comprobante_predeterminado: Optional[FormatoComprobanteEnum] = None
-    aclaraciones_legales: Optional[Dict[str, str]] = None
+    aclaraciones_legales: Optional[Dict[str, Optional[str]]] = None
 
 class ConfiguracionResponse(BaseModel):
     """Schema completo para devolver la configuración de una empresa."""
@@ -53,7 +53,7 @@ class ConfiguracionResponse(BaseModel):
     link_visual_2: Optional[str]
     link_visual_3: Optional[str]
     cuit: Optional[int]
-    aclaraciones_legales: Optional[Dict[str, str]]
+    aclaraciones_legales: Optional[Dict[str, Optional[str]]]
 
     class Config:
         from_attributes = True
