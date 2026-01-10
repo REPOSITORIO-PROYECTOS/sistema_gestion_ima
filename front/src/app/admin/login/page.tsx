@@ -3,16 +3,10 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { API_CONFIG } from "@/lib/api-config";
-import { useAuthStore } from "@/lib/authStore";
 
-const API_URL = API_CONFIG.BASE_URL;
 
 export default function AdminLogin() {
   const router = useRouter();
-  const setToken = useAuthStore((s) => s.setToken);
-  const setUsuario = useAuthStore((s) => s.setUsuario);
-  const setRole = useAuthStore((s) => s.setRole);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -25,37 +19,13 @@ export default function AdminLogin() {
     }
     try {
       setLoading(true);
-      let response: Response;
-      try {
-        response = await fetch(`${API_URL}/auth/token`, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({ username, password }),
-          cache: "no-store",
-        });
-      } catch {
-        await new Promise((r) => setTimeout(r, 250));
-        response = await fetch(`${API_URL}/auth/token`, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({ username, password }),
-          cache: "no-store",
-        });
-      }
-      if (!response.ok) throw new Error("Credenciales inválidas");
-      const { access_token } = await response.json();
-      setToken(access_token);
-      const me = await fetch(`${API_URL}/users/me`, {
-        headers: { Authorization: `Bearer ${access_token}` },
+      const response = await fetch(`/admin-auth`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ username, password }),
+        cache: "no-store",
       });
-      if (!me.ok) throw new Error("Error al obtener usuario");
-      const usuario = await me.json();
-      setUsuario(usuario);
-      setRole(usuario.rol);
-      const nombreRol = usuario?.rol?.nombre;
-      if (!["Admin", "Soporte"].includes(nombreRol)) {
-        throw new Error("Acceso restringido a administradores");
-      }
+      if (!response.ok) throw new Error("Credenciales inválidas");
       const until = Date.now() + 15 * 60 * 1000;
       localStorage.setItem("adminGuardValidUntil", String(until));
       toast.success("Acceso de administrador concedido");

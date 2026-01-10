@@ -75,6 +75,7 @@ coverage.xml
 # Other
 *.sqlite3
 *.db
+front/admin.sqlite
 
 *.README.md
 *.md

@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "jest"
+    "test": "jest",
+    "init:admin-sqlite": "bash scripts/init-admin-sqlite.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
