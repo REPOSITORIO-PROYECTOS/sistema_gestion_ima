@@ -132,10 +132,12 @@ export const ConfiguracionForm = (props: Props) => {
         if (data?.peso) {
           mensaje = `✅ PESO DETECTADO: ${data.peso} kg\n`;
           if (data.precio) mensaje += `Precio: $${data.precio}\n`;
-          mensaje += `\n(Datos crudos: ${JSON.stringify(data)})`;
-        } else if (data?.raw) {
-          mensaje = `⚠️ DATOS CRUDOS RECIBIDOS (Posible error de formato o baudios):\n${data.raw}\n`;
-          mensaje += `\nIntente ajustar la configuración de la balanza a 9600 baudios, 8 bits, Sin paridad.`;
+          mensaje += `\n(Datos procesados correctamente)`;
+        } else if (data?.rawLine || data?.raw) {
+          const raw = data.rawLine || data.raw;
+          mensaje = `⚠️ DATOS CRUDOS RECIBIDOS (No se pudo extraer peso):\n"${raw}"\n`;
+          mensaje += `\nEl sistema intentó buscar números pero no encontró un formato válido.`;
+          mensaje += `\nAsegúrese de que la balanza envíe datos numéricos visibles.`;
         } else {
           mensaje = JSON.stringify(data, null, 2);
         }
@@ -455,6 +457,20 @@ export const ConfiguracionForm = (props: Props) => {
                   <pre>{testBalanzaData}</pre>
                 </div>
               )}
+            </div>
+
+            <div className="p-4 border border-gray-200 bg-gray-50 rounded-md mt-4">
+              <h3 className="font-semibold text-gray-800 mb-2">Drivers y Herramientas</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Si tiene problemas para conectar la balanza, descargue los drivers necesarios.
+              </p>
+              <a
+                href="/Drivers_WIN.zip"
+                download="Drivers_WIN.zip"
+                className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+              >
+                📥 Descargar Drivers (Windows)
+              </a>
             </div>
 
             <FormField

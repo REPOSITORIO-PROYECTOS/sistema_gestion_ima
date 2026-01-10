@@ -63,41 +63,70 @@ export async function attachAutoScaleBridge(token: string, onData?: (data: unkno
 
                 try {
                   // console.log("📝 [Balanza] Línea procesada:", line);
-                  const o = JSON.parse(line)
-                  console.log("📦 [Balanza] Objeto JSON parseado:", o);
-
-                  // Callback para pruebas locales o visualización directa
-                  if (onData) {
-                    onData(o);
+                  
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  let o: any = null;
+                  try {
+                    o = JSON.parse(line);
+                  } catch {
+                    // Si no es JSON, intentamos parsear buscando números (estilo monitor_peso_importe_v3.py)
+                    // Buscamos números decimales (punto o coma)
+                    const normalizedLine = line.replace(/,/g, ".");
+                    // Regex para encontrar números: opcional signo, dígitos, opcional decimales
+                    const matches = normalizedLine.match(/[-+]?\d+(?:\.\d+)?/g);
+                    
+                    if (matches && matches.length > 0) {
+                      const peso = parseFloat(matches[0]);
+                      // Si hay un segundo número, asumimos que es el precio/importe
+                      const precio = matches.length >= 2 ? parseFloat(matches[1]) : undefined;
+                      
+                      o = { 
+                        peso, 
+                        precio, 
+                        nombre: "Balanza" 
+                      };
+                    }
                   }
 
-                  if (now - lastSent < minIntervalMs) continue
+                  if (o) {
+                    console.log("📦 [Balanza] Objeto procesado:", o);
 
-                  if (typeof o?.peso === "number") {
-                    lastSent = now
-                    console.log(`🚀 [Balanza] Enviando evento al backend (Peso: ${o.peso})`);
-                    const body = {
-                      peso: o.peso,
-                      precio: typeof o?.precio === "number" ? o.precio : undefined,
-                      nombre: typeof o?.nombre === "string" ? o.nombre : "Balanza",
+                    // Callback para pruebas locales o visualización directa
+                    if (onData) {
+                      onData(o);
                     }
 
-                    // Si hay callback, asumimos modo prueba y podríamos querer evitar el POST, 
-                    // pero por compatibilidad y para no romper lógica existente, lo mantenemos 
-                    // a menos que explícitamente se quiera evitar.
-                    // Por ahora, dejamos que siga enviando al backend.
-                    await fetch(`${API_CONFIG.BASE_URL}/scanner/evento`, {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                      body: JSON.stringify(body),
-                    })
+                    if (now - lastSent < minIntervalMs) continue
+
+                    if (typeof o?.peso === "number") {
+                      lastSent = now
+                      console.log(`🚀 [Balanza] Enviando evento al backend (Peso: ${o.peso})`);
+                      const body = {
+                        peso: o.peso,
+                        precio: typeof o?.precio === "number" ? o.precio : undefined,
+                        nombre: typeof o?.nombre === "string" ? o.nombre : "Balanza",
+                      }
+
+                      // Si hay callback, asumimos modo prueba y podríamos querer evitar el POST, 
+                      // pero por compatibilidad y para no romper lógica existente, lo mantenemos 
+                      // a menos que explícitamente se quiera evitar.
+                      // Por ahora, dejamos que siga enviando al backend.
+                      await fetch(`${API_CONFIG.BASE_URL}/scanner/evento`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                        body: JSON.stringify(body),
+                      })
+                    }
+                  } else {
+                     // Si no se pudo obtener un objeto válido (ni JSON ni regex)
+                     console.warn("⚠️ [Balanza] No se pudo interpretar la línea:", line);
+                     if (onData && line.trim().length > 0) {
+                        onData({ rawLine: line, error: "Formato desconocido" });
+                     }
                   }
-                } catch (parseError) {
-                  console.warn("⚠️ [Balanza] Error parseando línea JSON:", line, parseError);
-                  // Si falla el parseo, enviamos la línea cruda al callback para que el usuario vea algo
-                  if (onData && line.trim().length > 0) {
-                    onData({ rawLine: line, error: "No es JSON válido" });
-                  }
+
+                } catch (err) {
+                   console.error("❌ [Balanza] Error inesperado procesando línea:", err);
                 }
               }
             } catch (readError) {

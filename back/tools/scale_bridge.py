@@ -11,21 +11,31 @@ BAUD_RATE = int(os.getenv("SCANNER_BAUD_RATE", "9600"))
 MIN_INTERVAL_MS = int(os.getenv("SCANNER_MIN_INTERVAL_MS", "500"))
 DELTA_THRESHOLD = float(os.getenv("SCANNER_DELTA_THRESHOLD", "0.005"))
 
-def parse_weight(s: str) -> float | None:
-    m = re.search(r"-?\d+(?:[.,]\d+)?", s)
-    if not m:
-        return None
-    v = m.group(0).replace(",", ".")
+def parse_weight_and_price(s: str) -> tuple[float | None, float | None]:
+    # Reemplazamos comas por puntos para normalizar
+    normalized = s.replace(",", ".")
+    # Buscamos todos los números decimales
+    matches = re.findall(r"-?\d+(?:\.\d+)?", normalized)
+    
+    if not matches:
+        return None, None
+    
     try:
-        return float(v)
+        peso = float(matches[0])
+        precio = float(matches[1]) if len(matches) >= 2 else None
+        return peso, precio
     except ValueError:
-        return None
+        return None, None
 
-def post_weight(w: float) -> bool:
+def post_weight(w: float, p: float | None = None) -> bool:
     try:
+        payload = {"peso": w, "nombre": "Balanza"}
+        if p is not None:
+            payload["precio"] = p
+            
         r = requests.post(
             API_URL,
-            json={"peso": w, "nombre": "Balanza"},
+            json=payload,
             headers={"X-Scanner-Key": SCANNER_KEY},
             timeout=3,
         )
@@ -47,12 +57,14 @@ def main():
                         s = raw.decode("utf-8", errors="ignore").strip()
                     except Exception:
                         continue
-                    w = parse_weight(s)
+                    
+                    w, p = parse_weight_and_price(s)
                     if w is None:
                         continue
+                        
                     now = time.time() * 1000.0
                     if last_sent is None or abs(w - last_sent) >= DELTA_THRESHOLD or (now - last_ts) >= MIN_INTERVAL_MS:
-                        if post_weight(w):
+                        if post_weight(w, p):
                             last_sent = w
                             last_ts = now
         except Exception:
