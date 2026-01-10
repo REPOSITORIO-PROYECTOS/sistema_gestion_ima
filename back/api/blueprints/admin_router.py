@@ -89,3 +89,12 @@ def api_desactivar_usuario(
 def api_obtener_roles(db: Session = Depends(get_db)):
     """Devuelve la lista de todos los roles disponibles en el sistema."""
     return admin_manager.obtener_todos_los_roles(db)
+
+@router.patch("/usuarios/{usuario_id}/password", response_model=UsuarioResponse, summary="Actualizar contraseña de un usuario")
+def api_actualizar_password_usuario(usuario_id: int, req: CambiarPasswordUsuarioRequest, db: Session = Depends(get_db)):
+    """Actualiza la contraseña de un usuario (requiere privilegios de Admin)."""
+    try:
+        usuario = admin_manager.actualizar_password_usuario(db, usuario_id, req.nueva_password)
+        return usuario
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))

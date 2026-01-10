@@ -9,7 +9,7 @@ type BridgeCtrl = {
 const baud = Number(process.env.NEXT_PUBLIC_SCALE_BAUD || "9600")
 const minIntervalMs = Number(process.env.NEXT_PUBLIC_SCALE_MIN_INTERVAL_MS || "400")
 
-export async function attachAutoScaleBridge(token: string, onData?: (data: any) => void): Promise<BridgeCtrl | null> {
+export async function attachAutoScaleBridge(token: string, onData?: (data: unknown) => void): Promise<BridgeCtrl | null> {
   console.log("⚖️ [Balanza] Intentando conectar...");
   if (typeof navigator === "undefined" || !("serial" in navigator)) {
     console.error("❌ [Balanza] Web Serial API no soportada en este navegador.");
@@ -37,7 +37,24 @@ export async function attachAutoScaleBridge(token: string, onData?: (data: any) 
                 break;
               }
               if (!value) continue
-              // console.log("📥 [Balanza] Datos crudos recibidos:", value); // Comentado para no saturar si es mucho ruido
+              console.log("📥 [Balanza] Datos crudos recibidos:", value);
+
+              // Si tenemos callback, pasamos los datos crudos también para depuración
+              if (onData) {
+                // Intentamos pasar un objeto si parece JSON, o un objeto con "raw" si no
+                try {
+                  // Intento rápido de ver si es un JSON completo
+                  if (value.trim().startsWith('{') && value.trim().endsWith('}')) {
+                    // Dejamos que el bucle de abajo lo procese
+                  } else {
+                    // Si son datos parciales o texto plano, enviamos aviso
+                    onData({ raw: value, timestamp: Date.now() });
+                  }
+                } catch {
+                  onData({ raw: value, timestamp: Date.now() });
+                }
+              }
+
               buffer += value
               const parts = buffer.split(/\r?\n/)
               buffer = parts.pop() || ""
@@ -77,6 +94,10 @@ export async function attachAutoScaleBridge(token: string, onData?: (data: any) 
                   }
                 } catch (parseError) {
                   console.warn("⚠️ [Balanza] Error parseando línea JSON:", line, parseError);
+                  // Si falla el parseo, enviamos la línea cruda al callback para que el usuario vea algo
+                  if (onData && line.trim().length > 0) {
+                    onData({ rawLine: line, error: "No es JSON válido" });
+                  }
                 }
               }
             } catch (readError) {

@@ -57,10 +57,14 @@ def api_obtener_empresas(db: Session = Depends(get_db)):
     
     respuesta = []
     for emp in empresas_db:
-        # Buscamos el primer usuario admin de esa empresa para el campo 'admin_username'
+        # Buscamos el primer usuario admin preferentemente con rol "Admin", si no existe usamos "Gerente"
         primer_admin = db.exec(
-            select(Usuario).where(Usuario.id_empresa == emp.id, Usuario.rol.has(nombre="Gerente"))
+            select(Usuario).where(Usuario.id_empresa == emp.id, Usuario.rol.has(nombre="Admin"))
         ).first()
+        if not primer_admin:
+            primer_admin = db.exec(
+                select(Usuario).where(Usuario.id_empresa == emp.id, Usuario.rol.has(nombre="Gerente"))
+            ).first()
 
         respuesta.append(EmpresaResponse(
             id=emp.id,
@@ -69,7 +73,8 @@ def api_obtener_empresas(db: Session = Depends(get_db)):
             cuit=emp.cuit,
             activa=emp.activa,
             link_google_sheets=emp.configuracion.link_google_sheets if emp.configuracion else None,
-            admin_username=primer_admin.nombre_usuario if primer_admin else "N/A"
+            admin_username=primer_admin.nombre_usuario if primer_admin else "N/A",
+            admin_user_id=primer_admin.id if primer_admin else None
         ))
     return respuesta
 

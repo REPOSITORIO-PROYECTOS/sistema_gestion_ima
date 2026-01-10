@@ -95,35 +95,73 @@ export const ConfiguracionForm = (props: Props) => {
   const [probandoBalanza, setProbandoBalanza] = React.useState(false);
 
   // Función para probar balanza
-  const handleProbarBalanza = async () => {
+  const handleProbarBalanza = async (forzarSeleccion: boolean = false) => {
     if (!token) {
       toast.error("No hay token disponible");
       return;
     }
 
     setProbandoBalanza(true);
-    setTestBalanzaData("Conectando... por favor espere.");
+    setTestBalanzaData("Escuchando puertos... Coloque peso en la balanza.");
 
     try {
-      const bridge = await attachAutoScaleBridge(token, (data) => {
+      // 1. Verificar si ya hay puertos autorizados
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const puertosExistentes = await (navigator.serial as any).getPorts();
+
+      // 2. Si no hay puertos o se fuerza selección, pedir puerto
+      if (puertosExistentes.length === 0 || forzarSeleccion) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (navigator.serial as any).requestPort();
+        } catch (e) {
+          console.log("Selección de puerto cancelada o fallida", e);
+          if (puertosExistentes.length === 0) {
+            setTestBalanzaData("No se seleccionó ningún puerto. Intente nuevamente.");
+            setProbandoBalanza(false);
+            return;
+          }
+        }
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const bridge = await attachAutoScaleBridge(token, (data: any) => {
         console.log("TEST BALANZA DATA:", data);
-        setTestBalanzaData(JSON.stringify(data, null, 2));
+        let mensaje = "";
+
+        if (data?.peso) {
+          mensaje = `✅ PESO DETECTADO: ${data.peso} kg\n`;
+          if (data.precio) mensaje += `Precio: $${data.precio}\n`;
+          mensaje += `\n(Datos crudos: ${JSON.stringify(data)})`;
+        } else if (data?.raw) {
+          mensaje = `⚠️ DATOS CRUDOS RECIBIDOS (Posible error de formato o baudios):\n${data.raw}\n`;
+          mensaje += `\nIntente ajustar la configuración de la balanza a 9600 baudios, 8 bits, Sin paridad.`;
+        } else {
+          mensaje = JSON.stringify(data, null, 2);
+        }
+
+        setTestBalanzaData(mensaje);
       });
 
       if (!bridge) {
-        setTestBalanzaData("No se pudo conectar (Web Serial no soportado o cancelado).");
+        setTestBalanzaData("No se pudo conectar (Web Serial no soportado).");
         setProbandoBalanza(false);
         return;
       }
 
-      // Desconectar automáticamente después de 15 segundos para no dejar el puerto tomado
+      // Desconectar automáticamente después de 30 segundos
       setTimeout(() => {
         bridge.stop();
         setProbandoBalanza(false);
-        if (testBalanzaData === "Conectando... por favor espere.") {
-          setTestBalanzaData("Tiempo de espera agotado sin recibir datos.");
-        }
-      }, 15000);
+        // Usar un ref o simplemente verificar si sigue el mensaje inicial, pero testBalanzaData es state y aquí puede ser stale.
+        // Mejor simplemente seteamos un aviso si el usuario sigue esperando.
+        setTestBalanzaData((prev) => {
+          if (prev && prev.includes("Escuchando puertos")) {
+            return "Tiempo de espera agotado sin recibir datos. Verifique conexión y encienda la balanza.";
+          }
+          return prev;
+        });
+      }, 30000);
 
     } catch (error) {
       console.error(error);
@@ -140,7 +178,7 @@ export const ConfiguracionForm = (props: Props) => {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) throw new Error("Error al cargar artículos.");
-        const data: any[] = await res.json();
+        const data = await res.json() as { id: string | number; nombre?: string; descripcion?: string }[];
         // Mapeo seguro, intentando obtener nombre o descripcion
         const mapeados = data.map(p => ({
           id: String(p.id),
@@ -397,10 +435,19 @@ export const ConfiguracionForm = (props: Props) => {
               <Button
                 type="button"
                 variant="outline"
-                onClick={handleProbarBalanza}
+                onClick={() => handleProbarBalanza(false)}
                 disabled={probandoBalanza}
               >
-                {probandoBalanza ? "Escuchando puerto..." : "Probar Balanza Ahora"}
+                {probandoBalanza ? "Escuchando puerto..." : "Probar Balanza (Automático)"}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => handleProbarBalanza(true)}
+                disabled={probandoBalanza}
+                className="ml-2"
+              >
+                Seleccionar Nuevo Puerto
               </Button>
 
               {testBalanzaData && (
@@ -414,22 +461,58 @@ export const ConfiguracionForm = (props: Props) => {
               control={form.control}
               name="balanza_articulo_id"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="flex flex-col">
                   <FormLabel>Artículo para Balanza</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || ""}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona un artículo" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {articulos.map((articulo) => (
-                        <SelectItem key={articulo.id} value={articulo.id}>
-                          {articulo.nombre}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className={cn(
+                            "w-full justify-between",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          {field.value
+                            ? articulos.find(
+                              (articulo) => articulo.id === field.value
+                            )?.nombre
+                            : "Selecciona un artículo"}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[400px] p-0">
+                      <Command>
+                        <CommandInput placeholder="Buscar artículo..." />
+                        <CommandList>
+                          <CommandEmpty>No se encontró el artículo.</CommandEmpty>
+                          <CommandGroup>
+                            {articulos.map((articulo) => (
+                              <CommandItem
+                                value={articulo.nombre}
+                                key={articulo.id}
+                                onSelect={() => {
+                                  form.setValue("balanza_articulo_id", articulo.id, { shouldDirty: true });
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    articulo.id === field.value
+                                      ? "opacity-100"
+                                      : "opacity-0"
+                                  )}
+                                />
+                                {articulo.nombre}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                   <FormMessage />
                 </FormItem>
               )}
@@ -497,6 +580,11 @@ export const ConfiguracionForm = (props: Props) => {
                       <SelectItem value="evento">Precio de Evento (Pesada)</SelectItem>
                     </SelectContent>
                   </Select>
+                  <FormDescription>
+                    {field.value === "producto"
+                      ? "Se utilizará el precio definido en el catálogo del sistema multiplicado por el peso."
+                      : "Se utilizará el precio total o unitario enviado directamente por la balanza."}
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

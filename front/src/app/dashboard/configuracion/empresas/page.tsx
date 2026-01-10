@@ -4,13 +4,20 @@ import * as React from "react";
 import { useAuthStore } from "@/lib/authStore";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 // Importamos los componentes hijos que construirán la interfaz
 // Asegúrate de que estas rutas de importación sean correctas para tu proyecto
 import { EmpresasTable } from "./EmpresasTable";
 import { CreateEmpresaModal } from "./CreateEmpresaModal";
 import { ConfiguracionForm } from "@/components/ConfiguracionForm"; // Asumo que está en la misma carpeta
-import ProtectedRoute from "@/components/ProtectedRoute";
+import AdminGuard from "@/components/AdminGuard";
 
 // Definimos el tipo de dato para una Empresa, que será usado en todo el componente
 interface Empresa {
@@ -19,6 +26,8 @@ interface Empresa {
   nombre_fantasia: string;
   cuit: string;
   activa: boolean;
+  admin_username?: string;
+  admin_user_id?: number | null;
 }
 
 export default function GestionEmpresasPage() {
@@ -29,9 +38,10 @@ export default function GestionEmpresasPage() {
   const [empresas, setEmpresas] = React.useState<Empresa[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = React.useState(false);
-  
+
   // --- Estado Clave: Guarda el ID de la empresa seleccionada para configurar ---
   const [selectedEmpresaId, setSelectedEmpresaId] = React.useState<number | null>(null);
+  const [isConfigModalOpen, setIsConfigModalOpen] = React.useState(false);
 
   // --- Lógica de Obtención de Datos ---
   const fetchEmpresas = React.useCallback(async () => {
@@ -68,7 +78,7 @@ export default function GestionEmpresasPage() {
 
   // Memoizamos el cálculo de la empresa seleccionada para optimizar el rendimiento.
   // Solo se recalculará si cambia el ID seleccionado o la lista de empresas.
-  const empresaSeleccionada = React.useMemo(() => 
+  const empresaSeleccionada = React.useMemo(() =>
     selectedEmpresaId
       ? empresas.find(e => e.id === selectedEmpresaId)
       : null,
@@ -76,7 +86,7 @@ export default function GestionEmpresasPage() {
   );
 
   return (
-    <ProtectedRoute allowedRoles={["Admin", "Soporte"]}>
+    <AdminGuard>
       <div className="p-4 md:p-6 space-y-8">
         {/* --- SECCIÓN 1: CABECERA Y TABLA --- */}
         <div>
@@ -89,30 +99,46 @@ export default function GestionEmpresasPage() {
           </div>
 
           {loading && <p className="text-center p-8 text-muted-foreground">Cargando empresas...</p>}
-          
+
           {!loading && (
             <EmpresasTable
               empresas={empresas}
-              onConfigurarClick={(empresaId) => setSelectedEmpresaId(empresaId)}
+              onConfigurarClick={(empresaId) => {
+                setSelectedEmpresaId(empresaId);
+                setIsConfigModalOpen(true);
+              }}
               onActionSuccess={handleActionSuccess}
             />
           )}
         </div>
 
-        {/* --- SECCIÓN 2: FORMULARIO DE CONFIGURACIÓN (CONDICIONAL) --- */}
-        {selectedEmpresaId && (
-          <div className="border-t pt-8">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold">
-                Configuración de: <span className="text-blue-600">{empresaSeleccionada?.nombre_legal || `Empresa ID: ${selectedEmpresaId}`}</span>
-              </h2>
-              <Button variant="ghost" onClick={() => setSelectedEmpresaId(null)}>
-                Cerrar Configuración
+        <Dialog open={isConfigModalOpen} onOpenChange={(v) => {
+          setIsConfigModalOpen(v);
+          if (!v) setSelectedEmpresaId(null);
+        }}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Configuración de Empresa</DialogTitle>
+            </DialogHeader>
+            {selectedEmpresaId && (
+              <div className="py-2">
+                <div className="mb-4">
+                  <span className="text-sm text-muted-foreground">Empresa:</span>
+                  <div className="font-semibold">{empresaSeleccionada?.nombre_legal || `ID ${selectedEmpresaId}`}</div>
+                </div>
+                <ConfiguracionForm empresaId={selectedEmpresaId} />
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => {
+                setIsConfigModalOpen(false);
+                setSelectedEmpresaId(null);
+              }}>
+                Cerrar
               </Button>
-            </div>
-            <ConfiguracionForm empresaId={selectedEmpresaId} />
-          </div>
-        )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* --- MODAL DE CREACIÓN (CONTROLADO POR ESTADO) --- */}
         <CreateEmpresaModal
@@ -124,6 +150,6 @@ export default function GestionEmpresasPage() {
           }}
         />
       </div>
-    </ProtectedRoute>
+    </AdminGuard>
   );
 }

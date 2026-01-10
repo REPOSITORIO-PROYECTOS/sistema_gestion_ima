@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import FormVentas from "./FormVentas";
@@ -35,10 +35,10 @@ function DashboardVenta() {
   const token = useAuthStore((state) => state.token);
   const [productos, setProductos] = useState<ProductoVendido[]>([]);
   const [fechaActual, setFechaActual] = useState("");
-  const [horaActual, setHoraActual] = useState("");  
+  const [horaActual, setHoraActual] = useState("");
   const { cajaAbierta } = useCajaStore();
-  const role = useAuthStore((state) => state.role);   
-  
+  const role = useAuthStore((state) => state.role);
+
   // Estados movidos desde FormVentas
   const [descuentoSobreTotal, setDescuentoSobreTotal] = useState(0);
   const [descuentoNominalTotal, setDescuentoNominalTotal] = useState(0);
@@ -51,7 +51,7 @@ function DashboardVenta() {
   // Hook para calcular fecha y hora en vivo
   useEffect(() => {
     const updateDateTime = () => {
-      
+
       const now = new Date();
 
       setFechaActual(
@@ -118,27 +118,29 @@ function DashboardVenta() {
       setVuelto(0);
     }
   }, [montoPagado, metodoPago, totalVentaFinal]);
-  
-  const handleAgregarProducto = (
-    producto: { tipo: string; 
-    cantidad: number; 
-    precioTotal: number; 
-    descuentoAplicado: boolean;
-    porcentajeDescuento: number;
-    descuentoNominal: number; }
-  ) => { setProductos((prev) => [...prev, producto]); };
 
-  const handleEliminarProducto = (index: number) => {
+  const handleAgregarProducto = useCallback((
+    producto: {
+      tipo: string;
+      cantidad: number;
+      precioTotal: number;
+      descuentoAplicado: boolean;
+      porcentajeDescuento: number;
+      descuentoNominal: number;
+    }
+  ) => { setProductos((prev) => [...prev, producto]); }, []);
+
+  const handleEliminarProducto = useCallback((index: number) => {
     setProductos((prev) => prev.filter((_, i) => i !== index));
-  };
+  }, []);
 
-  const limpiarResumen = () => {
+  const limpiarResumen = useCallback(() => {
     setProductos([]);
     setDescuentoNominalTotal(0);
     setDescuentoSobreTotal(0);
     setMontoPagado(0);
     setVuelto(0);
-  };
+  }, []);
 
   // Formateo del total de venta
   const formatearMoneda = (valor: number): string => {
@@ -168,44 +170,44 @@ function DashboardVenta() {
             disabled
             className="w-full sm:w-[48%] lg:w-[23%] text-white font-semibold border border-white bg-transparent placeholder-white disabled:opacity-100 rounded-lg"
           />
-          
+
           {/* Modal para egresos de dinero en efectivo */}
           <Dialog>
-              <DialogTrigger asChild className="w-full sm:w-[48%] lg:w-[23%]">
-                <Button type="button" variant="success" disabled={!cajaAbierta}>
-                  Egresos de Dinero
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>Egresos de Dinero en Efectivo</DialogTitle>
-                  <DialogDescription>Si desea retirar dinero en efectivo de la caja, complete los datos</DialogDescription>
-                </DialogHeader>
+            <DialogTrigger asChild className="w-full sm:w-[48%] lg:w-[23%]">
+              <Button type="button" variant="success" disabled={!cajaAbierta}>
+                Egresos de Dinero
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Egresos de Dinero en Efectivo</DialogTitle>
+                <DialogDescription>Si desea retirar dinero en efectivo de la caja, complete los datos</DialogDescription>
+              </DialogHeader>
 
-                {/* Modal de Egreso de Dinero */}
-                <EgresoForm />
-              </DialogContent>
+              {/* Modal de Egreso de Dinero */}
+              <EgresoForm />
+            </DialogContent>
           </Dialog>
 
           {/* Boton Abrir / Cerrar Caja */}
           <Dialog>
-              <DialogTrigger asChild className="w-full sm:w-[48%] lg:w-[23%]">
-                  <Button type="submit" variant="success">
-                    {cajaAbierta ? "Cerrar Caja" : "Abrir Caja"}
-                  </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>Apertura / Cierre de Caja</DialogTitle>
-                  <DialogDescription>Ingrese los datos solicitados para abrir la caja</DialogDescription>
-                </DialogHeader>
+            <DialogTrigger asChild className="w-full sm:w-[48%] lg:w-[23%]">
+              <Button type="submit" variant="success">
+                {cajaAbierta ? "Cerrar Caja" : "Abrir Caja"}
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Apertura / Cierre de Caja</DialogTitle>
+                <DialogDescription>Ingrese los datos solicitados para abrir la caja</DialogDescription>
+              </DialogHeader>
 
-                {/* Modal de Apertura / Cierre de caja */}
-                <CajaForm
-                  onAbrirCaja={() => {}}
-                  onCerrarCaja={() => {}}
-                />
-              </DialogContent>
+              {/* Modal de Apertura / Cierre de caja */}
+              <CajaForm
+                onAbrirCaja={() => { }}
+                onCerrarCaja={() => { }}
+              />
+            </DialogContent>
           </Dialog>
         </div>
 
@@ -214,7 +216,7 @@ function DashboardVenta() {
 
           {/* Panel izquierdo: Resumen */}
           <div className="flex flex-col items-start w-full lg:w-1/2 md:max-w-2/3 bg-gray-100 rounded-xl shadow-md">
-            
+
             {/* Header */}
             <div className="w-full flex flex-row justify-between items-center px-6 py-4 bg-green-700 rounded-t-xl">
               <h4 className="text-xl font-semibold text-white">Resumen del Pedido</h4>
@@ -246,29 +248,29 @@ function DashboardVenta() {
                 </li>
               ))}
             </ul>
-            
+
             {/* Resumen de toda la Venta */}
             <div className="w-full p-4 border-t border-gray-300">
-                <div className="flex flex-col gap-4 p-6 bg-white border border-green-900 rounded-lg">
-                    <h3 className="text-2xl font-semibold text-green-900">Resumen Final del Pedido</h3>
-                    <p className="text-xl text-green-900"><span className="font-semibold">Total sin descuento:</span> {formatearMoneda(totalVenta)}</p>
-                    <p className="text-xl text-green-400"><span className="font-semibold">Descuento sobre total (%):</span> {descuentoSobreTotal}%</p>
-                    <p className="text-xl text-green-400"><span className="font-semibold">Descuento sobre total ($):</span> {formatearMoneda(descuentoNominalTotal)}</p>
-                    
-                    {metodoPago === "transferencia" && recargoTransferenciaActivo && (
-                        <p className="text-xl text-red-500"><span className="font-semibold">Recargo por Transferencia:</span> {recargoTransferencia}% ({formatearMoneda(totalConDescuento * recargoTransferencia / 100)})</p>
-                    )}
-                    {metodoPago === "bancario" && recargoBancarioActivo && (
-                        <p className="text-xl text-red-500"><span className="font-semibold">Recargo por POS:</span> {recargoBancario}% ({formatearMoneda(totalConDescuento * recargoBancario / 100)})</p>
-                    )}
-                    
-                    <span className="block w-full h-0.5 bg-green-900 my-2"></span>
-                    <p className="text-2xl font-bold text-green-900"><span className="font-semibold">Valor Final del Pedido:</span> {formatearMoneda(totalVentaFinal)}</p>
-                    
-                    {metodoPago === "efectivo" && montoPagado > 0 && (
-                        <p className="text-xl text-emerald-700 font-semibold">Vuelto para el cliente: {formatearMoneda(vuelto)}</p>
-                    )}
-                </div>
+              <div className="flex flex-col gap-4 p-6 bg-white border border-green-900 rounded-lg">
+                <h3 className="text-2xl font-semibold text-green-900">Resumen Final del Pedido</h3>
+                <p className="text-xl text-green-900"><span className="font-semibold">Total sin descuento:</span> {formatearMoneda(totalVenta)}</p>
+                <p className="text-xl text-green-400"><span className="font-semibold">Descuento sobre total (%):</span> {descuentoSobreTotal}%</p>
+                <p className="text-xl text-green-400"><span className="font-semibold">Descuento sobre total ($):</span> {formatearMoneda(descuentoNominalTotal)}</p>
+
+                {metodoPago === "transferencia" && recargoTransferenciaActivo && (
+                  <p className="text-xl text-red-500"><span className="font-semibold">Recargo por Transferencia:</span> {recargoTransferencia}% ({formatearMoneda(totalConDescuento * recargoTransferencia / 100)})</p>
+                )}
+                {metodoPago === "bancario" && recargoBancarioActivo && (
+                  <p className="text-xl text-red-500"><span className="font-semibold">Recargo por POS:</span> {recargoBancario}% ({formatearMoneda(totalConDescuento * recargoBancario / 100)})</p>
+                )}
+
+                <span className="block w-full h-0.5 bg-green-900 my-2"></span>
+                <p className="text-2xl font-bold text-green-900"><span className="font-semibold">Valor Final del Pedido:</span> {formatearMoneda(totalVentaFinal)}</p>
+
+                {metodoPago === "efectivo" && montoPagado > 0 && (
+                  <p className="text-xl text-emerald-700 font-semibold">Vuelto para el cliente: {formatearMoneda(vuelto)}</p>
+                )}
+              </div>
             </div>
           </div>
 

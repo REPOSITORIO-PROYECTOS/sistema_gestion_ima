@@ -1,10 +1,10 @@
 // Configuración de la API
 export const API_CONFIG = {
   // URL base de la API - usar variable de entorno o fallback
-  BASE_URL: (process.env.NEXT_PUBLIC_API_URL ||
+  BASE_URL:
     (process.env.NODE_ENV === 'production'
-      ? 'https://sistema-ima.sistemataup.online'
-      : 'http://localhost:8000')) + '/api',
+      ? (process.env.NEXT_PUBLIC_API_URL || 'https://sistema-ima.sistemataup.online')
+      : '') + '/api',
 
   // Endpoints
   ENDPOINTS: {

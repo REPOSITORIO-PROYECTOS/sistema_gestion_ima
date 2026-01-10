@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 from back.modelos import Tercero, Usuario, Rol
 from back.security import get_password_hash,verificar_password
 from back.schemas.admin_schemas import UsuarioCreate
+from back.security import get_password_hash
 
 # ===================================================================
 # === LÓGICA DE GESTIÓN DE USUARIOS
@@ -98,7 +99,18 @@ def activar_usuario(db: Session, usuario_id_a_activar: int) -> Usuario:
 
 def obtener_todos_los_usuarios(id_empresa,db: Session) -> List[Usuario]:
     """Obtiene una lista de todos los usuarios del sistema con su rol precargado."""
-    return db.exec(select(Usuario).where(Usuario.id_empresa==id_empresa).options(selectinload(Usuario.rol))).all()
+    return db.exec(select(Usuario).where(Usuario.id_empresa == id_empresa)).all()
+
+def actualizar_password_usuario(db: Session, usuario_id: int, nueva_password: str) -> Usuario:
+    """Actualiza de forma segura la contraseña de un usuario existente."""
+    usuario = db.get(Usuario, usuario_id)
+    if not usuario:
+        raise ValueError(f"Usuario con ID {usuario_id} no encontrado.")
+    usuario.password_hash = get_password_hash(nueva_password)
+    db.add(usuario)
+    db.commit()
+    db.refresh(usuario)
+    return usuario
 
 def obtener_todos_los_roles(db: Session) -> List[Rol]:
     """Obtiene una lista de todos los roles disponibles."""

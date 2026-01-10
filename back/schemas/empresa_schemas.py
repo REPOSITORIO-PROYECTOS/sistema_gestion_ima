@@ -28,6 +28,7 @@ class EmpresaResponse(BaseModel):
     activa: bool
     link_google_sheets: Optional[str] = None
     admin_username: str
+    admin_user_id: Optional[int] = None
     
     class Config:
         from_attributes = True
