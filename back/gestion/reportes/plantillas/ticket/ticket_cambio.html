@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ticket de Cambio</title>
+    <style>
+        /* Definición de variables dinámicas */
+        :root {
+            --t-font-size: {{ estilos.font_size }};
+            --t-max-width: {{ estilos.max_width }};
+            --t-padding: {{ estilos.padding }};
+            --t-print-width: {{ estilos.print_width }};
+        }
+
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: var(--t-font-size);
+            margin: 0;
+            padding: 0;
+            color: #000;
+        }
+
+        /* Responsive design for different printer widths */
+        .ticket {
+            width: 100%;
+            max-width: var(--t-max-width);
+            padding: var(--t-padding);
+            box-sizing: border-box;
+            border-top: 1px dashed black; 
+            margin-top: 5mm;
+            padding-top: 5mm;
+        }
+
+        /* Configuración de página para WeasyPrint (fuera de @media print por estándar CSS) */
+        @page {
+            size: {{ estilos.page_size }};
+            margin: 0;
+        }
+
+        @media print {
+            .ticket {
+                width: var(--t-print-width);
+                padding: var(--t-padding);
+            }
+        }
+
+        /* For 58mm printers */
+        @media (max-width: 60mm) {
+            .ticket {
+                width: 54mm;
+                padding: 1mm;
+                font-size: 9px;
+            }
+
+            .header h1 {
+                font-size: 12px;
+            }
+        }
+
+        .header,
+        .footer {
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 14px;
+            font-weight: bold;
+            word-wrap: break-word;
+            text-transform: uppercase;
+        }
+
+        .header p {
+            margin: 2px 0;
+        }
+
+        hr {
+            border: none;
+            border-top: 1px dashed black;
+            margin: 5px 0;
+        }
+
+        .item-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 5px;
+        }
+
+        .item-table th,
+        .item-table td {
+            text-align: left;
+            padding: 2px 0;
+            vertical-align: top;
+        }
+
+        .item-table th {
+            border-bottom: 1px solid black;
+            font-weight: bold;
+        }
+        
+        .col-cant { width: 15%; text-align: center; }
+        .col-desc { width: 85%; }
+
+        .cambio-info {
+            margin-top: 10px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 11px;
+            border: 1px solid black;
+            padding: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="ticket">
+        <div class="header">
+            <p>{{ emisor.razon_social }}</p>
+            <h1>TICKET DE CAMBIO</h1>
+            <p>Fecha: {{ fecha_emision | date('%d/%m/%Y %H:%M') }}</p>
+            {% if numero %}
+            <p>Ref: {{ numero }}</p>
+            {% endif %}
+        </div>
+
+        <hr>
+
+        <div class="cliente-info">
+            {% if receptor.nombre_razon_social %}
+            <p>Cliente: {{ receptor.nombre_razon_social }}</p>
+            {% endif %}
+        </div>
+
+        <table class="item-table">
+            <thead>
+                <tr>
+                    <th class="col-cant">Cant.</th>
+                    <th class="col-desc">Descripción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in transaccion.items %}
+                <tr>
+                    <td class="col-cant">{{ item.cantidad }}</td>
+                    <td class="col-desc">{{ item.descripcion }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="cambio-info">
+            <p>CAMBIO VÁLIDO HASTA:</p>
+            <p style="font-size: 14px; margin-top: 4px;">{{ fecha_limite_cambio }}</p>
+        </div>
+
+        <div class="footer">
+            <hr>
+            <p>Para realizar el cambio es indispensable presentar este ticket y el producto en perfectas condiciones.</p>
+            <p>Muchas gracias por su compra.</p>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -91,6 +91,70 @@ export default function GestionNegocio() {
     fetchRecargos();
   }, [token, setRecargoBancario, setRecargoTransferencia]);
 
+  // GET Configuración General (para ancho ticket cambio)
+  const [ticketCambioAncho, setTicketCambioAncho] = useState("80mm");
+
+  useEffect(() => {
+    if (!token) return;
+    const fetchConfig = async () => {
+      try {
+        const res = await fetch(`${API_CONFIG.BASE_URL}/configuracion/mi-empresa`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const aclaraciones = data.aclaraciones_legales || {};
+          if (aclaraciones.ticket_cambio_ancho) {
+            setTicketCambioAncho(aclaraciones.ticket_cambio_ancho);
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    fetchConfig();
+  }, [token]);
+
+  // Guardar Ancho Ticket Cambio
+  const guardarAnchoTicket = async (valor: string) => {
+    setTicketCambioAncho(valor);
+    if (!token || !empresaId) return;
+    try {
+        // 1. Obtener config actual para no sobrescribir otros campos de aclaraciones_legales
+        const resGet = await fetch(`${API_CONFIG.BASE_URL}/empresas/admin/${empresaId}/configuracion`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!resGet.ok) throw new Error("No se pudo leer la configuración actual");
+        
+        const data = await resGet.json();
+        const aclaraciones = data.aclaraciones_legales || {};
+        
+        // 2. Patch con el nuevo valor
+        const res = await fetch(`${API_CONFIG.BASE_URL}/empresas/admin/${empresaId}/configuracion`, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+                aclaraciones_legales: {
+                    ...aclaraciones,
+                    ticket_cambio_ancho: valor
+                }
+            })
+        });
+
+        if (res.ok) {
+            toast.success("Ancho de ticket actualizado");
+        } else {
+            toast.error("Error al guardar configuración");
+        }
+    } catch (e) {
+        console.error(e);
+        toast.error("Error al guardar configuración");
+    }
+  };
+
   // PATCH Recargos transferencia
   const actualizarRecargoTransferencia = async () => {
     try {
@@ -552,6 +616,24 @@ export default function GestionNegocio() {
               <div className="flex flex-col sm:flex-row w-full md:w-1/2 items-start gap-8 mb-6">
                 <label className="text-lg font-semibold text-green-950">🎨 Cambiar logo de empresa:</label>
                 <Input type="file" accept=".png,.jpg,.jpeg,.webp" ref={fileInputRef} onChange={handleFileChange} className="max-w-sm" />
+              </div>
+              
+              <div className="flex flex-col gap-2 w-full md:w-1/2 mb-6">
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  <label className="text-lg font-semibold text-green-950 whitespace-nowrap">🖨️ Ancho Ticket de Cambio:</label>
+                  <Select value={ticketCambioAncho} onValueChange={guardarAnchoTicket}>
+                    <SelectTrigger className="w-full cursor-pointer">
+                      <SelectValue placeholder="Seleccionar ancho" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="80mm">80mm (Estándar)</SelectItem>
+                      <SelectItem value="58mm">58mm (Pequeña)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Esta configuración aplica <strong>únicamente</strong> al ticket de cambio. El comprobante principal mantiene su formato estándar.
+                </p>
               </div>
             </div>
             <div className="flex flex-col items-start gap-8 p-4">

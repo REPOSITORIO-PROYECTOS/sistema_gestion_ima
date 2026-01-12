@@ -2,7 +2,7 @@
 
 import os
 import traceback
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 from jinja2 import Environment, FileSystemLoader
 from weasyprint import HTML, CSS
@@ -190,6 +190,58 @@ def generar_comprobante_stateless(data: GenerarComprobanteRequest) -> bytes:
         print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         raise RuntimeError(f"Error al procesar la plantilla: {e}")
 
+    # --- PASO 4.5: Renderizar Ticket de Cambio (Opcional) ---
+    html_cambio_renderizado = None
+    if data.incluir_ticket_cambio:
+        try:
+            # Calcular fecha límite
+            fecha_limite = "30 días"
+            if data.plazo_cambio:
+                fecha_limite = str(data.plazo_cambio)
+                
+                # Intentar calcular fecha exacta si es un número de días
+                try:
+                    dias_str = ''.join(filter(str.isdigit, fecha_limite))
+                    if dias_str:
+                        dias = int(dias_str)
+                        fecha_limite_dt = datetime.now() + timedelta(days=dias)
+                        fecha_limite = fecha_limite_dt.strftime('%d/%m/%Y')
+                except Exception as e_date:
+                    print(f"No se pudo calcular fecha límite exacta: {e_date}")
+
+            # Obtener configuración de ancho (default 80mm)
+            ancho_ticket = aclaraciones_de_la_empresa.get('ticket_cambio_ancho', '80mm')
+            
+            # Pre-calcular estilos para evitar lógica en el template (y errores de linter)
+            estilos = {
+                "font_size": "10px",
+                "max_width": "80mm",
+                "padding": "2mm",
+                "page_size": "80mm auto", # auto permite largo variable
+                "print_width": "76mm"
+            }
+            
+            if ancho_ticket == '58mm':
+                estilos = {
+                    "font_size": "9px",
+                    "max_width": "58mm",
+                    "padding": "1mm",
+                    "page_size": "58mm auto", # auto permite largo variable
+                    "print_width": "54mm"
+                }
+
+            contexto_cambio = {
+                "transaccion": transaccion_para_renderizar,
+                "fecha_limite_cambio": fecha_limite,
+                "estilos": estilos
+            }
+            template_cambio = env.get_template("ticket/ticket_cambio.html")
+            html_cambio_renderizado = template_cambio.render(contexto_cambio)
+            print("-> Ticket de cambio renderizado con éxito.")
+        except Exception as e:
+            print(f"Error al renderizar ticket de cambio: {e}")
+            # No fallamos todo el proceso si falla el ticket de cambio
+
     # --- PASO 5: Convertir a PDF ---
     try:
         css_string = ""
@@ -207,7 +259,22 @@ def generar_comprobante_stateless(data: GenerarComprobanteRequest) -> bytes:
                 }
             }
             """
-        pdf_bytes = HTML(string=html_renderizado).write_pdf(stylesheets=[CSS(string=css_string)])
+        
+        # Renderizar documento principal
+        main_doc = HTML(string=html_renderizado).render(stylesheets=[CSS(string=css_string)])
+        
+        # Si hay ticket de cambio, renderizar y unir
+        if html_cambio_renderizado:
+            # El ticket de cambio ya tiene sus estilos completos incrustados (incluyendo @page),
+            # así que no le pasamos el CSS global para evitar conflictos de tamaño.
+            cambio_doc = HTML(string=html_cambio_renderizado).render()
+            
+            # Unir páginas (esto agrega el contenido como nuevas páginas)
+            # Para tickets continuos, esto funciona bien si el driver de impresora corta al final del trabajo
+            # o si el tamaño de página es variable.
+            main_doc.pages.extend(cambio_doc.pages)
+            
+        pdf_bytes = main_doc.write_pdf()
         print(f"-> PDF generado. Tamaño: {len(pdf_bytes)} bytes.")
     except Exception as e:
         raise RuntimeError(f"Error al generar el archivo PDF: {e}")
