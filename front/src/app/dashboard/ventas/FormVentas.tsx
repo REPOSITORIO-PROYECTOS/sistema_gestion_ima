@@ -151,6 +151,7 @@ function FormVentas({
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [productoEscaneado, setProductoEscaneado] = useState<ProductoSeleccionado | null>(null);
   const [cantidadEscaneada, setCantidadEscaneada] = useState(1);
+  const [persistirProducto, setPersistirProducto] = useState(false); // Nuevo estado para persistir producto
   const inputRef = useRef<HTMLInputElement>(null);
   const cantidadInputRef = useRef<HTMLInputElement>(null);
   const empresa = useEmpresaStore((state) => state.empresa);
@@ -233,12 +234,25 @@ function FormVentas({
       porcentajeDescuento: descuentoPorcentual, // Asignación explícita
       descuentoNominal: descuentoNominal
     });
-    setProductoSeleccionado(null);
+    // Reset de campos
+    if (!persistirProducto) {
+      setProductoSeleccionado(null);
+      setCodigoEscaneado("");
+    }
     setCantidad(1);
     setDescuentoNominal(0);
     setDescuentoPorcentual(0);
-    setModoVenta('unidad');
-    inputRef.current?.focus();
+    setInputCantidadGranel("1");
+    setInputPrecioGranel("");
+
+    // Foco
+    setTimeout(() => {
+      if (persistirProducto) {
+        if (cantidadInputRef.current) cantidadInputRef.current.focus();
+      } else {
+        if (inputRef.current) inputRef.current.focus();
+      }
+    }, 100);
     toast.success("Producto agregado al resumen.");
   };
 
@@ -263,10 +277,22 @@ function FormVentas({
     setInputEfectivo("");
     setOpen(false);
     setCodigoEscaneado("");
-    setProductoSeleccionado(null);
+    // Solo reseteamos el producto si no está activa la persistencia
+    if (!persistirProducto) {
+      setProductoSeleccionado(null);
+    }
     setModoVenta('unidad');
     setCheckoutVisible(false); // <-- Ocultar la sección de checkout al resetear
-  }, [onLimpiarResumen]);
+    
+    // Foco post-venta
+    setTimeout(() => {
+        if (persistirProducto) {
+            if (cantidadInputRef.current) cantidadInputRef.current.focus();
+        } else {
+            if (inputRef.current) inputRef.current.focus();
+        }
+    }, 100);
+  }, [onLimpiarResumen, persistirProducto]);
 
   const formatearMoneda = (valor: string): string => {
     const limpio = valor.replace(/[^\d]/g, "");
@@ -579,11 +605,29 @@ function FormVentas({
 
       const blob = await respComp.blob();
       const url = URL.createObjectURL(blob);
-      const w = window.open(url);
-      if (w) {
-        setTimeout(() => { try { w.focus(); w.print(); } catch { } }, 500);
-        setTimeout(() => { URL.revokeObjectURL(url); }, 10000);
-      }
+      
+      // Descarga automática de respaldo
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Comprobante_${tipo}_${Date.now()}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Impresión silenciosa con iframe
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = url;
+      document.body.appendChild(iframe);
+      
+      iframe.onload = () => {
+        iframe.contentWindow?.print();
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+          URL.revokeObjectURL(url);
+        }, 10000); // Dar tiempo para que se envíe a la cola de impresión
+      };
+      
       toast.success("✅ Comprobante enviado a impresión.");
       console.log(`[${new Date().toISOString()}] Impresión enviada correctamente.`);
     } catch (error) {
@@ -834,31 +878,74 @@ function FormVentas({
                 busquedaCliente={busquedaCliente}
                 setBusquedaCliente={setBusquedaCliente}
               />
-              <span className="block w-full h-0.5 bg-green-900"></span>
-              <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
-                <Label className="text-lg font-semibold text-green-900">Descuento por Producto (%)</Label>
-                <Input
-                  type="number"
-                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                  min={0}
-                  max={100}
-                  value={descuentoPorcentual === 0 ? "" : descuentoPorcentual}
-                  onChange={(e) => setDescuentoPorcentual(Math.min(parseInt(e.target.value, 10) || 0, 100))}
-                  className="w-full md:max-w-2/3 text-black"
-                />
+              
+              <div className="flex flex-col gap-4 mt-4 p-4 border rounded-md bg-gray-50">
+                <Label className="font-semibold text-green-900">Configuración Adicional de Venta</Label>
+                <div className="flex flex-col gap-2">
+                   <Label>Observaciones (opcional)</Label>
+                   <Textarea 
+                     placeholder="Notas internas o para el cliente..." 
+                     value={observaciones}
+                     onChange={(e) => setObservaciones(e.target.value)}
+                     className="text-black bg-white"
+                   />
+                </div>
+                
+                <div className="flex flex-row gap-4 p-2 bg-white border border-gray-200 rounded-md">
+                    <div className="flex flex-col w-1/2">
+                        <Label className="text-xs font-semibold text-green-900 mb-1">Desc. Item (%)</Label>
+                        <Input
+                            type="number"
+                            min={0}
+                            max={100}
+                            placeholder="%"
+                            value={descuentoPorcentual === 0 ? "" : descuentoPorcentual}
+                            onChange={(e) => setDescuentoPorcentual(Math.min(parseInt(e.target.value, 10) || 0, 100))}
+                            className="text-black bg-white h-9"
+                            onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                        />
+                    </div>
+                    <div className="flex flex-col w-1/2">
+                        <Label className="text-xs font-semibold text-green-900 mb-1">Desc. Item ($)</Label>
+                        <Input
+                            type="number"
+                            min={0}
+                            placeholder="$"
+                            value={descuentoNominal === 0 ? "" : descuentoNominal}
+                            onChange={(e) => setDescuentoNominal(parseFloat(e.target.value) || 0)}
+                            className="text-black bg-white h-9"
+                            onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                        />
+                    </div>
+                </div>
+
+                <div className="flex flex-col gap-4 md:flex-row">
+                  <div className="flex flex-col gap-2 w-full md:w-1/2">
+                    <Label>Descuento Global (%)</Label>
+                    <Input 
+                      type="number" 
+                      min={0} 
+                      max={100} 
+                      value={descuentoSobreTotal === 0 ? "" : descuentoSobreTotal} 
+                      onWheel={(e) => (e.target as HTMLInputElement).blur()} 
+                      onChange={(e) => setDescuentoSobreTotal(Math.min(parseInt(e.target.value, 10) || 0, 100))} 
+                      className="w-full text-black bg-white" 
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2 w-full md:w-1/2">
+                    <Label>Descuento Global ($)</Label>
+                    <Input 
+                      type="number" 
+                      min={0} 
+                      value={descuentoNominalTotal === 0 ? "" : descuentoNominalTotal} 
+                      onWheel={(e) => (e.target as HTMLInputElement).blur()} 
+                      onChange={(e) => setDescuentoNominalTotal(Math.min(parseFloat(e.target.value) || 0, totalVenta))} 
+                      className="w-full text-black bg-white" 
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
-                <Label className="text-lg font-semibold text-green-900">Descuento por Producto ($)</Label>
-                <Input
-                  type="number"
-                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                  min={0}
-                  value={descuentoNominal === 0 ? "" : descuentoNominal}
-                  onChange={(e) => setDescuentoNominal(Math.min(parseFloat(e.target.value) || 0, totalProducto))}
-                  className="w-full md:max-w-2/3 text-black"
-                />
-              </div>
             </AccordionContent>
           </AccordionItem>
         </Accordion>
@@ -885,6 +972,8 @@ function FormVentas({
             cantidadEscaneada={cantidadEscaneada}
             setCantidadEscaneada={setCantidadEscaneada}
             handleAgregarDesdePopover={handleAgregarDesdePopover}
+            persistirProducto={persistirProducto}
+            setPersistirProducto={setPersistirProducto}
           />
 
           {/* Sección de Cantidad */}
@@ -1019,28 +1108,6 @@ function FormVentas({
                 </div>
               </TooltipProvider>
             </RadioGroup>
-
-            <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="item-1">
-                <AccordionTrigger className="cursor-pointer text-md">Observaciones y Descuentos Globales</AccordionTrigger>
-                <AccordionContent className="flex flex-col gap-4 pt-4">
-                  <div className="flex flex-col w-full gap-2">
-                    <Label className="text-green-900 text-xl" htmlFor="message-2">Observaciones</Label>
-                    <Textarea placeholder="Observaciones de la venta..." id="message-2" value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
-                  </div>
-                  <span className="block w-full h-0.5 bg-green-900"></span>
-
-                  <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
-                    <Label className="text-lg font-semibold text-green-900">Descuento Sobre Total (%)</Label>
-                    <Input type="number" min={0} max={100} value={descuentoSobreTotal === 0 ? "" : descuentoSobreTotal} onWheel={(e) => (e.target as HTMLInputElement).blur()} onChange={(e) => setDescuentoSobreTotal(Math.min(parseInt(e.target.value, 10) || 0, 100))} className="w-full md:max-w-2/3 text-black" />
-                  </div>
-                  <div className="flex flex-col gap-4 items-start justify-between md:flex-row md:items-center">
-                    <Label className="text-lg font-semibold text-green-900">Descuento Sobre Total ($)</Label>
-                    <Input type="number" min={0} value={descuentoNominalTotal === 0 ? "" : descuentoNominalTotal} onWheel={(e) => (e.target as HTMLInputElement).blur()} onChange={(e) => setDescuentoNominalTotal(Math.min(parseFloat(e.target.value) || 0, totalVenta))} className="w-full md:max-w-2/3 text-black" />
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
 
             <Button type="submit" disabled={isLoading} className={`!py-6 bg-green-900 flex items-center justify-center gap-2 ${isLoading ? "cursor-not-allowed opacity-50" : "hover:bg-green-700 cursor-pointer"}`}>
               {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}

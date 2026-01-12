@@ -5,8 +5,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command"
-import { ChevronsUpDown } from "lucide-react"
-import { Button } from "@/components/ui/button" // <-- Importar Button
+import { ChevronsUpDown, Lock, LockOpen } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 // Tipos
 type Producto = {
@@ -38,6 +38,10 @@ interface SeccionProductoProps {
   cantidadEscaneada: number;
   setCantidadEscaneada: (cantidad: number) => void;
   handleAgregarDesdePopover: () => void;
+  
+  // Persistencia de producto
+  persistirProducto: boolean;
+  setPersistirProducto: (v: boolean) => void;
 }
 
 export function SeccionProducto({
@@ -45,7 +49,8 @@ export function SeccionProducto({
   productos, productoSeleccionado, setProductoSeleccionado,
   open, setOpen, tipoClienteSeleccionadoId,
   popoverOpen, setPopoverOpen, productoEscaneado,
-  cantidadEscaneada, setCantidadEscaneada, handleAgregarDesdePopover
+  cantidadEscaneada, setCantidadEscaneada, handleAgregarDesdePopover,
+  persistirProducto, setPersistirProducto
 }: SeccionProductoProps) {
 return (
     // Usamos un div contenedor con flex-col y gap para espaciar las secciones internas
@@ -110,39 +115,50 @@ return (
         <Label className="text-xl font-semibold text-green-900 md:text-right">
           Producto
         </Label>
-        <div className="md:col-span-2">
-          {productos.length === 0 ? (
-            <p className="text-green-900 font-semibold">Cargando...</p>
-          ) : (
-            <Popover open={open} onOpenChange={setOpen}>
-              <PopoverTrigger asChild>
-                <button
-                  aria-label="Seleccionar un producto"
-                  role="combobox"
-                  aria-expanded={open}
-                  aria-controls="productos-lista"
-                  className="w-full justify-between text-left cursor-pointer border px-3 py-2 rounded-md shadow-sm bg-white text-black flex items-center"
-                  onClick={() => setOpen(!open)}
-                >
-                  {productoSeleccionado ? `${productoSeleccionado.nombre} - $${tipoClienteSeleccionadoId === "1" ? productoSeleccionado.venta_negocio : productoSeleccionado.precio_venta}` : "Seleccionar producto"}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent side="bottom" align="start" className="w-full p-0 max-h-64 overflow-y-auto z-50" sideOffset={8}>
-                <Command id="productos-lista">
-                  <CommandInput placeholder="Buscar producto..." />
-                  <CommandEmpty>No se encontró ningún producto.</CommandEmpty>
-                  <CommandGroup>
-                    {productos.map((p) => (
-                      <CommandItem key={p.id} value={p.nombre} className="pl-2 pr-4 py-2 text-sm text-black cursor-pointer" onSelect={() => { setProductoSeleccionado(p); setOpen(false); }}>
-                        <span className="truncate">{p.nombre} | ${tipoClienteSeleccionadoId === "1" ? p.venta_negocio : p.precio_venta} | Stock: {p.stock_actual}</span>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          )}
+        <div className="md:col-span-2 flex gap-2">
+          <div className="flex-1">
+            {productos.length === 0 ? (
+              <p className="text-green-900 font-semibold">Cargando...</p>
+            ) : (
+              <Popover open={open} onOpenChange={setOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    aria-label="Seleccionar un producto"
+                    role="combobox"
+                    aria-expanded={open}
+                    aria-controls="productos-lista"
+                    className="w-full justify-between text-left cursor-pointer border px-3 py-2 rounded-md shadow-sm bg-white text-black flex items-center"
+                    onClick={() => setOpen(!open)}
+                  >
+                    {productoSeleccionado ? `${productoSeleccionado.nombre} - $${tipoClienteSeleccionadoId === "1" ? productoSeleccionado.venta_negocio : productoSeleccionado.precio_venta}` : "Seleccionar producto"}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent side="bottom" align="start" className="w-full p-0 max-h-64 overflow-y-auto z-50" sideOffset={8}>
+                  <Command id="productos-lista">
+                    <CommandInput placeholder="Buscar producto..." />
+                    <CommandEmpty>No se encontró ningún producto.</CommandEmpty>
+                    <CommandGroup>
+                      {productos.map((p) => (
+                        <CommandItem key={p.id} value={p.nombre} className="pl-2 pr-4 py-2 text-sm text-black cursor-pointer" onSelect={() => { setProductoSeleccionado(p); setOpen(false); }}>
+                          <span className="truncate">{p.nombre} | ${tipoClienteSeleccionadoId === "1" ? p.venta_negocio : p.precio_venta} | Stock: {p.stock_actual}</span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            )}
+          </div>
+          <Button
+            type="button"
+            variant={persistirProducto ? "default" : "outline"}
+            size="icon"
+            onClick={() => setPersistirProducto(!persistirProducto)}
+            title={persistirProducto ? "Producto persistente (No se borrará al agregar)" : "Producto se limpiará al agregar"}
+          >
+            {persistirProducto ? <Lock className="h-4 w-4" /> : <LockOpen className="h-4 w-4" />}
+          </Button>
         </div>
       </div>
     </div>
