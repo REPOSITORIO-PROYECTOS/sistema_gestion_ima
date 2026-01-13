@@ -397,7 +397,7 @@ export default function MesasPage() {
         <div className="flex gap-2">
           <div className="flex bg-gray-100 p-1 rounded-lg mr-2 items-center">
             <Button
-              variant={viewMode === 'grid' ? 'white' : 'ghost'}
+              variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
               size="sm"
               onClick={() => setViewMode('grid')}
               className={`px-3 ${viewMode === 'grid' ? 'bg-white shadow-sm' : 'text-gray-500'}`}
@@ -406,7 +406,7 @@ export default function MesasPage() {
               <LayoutGrid className="h-4 w-4" />
             </Button>
             <Button
-              variant={viewMode === 'list' ? 'white' : 'ghost'}
+              variant={viewMode === 'list' ? 'secondary' : 'ghost'}
               size="sm"
               onClick={() => setViewMode('list')}
               className={`px-3 ${viewMode === 'list' ? 'bg-white shadow-sm' : 'text-gray-500'}`}

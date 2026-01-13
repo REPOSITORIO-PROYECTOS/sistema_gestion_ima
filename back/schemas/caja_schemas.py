@@ -44,6 +44,10 @@ class RegistrarVentaRequest(BaseModel):
     pago_separado: Optional[bool] = None
     detalles_pago_separado: Optional[str] = None
 
+class ConsumoMesaFacturarRequest(BaseModel):
+    metodo_pago: str
+    cobrar_propina: bool = False
+
 class CajaMovimientoResponse(BaseModel):
     id: int
     id_sesion_caja: int # Renombramos para consistencia

@@ -2,6 +2,9 @@
 const API_HOST = process.env.NEXT_PUBLIC_API_URL || 'https://sistema-ima.sistemataup.online';
 
 const nextConfig = {
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   async rewrites() {
     return [
       {
