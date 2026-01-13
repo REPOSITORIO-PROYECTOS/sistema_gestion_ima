@@ -3,6 +3,7 @@
 import NavBar from '@/components/interface/NavBar'
 import ProtectedRoute from "@/components/ProtectedRoute"
 import { useAuthStore } from '@/lib/authStore'
+import ComandaMonitor from '@/components/ComandaMonitor'
 
 // Tipado de los path
 type NavLink = {
@@ -36,6 +37,9 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
       <main id="main-content" className="w-full min-h-screen py-32 px-8 relative">
         {children}   
       </main>
+
+      {/* Monitor de Comandas (Solo visible si se activa manualmente) */}
+      {(role?.nombre === 'Admin' || role?.nombre === 'Cajero') && <ComandaMonitor />}
 
       {/* Copyright */}
       <footer className="text-center text-md text-gray-500 p-4">

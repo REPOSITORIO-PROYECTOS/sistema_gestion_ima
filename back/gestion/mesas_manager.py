@@ -15,6 +15,9 @@ from back.schemas.mesa_schemas import (
     ConsumoMesaCreate, ConsumoMesaUpdate, ConsumoMesaRead,
     ConsumoMesaDetalleCreate, ConsumoMesaDetalleRead
 )
+from back.schemas.caja_schemas import ConsumoMesaFacturarRequest, ArticuloVendido
+from back.gestion.caja.registro_caja import registrar_venta_y_movimiento_caja
+from back.gestion.caja.apertura_cierre import obtener_caja_abierta_por_usuario
 
 # ===================================================================
 # === FUNCIONES PARA MESAS
@@ -122,6 +125,27 @@ def agregar_detalle_consumo(db: Session, id_consumo: int, detalle_data: ConsumoM
     db.refresh(detalle)
     return detalle
 
+def obtener_comandas_pendientes(db: Session, id_empresa: int) -> List[ConsumoMesaDetalle]:
+    """Obtiene los detalles de consumo (comandas) que no han sido impresos."""
+    statement = select(ConsumoMesaDetalle).join(ConsumoMesa).where(
+        ConsumoMesa.id_empresa == id_empresa,
+        ConsumoMesa.estado == "ABIERTO",
+        ConsumoMesaDetalle.impreso == False
+    ).options(
+        selectinload(ConsumoMesaDetalle.articulo).selectinload(Articulo.categoria),
+        selectinload(ConsumoMesaDetalle.consumo).selectinload(ConsumoMesa.mesa)
+    )
+    return db.exec(statement).all()
+
+def marcar_comanda_como_impresa(db: Session, ids_detalle: List[int]) -> bool:
+    """Marca una lista de detalles como impresos."""
+    statement = select(ConsumoMesaDetalle).where(ConsumoMesaDetalle.id.in_(ids_detalle))
+    detalles = db.exec(statement).all()
+    for detalle in detalles:
+        detalle.impreso = True
+    db.commit()
+    return True
+
 def cerrar_consumo_mesa(db: Session, id_consumo: int, id_empresa: int) -> Optional[ConsumoMesa]:
     """Cierra un consumo (prepara para facturación)."""
     consumo = obtener_consumo_por_id(db, id_consumo, id_empresa)
@@ -134,11 +158,49 @@ def cerrar_consumo_mesa(db: Session, id_consumo: int, id_empresa: int) -> Option
     db.refresh(consumo)
     return consumo
 
-def facturar_consumo_mesa(db: Session, id_consumo: int, id_empresa: int) -> Optional[ConsumoMesa]:
-    """Marca un consumo como facturado."""
+def facturar_consumo_mesa(
+    db: Session, 
+    id_consumo: int, 
+    id_empresa: int, 
+    usuario_actual: Usuario,
+    facturar_data: ConsumoMesaFacturarRequest
+) -> Optional[ConsumoMesa]:
+    """Marca un consumo como facturado y registra la venta en caja."""
     consumo = obtener_consumo_por_id(db, id_consumo, id_empresa)
     if not consumo or consumo.estado != "CERRADO":
         return None
+
+    # 1. Verificar sesión de caja abierta
+    sesion_caja = obtener_caja_abierta_por_usuario(db, usuario_actual)
+    if not sesion_caja:
+        raise ValueError("No tienes una caja abierta. Debes abrir caja para facturar.")
+
+    # 2. Preparar datos para registro de venta
+    articulos_vendidos = []
+    for detalle in consumo.detalles:
+        articulos_vendidos.append(ArticuloVendido(
+            id_articulo=detalle.id_articulo,
+            cantidad=detalle.cantidad,
+            precio_unitario=detalle.precio_unitario
+        ))
+
+    propina_a_cobrar = consumo.propina if facturar_data.cobrar_propina else 0.0
+
+    # 3. Registrar venta y movimiento (OMITIENDO STOCK porque ya se descontó al agregar)
+    registrar_venta_y_movimiento_caja(
+        db=db,
+        usuario_actual=usuario_actual,
+        id_sesion_caja=sesion_caja.id,
+        total_venta=consumo.total,
+        metodo_pago=facturar_data.metodo_pago,
+        articulos_vendidos=articulos_vendidos,
+        id_cliente=None, # Por ahora sin cliente específico en mesa
+        tipo_comprobante_solicitado="Ticket", # O configurable
+        omitir_stock=True,
+        propina=propina_a_cobrar,
+    )
+
+    # 4. Actualizar estado del consumo
 
     consumo.estado = "FACTURADO"
     db.commit()
@@ -170,6 +232,9 @@ def generar_ticket_consumo(db: Session, id_consumo: int, id_empresa: int, format
             } for detalle in consumo.detalles
         ],
         "total": consumo.total,
+        "propina": consumo.propina,
+        "porcentaje_propina": consumo.porcentaje_propina,
+        "total_con_propina": consumo.total + consumo.propina,
     }
 
     return ticket_data

@@ -36,8 +36,8 @@ interface MesasStore {
   fetchConsumos: () => Promise<void>;
   createConsumo: (data: ConsumoCreate) => Promise<ConsumoMesa | null>;
   addDetalleConsumo: (idConsumo: number, data: ConsumoDetalleCreate) => Promise<{ ok: boolean; error?: string }>;
-  cerrarConsumo: (idConsumo: number) => Promise<boolean>;
-  facturarConsumo: (idConsumo: number) => Promise<boolean>;
+  cerrarConsumo: (idConsumo: number, porcentajePropina?: number) => Promise<boolean>;
+  facturarConsumo: (idConsumo: number, metodoPago?: string, cobrarPropina?: boolean) => Promise<boolean>;
 
   // Acciones para Tickets
   generarTicket: (data: TicketRequest) => Promise<TicketResponse | null>;
@@ -281,10 +281,10 @@ export const useMesasStore = create<MesasStore>((set, get) => ({
     }
   },
 
-  cerrarConsumo: async (idConsumo: number) => {
+  cerrarConsumo: async (idConsumo: number, porcentajePropina: number = 0) => {
     set({ loading: true, error: null });
     try {
-      const response = await api.consumos.cerrar(idConsumo);
+      const response = await api.consumos.cerrar(idConsumo, porcentajePropina);
       if (response.success) {
         const consumo = get().consumos.find(c => c.id === idConsumo);
         if (consumo?.id_mesa) {
@@ -306,10 +306,10 @@ export const useMesasStore = create<MesasStore>((set, get) => ({
     }
   },
 
-  facturarConsumo: async (idConsumo: number) => {
+  facturarConsumo: async (idConsumo: number, metodoPago: string = 'Efectivo', cobrarPropina: boolean = true) => {
     set({ loading: true, error: null });
     try {
-      const response = await api.consumos.facturar(idConsumo);
+      const response = await api.consumos.facturar(idConsumo, metodoPago, cobrarPropina);
       if (response.success) {
         const consumo = get().consumos.find(c => c.id === idConsumo);
         if (consumo?.id_mesa) {

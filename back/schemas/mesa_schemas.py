@@ -35,10 +35,10 @@ class MesaRead(MesaBase):
 # ===================================================================
 
 class ConsumoMesaDetalleBase(BaseModel):
-    cantidad: float = Field(..., gt=0)
-    precio_unitario: float
-    descuento_aplicado: float = Field(default=0.0)
     id_articulo: int
+    cantidad: float
+    precio_unitario: float
+    descuento_aplicado: Optional[float] = 0.0
 
 class ConsumoMesaDetalleCreate(ConsumoMesaDetalleBase):
     pass
@@ -46,19 +46,57 @@ class ConsumoMesaDetalleCreate(ConsumoMesaDetalleBase):
 class ConsumoMesaDetalleRead(ConsumoMesaDetalleBase):
     id: int
     id_consumo_mesa: int
+    impreso: bool = False
 
     class Config:
         from_attributes = True
 
+# Schemas para Comandas Populated
+class CategoriaSimple(BaseModel):
+    nombre: str
+    class Config:
+        from_attributes = True
+
+class ArticuloSimple(BaseModel):
+    id: int
+    descripcion: str
+    categoria: Optional[CategoriaSimple] = None
+    class Config:
+        from_attributes = True
+
+class ConsumoSimple(BaseModel):
+    id: int
+    id_mesa: int
+    mesa: Optional[MesaRead] = None
+    class Config:
+        from_attributes = True
+
+class ConsumoMesaDetallePopulated(ConsumoMesaDetalleRead):
+    articulo: Optional[ArticuloSimple] = None
+    consumo: Optional[ConsumoSimple] = None
+
 class ConsumoMesaBase(BaseModel):
     total: float = Field(default=0.0)
+    propina: float = Field(default=0.0)
+    porcentaje_propina: float = Field(default=0.0)
     estado: str = Field(default="ABIERTO", description="Estado: ABIERTO, CERRADO, FACTURADO")
+
+class ConsumoMesaCierreRequest(BaseModel):
+    porcentaje_propina: float = Field(default=0.0, ge=0.0, description="Porcentaje de propina sugerido")
+
+class ConsumoMesaFacturarRequest(BaseModel):
+    metodo_pago: str = Field(default="Efectivo")
+    cobrar_propina: bool = Field(default=True)
+
+
 
 class ConsumoMesaCreate(ConsumoMesaBase):
     id_mesa: int
 
 class ConsumoMesaUpdate(BaseModel):
     total: Optional[float] = None
+    propina: Optional[float] = None
+    porcentaje_propina: Optional[float] = None
     estado: Optional[str] = None
     timestamp_cierre: Optional[datetime] = None
 

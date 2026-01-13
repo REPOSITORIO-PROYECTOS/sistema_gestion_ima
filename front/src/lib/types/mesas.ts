@@ -28,6 +28,8 @@ export interface ConsumoMesa {
   timestamp_inicio: string;
   timestamp_cierre?: string;
   total: number;
+  propina?: number;
+  porcentaje_propina?: number;
   estado: 'abierto' | 'cerrado' | 'facturado';
   id_mesa: number;
   id_usuario: number;
@@ -72,6 +74,9 @@ export interface TicketResponse {
     categoria?: string | null;
   }>;
   total: number;
+  propina?: number;
+  porcentaje_propina?: number;
+  total_con_propina?: number;
 }
 
 // Formularios

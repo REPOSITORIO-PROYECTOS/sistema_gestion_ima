@@ -24,7 +24,7 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
   const usuario = useAuthStore((state) => state.usuario);
   
   const [nombreUsuario, setNombreUsuario] = useState(usuario?.nombre_usuario || "");
-  const [llave, setLlave] = useState("");
+  // const [llave, setLlave] = useState(""); // ELIMINADO POR PEDIDO DEL USUARIO
   const [isLoading, setIsLoading] = useState(false);
   const [fechaActual, setFechaActual] = useState("");
   const [horaActual, setHoraActual] = useState("");
@@ -84,7 +84,7 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
     e.preventDefault();
 
     // Validamos que no se manden datos vacíos
-    if (!nombreUsuario.trim() || !saldoInicial.trim() || !llave.trim()) {
+    if (!nombreUsuario.trim() || !saldoInicial.trim()) {
       toast.error("Por favor, completá todos los campos.");
       return;
     }
@@ -107,25 +107,7 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
     setIsLoading(true);
 
     try {
-      // Paso 1: Validar la llave
-      const res = await fetch("https://sistema-ima.sistemataup.online/api/auth/validar-llave", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ 
-          llave,
-          saldo_inicial: saldoInicialLimpio,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        return toast.error(`⛔ ${data.detail || "Llave incorrecta."}`);
-      }
-
-      // Paso 2: Abrir la caja una vez validados
+      // Paso 2: Abrir la caja (Validación de llave eliminada por pedido)
       const abrirRes = await fetch("https://sistema-ima.sistemataup.online/api/caja/abrir", {
         method: "POST",
         headers: {
@@ -218,7 +200,7 @@ const handleImprimirCierre = async (idSesionCerrada: number) => {
 
   // Cerrar caja
   const handleCerrarCaja = async (imprimirDespues: boolean) => {
-    if (!nombreUsuario.trim() || !llave.trim()) {
+    if (!nombreUsuario.trim()) {
       toast.error("Por favor, completá todos los campos.");
       return;
     }
@@ -227,21 +209,7 @@ const handleImprimirCierre = async (idSesionCerrada: number) => {
     setIsLoading(true);
 
     try {
-      // Paso 1: Validar la llave (CON EL HEADER CORREGIDO)
-      const validarRes = await fetch("https://sistema-ima.sistemataup.online/api/auth/validar-llave", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`, // <-- LA CORRECCIÓN CLAVE
-        },
-        body: JSON.stringify({ llave }),
-      });
-      if (!validarRes.ok) {
-        const validarData = await validarRes.json();
-        throw new Error(validarData.detail || "Llave incorrecta.");
-      }
-
-      // Paso 2: Si la llave es válida, cerramos la caja
+      // Paso 2: Cerrar la caja
       const saldoFinalLimpio = limpiarMoneda(saldoFinalDeclarado);
       const efectivo = limpiarMoneda(saldoFinalEfectivo);
       const transferencias = limpiarMoneda(saldoFinalTransferencias);
@@ -273,7 +241,7 @@ const handleImprimirCierre = async (idSesionCerrada: number) => {
       // Limpiamos todo
       clearCaja();
       onCerrarCaja();
-      setLlave("");
+      // setLlave(""); // ELIMINADO
       setSaldoFinalDeclarado("");
       setSaldoFinalEfectivo("");
       setSaldoFinalBancario("");
@@ -365,19 +333,6 @@ const handleImprimirCierre = async (idSesionCerrada: number) => {
 
           {/* Separador visual */}
           <span className="block w-full h-px bg-border my-2"></span>
-
-          {/* --- CAMPOS COMUNES PARA ABRIR Y CERRAR --- */}
-          <div className="flex items-center justify-between gap-4">
-            <Label htmlFor="llave-maestra" className="text-right text-md md:text-lg">Llave Maestra</Label>
-            <Input 
-              id="llave-maestra"
-              type="password" 
-              value={llave} 
-              onChange={(e) => setLlave(e.target.value)} 
-              placeholder="Llave del día" 
-              className="w-full max-w-3/5" 
-            />
-          </div>
 
           <div className="flex items-center justify-between gap-4">
             <Label className="text-right sm:text-lg">Fecha</Label>

@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 from typing import List, Dict, Any
 
 # --- Módulos del Proyecto ---
-from back.modelos import ConfiguracionEmpresa, Usuario, Tercero, Venta, CajaMovimiento, VentaDetalle, Articulo
+from back.modelos import ConfiguracionEmpresa, Usuario, Tercero, Venta, CajaMovimiento, VentaDetalle, Articulo, StockMovimiento
 # Importamos el especialista de AFIP refactorizado
 from back.gestion.facturacion_afip import generar_factura_para_venta, generar_nota_credito_para_venta
 # Importamos los schemas que vamos a construir
@@ -203,6 +203,29 @@ def crear_nota_credito_para_anular(
     db.add(venta_original)
 
     # --- FIN DE LA CORRECCIÓN CLAVE ---
+
+    # --- 5. Devolución de Stock por Nota de Crédito ---
+    # Recorremos los items de la venta original para devolverlos al stock
+    if venta_original.items:
+        for item in venta_original.items:
+            articulo = item.articulo
+            if articulo and articulo.activo:
+                stock_anterior = articulo.stock_actual
+                articulo.stock_actual += item.cantidad
+                stock_nuevo = articulo.stock_actual
+                
+                mov_stock = StockMovimiento(
+                    tipo="NOTA_CREDITO",
+                    cantidad=item.cantidad,
+                    stock_anterior=stock_anterior,
+                    stock_nuevo=stock_nuevo,
+                    id_articulo=articulo.id,
+                    id_usuario=usuario_actual.id,
+                    id_venta_detalle=item.id,
+                    id_empresa=usuario_actual.id_empresa
+                )
+                db.add(mov_stock)
+                db.add(articulo)
 
     # El commit se hará en el router que llama a esta función.
     return resultado_afip_nc
