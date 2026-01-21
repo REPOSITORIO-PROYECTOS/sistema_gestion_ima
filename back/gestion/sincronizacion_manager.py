@@ -74,19 +74,33 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int) -> Di
     actualizados = 0
     filas_con_error = 0
     
+    # Set para rastrear los códigos que SÍ existen en el sheet
+    codigos_en_sheet = set()
+
     # 3. PROCESAR CADA FILA Y SINCRONIZAR
     for i, fila_sheet in enumerate(articulos_del_sheet):
+        # Depuración: Imprimir claves de la primera fila para verificar nombres de columnas
+        if i == 0:
+            print(f"DEBUG: Claves encontradas en la primera fila del Sheet: {list(fila_sheet.keys())}")
+
         try:
             # --- Lectura Segura de Columnas ---
-            # Usamos .get() para evitar errores si una columna no existe en el Sheet.
-            codigo_interno = fila_sheet.get('codigo_interno')
+            # Intentamos leer 'codigo_interno', si no existe probamos 'Código' o 'codigo'
+            raw_codigo = fila_sheet.get('codigo_interno') or fila_sheet.get('Código') or fila_sheet.get('codigo')
+            
+            # Normalización del código: convertir a string y quitar espacios
+            codigo_interno = str(raw_codigo).strip() if raw_codigo else None
+            
             descripcion = fila_sheet.get('descripcion')
             
             # Si el código o la descripción no existen, la fila es inválida.
             if not codigo_interno or not descripcion:
-                print(f"Error en fila {i+2}: 'codigo_interno' o 'descripcion' están vacíos. Saltando.")
+                print(f"Error en fila {i+2}: Código ('{raw_codigo}') o descripción vacíos. Saltando.")
                 filas_con_error += 1
                 continue
+
+            # Agregamos el código al set de códigos válidos (normalizado)
+            codigos_en_sheet.add(codigo_interno)
 
             # --- Lógica de UPSERT (Update or Insert) ---
             articulo_existente = db.exec(
@@ -136,6 +150,28 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int) -> Di
             print(f"Error fatal procesando la fila {i+2} ({fila_sheet.get('codigo_interno')}): {e}")
             filas_con_error += 1
             
+    # --- Lógica de Eliminación (Delete) ---
+    # Eliminar artículos que están en la DB pero NO en el Sheet
+    # Esto cumple con el requerimiento: "si no esta en el drive se tiene que borrar"
+    
+    # 1. Obtenemos todos los artículos de esta empresa
+    articulos_en_db = db.exec(
+        select(Articulo).where(Articulo.id_empresa == id_empresa_actual)
+    ).all()
+    
+    eliminados = 0
+    print(f"Verificando eliminaciones... Total en DB: {len(articulos_en_db)}. Total en Sheet (únicos): {len(codigos_en_sheet)}")
+    print(f"Muestra de códigos en Sheet: {list(codigos_en_sheet)[:10]}")
+    
+    for articulo in articulos_en_db:
+        # Normalizamos también el código de la DB para comparar manzanas con manzanas
+        codigo_db_normalizado = str(articulo.codigo_interno).strip()
+        
+        if codigo_db_normalizado not in codigos_en_sheet:
+            print(f"Eliminando artículo obsoleto (no encontrado en Sheet): DB='{codigo_db_normalizado}' Desc='{articulo.descripcion}'")
+            db.delete(articulo)
+            eliminados += 1
+
     # 4. GUARDAR TODOS LOS CAMBIOS EN LA BASE DE DATOS
     # El commit se hace una sola vez al final, haciendo la operación atómica.
     db.commit()
@@ -148,5 +184,6 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int) -> Di
         "leidos_de_sheet": len(articulos_del_sheet),
         "creados_en_db": creados,
         "actualizados_en_db": actualizados,
+        "eliminados_en_db": eliminados,
         "filas_con_error": filas_con_error
     }

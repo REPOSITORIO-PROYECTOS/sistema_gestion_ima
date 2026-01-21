@@ -286,6 +286,24 @@ def sincronizar_articulos_desde_sheets(db: Session, id_empresa_actual: int) -> D
             resumen["errores"] += 1
             continue
             
+    # --- BLOQUE DE ELIMINACIÓN (Nuevo) ---
+    print("--- Verificando eliminaciones de artículos obsoletos ---")
+    eliminados = 0
+    # Obtenemos los códigos que SÍ están en el sheet (ya procesados en articulos_sheets_unicos)
+    codigos_validos_sheet = set(articulos_sheets_unicos.keys())
+    
+    # Recorremos todos los artículos que teníamos en la DB al inicio
+    # Nota: articulos_db_dict tiene {codigo: objeto}
+    for codigo_db, articulo_db in articulos_db_dict.items():
+        # Normalizamos por seguridad, aunque ya deberían estar normalizados en el dict
+        if codigo_db not in codigos_validos_sheet:
+            print(f"Eliminando artículo obsoleto (no encontrado en Sheet): '{codigo_db}' - {articulo_db.descripcion}")
+            db.delete(articulo_db)
+            eliminados += 1
+            
+    resumen["eliminados"] = eliminados
+    # -------------------------------------
+
     # 6. COMMIT FINAL DE LA TRANSACCIÓN (Sin cambios)
     try:
         db.commit()

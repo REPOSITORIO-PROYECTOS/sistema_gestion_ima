@@ -80,10 +80,15 @@ def api_get_articulo(
     db: Session = Depends(get_db)
 ):
     """Obtiene un artículo específico por su ID, verificando que pertenezca a la empresa del usuario."""
-    articulo_db = articulos_manager.obtener_articulo_por_id(db, current_user.id_empresa, id_articulo)
-    if not articulo_db:
-        raise HTTPException(status_code=404, detail=f"Artículo con ID {id_articulo} no encontrado en su empresa.")
-    return articulo_db
+    try:
+        articulo_db = articulos_manager.obtener_articulo_por_id(db, current_user.id_empresa, id_articulo)
+        if not articulo_db:
+            raise HTTPException(status_code=404, detail=f"Artículo con ID {id_articulo} no encontrado en su empresa.")
+        return articulo_db
+    except ValidationError as e:
+        print("!!!!!!!!!!!!!! ERROR DE VALIDACIÓN DE PYDANTIC (GET ARTICULO) !!!!!!!!!!!!!!")
+        print(e.json(indent=2))
+        raise HTTPException(status_code=500, detail="Error de validación interna al obtener el artículo.")
 
 # ===================================================================
 # === ENDPOINTS DE ESCRITURA (CREATE, UPDATE, DELETE) - Rutas mantenidas

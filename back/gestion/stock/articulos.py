@@ -42,7 +42,11 @@ def obtener_articulo_por_id(id_empresa: int, db: Session, articulo_id: int) -> O
     """
     CORREGIDO: Obtiene un artículo específico por su ID, asegurando que pertenezca a la empresa.
     """
-    statement = select(Articulo).where(Articulo.id == articulo_id, Articulo.id_empresa == id_empresa)
+    statement = (
+        select(Articulo)
+        .where(Articulo.id == articulo_id, Articulo.id_empresa == id_empresa)
+        .options(selectinload(Articulo.codigos))
+    )
     return db.exec(statement).first() # Usamos .first() para obtener solo uno.
 
 def buscar_articulo_por_codigo(db: Session, id_empresa_actual: int, codigo: str) -> Optional[Articulo]:

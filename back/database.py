@@ -20,7 +20,12 @@ if not all([DB_USER, DB_PASSWORD, DB_HOST, DB_NAME]):
 # Línea corregida
 DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
-engine = create_engine(DATABASE_URL, echo=True)
+engine = create_engine(
+    DATABASE_URL, 
+    echo=True,
+    pool_pre_ping=True,  # Verifica la conexión antes de usarla (evita "MySQL server has gone away")
+    pool_recycle=3600    # Recicla conexiones cada hora para prevenir timeouts
+)
 
 # --- ESTA ES LA ADICIÓN CLAVE ---
 # Creamos una "Fábrica de Sesiones" que puede ser importada y usada por scripts externos.
