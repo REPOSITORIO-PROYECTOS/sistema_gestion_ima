@@ -70,11 +70,11 @@ def eliminar_mesa(db: Session, id_mesa: int, id_empresa: int) -> bool:
 # ===================================================================
 
 def obtener_consumos_abiertos_por_mesa(db: Session, id_mesa: int, id_empresa: int) -> List[ConsumoMesa]:
-    """Obtiene consumos abiertos de una mesa."""
+    """Obtiene consumos abiertos o cerrados (no facturados) de una mesa."""
     statement = select(ConsumoMesa).where(
         ConsumoMesa.id_mesa == id_mesa,
         ConsumoMesa.id_empresa == id_empresa,
-        ConsumoMesa.estado == "ABIERTO"
+        ConsumoMesa.estado.in_(["ABIERTO", "CERRADO"])
     ).options(selectinload(ConsumoMesa.detalles).selectinload(ConsumoMesaDetalle.articulo))
     return db.exec(statement).all()
 
@@ -83,7 +83,10 @@ def obtener_consumo_por_id(db: Session, id_consumo: int, id_empresa: int) -> Opt
     statement = select(ConsumoMesa).where(
         ConsumoMesa.id == id_consumo,
         ConsumoMesa.id_empresa == id_empresa
-    ).options(selectinload(ConsumoMesa.detalles).selectinload(ConsumoMesaDetalle.articulo))
+    ).options(
+        selectinload(ConsumoMesa.detalles).selectinload(ConsumoMesaDetalle.articulo),
+        selectinload(ConsumoMesa.usuario)
+    )
     return db.exec(statement).first()
 
 def crear_consumo_mesa(db: Session, consumo_data: ConsumoMesaCreate, id_usuario: int, id_empresa: int) -> ConsumoMesa:
@@ -146,14 +149,20 @@ def marcar_comanda_como_impresa(db: Session, ids_detalle: List[int]) -> bool:
     db.commit()
     return True
 
-def cerrar_consumo_mesa(db: Session, id_consumo: int, id_empresa: int) -> Optional[ConsumoMesa]:
+def cerrar_consumo_mesa(db: Session, id_consumo: int, id_empresa: int, porcentaje_propina: float = 0.0) -> Optional[ConsumoMesa]:
     """Cierra un consumo (prepara para facturación)."""
     consumo = obtener_consumo_por_id(db, id_consumo, id_empresa)
     if not consumo or consumo.estado != "ABIERTO":
         return None
 
+    # Calcular propina
+    propina_monto = (consumo.total * porcentaje_propina) / 100.0
+
     consumo.estado = "CERRADO"
     consumo.timestamp_cierre = datetime.utcnow()
+    consumo.porcentaje_propina = porcentaje_propina
+    consumo.propina = propina_monto
+    
     db.commit()
     db.refresh(consumo)
     return consumo
@@ -221,6 +230,7 @@ def generar_ticket_consumo(db: Session, id_consumo: int, id_empresa: int, format
     # Por ahora, devolver datos básicos
     ticket_data = {
         "mesa_numero": consumo.mesa.numero,
+        "mozo": consumo.usuario.nombre_usuario if consumo.usuario else "Desconocido",
         "timestamp": consumo.timestamp_inicio.isoformat(),
         "detalles": [
             {
@@ -229,6 +239,7 @@ def generar_ticket_consumo(db: Session, id_consumo: int, id_empresa: int, format
                 "precio_unitario": detalle.precio_unitario,
                 "subtotal": detalle.cantidad * detalle.precio_unitario,
                 "categoria": (detalle.articulo.categoria.nombre if detalle.articulo and detalle.articulo.categoria else None),
+                "observacion": detalle.observacion,
             } for detalle in consumo.detalles
         ],
         "total": consumo.total,

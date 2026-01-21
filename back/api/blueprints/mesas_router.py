@@ -1,7 +1,7 @@
 # back/api/blueprints/mesas_router.py
 # Endpoints para gestión de mesas y consumos
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlmodel import Session
 from typing import List
 
@@ -19,7 +19,7 @@ from back.schemas.mesa_schemas import (
     ConsumoMesaCreate, ConsumoMesaUpdate, ConsumoMesaRead,
     ConsumoMesaDetalleCreate, TicketMesaRequest, TicketResponse,
     ConsumoMesaCierreRequest, ConsumoMesaFacturarRequest,
-    ConsumoMesaDetallePopulated
+    ConsumoMesaDetallePopulated, MarcarImpresoRequest
 )
 from back.schemas.caja_schemas import RespuestaGenerica
 
@@ -168,11 +168,18 @@ def api_cerrar_consumo(
 @router.put("/consumo/{consumo_id}/facturar", response_model=ConsumoMesaRead)
 def api_facturar_consumo(
     consumo_id: int,
+    facturar_data: ConsumoMesaFacturarRequest,
     current_user: Usuario = Depends(obtener_usuario_actual),
     db: Session = Depends(get_db)
 ):
     """Marca un consumo como facturado."""
-    consumo = mesas_manager.facturar_consumo_mesa(db, consumo_id, current_user.id_empresa)
+    consumo = mesas_manager.facturar_consumo_mesa(
+        db, 
+        consumo_id, 
+        current_user.id_empresa, 
+        current_user, 
+        facturar_data
+    )
     if not consumo:
         raise HTTPException(status_code=400, detail="No se pudo facturar el consumo")
     return consumo
@@ -209,11 +216,11 @@ def api_get_comandas_pendientes(
 
 @router.post("/comandas/marcar_impreso", response_model=RespuestaGenerica)
 def api_marcar_comandas_impresas(
-    ids_detalles: List[int],
+    request: MarcarImpresoRequest,
     current_user: Usuario = Depends(obtener_usuario_actual),
     db: Session = Depends(get_db)
 ):
     """Marca detalles como impresos."""
-    mesas_manager.marcar_comanda_como_impresa(db, ids_detalles)
+    mesas_manager.marcar_comanda_como_impresa(db, request.ids_detalles)
     return RespuestaGenerica(mensaje="Detalles marcados como impresos")
 

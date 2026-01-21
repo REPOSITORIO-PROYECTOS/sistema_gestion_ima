@@ -131,6 +131,17 @@ export default function MesasPage() {
     return () => clearInterval(interval);
   }, [fetchMesas, fetchMesaLogs, fetchConsumos]);
 
+  // Sincronizar selectedConsumo cuando cambia la lista de consumos (global state)
+  useEffect(() => {
+    if (selectedConsumo) {
+      const updatedConsumo = consumos.find(c => c.id === selectedConsumo.id);
+      // Si encontramos una versión actualizada y es diferente a la actual
+      if (updatedConsumo && updatedConsumo !== selectedConsumo) {
+        setSelectedConsumo(updatedConsumo);
+      }
+    }
+  }, [consumos, selectedConsumo]);
+
   // Función para validar número de mesa en tiempo real
   const validarNumeroMesa = (numero: string, excludeId?: number): string | null => {
     const num = parseInt(numero);

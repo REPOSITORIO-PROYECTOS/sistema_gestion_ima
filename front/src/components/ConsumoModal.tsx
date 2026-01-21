@@ -28,11 +28,20 @@ export const ConsumoModal: React.FC<ConsumoModalProps> = ({ isOpen, onClose, con
   const [hasFetchedArticulos, setHasFetchedArticulos] = useState(false);
   const [selectedArticuloId, setSelectedArticuloId] = useState<string>('');
   const [cantidad, setCantidad] = useState<number>(1);
+  const [observacion, setObservacion] = useState<string>('');
   const [porcentajePropina, setPorcentajePropina] = useState<number>(10);
   const [metodoPago, setMetodoPago] = useState<string>('Efectivo');
   const [cobrarPropina, setCobrarPropina] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState(false);
   const [isCheckoutMode, setIsCheckoutMode] = useState(false);
+
+  // Estado local para carrito de pedidos antes de enviar
+  const [localItems, setLocalItems] = useState<Array<{
+    id_articulo: number;
+    cantidad: number;
+    observacion?: string;
+    articulo: Articulo; // Para mostrar detalles
+  }>>([]);
 
   const fetchArticulos = React.useCallback(async () => {
     if (!usuario?.id_empresa) {
@@ -84,41 +93,49 @@ export const ConsumoModal: React.FC<ConsumoModalProps> = ({ isOpen, onClose, con
       return;
     }
 
-    setSubmitting(true);
-    const result = await addDetalleConsumo(consumo.id, {
+    // Agregar a la lista local (Carrito)
+    setLocalItems(prev => [...prev, {
       id_articulo: parseInt(selectedArticuloId),
       cantidad,
-      precio_unitario: latest.precio_venta,
-      descuento_aplicado: 0,
-    });
+      observacion: observacion || undefined,
+      articulo: latest
+    }]);
+
+    toast.success('Agregado al pedido (Pendiente de envío).');
+    setSelectedArticuloId('');
+    setCantidad(1);
+    setObservacion('');
+  };
+
+  const handleEnviarPedido = async () => {
+    if (localItems.length === 0) return;
+
+    setSubmitting(true);
+    let errorCount = 0;
+
+    // Enviar cada item
+    for (const item of localItems) {
+      const result = await addDetalleConsumo(consumo!.id, {
+        id_articulo: item.id_articulo,
+        cantidad: item.cantidad,
+        precio_unitario: item.articulo.precio_venta,
+        descuento_aplicado: 0,
+        observacion: item.observacion
+      });
+      if (!result.ok) errorCount++;
+    }
+
     setSubmitting(false);
-    if (result.ok) {
-      toast.success('Artículo agregado al consumo.');
 
-      // Imprimir automáticamente comanda individual
-      const ticketItem: TicketResponse = {
-        mesa_numero: consumo.mesa?.numero || 0,
-        timestamp: new Date().toISOString(),
-        detalles: [{
-          articulo: articulo.descripcion,
-          cantidad: cantidad,
-          precio_unitario: articulo.precio_venta,
-          subtotal: cantidad * articulo.precio_venta,
-          categoria: (articulo as any).categoria?.nombre || null // Intentar obtener categoría si existe
-        }],
-        total: cantidad * articulo.precio_venta,
-        propina: 0,
-        porcentaje_propina: 0,
-        total_con_propina: cantidad * articulo.precio_venta
-      };
-      routeToDepartments(ticketItem);
-      toast.success('Comanda enviada automáticamente.');
-
-      setSelectedArticuloId('');
-      setCantidad(1);
-      fetchConsumos(); // Para actualizar el consumo en el store
+    if (errorCount === 0) {
+      toast.success("Pedido enviado a cocina correctamente");
+      setLocalItems([]);
+      fetchConsumos();
     } else {
-      toast.error(result.error || error || 'Error al agregar artículo.');
+      toast.error(`Se enviaron algunos items, pero ${errorCount} fallaron.`);
+      // Opcional: mantener los fallidos en localItems? Por ahora limpiamos todo o refrescamos
+      fetchConsumos();
+      setLocalItems([]);
     }
   };
 
@@ -144,6 +161,12 @@ export const ConsumoModal: React.FC<ConsumoModalProps> = ({ isOpen, onClose, con
       const success = await facturarConsumo(consumo.id, metodoPago, cobrarPropina);
       setSubmitting(false);
       if (success) {
+        // Imprimir Ticket al facturar
+        const ticket = await generarTicket({ id_consumo_mesa: consumo.id, formato: 'ticket' });
+        if (ticket) {
+          const html = buildTicketHtml("TICKET DE VENTA", ticket);
+          printHtml(html);
+        }
         toast.success('Consumo facturado exitosamente.');
         onClose();
       } else {
@@ -174,227 +197,271 @@ export const ConsumoModal: React.FC<ConsumoModalProps> = ({ isOpen, onClose, con
   const handleCheckout = async () => {
     if (!consumo) return;
     const totalConPropina = totalConsumo * (1 + porcentajePropina / 100);
-    
+
     if (confirm(`¿Confirmar cobro total de $${totalConPropina.toFixed(2)}?`)) {
-        setSubmitting(true);
-        // 1. Cerrar Consumo (Calcula totales y propina)
-        const closed = await cerrarConsumo(consumo.id, porcentajePropina);
-        if (!closed) {
-             setSubmitting(false);
-             toast.error(error || 'Error al cerrar consumo.');
-             return;
-        }
-        
-        // 2. Facturar Consumo (Genera venta y movimiento de caja)
-        // Nota: facturarConsumo usa el estado actualizado en el store, pero como acabamos de llamar a cerrarConsumo
-        // y este actualiza el store, deberíamos estar bien. Sin embargo, para mayor seguridad,
-        // confiamos en que cerrarConsumo devolvió true.
-        const billed = await facturarConsumo(consumo.id, metodoPago, cobrarPropina);
+      setSubmitting(true);
+      // 1. Cerrar Consumo (Calcula totales y propina)
+      const closed = await cerrarConsumo(consumo.id, porcentajePropina);
+      if (!closed) {
         setSubmitting(false);
-        
-        if (billed) {
-             toast.success('Cobro registrado y mesa liberada.');
-             onClose();
-        } else {
-             toast.error(error || 'Error al facturar consumo.');
-        }
+        toast.error(error || 'Error al cerrar consumo.');
+        return;
+      }
+
+      // 2. Facturar Consumo (Genera venta y movimiento de caja)
+      // Nota: facturarConsumo usa el estado actualizado en el store, pero como acabamos de llamar a cerrarConsumo
+      // y este actualiza el store, deberíamos estar bien. Sin embargo, para mayor seguridad,
+      // confiamos en que cerrarConsumo devolvió true.
+      const billed = await facturarConsumo(consumo.id, metodoPago, cobrarPropina);
+      setSubmitting(false);
+
+      if (billed) {
+        toast.success('Cobro registrado y mesa liberada.');
+        onClose();
+      } else {
+        toast.error(error || 'Error al facturar consumo.');
+      }
     }
   };
 
-  const totalConsumo = consumo?.detalles?.reduce((sum, detalle) => sum + (detalle.cantidad * detalle.precio_unitario), 0) || 0;
+  const totalConsumo = (consumo?.detalles?.reduce((sum, detalle) => sum + (detalle.cantidad * detalle.precio_unitario), 0) || 0) +
+    (localItems.reduce((sum, item) => sum + (item.cantidad * item.articulo.precio_venta), 0));
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="w-full max-w-[95vw] sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Consumo de Mesa {consumo?.mesa?.numero}</DialogTitle>
           <DialogDescription>
             Detalles del consumo actual. Total: ${totalConsumo.toFixed(2)}
+            {localItems.length > 0 && <span className="text-yellow-600 ml-2 font-medium">(Hay items pendientes)</span>}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           {consumo?.estado === 'abierto' && !isCheckoutMode && (
-            <div className="flex items-end gap-2">
-              <div className="grid gap-1.5 flex-grow">
-                <Label htmlFor="articulo">Artículo</Label>
-                <Select onValueChange={setSelectedArticuloId} value={selectedArticuloId}>
-                  <SelectTrigger id="articulo">
-                    <SelectValue placeholder="Selecciona un artículo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {articulos.map((articulo) => (
-                      <SelectItem key={articulo.id} value={String(articulo.id)}>
-                        {articulo.descripcion} - ${articulo.precio_venta.toFixed(2)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <div className="grid gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-end gap-2">
+                <div className="grid gap-1.5 flex-grow w-full">
+                  <Label htmlFor="articulo">Artículo</Label>
+                  <Select onValueChange={setSelectedArticuloId} value={selectedArticuloId}>
+                    <SelectTrigger id="articulo" className="w-full">
+                      <SelectValue placeholder="Selecciona un artículo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {articulos.map((articulo) => (
+                        <SelectItem key={articulo.id} value={String(articulo.id)}>
+                          {articulo.descripcion} - ${articulo.precio_venta.toFixed(2)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="grid gap-1.5 w-24">
-                <Label htmlFor="cantidad">Cantidad</Label>
-                <Input
-                  id="cantidad"
-                  type="number"
-                  value={cantidad}
-                  onChange={(e) => setCantidad(parseInt(e.target.value) || 1)}
-                  min="1"
-                />
+
+              <div className="flex flex-col sm:flex-row sm:items-end gap-2">
+                <div className="grid gap-1.5 flex-grow w-full">
+                  <Label htmlFor="observacion">Observación</Label>
+                  <Input
+                    id="observacion"
+                    value={observacion}
+                    onChange={(e) => setObservacion(e.target.value)}
+                    placeholder="Opcional: Sin cebolla, punto de cocción..."
+                  />
+                </div>
+                <div className="flex gap-2 w-full sm:w-auto">
+                  <div className="grid gap-1.5 flex-grow sm:w-24">
+                    <Label htmlFor="cantidad">Cantidad</Label>
+                    <Input
+                      id="cantidad"
+                      type="number"
+                      value={cantidad}
+                      onChange={(e) => setCantidad(parseInt(e.target.value) || 1)}
+                      min="1"
+                    />
+                  </div>
+                  <Button onClick={handleAddDetalle} disabled={submitting || !selectedArticuloId || cantidad <= 0 || isLoadingArticulos} className="mb-[1px]">
+                    {submitting || isLoadingArticulos ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                    <span className="sm:hidden ml-2">Añadir</span>
+                  </Button>
+                </div>
               </div>
-              <Button onClick={handleAddDetalle} disabled={submitting || !selectedArticuloId || cantidad <= 0 || isLoadingArticulos}>
-                {submitting || isLoadingArticulos ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                Añadir
-              </Button>
             </div>
           )}
 
           <h3 className="text-lg font-semibold mt-4">Artículos Consumidos</h3>
-          {consumo?.detalles && consumo.detalles.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Artículo</TableHead>
-                  <TableHead>Cantidad</TableHead>
-                  <TableHead>Precio Unitario</TableHead>
-                  <TableHead className="text-right">Subtotal</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {consumo.detalles.map((detalle) => (
-                  <TableRow key={detalle.id}>
-                    <TableCell>{detalle.articulo?.descripcion}</TableCell>
-                    <TableCell>{detalle.cantidad}</TableCell>
-                    <TableCell>${detalle.precio_unitario.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">${(detalle.cantidad * detalle.precio_unitario).toFixed(2)}</TableCell>
+          <div className="overflow-x-auto rounded-md border">
+            {(consumo?.detalles && consumo.detalles.length > 0) || localItems.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Artículo</TableHead>
+                    <TableHead>Cant.</TableHead>
+                    <TableHead>Precio</TableHead>
+                    <TableHead className="text-right">Subtotal</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <p className="text-gray-500">No hay artículos en este consumo.</p>
-          )}
+                </TableHeader>
+                <TableBody>
+                  {/* Items guardados */}
+                  {consumo?.detalles?.map((detalle) => (
+                    <TableRow key={detalle.id}>
+                      <TableCell className="whitespace-nowrap">
+                        {detalle.articulo?.descripcion}
+                        {detalle.observacion && <div className="text-xs text-gray-500 italic">({detalle.observacion})</div>}
+                      </TableCell>
+                      <TableCell>{detalle.cantidad}</TableCell>
+                      <TableCell>${detalle.precio_unitario.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">${(detalle.cantidad * detalle.precio_unitario).toFixed(2)}</TableCell>
+                    </TableRow>
+                  ))}
+                  {/* Items pendientes (local) */}
+                  {localItems.map((item, index) => (
+                    <TableRow key={`local-${index}`} className="bg-yellow-50">
+                      <TableCell className="whitespace-nowrap font-medium text-yellow-700">
+                        {item.articulo.descripcion} <span className="text-xs bg-yellow-200 px-1 rounded ml-1">Pendiente</span>
+                        {item.observacion && <div className="text-xs text-yellow-600 italic">({item.observacion})</div>}
+                      </TableCell>
+                      <TableCell className="text-yellow-700">{item.cantidad}</TableCell>
+                      <TableCell className="text-yellow-700">${item.articulo.precio_venta.toFixed(2)}</TableCell>
+                      <TableCell className="text-right text-yellow-700">${(item.cantidad * item.articulo.precio_venta).toFixed(2)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-gray-500 p-4 text-center">No hay artículos en este consumo.</p>
+            )}
+          </div>
 
           {/* Seccion de Propina (Solo si está abierto) */}
           {consumo?.estado === 'abierto' && (
-             <div className="flex items-center justify-end gap-4 mt-4 p-2 bg-gray-50 rounded-lg border border-gray-100">
-                <Label htmlFor="propina" className="font-medium">Propina Sugerida (%):</Label>
-                <div className="flex items-center gap-2">
-                  <Input 
-                    id="propina"
-                    type="number" 
-                    min="0" 
-                    max="100"
-                    className="w-20 text-right"
-                    value={porcentajePropina}
-                    onChange={(e) => setPorcentajePropina(parseFloat(e.target.value) || 0)}
-                  />
-                  <span className="text-gray-600 font-semibold min-w-[80px] text-right">
-                    ${((totalConsumo * porcentajePropina) / 100).toFixed(2)}
-                  </span>
-                </div>
-             </div>
+            <div className="flex flex-col sm:flex-row items-center justify-end gap-4 mt-4 p-2 bg-gray-50 rounded-lg border border-gray-100">
+              <Label htmlFor="propina" className="font-medium">Propina Sugerida (%):</Label>
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <Input
+                  id="propina"
+                  type="number"
+                  min="0"
+                  max="100"
+                  className="w-20 text-right"
+                  value={porcentajePropina}
+                  onChange={(e) => setPorcentajePropina(parseFloat(e.target.value) || 0)}
+                />
+                <span className="text-gray-600 font-semibold min-w-[80px] text-right">
+                  ${((totalConsumo * porcentajePropina) / 100).toFixed(2)}
+                </span>
+              </div>
+            </div>
           )}
 
           {/* Seccion de Facturación (Si está cerrado O estamos en modo checkout) */}
           {(consumo?.estado === 'cerrado' || isCheckoutMode) && (
-             <div className="flex flex-col gap-3 mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                <h4 className="font-semibold text-blue-900">Datos para Facturación</h4>
-                <div className="flex flex-wrap items-center gap-6">
-                    <div className="flex items-center gap-2">
-                        <Label htmlFor="metodoPago" className="text-blue-800">Método de Pago:</Label>
-                        <Select value={metodoPago} onValueChange={setMetodoPago}>
-                            <SelectTrigger className="w-[140px] bg-white">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Efectivo">Efectivo</SelectItem>
-                                <SelectItem value="Tarjeta">Tarjeta</SelectItem>
-                                <SelectItem value="Transferencia">Transferencia</SelectItem>
-                                <SelectItem value="QR">QR / Billetera</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                        <input 
-                            type="checkbox" 
-                            id="cobrarPropina" 
-                            checked={cobrarPropina} 
-                            onChange={(e) => setCobrarPropina(e.target.checked)}
-                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <Label htmlFor="cobrarPropina" className="text-blue-800 cursor-pointer">
-                            Cobrar Propina 
-                            {(consumo?.propina || porcentajePropina > 0) ? ` ($${consumo?.propina ? consumo.propina.toFixed(2) : ((totalConsumo * porcentajePropina) / 100).toFixed(2)})` : ''}
-                        </Label>
-                    </div>
-
-                    <div className="ml-auto font-bold text-lg text-blue-900">
-                        Total a Cobrar: $
-                        {(
-                            (consumo?.estado === 'cerrado' ? (consumo?.total || 0) : totalConsumo) + 
-                            (cobrarPropina ? (consumo?.propina || (totalConsumo * porcentajePropina / 100)) : 0)
-                        ).toFixed(2)}
-                    </div>
+            <div className="flex flex-col gap-3 mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
+              <h4 className="font-semibold text-blue-900">Datos para Facturación</h4>
+              <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-4 sm:gap-6">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <Label htmlFor="metodoPago" className="text-blue-800 whitespace-nowrap">Método de Pago:</Label>
+                  <Select value={metodoPago} onValueChange={setMetodoPago}>
+                    <SelectTrigger className="w-full sm:w-[140px] bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Efectivo">Efectivo</SelectItem>
+                      <SelectItem value="Tarjeta">Tarjeta</SelectItem>
+                      <SelectItem value="Transferencia">Transferencia</SelectItem>
+                      <SelectItem value="QR">QR / Billetera</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                {isCheckoutMode && (
-                    <div className="flex justify-end gap-2 mt-2">
-                        <Button variant="outline" onClick={() => setIsCheckoutMode(false)}>Cancelar</Button>
-                        <Button onClick={handleCheckout} disabled={submitting}>Confirmar Cobro</Button>
-                    </div>
-                )}
-             </div>
-          )}
-        </div>
-     <div className="flex justify-between items-center mt-4 border-t pt-4">
-        {/* Grupo Izquierda: Acciones de Impresión */}
-        <div className="flex gap-2">
-          <Button variant="secondary" size="sm" onClick={handleImprimirComanda}>
-            <ChefHat className="h-4 w-4 mr-2" />
-            Marcha (Cocina)
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleImprimirPrecuenta}>
-            <FileText className="h-4 w-4 mr-2" />
-            Pre-cuenta
-          </Button>
-        </div>
 
-        {/* Grupo Derecha: Cerrar/Facturar */}
-        <div className="flex gap-2">
-           {consumo?.estado === 'abierto' && !isCheckoutMode && (
-             <>
-                <Button variant="destructive" onClick={handleCerrarConsumo}>
-                    <X className="h-4 w-4 mr-2" />
-                    Cerrar Mesa
-                </Button>
-                <Button onClick={() => setIsCheckoutMode(true)} className="bg-green-600 hover:bg-green-700">
-                    <Receipt className="h-4 w-4 mr-2" />
-                    Cobrar Ahora
-                </Button>
-             </>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="cobrarPropina"
+                    checked={cobrarPropina}
+                    onChange={(e) => setCobrarPropina(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <Label htmlFor="cobrarPropina" className="text-blue-800 cursor-pointer select-none">
+                    Cobrar Propina
+                    {(consumo?.propina || porcentajePropina > 0) ? ` ($${consumo?.propina ? consumo.propina.toFixed(2) : ((totalConsumo * porcentajePropina) / 100).toFixed(2)})` : ''}
+                  </Label>
+                </div>
+
+                <div className="ml-auto font-bold text-lg text-blue-900 w-full sm:w-auto text-right">
+                  Total a Cobrar: $
+                  {(
+                    (consumo?.estado === 'cerrado' ? (consumo?.total || 0) : totalConsumo) +
+                    (cobrarPropina ? (consumo?.propina || (totalConsumo * porcentajePropina / 100)) : 0)
+                  ).toFixed(2)}
+                </div>
+              </div>
+              {isCheckoutMode && (
+                <div className="flex justify-end gap-2 mt-2 w-full">
+                  <Button variant="outline" onClick={() => setIsCheckoutMode(false)} className="flex-1 sm:flex-none">Cancelar</Button>
+                  <Button onClick={handleCheckout} disabled={submitting} className="flex-1 sm:flex-none">Confirmar Cobro</Button>
+                </div>
+              )}
+            </div>
           )}
-          {consumo?.estado === 'cerrado' && (
-            <Button onClick={handleFacturarConsumo} disabled={submitting}>
-              <Receipt className="h-4 w-4 mr-2" />
-              Facturar Consumo
-            </Button>
-          )}
-          {(consumo?.estado === 'cerrado' || consumo?.estado === 'facturado') && (
-            <Button onClick={async () => {
-              if (consumo) {
-                const ticket = await generarTicket({ id_consumo_mesa: consumo.id, formato: 'ticket' });
-                if (ticket) {
-                  onTicketGenerated(ticket);
-                }
-              }
-            }} disabled={submitting}>
-              <Receipt className="h-4 w-4 mr-2" />
-              Generar Ticket
-            </Button>
-          )}
-          <Button variant="ghost" onClick={onClose}>Cerrar</Button>
         </div>
-      </div>
-    </DialogContent>
+        <div className="flex flex-col-reverse sm:flex-row justify-between items-center gap-4 mt-4 border-t pt-4">
+          {/* Grupo Izquierda: Acciones de Impresión */}
+          <div className="flex gap-2 w-full sm:w-auto justify-center sm:justify-start">
+            {localItems.length > 0 ? (
+              <Button onClick={handleEnviarPedido} disabled={submitting} className="flex-1 sm:flex-none bg-orange-600 hover:bg-orange-700 text-white">
+                <ChefHat className="h-4 w-4 mr-2" />
+                <span className="sm:inline">Enviar Pedido ({localItems.length})</span>
+              </Button>
+            ) : (
+              <Button variant="secondary" size="sm" onClick={handleImprimirComanda} className="flex-1 sm:flex-none">
+                <ChefHat className="h-4 w-4 mr-2" />
+                <span className="sm:inline">Reimprimir Comanda</span>
+              </Button>
+            )}
+
+            <Button variant="outline" size="sm" onClick={handleImprimirPrecuenta} className="flex-1 sm:flex-none">
+              <FileText className="h-4 w-4 mr-2" />
+              <span className="sm:inline">Pre-cuenta</span>
+            </Button>
+          </div>
+
+          {/* Grupo Derecha: Cerrar/Facturar */}
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            {consumo?.estado === 'abierto' && !isCheckoutMode && (
+              <>
+                <Button variant="destructive" onClick={handleCerrarConsumo} className="w-full sm:w-auto">
+                  <X className="h-4 w-4 mr-2" />
+                  Cerrar Mesa
+                </Button>
+                <Button onClick={() => setIsCheckoutMode(true)} className="bg-green-600 hover:bg-green-700 w-full sm:w-auto">
+                  <Receipt className="h-4 w-4 mr-2" />
+                  Cobrar Ahora
+                </Button>
+              </>
+            )}
+            {consumo?.estado === 'cerrado' && (
+              <Button onClick={handleFacturarConsumo} disabled={submitting} className="w-full sm:w-auto">
+                <Receipt className="h-4 w-4 mr-2" />
+                Facturar Consumo
+              </Button>
+            )}
+            {(consumo?.estado === 'cerrado' || consumo?.estado === 'facturado') && (
+              <Button onClick={async () => {
+                if (consumo) {
+                  const ticket = await generarTicket({ id_consumo_mesa: consumo.id, formato: 'ticket' });
+                  if (ticket) {
+                    onTicketGenerated(ticket);
+                  }
+                }
+              }} disabled={submitting} className="w-full sm:w-auto">
+                <Receipt className="h-4 w-4 mr-2" />
+                Generar Ticket
+              </Button>
+            )}
+            <Button variant="ghost" onClick={onClose} className="w-full sm:w-auto">Cerrar</Button>
+          </div>
+        </div>
+      </DialogContent>
     </Dialog>
   );
 };

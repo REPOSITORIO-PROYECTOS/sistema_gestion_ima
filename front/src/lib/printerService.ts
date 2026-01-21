@@ -1,19 +1,72 @@
 import type { TicketResponse } from '@/lib/types/mesas';
 
 export const buildTicketHtml = (titulo: string, ticket: TicketResponse, detalles?: TicketResponse['detalles']) => {
+  const isComanda = titulo.toLowerCase().includes('comanda') || titulo.toLowerCase().includes('pedido');
   const fecha = new Date(ticket.timestamp).toLocaleString('es-AR');
-  const rows = (detalles ?? ticket.detalles)
+  const items = detalles ?? ticket.detalles;
+
+  if (isComanda) {
+    // Formato Comanda (55mm, sin precios, solo operativo)
+    const rows = items.map(d => `
+      <div style="border-bottom: 1px dashed #000; padding: 5px 0;">
+        <div style="display:flex; justify-content:space-between; align-items: flex-start; font-weight:bold; font-size:14px;">
+          <span style="flex: 1; margin-right: 5px;">${d.articulo}</span>
+          <span style="white-space: nowrap;">x ${d.cantidad}</span>
+        </div>
+        ${d.observacion ? `<div style="font-size:12px; font-weight:bold; margin-top:2px; padding-left: 5px;">** ${d.observacion} **</div>` : ''}
+      </div>
+    `).join('');
+
+    return `<!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>${titulo}</title>
+        <style>
+          body { font-family: 'Courier New', monospace; margin: 0; padding: 0; background: #fff; }
+          .ticket { width: 55mm; margin: 0; padding: 2mm; box-sizing: border-box; }
+          h1 { font-size: 16px; margin: 0 0 5px; text-align: center; text-transform: uppercase; }
+          .meta { font-size: 12px; margin-bottom: 10px; border-bottom: 2px solid #000; padding-bottom: 5px; }
+          .meta div { margin-bottom: 2px; }
+          .items { margin-top: 5px; }
+        </style>
+      </head>
+      <body onload="window.print()">
+        <div class="ticket">
+          <h1>${titulo}</h1>
+          <div class="meta">
+            <div>MESA: <span style="font-size:18px; font-weight:bold">${ticket.mesa_numero}</span></div>
+            <div>MOZO: ${ticket.mozo || 'S/A'}</div>
+            <div>FECHA: ${fecha}</div>
+          </div>
+          <div class="items">
+            ${rows}
+          </div>
+          <div style="margin-top:10px; text-align:center; font-size:12px; border-top: 2px solid #000; padding-top:5px;">
+            --- FIN ---
+          </div>
+        </div>
+      </body>
+    </html>`;
+  }
+
+  // Formato Ticket/Pre-cuenta (Estándar, con precios)
+  const rows = items
     .map(
       (d) =>
         `<tr>
-          <td style="padding:4px 8px">${d.articulo}</td>
+          <td style="padding:4px 8px">
+            ${d.articulo}
+            ${d.observacion ? `<div style="font-size:10px;font-style:italic;color:#555">(${d.observacion})</div>` : ''}
+          </td>
           <td style="padding:4px 8px;text-align:center">${d.cantidad}</td>
           <td style="padding:4px 8px;text-align:right">$${d.precio_unitario.toFixed(2)}</td>
           <td style="padding:4px 8px;text-align:right">$${d.subtotal.toFixed(2)}</td>
         </tr>`
     )
     .join('');
-  const total = (detalles ?? ticket.detalles).reduce((acc, d) => acc + d.subtotal, 0);
+  const total = items.reduce((acc, d) => acc + d.subtotal, 0);
+
   return `<!doctype html>
   <html>
     <head>

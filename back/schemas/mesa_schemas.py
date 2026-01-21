@@ -39,6 +39,7 @@ class ConsumoMesaDetalleBase(BaseModel):
     cantidad: float
     precio_unitario: float
     descuento_aplicado: Optional[float] = 0.0
+    observacion: Optional[str] = None
 
 class ConsumoMesaDetalleCreate(ConsumoMesaDetalleBase):
     pass
@@ -107,7 +108,7 @@ class ConsumoMesaRead(ConsumoMesaBase):
     id_mesa: int
     id_usuario: int
     id_empresa: int
-    detalles: List[ConsumoMesaDetalleRead] = []
+    detalles: List[ConsumoMesaDetallePopulated] = []
 
     class Config:
         from_attributes = True
@@ -123,3 +124,6 @@ class TicketMesaRequest(BaseModel):
 class TicketResponse(BaseModel):
     ticket_html: str
     ticket_texto: str
+
+class MarcarImpresoRequest(BaseModel):
+    ids_detalles: List[int]

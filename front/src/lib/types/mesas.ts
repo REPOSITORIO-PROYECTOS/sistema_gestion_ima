@@ -47,6 +47,7 @@ export interface ConsumoMesaDetalle {
   id_articulo: number;
   articulo?: Articulo;
   subtotal?: number;
+  observacion?: string;
 }
 
 export interface Articulo {
@@ -65,6 +66,7 @@ export interface TicketRequest {
 
 export interface TicketResponse {
   mesa_numero: number;
+  mozo?: string;
   timestamp: string;
   detalles: Array<{
     articulo: string;
@@ -72,6 +74,7 @@ export interface TicketResponse {
     precio_unitario: number;
     subtotal: number;
     categoria?: string | null;
+    observacion?: string;
   }>;
   total: number;
   propina?: number;
@@ -104,4 +107,5 @@ export interface ConsumoDetalleCreate {
   cantidad: number;
   precio_unitario: number;
   descuento_aplicado?: number;
+  observacion?: string;
 }

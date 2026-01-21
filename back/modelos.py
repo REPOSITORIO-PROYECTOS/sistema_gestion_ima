@@ -499,6 +499,7 @@ class ConsumoMesaDetalle(SQLModel, table=True):
     id_consumo_mesa: int = Field(foreign_key="consumo_mesa.id")
     id_articulo: int = Field(foreign_key="articulos.id")
     impreso: bool = Field(default=False)
+    observacion: Optional[str] = Field(default=None) # Nueva columna para observaciones
     consumo: "ConsumoMesa" = Relationship(back_populates="detalles")
     articulo: "Articulo" = Relationship()
     movimiento_stock: Optional[StockMovimiento] = Relationship(back_populates="consumo_mesa_detalle")

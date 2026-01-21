@@ -81,10 +81,23 @@ def api_get_articulo(
 ):
     """Obtiene un artículo específico por su ID, verificando que pertenezca a la empresa del usuario."""
     try:
-        articulo_db = articulos_manager.obtener_articulo_por_id(db, current_user.id_empresa, id_articulo)
+        articulo_db = articulos_manager.obtener_articulo_por_id(
+            id_empresa=current_user.id_empresa,
+            db=db,
+            articulo_id=id_articulo
+        )
         if not articulo_db:
             raise HTTPException(status_code=404, detail=f"Artículo con ID {id_articulo} no encontrado en su empresa.")
-        return articulo_db
+            
+        # Validación explícita para detectar errores de schema antes de que FastAPI lo haga
+        try:
+            return ArticuloReadConCodigos.model_validate(articulo_db)
+        except ValidationError as val_err:
+            print(f"!!!!!!!!!!!!!! ERROR DE VALIDACIÓN DE PYDANTIC (GET ARTICULO {id_articulo}) !!!!!!!!!!!!!!")
+            print(val_err.json(indent=2))
+            # Intentar identificar el campo problemático para el log
+            raise HTTPException(status_code=500, detail=f"Error de validación de datos del artículo: {val_err}")
+
     except ValidationError as e:
         print("!!!!!!!!!!!!!! ERROR DE VALIDACIÓN DE PYDANTIC (GET ARTICULO) !!!!!!!!!!!!!!")
         print(e.json(indent=2))
