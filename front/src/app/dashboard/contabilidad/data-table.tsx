@@ -193,7 +193,39 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
                 const errorData = await response.json();
                 throw new Error(errorData.detail || `Error en la operación: ${accionActual}`);
             }
+            
+            const responseData = await response.json();
             toast.success("¡Operación Exitosa!", { description: successMessage });
+            
+            // --- NUEVO: Descargar PDF si es Anulación ---
+            if (accionActual === 'anular' && selectedRows.length === 1) {
+                 const idVenta = selectedRows[0].original.venta?.id;
+                 if (idVenta) {
+                     toast.info("Generando PDF de Nota de Crédito...");
+                     try {
+                         const pdfRes = await fetch(`https://sistema-ima.sistemataup.online/api/comprobantes/venta/${idVenta}/nota-credito/pdf`, {
+                             headers: { Authorization: `Bearer ${token}` }
+                         });
+                         if (pdfRes.ok) {
+                             const blob = await pdfRes.blob();
+                             const url = window.URL.createObjectURL(blob);
+                             const a = document.createElement('a');
+                             a.href = url;
+                             a.download = `NC_Venta_${idVenta}.pdf`;
+                             document.body.appendChild(a);
+                             a.click();
+                             window.URL.revokeObjectURL(url);
+                             document.body.removeChild(a);
+                         } else {
+                             toast.error("No se pudo descargar el PDF de la Nota de Crédito");
+                         }
+                     } catch (e) {
+                         console.error(e);
+                         toast.error("Error al descargar PDF");
+                     }
+                 }
+            }
+
             table.resetRowSelection();
             onActionComplete();
         } catch (error) {

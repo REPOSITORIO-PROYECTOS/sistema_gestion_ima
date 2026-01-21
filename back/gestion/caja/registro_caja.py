@@ -30,6 +30,8 @@ def registrar_venta_y_movimiento_caja(
     pago_separado:bool = None,
     detalles_pago_separado: str = None,
     tipo_comprobante_solicitado: str = None,
+    omitir_stock: bool = False,
+    propina: float = 0.0
 ) -> Tuple[Venta, CajaMovimiento]:
     """
     Registra una Venta, aplica recargos dinámicos según la configuración
@@ -42,7 +44,9 @@ def registrar_venta_y_movimiento_caja(
             raise ValueError(f"El artículo con ID {item.id_articulo} no existe.")
         if articulo_db.id_empresa != usuario_actual.id_empresa:
             raise ValueError(f"El artículo '{articulo_db.descripcion}' no pertenece a la empresa.")
-        if articulo_db.stock_actual < item.cantidad:
+        # Si omitir_stock es True, no validamos cantidad vs stock aquí, 
+        # asumimos que ya se validó/descontó previamente (ej: en mesas)
+        if not omitir_stock and articulo_db.stock_actual < item.cantidad:
             raise ValueError(f"Stock insuficiente para '{articulo_db.descripcion}'.")
 
     # --- 2. LÓGICA DE RECARGO DINÁMICO ---
@@ -114,6 +118,10 @@ def registrar_venta_y_movimiento_caja(
         # Podríamos lanzar un error si quisiéramos ser más estrictos.
         print(f"   -> ADVERTENCIA: Tipo '{tipo_comprobante_solicitado}' no reconocido para lógica de stock/caja.")
 
+    # Override si se solicita omitir stock (ej: desde módulo Mesas donde ya se descontó)
+    if omitir_stock:
+        print("   -> OVERRIDE: Omitir descuento de STOCK solicitado.")
+        afectar_stock = False
     
     for item in articulos_vendidos:
         articulo_a_actualizar = db.get(Articulo, item.id_articulo)
@@ -146,17 +154,26 @@ def registrar_venta_y_movimiento_caja(
                 db.add(articulo_a_actualizar)
 
     movimiento_principal = None # Inicializamos como None
-    print("   -> Registrando movimiento en caja...")
-    movimiento_principal = CajaMovimiento(
-        tipo=TipoMovimiento.VENTA.value,
-        concepto=f"Venta ({tipo_comprobante_solicitado}) ID: {nueva_venta.id}",
-        monto=total_final_con_recargo,
-        metodo_pago=metodo_pago,
-        id_caja_sesion=id_sesion_caja,
-        id_usuario=usuario_actual.id,
-        id_venta=nueva_venta.id,
-    )
-    db.add(movimiento_principal)
+    
+    if afectar_caja:
+        print("   -> Registrando movimiento en caja...")
+        monto_total_caja = total_final_con_recargo + propina
+        concepto_movimiento = f"Venta ({tipo_comprobante_solicitado}) ID: {nueva_venta.id}"
+        if propina > 0:
+            concepto_movimiento += f" (Incluye Propina: ${propina:.2f})"
+
+        movimiento_principal = CajaMovimiento(
+            tipo=TipoMovimiento.VENTA.value,
+            concepto=concepto_movimiento,
+            monto=monto_total_caja,
+            metodo_pago=metodo_pago,
+            id_caja_sesion=id_sesion_caja,
+            id_usuario=usuario_actual.id,
+            id_venta=nueva_venta.id,
+        )
+        db.add(movimiento_principal)
+    else:
+        print("   -> OMITIDO: No se registra movimiento en caja según configuración.")
         
     db.flush()
 

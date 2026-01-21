@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useMesasStore } from '@/lib/mesasStore';
 import { useAuthStore } from '@/lib/authStore';
+import { useCajaStore } from '@/lib/cajaStore';
+import CajaForm from '../ventas/CajaForm';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Plus, Edit, Trash2, Users, Eye, EyeOff, RefreshCw, Receipt, Printer } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, Users, Eye, EyeOff, RefreshCw, Receipt, Printer, LayoutGrid, List } from 'lucide-react';
 import { TicketModal } from '@/components/TicketModal';
 import { ConsumoModal } from '@/components/ConsumoModal';
 import { routeToDepartments } from '@/lib/ticketRoutingService';
@@ -19,6 +21,8 @@ import { toast } from 'sonner';
 import type { ConsumoMesa, TicketResponse, Mesa} from '@/lib/types/mesas';
 
 export default function MesasPage() {
+  const { cajaAbierta, verificarEstadoCaja } = useCajaStore();
+  const [isCajaDialogOpen, setIsCajaDialogOpen] = useState(false);
   const [ticketModalOpen, setTicketModalOpen] = useState(false);
   const [currentTicket, setCurrentTicket] = useState<TicketResponse | null>(null);
   const [consumoModalOpen, setConsumoModalOpen] = useState(false);
@@ -35,6 +39,7 @@ export default function MesasPage() {
   };
   const [selectedMesas, setSelectedMesas] = useState<number[]>([]);
   const [targetMesaId, setTargetMesaId] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   // Alternar selección de una mesa
   const toggleSelectMesa = (id: number) => {
@@ -61,7 +66,7 @@ export default function MesasPage() {
     setTargetMesaId(null); // Resetear mesa de destino al deseleccionar todas
   };
 
-  const { usuario } = useAuthStore();
+  const { usuario, token } = useAuthStore();
 
   const {
     mesas,
@@ -104,6 +109,12 @@ export default function MesasPage() {
   });
   const [localError, setLocalError] = useState<string | null>(null);
   const [numeroError, setNumeroError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (token) {
+      verificarEstadoCaja(token);
+    }
+  }, [token, verificarEstadoCaja]);
 
   useEffect(() => {
     const saved = localStorage.getItem('mesas:selected');
@@ -340,6 +351,40 @@ export default function MesasPage() {
     };
   };
 
+  if (!cajaAbierta) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] space-y-4">
+        <div className="p-6 bg-yellow-50 rounded-full">
+          <Receipt className="h-12 w-12 text-yellow-600" />
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900">Caja Cerrada</h1>
+        <p className="text-gray-600 text-center max-w-md">
+          Para gestionar las mesas, primero debes abrir la caja.
+        </p>
+        <div className="flex gap-4">
+          <Button variant="outline" onClick={() => window.location.href = '/dashboard/ventas'}>
+            Ir a Ventas
+          </Button>
+          
+          <Dialog open={isCajaDialogOpen} onOpenChange={setIsCajaDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>Abrir Caja Aquí</Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>Apertura de Caja</DialogTitle>
+              </DialogHeader>
+              <CajaForm 
+                onAbrirCaja={() => setIsCajaDialogOpen(false)} 
+                onCerrarCaja={() => setIsCajaDialogOpen(false)} 
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -350,6 +395,27 @@ export default function MesasPage() {
         </div>
 
         <div className="flex gap-2">
+          <div className="flex bg-gray-100 p-1 rounded-lg mr-2 items-center">
+            <Button
+              variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('grid')}
+              className={`px-3 ${viewMode === 'grid' ? 'bg-white shadow-sm' : 'text-gray-500'}`}
+              title="Vista de Cuadrícula"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('list')}
+              className={`px-3 ${viewMode === 'list' ? 'bg-white shadow-sm' : 'text-gray-500'}`}
+              title="Vista de Lista"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
+
           <Button variant="outline" onClick={fetchMesas} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Actualizar
@@ -517,6 +583,7 @@ export default function MesasPage() {
       </div>
 
       {/* Mapa visual de mesas */}
+      {viewMode === 'grid' && (
       <Card>
         <CardHeader>
           <CardTitle>Mapa de Mesas (selecciona una o varias)</CardTitle>
@@ -602,6 +669,9 @@ export default function MesasPage() {
           </div>
         </CardContent>
       </Card>
+      )}
+
+      {viewMode === 'list' && (
       <Card>
         <CardHeader>
           <CardTitle>Lista de Mesas</CardTitle>
@@ -747,6 +817,7 @@ export default function MesasPage() {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Registro de Cambios de Estado */}
       <Card>

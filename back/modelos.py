@@ -479,6 +479,8 @@ class ConsumoMesa(SQLModel, table=True):
     timestamp_inicio: datetime = Field(default_factory=datetime.utcnow)
     timestamp_cierre: Optional[datetime] = None
     total: float = Field(default=0.0)
+    propina: float = Field(default=0.0) # Monto calculado de propina
+    porcentaje_propina: float = Field(default=0.0) # Porcentaje aplicado
     estado: str = Field(default="ABIERTO")  # ABIERTO, CERRADO, FACTURADO
     id_mesa: int = Field(foreign_key="mesas.id")
     id_usuario: int = Field(foreign_key="usuarios.id")
@@ -496,6 +498,7 @@ class ConsumoMesaDetalle(SQLModel, table=True):
     descuento_aplicado: float = Field(default=0.0)
     id_consumo_mesa: int = Field(foreign_key="consumo_mesa.id")
     id_articulo: int = Field(foreign_key="articulos.id")
+    impreso: bool = Field(default=False)
     consumo: "ConsumoMesa" = Relationship(back_populates="detalles")
     articulo: "Articulo" = Relationship()
     movimiento_stock: Optional[StockMovimiento] = Relationship(back_populates="consumo_mesa_detalle")

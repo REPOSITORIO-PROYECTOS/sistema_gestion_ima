@@ -245,7 +245,7 @@ def api_anular_factura_con_nc(
         resultado_nc = facturacion_lotes_manager.crear_nota_credito_para_anular(
             db=db,
             usuario_actual=current_user,
-            id_movimiento_a_anular=req.id_movimiento_a_anular
+            id_movimiento_a_anular=req.id_movimiento
         )
         
         # Si la lógica del manager no lanzó ninguna excepción, hacemos commit

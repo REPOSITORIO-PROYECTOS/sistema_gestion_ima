@@ -17,7 +17,9 @@ import back.gestion.mesas_manager as mesas_manager
 from back.schemas.mesa_schemas import (
     MesaCreate, MesaUpdate, MesaRead,
     ConsumoMesaCreate, ConsumoMesaUpdate, ConsumoMesaRead,
-    ConsumoMesaDetalleCreate, TicketMesaRequest, TicketResponse
+    ConsumoMesaDetalleCreate, TicketMesaRequest, TicketResponse,
+    ConsumoMesaCierreRequest, ConsumoMesaFacturarRequest,
+    ConsumoMesaDetallePopulated
 )
 from back.schemas.caja_schemas import RespuestaGenerica
 
@@ -152,11 +154,13 @@ def api_add_detalle_consumo(
 @router.put("/consumo/{consumo_id}/cerrar", response_model=ConsumoMesaRead)
 def api_cerrar_consumo(
     consumo_id: int,
+    cierre_data: ConsumoMesaCierreRequest = None,
     current_user: Usuario = Depends(obtener_usuario_actual),
     db: Session = Depends(get_db)
 ):
     """Cierra un consumo para facturación."""
-    consumo = mesas_manager.cerrar_consumo_mesa(db, consumo_id, current_user.id_empresa)
+    porcentaje = cierre_data.porcentaje_propina if cierre_data else 0.0
+    consumo = mesas_manager.cerrar_consumo_mesa(db, consumo_id, current_user.id_empresa, porcentaje)
     if not consumo:
         raise HTTPException(status_code=400, detail="No se pudo cerrar el consumo")
     return consumo
@@ -190,3 +194,26 @@ def api_generar_ticket(
     if not ticket_data:
         raise HTTPException(status_code=404, detail="Consumo no encontrado")
     return ticket_data
+
+# ===================================================================
+# === ENDPOINTS PARA GESTIÓN DE COMANDAS (IMPRESIÓN CENTRALIZADA)
+# ===================================================================
+
+@router.get("/comandas/pendientes", response_model=List[ConsumoMesaDetallePopulated])
+def api_get_comandas_pendientes(
+    current_user: Usuario = Depends(obtener_usuario_actual),
+    db: Session = Depends(get_db)
+):
+    """Obtiene detalles pendientes de impresión (Comandas)."""
+    return mesas_manager.obtener_comandas_pendientes(db, current_user.id_empresa)
+
+@router.post("/comandas/marcar_impreso", response_model=RespuestaGenerica)
+def api_marcar_comandas_impresas(
+    ids_detalles: List[int],
+    current_user: Usuario = Depends(obtener_usuario_actual),
+    db: Session = Depends(get_db)
+):
+    """Marca detalles como impresos."""
+    mesas_manager.marcar_comanda_como_impresa(db, ids_detalles)
+    return RespuestaGenerica(mensaje="Detalles marcados como impresos")
+

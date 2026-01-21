@@ -73,6 +73,10 @@ class GenerarComprobanteRequest(BaseModel):
     transaccion: TransaccionData
     comprobante_asociado: Optional[Dict[str, Any]] = None  # Para notas de crédito
     
+    # Nuevo soporte para ticket de cambio
+    incluir_ticket_cambio: Optional[bool] = False
+    plazo_cambio: Optional[str] = "30 días"
+    
 class FacturarLoteRequest(BaseModel):
     # Una lista de IDs de CajaMovimiento (de tipo VENTA) que se quieren facturar.
     ids_movimientos: List[int] = Field(..., min_length=1)

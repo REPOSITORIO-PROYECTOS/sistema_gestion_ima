@@ -27,6 +27,10 @@ export const API_CONFIG = {
     // Tickets
     TICKET_GENERAR: '/mesas/ticket/generar',
 
+    // Comandas (Impresión)
+    COMANDAS_PENDIENTES: '/mesas/comandas/pendientes',
+    COMANDAS_MARCAR_IMPRESO: '/mesas/comandas/marcar_impreso',
+
     // Productos (para consumos)
     PRODUCTOS: '/articulos/obtener_todos',
     ARTICULO_BY_ID: (id: number) => `/articulos/obtener/${id}`,

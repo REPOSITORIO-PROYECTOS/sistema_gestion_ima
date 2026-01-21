@@ -120,14 +120,20 @@ export const api = {
     getAbiertosByMesa: (mesaId: number) => apiClient.get(API_CONFIG.ENDPOINTS.CONSUMOS_ABIERTOS(mesaId)),
     create: (data: ConsumoCreate) => apiClient.post(API_CONFIG.ENDPOINTS.CONSUMO_CREATE, data),
     addDetalle: (consumoId: number, data: ConsumoDetalleCreate) => apiClient.post(API_CONFIG.ENDPOINTS.CONSUMO_ADD_DETALLE(consumoId), data),
-    cerrar: (consumoId: number) => apiClient.put(API_CONFIG.ENDPOINTS.CONSUMO_CERRAR(consumoId)),
-    facturar: (consumoId: number) => apiClient.put(API_CONFIG.ENDPOINTS.CONSUMO_FACTURAR(consumoId)),
+    cerrar: (consumoId: number, porcentajePropina: number = 0) => apiClient.put(API_CONFIG.ENDPOINTS.CONSUMO_CERRAR(consumoId), { porcentaje_propina: porcentajePropina }),
+    facturar: (consumoId: number, metodoPago: string = 'Efectivo', cobrarPropina: boolean = true) => apiClient.put(API_CONFIG.ENDPOINTS.CONSUMO_FACTURAR(consumoId), { metodo_pago: metodoPago, cobrar_propina: cobrarPropina }),
     getAllActiveByEmpresa: (empresaId: number) => apiClient.get(`${API_CONFIG.ENDPOINTS.CONSUMOS_GET_ALL_ACTIVE_BY_EMPRESA}?empres-id=${empresaId}`),
   },
 
   // Tickets
   tickets: {
     generar: (data: TicketRequest) => apiClient.post(API_CONFIG.ENDPOINTS.TICKET_GENERAR, data),
+  },
+
+  // Comandas
+  comandas: {
+    getPendientes: () => apiClient.get(API_CONFIG.ENDPOINTS.COMANDAS_PENDIENTES),
+    marcarImpreso: (ids: number[]) => apiClient.post(API_CONFIG.ENDPOINTS.COMANDAS_MARCAR_IMPRESO, { ids_detalles: ids }),
   },
 
   // Articulos

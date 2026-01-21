@@ -194,6 +194,7 @@ def obtener_datos_para_ticket_cierre_detallado(db: Session, id_sesion: int, usua
         "empresa": sesion.usuario_apertura.empresa,
         "totales": {
             "ventas": total_ventas,
+            "propinas": total_propinas,  # Agregado al diccionario
             "ingresos": total_ingresos,
             "egresos": total_egresos,
         },
