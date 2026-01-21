@@ -19,7 +19,7 @@ from back.schemas.mesa_schemas import (
     ConsumoMesaCreate, ConsumoMesaUpdate, ConsumoMesaRead,
     ConsumoMesaDetalleCreate, TicketMesaRequest, TicketResponse,
     ConsumoMesaCierreRequest, ConsumoMesaFacturarRequest,
-    ConsumoMesaDetallePopulated, MarcarImpresoRequest
+    ConsumoMesaDetallePopulated, MarcarImpresoRequest, UnirMesasRequest
 )
 from back.schemas.caja_schemas import RespuestaGenerica
 
@@ -220,7 +220,31 @@ def api_marcar_comandas_impresas(
     current_user: Usuario = Depends(obtener_usuario_actual),
     db: Session = Depends(get_db)
 ):
-    """Marca detalles como impresos."""
-    mesas_manager.marcar_comanda_como_impresa(db, request.ids_detalles)
-    return RespuestaGenerica(mensaje="Detalles marcados como impresos")
+    try:
+        from back.gestion.impresion_manager import obtener_sesion_abierta
+        if not obtener_sesion_abierta(db, current_user.id_empresa):
+            raise HTTPException(status_code=403, detail="Debe abrir la sesión de impresión antes de marcar")
+        count = mesas_manager.marcar_comanda_como_impresa(db, request.ids_detalles, current_user.id_empresa)
+        if count == 0:
+            raise HTTPException(status_code=404, detail="No se encontraron detalles para marcar")
+        return RespuestaGenerica(mensaje=f"Detalles marcados como impresos: {count}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error al marcar impresos: {str(e)}")
 
+@router.post("/unir", response_model=RespuestaGenerica)
+def api_unir_mesas(
+    request: "UnirMesasRequest",
+    current_user: Usuario = Depends(obtener_usuario_actual),
+    db: Session = Depends(get_db)
+):
+    try:
+        moved = mesas_manager.unir_mesas(db, current_user.id_empresa, request.source_mesa_ids, request.target_mesa_id)
+        if moved == 0:
+            raise HTTPException(status_code=404, detail="No hay consumos para unir")
+        return RespuestaGenerica(mensaje=f"Mesas unidas, consumos movidos: {moved}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error al unir mesas: {str(e)}")

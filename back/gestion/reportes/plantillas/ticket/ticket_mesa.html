@@ -1,0 +1,32 @@
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+body { font-family: Arial, sans-serif; font-size: 12px; }
+h1 { font-size: 14px; margin: 4px 0; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 2px 0; }
+.tot { margin-top: 6px; font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>Ticket Mesa</h1>
+<div>Fecha: {{ fecha_emision|date }}</div>
+<table>
+<thead><tr><th>Item</th><th>Cant</th><th>Precio</th><th>Subt</th></tr></thead>
+<tbody>
+{% for it in transaccion.items %}
+<tr>
+<td>{{ it.descripcion }}</td>
+<td>{{ it.cantidad }}</td>
+<td>{{ it.precio_unitario }}</td>
+<td>{{ it.subtotal }}</td>
+</tr>
+{% endfor %}
+</tbody>
+<tfoot>
+<tr><td colspan="4" class="tot">Total: {{ transaccion.total }}</td></tr>
+</tfoot>
+</table>
+</body>
+</html>

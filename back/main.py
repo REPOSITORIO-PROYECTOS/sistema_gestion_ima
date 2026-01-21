@@ -1,7 +1,7 @@
 # back/main.py
 
 import os
-from back.api.blueprints import admin_router, afip_tools_router, articulos_router, auth_router,actualizacion_masiva_router,clientes_router, configuracion_router, empresa_router, importaciones_router, proveedores_router, comprobantes_router, mesas_router, scanner_router
+from back.api.blueprints import admin_router, afip_tools_router, articulos_router, auth_router,actualizacion_masiva_router,clientes_router, configuracion_router, empresa_router, importaciones_router, proveedores_router, comprobantes_router, mesas_router, scanner_router, ordenes_router, impresion_router
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -15,6 +15,7 @@ from back.api.blueprints import usuarios_router
 # Importamos la configuración para la conexión inicial y CORS
 from back import config # (y otros que necesites)
 from back.utils.mysql_handler import get_db_connection
+from back.database import create_db_and_tables
 
 # --- Inicialización de FastAPI ---
 app = FastAPI(
@@ -60,6 +61,11 @@ def startup_event():
     
     if config.GOOGLE_SHEET_ID:
         print(f"ℹ️  Google Sheets configurado para reportes (ID: {config.GOOGLE_SHEET_ID[:10]}...).")
+    try:
+        print("⛏️ Creando tablas nuevas si faltan...")
+        create_db_and_tables()
+    except Exception as e:
+        print(f"⚠️ No se pudieron crear tablas automáticamente: {e}")
 
 
 # --- Inclusión de Routers ---
@@ -79,6 +85,8 @@ app.include_router(comprobantes_router.router)
 app.include_router(afip_tools_router.router)
 app.include_router(mesas_router.router)
 app.include_router(scanner_router.router)
+app.include_router(ordenes_router.router)
+app.include_router(impresion_router.router)
 
 
 # --- Endpoint Raíz ---

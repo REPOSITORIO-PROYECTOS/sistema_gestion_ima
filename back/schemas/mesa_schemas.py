@@ -127,3 +127,7 @@ class TicketResponse(BaseModel):
 
 class MarcarImpresoRequest(BaseModel):
     ids_detalles: List[int]
+
+class UnirMesasRequest(BaseModel):
+    source_mesa_ids: List[int] = Field(alias="source_mes-ids")
+    target_mesa_id: int = Field(alias="target_mes-id")

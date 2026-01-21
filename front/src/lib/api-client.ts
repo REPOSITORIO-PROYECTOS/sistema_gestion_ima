@@ -24,7 +24,7 @@ class ApiClient {
       const url = `${this.baseUrl}${endpoint}`;
       // Obtener el token del authStore
       const token = useAuthStore.getState().token || undefined;
-      
+
       const response = await fetch(url, {
         ...options,
         headers: {
@@ -57,6 +57,34 @@ class ApiClient {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
+    }
+  }
+
+  async download(endpoint: string, body?: unknown, headers?: Record<string, string>): Promise<Blob | null> {
+    try {
+      const url = `${this.baseUrl}${endpoint}`;
+      const token = useAuthStore.getState().token || undefined;
+      const response = await fetch(url, {
+        method: 'POST',
+        body: body ? JSON.stringify(body) : undefined,
+        headers: {
+          ...getAuthHeaders(token),
+          Accept: 'application/pdf',
+          ...headers,
+        },
+      });
+      if (!response.ok) {
+        try {
+          const err = await response.json();
+          throw new Error(err?.detail || `HTTP ${response.status}: ${response.statusText}`);
+        } catch (e) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+      }
+      return await response.blob();
+    } catch (e) {
+      console.error('Download error:', e);
+      return null;
     }
   }
 
@@ -134,6 +162,18 @@ export const api = {
   comandas: {
     getPendientes: () => apiClient.get(API_CONFIG.ENDPOINTS.COMANDAS_PENDIENTES),
     marcarImpreso: (ids: number[]) => apiClient.post(API_CONFIG.ENDPOINTS.COMANDAS_MARCAR_IMPRESO, { ids_detalles: ids }),
+  },
+
+  // Comprobantes
+  comprobantes: {
+    generarPDF: async (payload: any) => apiClient.download(API_CONFIG.ENDPOINTS.COMPROBANTES_GENERAR, payload),
+    agrupar: (ids: number[], nuevoTipo: string) => apiClient.post(API_CONFIG.ENDPOINTS.COMPROBANTES_AGRUPAR, { ids_comprobantes: ids, nuevo_tipo_comprobante: nuevoTipo }),
+    facturarLote: (idsMovimientos: number[], idClienteFinal?: number) => apiClient.post(API_CONFIG.ENDPOINTS.COMPROBANTES_FACTURAR_LOTE, { ids_movimientos: idsMovimientos, id_cliente_final: idClienteFinal }),
+  },
+
+  impresion: {
+    generarComandaPDF: async (ids: number[]) => apiClient.download(API_CONFIG.ENDPOINTS.IMPRESION_COMANDA_PDF, { ids_detalles: ids }),
+    generarMesaPDF: async (consumoId: number) => apiClient.download(API_CONFIG.ENDPOINTS.IMPRESION_MESA_PDF, { id_consumo_mesa: consumoId }),
   },
 
   // Articulos

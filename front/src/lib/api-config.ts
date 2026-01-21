@@ -30,6 +30,13 @@ export const API_CONFIG = {
     // Comandas (Impresión)
     COMANDAS_PENDIENTES: '/mesas/comandas/pendientes',
     COMANDAS_MARCAR_IMPRESO: '/mesas/comandas/marcar_impreso',
+    IMPRESION_COMANDA_PDF: '/impresion/comanda/pdf',
+    IMPRESION_MESA_PDF: '/impresion/mesa/pdf',
+
+    // Comprobantes
+    COMPROBANTES_GENERAR: '/comprobantes/generar',
+    COMPROBANTES_AGRUPAR: '/comprobantes/agrupar',
+    COMPROBANTES_FACTURAR_LOTE: '/comprobantes/facturar-lote',
 
     // Productos (para consumos)
     PRODUCTOS: '/articulos/obtener_todos',

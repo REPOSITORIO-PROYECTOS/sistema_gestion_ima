@@ -503,3 +503,49 @@ class ConsumoMesaDetalle(SQLModel, table=True):
     consumo: "ConsumoMesa" = Relationship(back_populates="detalles")
     articulo: "Articulo" = Relationship()
     movimiento_stock: Optional[StockMovimiento] = Relationship(back_populates="consumo_mesa_detalle")
+
+# ===================================================================
+# === AUDITORÍA Y ÓRDENES
+# ===================================================================
+
+class AuditLog(SQLModel, table=True):
+    __tablename__ = "audit_logs"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    accion: str
+    entidad: str
+    entidad_id: Optional[int] = None
+    exito: bool = Field(default=True)
+    detalles: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSON))
+    id_usuario: int = Field(foreign_key="usuarios.id")
+    id_empresa: int = Field(foreign_key="empresas.id")
+    usuario: Usuario = Relationship()
+    empresa: "Empresa" = Relationship()
+
+class Orden(SQLModel, table=True):
+    __tablename__ = "ordenes"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    tipo: str = Field(default="MESA")
+    estado: str = Field(default="ABIERTA")
+    total: float = Field(default=0.0)
+    id_consumo_mesa: Optional[int] = Field(default=None, foreign_key="consumo_mesa.id")
+    id_venta: Optional[int] = Field(default=None, foreign_key="ventas.id")
+    numero_comprobante: Optional[str] = None
+    id_usuario: int = Field(foreign_key="usuarios.id")
+    id_empresa: int = Field(foreign_key="empresas.id")
+    consumo_mesa: Optional["ConsumoMesa"] = Relationship()
+    venta: Optional["Venta"] = Relationship()
+    usuario: Usuario = Relationship()
+    empresa: "Empresa" = Relationship()
+
+class ImpresionSesion(SQLModel, table=True):
+    __tablename__ = "impresion_sesion"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    timestamp_inicio: datetime = Field(default_factory=datetime.utcnow)
+    timestamp_cierre: Optional[datetime] = None
+    estado: str = Field(default="ABIERTA")
+    id_usuario: int = Field(foreign_key="usuarios.id")
+    id_empresa: int = Field(foreign_key="empresas.id")
+    usuario: Usuario = Relationship()
+    empresa: "Empresa" = Relationship()

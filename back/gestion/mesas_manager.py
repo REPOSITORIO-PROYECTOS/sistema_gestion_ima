@@ -18,6 +18,8 @@ from back.schemas.mesa_schemas import (
 from back.schemas.caja_schemas import ConsumoMesaFacturarRequest, ArticuloVendido
 from back.gestion.caja.registro_caja import registrar_venta_y_movimiento_caja
 from back.gestion.caja.apertura_cierre import obtener_caja_abierta_por_usuario
+from back.gestion.ordenes_manager import registrar_orden_por_consumo, actualizar_orden_con_venta
+from back.modelos import AuditLog
 
 # ===================================================================
 # === FUNCIONES PARA MESAS
@@ -140,14 +142,29 @@ def obtener_comandas_pendientes(db: Session, id_empresa: int) -> List[ConsumoMes
     )
     return db.exec(statement).all()
 
-def marcar_comanda_como_impresa(db: Session, ids_detalle: List[int]) -> bool:
-    """Marca una lista de detalles como impresos."""
-    statement = select(ConsumoMesaDetalle).where(ConsumoMesaDetalle.id.in_(ids_detalle))
+def marcar_comanda_como_impresa(db: Session, ids_detalle: List[int], id_empresa: Optional[int] = None) -> int:
+    statement = select(ConsumoMesaDetalle).join(ConsumoMesa).where(
+        ConsumoMesaDetalle.id.in_(ids_detalle)
+    )
+    if id_empresa is not None:
+        statement = statement.where(ConsumoMesa.id_empresa == id_empresa)
     detalles = db.exec(statement).all()
+    count = 0
     for detalle in detalles:
         detalle.impreso = True
+        count += 1
+    if count > 0 and id_empresa is not None:
+        db.add(AuditLog(
+            accion="MARCAR_IMPRESO",
+            entidad="ConsumoMesaDetalle",
+            entidad_id=detalles[0].id if detalles else None,
+            exito=True,
+            detalles={"ids_detalle": ids_detalle, "marcados": count},
+            id_usuario=0,
+            id_empresa=id_empresa
+        ))
     db.commit()
-    return True
+    return count
 
 def cerrar_consumo_mesa(db: Session, id_consumo: int, id_empresa: int, porcentaje_propina: float = 0.0) -> Optional[ConsumoMesa]:
     """Cierra un consumo (prepara para facturación)."""
@@ -165,7 +182,7 @@ def cerrar_consumo_mesa(db: Session, id_consumo: int, id_empresa: int, porcentaj
     
     db.commit()
     db.refresh(consumo)
-    return consumo
+    return registrar_orden_por_consumo(db, consumo, usuario_actual) or consumo
 
 def facturar_consumo_mesa(
     db: Session, 
@@ -214,6 +231,7 @@ def facturar_consumo_mesa(
     consumo.estado = "FACTURADO"
     db.commit()
     db.refresh(consumo)
+    actualizar_orden_con_venta(db, consumo, consumo.ventas[0] if hasattr(consumo, "ventas") and consumo.ventas else None, usuario_actual)
     return consumo
 
 # ===================================================================
@@ -283,3 +301,40 @@ def crear_movimiento_stock_consumo(db: Session, detalle: ConsumoMesaDetalle, id_
     db.refresh(movimiento)
     
     return movimiento
+
+def unir_mesas(db: Session, id_empresa: int, source_mesa_ids: List[int], target_mesa_id: int) -> int:
+    target = select(Mesa).where(Mesa.id == target_mesa_id, Mesa.id_empresa == id_empresa)
+    target_mesa = db.exec(target).first()
+    if not target_mesa or not target_mesa.activo:
+        raise ValueError("Mesa destino inválida o inactiva")
+    total_movidos = 0
+    for mid in source_mesa_ids:
+        if mid == target_mesa_id:
+            continue
+        src_stmt = select(Mesa).where(Mesa.id == mid, Mesa.id_empresa == id_empresa)
+        src_mesa = db.exec(src_stmt).first()
+        if not src_mesa or not src_mesa.activo:
+            continue
+        cons_stmt = select(ConsumoMesa).where(
+            ConsumoMesa.id_mesa == mid,
+            ConsumoMesa.id_empresa == id_empresa,
+            ConsumoMesa.estado.in_(["ABIERTO", "CERRADO"])
+        )
+        consumos = db.exec(cons_stmt).all()
+        for consumo in consumos:
+            consumo.id_mesa = target_mesa_id
+            total_movidos += 1
+    if total_movidos > 0:
+        target_mesa.estado = "OCUPADA"
+        db.commit()
+    db.add(AuditLog(
+        accion="UNIR_MESAS",
+        entidad="Mesa",
+        entidad_id=target_mesa_id,
+        exito=True,
+        detalles={"source_mesa_ids": source_mesa_ids, "movidos": total_movidos},
+        id_usuario=0,
+        id_empresa=id_empresa
+    ))
+    db.commit()
+    return total_movidos
