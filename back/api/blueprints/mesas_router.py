@@ -126,30 +126,13 @@ def api_add_detalle_consumo(
     db: Session = Depends(get_db)
 ):
     """Agrega un detalle a un consumo."""
-    consumo = mesas_manager.obtener_consumo_por_id(db, consumo_id, current_user.id_empresa)
-    if not consumo:
-        raise HTTPException(status_code=404, detail="Consumo no encontrado")
-    if consumo.estado != "ABIERTO":
-        raise HTTPException(status_code=400, detail="El consumo no está abierto")
-
-    if detalle_data.cantidad <= 0:
-        raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a cero")
-
-    articulo = db.get(Articulo, detalle_data.id_articulo)
-    if not articulo:
-        raise HTTPException(status_code=404, detail="Artículo no encontrado")
-    if not articulo.activo:
-        raise HTTPException(status_code=400, detail="El artículo está inactivo")
-    if articulo.stock_actual < detalle_data.cantidad:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Stock insuficiente: disponible {articulo.stock_actual}, solicitado {detalle_data.cantidad}"
-        )
-
-    detalle = mesas_manager.agregar_detalle_consumo(db, consumo_id, detalle_data, current_user.id_empresa)
-    if not detalle:
-        raise HTTPException(status_code=400, detail="No se pudo agregar el detalle")
-    return {"mensaje": "Detalle agregado exitosamente", "detalle": detalle}
+    try:
+        detalle = mesas_manager.agregar_detalle_consumo(db, consumo_id, detalle_data, current_user.id_empresa)
+        return {"mensaje": "Detalle agregado exitosamente", "detalle": detalle}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
 
 @router.put("/consumo/{consumo_id}/cerrar", response_model=ConsumoMesaRead)
 def api_cerrar_consumo(
@@ -221,15 +204,12 @@ def api_marcar_comandas_impresas(
     db: Session = Depends(get_db)
 ):
     try:
-        from back.gestion.impresion_manager import obtener_sesion_abierta
-        if not obtener_sesion_abierta(db, current_user.id_empresa):
-            raise HTTPException(status_code=403, detail="Debe abrir la sesión de impresión antes de marcar")
-        count = mesas_manager.marcar_comanda_como_impresa(db, request.ids_detalles, current_user.id_empresa)
-        if count == 0:
-            raise HTTPException(status_code=404, detail="No se encontraron detalles para marcar")
+        count = mesas_manager.marcar_comandas_impresas_con_sesion(db, current_user.id_empresa, request.ids_detalles)
         return RespuestaGenerica(mensaje=f"Detalles marcados como impresos: {count}")
-    except HTTPException:
-        raise
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error al marcar impresos: {str(e)}")
 

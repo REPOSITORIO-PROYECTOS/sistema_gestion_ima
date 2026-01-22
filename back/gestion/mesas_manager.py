@@ -106,13 +106,21 @@ def crear_consumo_mesa(db: Session, consumo_data: ConsumoMesaCreate, id_usuario:
 def agregar_detalle_consumo(db: Session, id_consumo: int, detalle_data: ConsumoMesaDetalleCreate, id_empresa: int) -> Optional[ConsumoMesaDetalle]:
     """Agrega un detalle a un consumo."""
     consumo = obtener_consumo_por_id(db, id_consumo, id_empresa)
-    if not consumo or consumo.estado != "ABIERTO":
-        return None
+    if not consumo:
+        raise ValueError("Consumo no encontrado")
+    if consumo.estado != "ABIERTO":
+        raise ValueError("El consumo no está abierto")
+    if detalle_data.cantidad <= 0:
+        raise ValueError("La cantidad debe ser mayor a cero")
 
     # Verificar stock disponible
     articulo = db.get(Articulo, detalle_data.id_articulo)
-    if not articulo or articulo.stock_actual < detalle_data.cantidad:
-        return None  # Stock insuficiente
+    if not articulo:
+        raise ValueError("Artículo no encontrado")
+    if not getattr(articulo, "activo", True):
+        raise ValueError("El artículo está inactivo")
+    if articulo.stock_actual < detalle_data.cantidad:
+        raise ValueError(f"Stock insuficiente: disponible {articulo.stock_actual}, solicitado {detalle_data.cantidad}")
 
     detalle = ConsumoMesaDetalle(**detalle_data.model_dump(), id_consumo_mesa=id_consumo)
     db.add(detalle)
@@ -129,6 +137,15 @@ def agregar_detalle_consumo(db: Session, id_consumo: int, detalle_data: ConsumoM
     db.commit()
     db.refresh(detalle)
     return detalle
+
+def marcar_comandas_impresas_con_sesion(db: Session, id_empresa: int, ids_detalle: List[int]) -> int:
+    from back.gestion.impresion_manager import obtener_sesion_abierta
+    if not obtener_sesion_abierta(db, id_empresa):
+        raise PermissionError("Debe abrir la sesión de impresión antes de marcar")
+    count = marcar_comanda_como_impresa(db, ids_detalle, id_empresa)
+    if count == 0:
+        raise ValueError("No se encontraron detalles para marcar")
+    return count
 
 def obtener_comandas_pendientes(db: Session, id_empresa: int) -> List[ConsumoMesaDetalle]:
     """Obtiene los detalles de consumo (comandas) que no han sido impresos."""
