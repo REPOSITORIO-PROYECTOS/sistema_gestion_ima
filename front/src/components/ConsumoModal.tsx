@@ -71,7 +71,7 @@ export const ConsumoModal: React.FC<ConsumoModalProps> = ({ isOpen, onClose, con
       fetchArticulos();
     }
   }, [isOpen, usuario?.id_empresa, fetchArticulos, hasFetchedArticulos]);
-  
+
   useEffect(() => {
     if (!isOpen) return;
     let lastVersion = parseInt(localStorage.getItem("catalogo_version") || "0", 10);
@@ -89,7 +89,7 @@ export const ConsumoModal: React.FC<ConsumoModalProps> = ({ isOpen, onClose, con
           localStorage.setItem("catalogo_version", String(v));
           toast.success("Catálogo de cocina actualizado");
         }
-      } catch {}
+      } catch { }
     }, 5000);
     return () => clearInterval(interval);
   }, [isOpen, fetchArticulos]);
@@ -198,7 +198,7 @@ export const ConsumoModal: React.FC<ConsumoModalProps> = ({ isOpen, onClose, con
     }
   };
 
-  
+
 
   const handleCheckout = async () => {
     if (!consumo) return;
@@ -440,7 +440,7 @@ export const ConsumoModal: React.FC<ConsumoModalProps> = ({ isOpen, onClose, con
                 Facturar Consumo
               </Button>
             )}
-            
+
             <Button variant="ghost" onClick={onClose} className="w-full sm:w-auto">Cerrar</Button>
           </div>
         </div>
