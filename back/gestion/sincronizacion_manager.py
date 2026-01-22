@@ -171,8 +171,8 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int) -> Di
             print(f"Eliminando artículo obsoleto (no encontrado en Sheet): DB='{codigo_db_normalizado}' Desc='{articulo.descripcion}'")
             db.delete(articulo)
             eliminados += 1
-
-    # 4. Actualizar versión de catálogo y guardar cambios
+    
+    # Actualizar versión de catálogo
     if config_empresa:
         try:
             config_empresa.catalogo_version = (config_empresa.catalogo_version or 0) + 1

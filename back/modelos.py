@@ -397,9 +397,9 @@ class ConfiguracionEmpresa(SQLModel, table=True):
     # --- Versión de Catálogo ---
     catalogo_version: int = Field(default=0)
     
+    
     # --- RELACIÓN ---
     empresa: Empresa = Relationship(back_populates="configuracion")
-    
     
 class ArticuloProveedor(SQLModel, table=True):
     __tablename__ = "articulo_proveedor"

@@ -206,4 +206,4 @@ def api_catalogo_version(
     db: Session = Depends(get_db)
 ):
     cfg = db.get(ConfiguracionEmpresa, current_user.id_empresa)
-    return {"version": (cfg.catalogo_version if cfg else 0)}
+    return {"version": (cfg.catalogo_version if cfg and hasattr(cfg, "catalogo_version") else 0)}

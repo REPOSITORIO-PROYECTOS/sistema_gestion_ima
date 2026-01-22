@@ -4,7 +4,7 @@ import os
 import shutil
 from fastapi import UploadFile, HTTPException, status
 from sqlmodel import Session
-from back.modelos import ConfiguracionEmpresa, Usuario
+from back.modelos import ConfiguracionEmpresa, Usuario, Empresa
 from back.schemas.configuracion_schemas import ConfiguracionUpdate, RecargoData, RecargoUpdate
 
 # Creamos una carpeta 'static/uploads' en la raíz del proyecto si no existe
@@ -186,7 +186,16 @@ def obtener_configuracion_empresa(db: Session, id_empresa: int) -> Configuracion
     config = db.get(ConfiguracionEmpresa, id_empresa)
     if not config:
         print(f"No se encontró configuración para la empresa ID {id_empresa}. Creando una nueva.")
-        config = ConfiguracionEmpresa(id_empresa=id_empresa)
+        empresa = db.get(Empresa, id_empresa)
+        cuit_val = empresa.cuit if empresa and getattr(empresa, "cuit", None) else ""
+        nombre_val = None
+        if empresa:
+            nombre_val = empresa.nombre_fantasia or empresa.nombre_legal
+        config = ConfiguracionEmpresa(
+            id_empresa=id_empresa,
+            cuit=cuit_val,
+            nombre_negocio=nombre_val
+        )
         db.add(config)
         db.commit()
         db.refresh(config)

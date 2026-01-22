@@ -43,7 +43,7 @@ class ConfiguracionResponse(BaseModel):
     color_principal: str
     ruta_logo: Optional[str]
     ruta_icono: Optional[str]
-    afip_condicion_iva: Optional[CondicionIVAEnum] = None
+    afip_condicion_iva: Optional[str] = None
     afip_punto_venta_predeterminado: Optional[int]
     direccion_negocio: Optional[str]
     telefono_negocio: Optional[str]
@@ -52,7 +52,7 @@ class ConfiguracionResponse(BaseModel):
     link_visual_1: Optional[str]
     link_visual_2: Optional[str]
     link_visual_3: Optional[str]
-    cuit: Optional[int]
+    cuit: Optional[str]
     aclaraciones_legales: Optional[Dict[str, Optional[str]]]
 
     class Config:
@@ -73,4 +73,3 @@ class ColorUpdateRequest(BaseModel):
 
 class ColorResponse(BaseModel):
     color_principal: str
-
