@@ -9,6 +9,7 @@ from back.gestion.reportes.adapters_mesas import construir_request_comanda, cons
 from back.gestion.reportes.generador_comprobantes import generar_comprobante_stateless
 from back.modelos import ConsumoMesa, ConsumoMesaDetalle
 from sqlmodel import select
+from back.schemas.mesa_schemas import ComandaPdfRequest
 
 router = APIRouter(prefix="/impresion", tags=["Impresion"])
 
@@ -40,17 +41,31 @@ def api_cerrar_sesion_impresion(
 
 @router.post("/comanda/pdf")
 def api_generar_comanda_pdf(
-    ids_detalles: list[int],
+    req: ComandaPdfRequest,
     current_user: Usuario = Depends(obtener_usuario_actual),
     db: Session = Depends(get_db)
 ):
     if not obtener_sesion_abierta(db, current_user.id_empresa):
         raise HTTPException(status_code=403, detail="Debe abrir la sesión de impresión")
-    stmt = select(ConsumoMesaDetalle).join(ConsumoMesa).where(
-        ConsumoMesaDetalle.id.in_(ids_detalles),
-        ConsumoMesa.id_empresa == current_user.id_empresa
-    )
-    detalles = db.exec(stmt).all()
+    detalles = []
+    if req.id_consumo_mesa:
+        stmt = select(ConsumoMesaDetalle).join(ConsumoMesa).where(
+            ConsumoMesaDetalle.id_consumo_mesa == req.id_consumo_mesa,
+            ConsumoMesa.id_empresa == current_user.id_empresa
+        )
+        detalles = db.exec(stmt).all()
+        if req.only_pendientes:
+            detalles = [d for d in detalles if not d.impreso]
+    elif req.ids_detalles:
+        stmt = select(ConsumoMesaDetalle).join(ConsumoMesa).where(
+            ConsumoMesaDetalle.id.in_(req.ids_detalles),
+            ConsumoMesa.id_empresa == current_user.id_empresa
+        )
+        detalles = db.exec(stmt).all()
+        if req.only_pendientes:
+            detalles = [d for d in detalles if not d.impreso]
+    else:
+        raise HTTPException(status_code=400, detail="Faltan parámetros para generar comanda")
     req = construir_request_comanda(db, detalles, current_user.id_empresa)
     pdf = generar_comprobante_stateless(req)
     return Response(content=pdf, media_type="application/pdf", headers={"Content-Disposition": 'inline; filename="comanda.pdf"'})

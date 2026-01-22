@@ -10,6 +10,7 @@ from typing import List
 from back.database import get_db
 from back.security import es_admin, obtener_usuario_actual
 from back.modelos import Usuario
+from back.modelos import ConfiguracionEmpresa
 import back.gestion.stock.articulos as articulos_manager
 # --- ¡IMPORTACIONES CORREGIDAS SEGÚN SU NUEVO ARCHIVO! ---
 from back.schemas.articulo_schemas import (
@@ -198,3 +199,11 @@ def api_buscar_articulo_por_codigo(
     if not articulo:
         raise HTTPException(status_code=404, detail=f"Artículo con código '{codigo}' no encontrado.")
     return articulo
+
+@router.get("/version")
+def api_catalogo_version(
+    current_user: Usuario = Depends(obtener_usuario_actual),
+    db: Session = Depends(get_db)
+):
+    cfg = db.get(ConfiguracionEmpresa, current_user.id_empresa)
+    return {"version": (cfg.catalogo_version if cfg else 0)}

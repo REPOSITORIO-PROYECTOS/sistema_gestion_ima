@@ -558,6 +558,27 @@ function FormVentas({
     }
   }, [token, setProductos]);
 
+  useEffect(() => {
+    let lastVersion = parseInt(localStorage.getItem("catalogo_version") || "0", 10);
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_CONFIG.BASE_URL}/articulos/version`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) return;
+        const data = await res.json() as { version?: number };
+        const v = typeof data.version === "number" ? data.version : 0;
+        if (v > lastVersion) {
+          await refrescarProductos();
+          lastVersion = v;
+          localStorage.setItem("catalogo_version", String(v));
+          toast.success("Catálogo actualizado");
+        }
+      } catch {}
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [token, refrescarProductos]);
+
   const imprimirComprobante = useCallback(async (
     tipo: string,
     items: ItemComprobante[],

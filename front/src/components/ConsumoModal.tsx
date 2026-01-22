@@ -9,6 +9,7 @@ import { Loader2, Plus, X, Receipt, ChefHat, FileText } from 'lucide-react';
 import { useMesasStore } from '@/lib/mesasStore';
 import { useAuthStore } from '@/lib/authStore';
 import { api } from '@/lib/api-client';
+import { API_CONFIG } from '@/lib/api-config';
 import type { ConsumoMesa, Articulo, TicketResponse } from '@/lib/types/mesas';
 import { toast } from 'sonner';
 import { routeToDepartments } from '@/lib/ticketRoutingService';
@@ -70,6 +71,28 @@ export const ConsumoModal: React.FC<ConsumoModalProps> = ({ isOpen, onClose, con
       fetchArticulos();
     }
   }, [isOpen, usuario?.id_empresa, fetchArticulos, hasFetchedArticulos]);
+  
+  useEffect(() => {
+    if (!isOpen) return;
+    let lastVersion = parseInt(localStorage.getItem("catalogo_version") || "0", 10);
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_CONFIG.BASE_URL}/articulos/version`, {
+          headers: { Authorization: `Bearer ${useAuthStore.getState().token || ''}` }
+        });
+        if (!res.ok) return;
+        const data = await res.json() as { version?: number };
+        const v = typeof data.version === "number" ? data.version : 0;
+        if (v > lastVersion) {
+          await fetchArticulos();
+          lastVersion = v;
+          localStorage.setItem("catalogo_version", String(v));
+          toast.success("Catálogo de cocina actualizado");
+        }
+      } catch {}
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [isOpen, fetchArticulos]);
 
   const handleAddDetalle = async () => {
     if (!consumo || !selectedArticuloId || cantidad <= 0) {
@@ -175,24 +198,7 @@ export const ConsumoModal: React.FC<ConsumoModalProps> = ({ isOpen, onClose, con
     }
   };
 
-  const handleImprimirComanda = async () => {
-    if (!consumo) return;
-    toast.info("Enviando a cocina...");
-    // 'comanda' debe ser un formato que tu backend entienda para imprimir solo lo nuevo
-    const ticket = await generarTicket({ id_consumo_mesa: consumo.id, formato: 'ticket' });
-    if (ticket) {
-      routeToDepartments(ticket);
-      toast.success("Comanda enviada correctamente");
-    }
-  };
-
-  const handleImprimirPrecuenta = async () => {
-    if (!consumo) return;
-    toast.info("Imprimiendo pre-cuenta...");
-    // 'comprobante' o 'precuenta' según tu backend
-    const ticket = await generarTicket({ id_consumo_mesa: consumo.id, formato: 'comprobante' });
-    if (ticket) toast.success("Pre-cuenta generada");
-  };
+  
 
   const handleCheckout = async () => {
     if (!consumo) return;
@@ -405,24 +411,13 @@ export const ConsumoModal: React.FC<ConsumoModalProps> = ({ isOpen, onClose, con
           )}
         </div>
         <div className="flex flex-col-reverse sm:flex-row justify-between items-center gap-4 mt-4 border-t pt-4">
-          {/* Grupo Izquierda: Acciones de Impresión */}
           <div className="flex gap-2 w-full sm:w-auto justify-center sm:justify-start">
             {localItems.length > 0 ? (
               <Button onClick={handleEnviarPedido} disabled={submitting} className="flex-1 sm:flex-none bg-orange-600 hover:bg-orange-700 text-white">
                 <ChefHat className="h-4 w-4 mr-2" />
                 <span className="sm:inline">Enviar Pedido ({localItems.length})</span>
               </Button>
-            ) : (
-              <Button variant="secondary" size="sm" onClick={handleImprimirComanda} className="flex-1 sm:flex-none">
-                <ChefHat className="h-4 w-4 mr-2" />
-                <span className="sm:inline">Reimprimir Comanda</span>
-              </Button>
-            )}
-
-            <Button variant="outline" size="sm" onClick={handleImprimirPrecuenta} className="flex-1 sm:flex-none">
-              <FileText className="h-4 w-4 mr-2" />
-              <span className="sm:inline">Pre-cuenta</span>
-            </Button>
+            ) : null}
           </div>
 
           {/* Grupo Derecha: Cerrar/Facturar */}
@@ -445,19 +440,7 @@ export const ConsumoModal: React.FC<ConsumoModalProps> = ({ isOpen, onClose, con
                 Facturar Consumo
               </Button>
             )}
-            {(consumo?.estado === 'cerrado' || consumo?.estado === 'facturado') && (
-              <Button onClick={async () => {
-                if (consumo) {
-                  const ticket = await generarTicket({ id_consumo_mesa: consumo.id, formato: 'ticket' });
-                  if (ticket) {
-                    onTicketGenerated(ticket);
-                  }
-                }
-              }} disabled={submitting} className="w-full sm:w-auto">
-                <Receipt className="h-4 w-4 mr-2" />
-                Generar Ticket
-              </Button>
-            )}
+            
             <Button variant="ghost" onClick={onClose} className="w-full sm:w-auto">Cerrar</Button>
           </div>
         </div>

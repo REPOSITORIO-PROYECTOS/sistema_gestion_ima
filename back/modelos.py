@@ -394,6 +394,9 @@ class ConfiguracionEmpresa(SQLModel, table=True):
     afip_certificado_encrypted: Optional[str] = Field(default=None)
     afip_clave_privada_encrypted: Optional[str] = Field(default=None)
     
+    # --- Versión de Catálogo ---
+    catalogo_version: int = Field(default=0)
+    
     # --- RELACIÓN ---
     empresa: Empresa = Relationship(back_populates="configuracion")
     

@@ -18,7 +18,8 @@ import { TicketModal } from '@/components/TicketModal';
 import { ConsumoModal } from '@/components/ConsumoModal';
 import { routeToDepartments } from '@/lib/ticketRoutingService';
 import { toast } from 'sonner';
-import type { ConsumoMesa, TicketResponse, Mesa} from '@/lib/types/mesas';
+import type { ConsumoMesa, TicketResponse, Mesa } from '@/lib/types/mesas';
+import { api } from '@/lib/api-client';
 
 export default function MesasPage() {
   const { cajaAbierta, verificarEstadoCaja } = useCajaStore();
@@ -40,6 +41,28 @@ export default function MesasPage() {
   const [selectedMesas, setSelectedMesas] = useState<number[]>([]);
   const [targetMesaId, setTargetMesaId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [autoPrintMode, setAutoPrintMode] = useState<'none' | 'ticket' | 'comanda'>('none');
+  const [onlyPending, setOnlyPending] = useState<boolean>(true);
+  const openBlob = (blob: Blob | null) => {
+    if (!blob) {
+      toast.error("No se pudo generar el PDF. Verifica la sesión de impresión.");
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+  };
+  const handlePrintMesaPDF = async (mesaId: number) => {
+    const consumoActivo = consumos.find(c => c.id_mesa === mesaId && c.estado === 'abierto');
+    if (!consumoActivo) return;
+    const blob = await api.impresion.generarMesaPDF(consumoActivo.id);
+    openBlob(blob);
+  };
+  const handlePrintComandaPDF = async (mesaId: number) => {
+    const consumoActivo = consumos.find(c => c.id_mesa === mesaId && c.estado === 'abierto');
+    if (!consumoActivo) return;
+    const blob = await api.impresion.generarComandaPDF({ id_consumo_mesa: consumoActivo.id, only_pendientes: onlyPending });
+    openBlob(blob);
+  };
 
   // Alternar selección de una mesa
   const toggleSelectMesa = (id: number) => {
@@ -48,6 +71,13 @@ export default function MesasPage() {
       // Si la mesa de destino seleccionada ya no está en las mesas seleccionadas, resetearla
       if (targetMesaId && !newSelected.includes(targetMesaId)) {
         setTargetMesaId(null);
+      }
+      if (!prev.includes(id)) {
+        const mesa = mesas.find(m => m.id === id);
+        if (mesa && mesa.estado === 'OCUPADA') {
+          if (autoPrintMode === 'ticket') handlePrintMesaPDF(id);
+          if (autoPrintMode === 'comanda') handlePrintComandaPDF(id);
+        }
       }
       return newSelected;
     });
@@ -88,7 +118,7 @@ export default function MesasPage() {
   // Agrega esta función manejadora
   const handleUnirMesas = async () => {
     if (selectedMesas.length < 2) return;
-    
+
     if (confirm(`¿Deseas unir las mesas ${selectedMesas.join(', ')}? Se creará un solo consumo compartido.`)) {
       const success = await unirMesas(selectedMesas);
       if (success) {
@@ -119,7 +149,7 @@ export default function MesasPage() {
   useEffect(() => {
     const saved = localStorage.getItem('mesas:selected');
     if (saved) {
-      try { setSelectedMesas(JSON.parse(saved)); } catch {}
+      try { setSelectedMesas(JSON.parse(saved)); } catch { }
     }
     fetchMesas();
     fetchMesaLogs();
@@ -376,7 +406,7 @@ export default function MesasPage() {
           <Button variant="outline" onClick={() => window.location.href = '/dashboard/ventas'}>
             Ir a Ventas
           </Button>
-          
+
           <Dialog open={isCajaDialogOpen} onOpenChange={setIsCajaDialogOpen}>
             <DialogTrigger asChild>
               <Button>Abrir Caja Aquí</Button>
@@ -385,9 +415,9 @@ export default function MesasPage() {
               <DialogHeader>
                 <DialogTitle>Apertura de Caja</DialogTitle>
               </DialogHeader>
-              <CajaForm 
-                onAbrirCaja={() => setIsCajaDialogOpen(false)} 
-                onCerrarCaja={() => setIsCajaDialogOpen(false)} 
+              <CajaForm
+                onAbrirCaja={() => setIsCajaDialogOpen(false)}
+                onCerrarCaja={() => setIsCajaDialogOpen(false)}
               />
             </DialogContent>
           </Dialog>
@@ -426,6 +456,34 @@ export default function MesasPage() {
               <List className="h-4 w-4" />
             </Button>
           </div>
+          <Select value={autoPrintMode} onValueChange={(v: 'none' | 'ticket' | 'comanda') => setAutoPrintMode(v)}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Auto imprimir" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Sin auto</SelectItem>
+              <SelectItem value="ticket">Ticket Mesa</SelectItem>
+              <SelectItem value="comanda">Comanda</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="flex items-center gap-2">
+            <input type="checkbox" checked={onlyPending} onChange={(e) => setOnlyPending(e.target.checked)} />
+            <span className="text-sm text-gray-700">Solo pendientes</span>
+          </div>
+          <Button variant="outline" size="sm" onClick={async () => {
+            const res = await api.impresion.abrirSesion();
+            if (res.success) toast.success("Sesión de impresión abierta");
+            else toast.error(res.error || "Error al abrir sesión");
+          }}>
+            Abrir Sesión Impresión
+          </Button>
+          <Button variant="outline" size="sm" onClick={async () => {
+            const res = await api.impresion.cerrarSesion();
+            if (res.success) toast.success("Sesión de impresión cerrada");
+            else toast.error(res.error || "Error al cerrar sesión");
+          }}>
+            Cerrar Sesión
+          </Button>
 
           <Button variant="outline" onClick={fetchMesas} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
@@ -595,239 +653,246 @@ export default function MesasPage() {
 
       {/* Mapa visual de mesas */}
       {viewMode === 'grid' && (
-      <Card>
-        <CardHeader>
-          <CardTitle>Mapa de Mesas (selecciona una o varias)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-4 p-2">
-            {/* Botón de Unir Mesas (solo aparece si hay seleccionadas) */}
-            {selectedMesas.length > 1 && (
-              <div className="w-full flex justify-end mb-4">
-                <Button onClick={handleUnirMesas} disabled={loading} variant="secondary">
-                  <Users className="h-4 w-4 mr-2" />
-                  Unir {selectedMesas.length} Mesas Seleccionadas
-                </Button>
-              </div>
-            )}
+        <Card>
+          <CardHeader>
+            <CardTitle>Mapa de Mesas (selecciona una o varias)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-4 p-2">
+              {/* Botón de Unir Mesas (solo aparece si hay seleccionadas) */}
+              {selectedMesas.length > 1 && (
+                <div className="w-full flex justify-end mb-4">
+                  <Button onClick={handleUnirMesas} disabled={loading} variant="secondary">
+                    <Users className="h-4 w-4 mr-2" />
+                    Unir {selectedMesas.length} Mesas Seleccionadas
+                  </Button>
+                </div>
+              )}
 
-            {/* Mapeo de Mesas */}
-            {mesas.map((mesa) => (
-              <div
-                key={mesa.id}
-                className={`relative group flex flex-col items-center justify-center border rounded-lg p-4 transition-all duration-150 shadow-sm w-32 h-32 
+              {/* Mapeo de Mesas */}
+              {mesas.map((mesa) => (
+                <div
+                  key={mesa.id}
+                  className={`relative group flex flex-col items-center justify-center border rounded-lg p-4 transition-all duration-150 shadow-sm w-32 h-32 
                   ${selectedMesas.includes(mesa.id) ? 'bg-blue-50 border-blue-400 ring-1 ring-blue-400' : 'bg-white hover:bg-gray-50'} 
                   ${!mesa.activo ? 'opacity-50' : 'cursor-pointer'} 
                   ${mesa.estado === 'OCUPADA' ? 'border-red-200 bg-red-50 hover:bg-red-100' : ''} 
                   ${mesa.estado === 'LIBRE' ? 'border-green-200 hover:bg-green-50' : ''} 
                 `}
-                // El clic principal en la tarjeta ABRE la acción (Iniciar o Ver Consumo)
-                onClick={() => {
-                  if (!mesa.activo) return;
-                  if (mesa.estado === 'LIBRE') handleIniciarConsumo(mesa.id);
-                  if (mesa.estado === 'OCUPADA') handleVerConsumo(mesa.id);
-                }}
-              >
-                {/* 1. Checkbox en la esquina para SELECCIONAR (Unir mesas) */}
-                {mesa.activo && (
-                  <div
-                    className="absolute top-2 left-2 z-10"
-                    onClick={(e) => e.stopPropagation()} // Evita abrir la mesa al marcar el check
-                  >
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      checked={selectedMesas.includes(mesa.id)}
-                      onChange={() => toggleSelectMesa(mesa.id)}
-                    />
-                  </div>
-                )}
+                  // El clic principal en la tarjeta ABRE la acción (Iniciar o Ver Consumo)
+                  onClick={() => {
+                    if (!mesa.activo) return;
+                    if (mesa.estado === 'LIBRE') handleIniciarConsumo(mesa.id);
+                    if (mesa.estado === 'OCUPADA') handleVerConsumo(mesa.id);
+                  }}
+                >
+                  {/* 1. Checkbox en la esquina para SELECCIONAR (Unir mesas) */}
+                  {mesa.activo && (
+                    <div
+                      className="absolute top-2 left-2 z-10"
+                      onClick={(e) => e.stopPropagation()} // Evita abrir la mesa al marcar el check
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        checked={selectedMesas.includes(mesa.id)}
+                        onChange={() => toggleSelectMesa(mesa.id)}
+                      />
+                    </div>
+                  )}
 
-                {/* 2. Información de la Mesa */}
-                <span className="text-3xl font-bold mb-1">{mesa.numero}</span>
-                <div className="flex flex-col items-center gap-1">
-                  <span className="text-xs text-gray-500 flex items-center gap-1">
-                    <Users className="h-3 w-3" /> {mesa.capacidad}
-                  </span>
-                  
-                  {/* Badge de Estado */}
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase 
+                  {/* 2. Información de la Mesa */}
+                  <span className="text-3xl font-bold mb-1">{mesa.numero}</span>
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-xs text-gray-500 flex items-center gap-1">
+                      <Users className="h-3 w-3" /> {mesa.capacidad}
+                    </span>
+
+                    {/* Badge de Estado */}
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase 
                     ${mesa.estado === 'LIBRE' ? 'bg-green-200 text-green-800' : ''} 
                     ${mesa.estado === 'OCUPADA' ? 'bg-red-200 text-red-800' : ''} 
                     ${mesa.estado === 'RESERVADA' ? 'bg-yellow-200 text-yellow-800' : ''} 
                   `}>
-                    {mesa.estado}
-                  </span>
+                      {mesa.estado}
+                    </span>
 
-                  {/* Si tiene consumo, mostramos el total pequeño */}
-                  {mesa.estado === 'OCUPADA' && (() => {
-                     const info = getConsumoInfo(mesa.id);
-                     return info.tieneConsumo ? (
-                       <span className="text-xs font-semibold text-green-700 mt-1">
-                         ${info.total.toFixed(0)}
-                       </span>
-                     ) : null;
-                  })()}
+                    {/* Si tiene consumo, mostramos el total pequeño */}
+                    {mesa.estado === 'OCUPADA' && (() => {
+                      const info = getConsumoInfo(mesa.id);
+                      return info.tieneConsumo ? (
+                        <span className="text-xs font-semibold text-green-700 mt-1">
+                          ${info.total.toFixed(0)}
+                        </span>
+                      ) : null;
+                    })()}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-          
-          {/* Controles de selección masiva (Opcional, puedes dejarlo o quitarlo) */}
-          <div className="flex gap-2 mt-4 pt-4 border-t">
-            <Button variant="ghost" size="sm" onClick={selectAllMesas} className="text-xs">Seleccionar todas</Button>
-            <Button variant="ghost" size="sm" onClick={deselectAllMesas} className="text-xs">Deseleccionar</Button>
-          </div>
-        </CardContent>
-      </Card>
+              ))}
+            </div>
+
+            {/* Controles de selección masiva (Opcional, puedes dejarlo o quitarlo) */}
+            <div className="flex gap-2 mt-4 pt-4 border-t">
+              <Button variant="ghost" size="sm" onClick={selectAllMesas} className="text-xs">Seleccionar todas</Button>
+              <Button variant="ghost" size="sm" onClick={deselectAllMesas} className="text-xs">Deseleccionar</Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {viewMode === 'list' && (
-      <Card>
-        <CardHeader>
-          <CardTitle>Lista de Mesas</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin" />
-            </div>
-          ) : mesas.length === 0 ? (
-            <div className="text-center py-12">
-              <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No hay mesas configuradas</h3>
-              <p className="text-gray-600 mb-4">
-                Comienza creando tu primera mesa para gestionar los consumos de tus clientes.
-              </p>
-              <Button onClick={handleOpenCreateDialog}>
-                <Plus className="h-4 w-4 mr-2" />
-                Crear Primera Mesa
-              </Button>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>
-                    <input
-                      type="checkbox"
-                      checked={selectedMesas.length === mesas.length && mesas.length > 0}
-                      onChange={e => e.target.checked ? selectAllMesas() : deselectAllMesas()}
-                      aria-label="Seleccionar todas"
-                    />
-                  </TableHead>
-                  <TableHead>Número</TableHead>
-                  <TableHead>Capacidad</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Activo</TableHead>
-                  <TableHead>Consumo Actual</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {mesas.map((mesa) => (
-                  <TableRow key={mesa.id} className={selectedMesas.includes(mesa.id) ? 'bg-blue-50' : ''}>
-                    <TableCell>
+        <Card>
+          <CardHeader>
+            <CardTitle>Lista de Mesas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            ) : mesas.length === 0 ? (
+              <div className="text-center py-12">
+                <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No hay mesas configuradas</h3>
+                <p className="text-gray-600 mb-4">
+                  Comienza creando tu primera mesa para gestionar los consumos de tus clientes.
+                </p>
+                <Button onClick={handleOpenCreateDialog}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Crear Primera Mesa
+                </Button>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>
                       <input
                         type="checkbox"
-                        checked={selectedMesas.includes(mesa.id)}
-                        onChange={() => toggleSelectMesa(mesa.id)}
-                        aria-label={`Seleccionar mesa ${mesa.numero}`}
-                        disabled={!mesa.activo}
+                        checked={selectedMesas.length === mesas.length && mesas.length > 0}
+                        onChange={e => e.target.checked ? selectAllMesas() : deselectAllMesas()}
+                        aria-label="Seleccionar todas"
                       />
-                    </TableCell>
-                    <TableCell className="font-medium">Mesa {mesa.numero}</TableCell>
-                    <TableCell>{mesa.capacidad} personas</TableCell>
-                    <TableCell>
-                      <Badge className={getEstadoColor(mesa.estado)}>
-                        {getEstadoText(mesa.estado)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Badge className={mesa.activo ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}>
-                          {mesa.activo ? 'Activo' : 'Revisar'}
-                        </Badge>
-                        {!mesa.activo && (
-                          <span className="text-xs text-orange-600 font-medium">⚠️ Requiere atención</span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {(() => {
-                        const consumoInfo = getConsumoInfo(mesa.id);
-                        return consumoInfo.tieneConsumo ? (
-                          <div className="text-sm flex flex-col gap-1">
-                            <div className="font-medium text-green-600">
-                              ${consumoInfo.total.toFixed(2)}
-                            </div>
-                            <div className="text-gray-500">
-                              Desde {consumoInfo.tiempo}
-                            </div>
-                            <Button variant="ghost" size="sm" className="mt-1 px-2 py-1 h-7 w-fit" title="Imprimir comanda"
-                              onClick={() => handleImprimirComanda(mesa.id)}>
-                              <Printer className="h-4 w-4 mr-1" />
-                              Ticket
-                            </Button>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 text-sm">Sin consumo</span>
-                        );
-                      })()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end items-center gap-2">
-                        {mesa.estado === 'LIBRE' && mesa.activo && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleIniciarConsumo(mesa.id)}
-                            disabled={loading}
-                          >
-                            Iniciar Consumo
-                          </Button>
-                        )}
-                        {mesa.estado === 'OCUPADA' && mesa.activo && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleVerConsumo(mesa.id)}
-                          >
-                            Ver Consumo
-                          </Button>
-                        )}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(mesa)}
-                          disabled={!mesa.activo}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => toggleMesaStatus(mesa)}
-                          title={mesa.activo ? 'Desactivar Mesa' : 'Activar Mesa'}
-                        >
-                          {mesa.activo ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDelete(mesa.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+                    </TableHead>
+                    <TableHead>Número</TableHead>
+                    <TableHead>Capacidad</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead>Activo</TableHead>
+                    <TableHead>Consumo Actual</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {mesas.map((mesa) => (
+                    <TableRow key={mesa.id} className={selectedMesas.includes(mesa.id) ? 'bg-blue-50' : ''}>
+                      <TableCell>
+                        <input
+                          type="checkbox"
+                          checked={selectedMesas.includes(mesa.id)}
+                          onChange={() => toggleSelectMesa(mesa.id)}
+                          aria-label={`Seleccionar mesa ${mesa.numero}`}
+                          disabled={!mesa.activo}
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium">Mesa {mesa.numero}</TableCell>
+                      <TableCell>{mesa.capacidad} personas</TableCell>
+                      <TableCell>
+                        <Badge className={getEstadoColor(mesa.estado)}>
+                          {getEstadoText(mesa.estado)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Badge className={mesa.activo ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}>
+                            {mesa.activo ? 'Activo' : 'Revisar'}
+                          </Badge>
+                          {!mesa.activo && (
+                            <span className="text-xs text-orange-600 font-medium">⚠️ Requiere atención</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          const consumoInfo = getConsumoInfo(mesa.id);
+                          return consumoInfo.tieneConsumo ? (
+                            <div className="text-sm flex flex-col gap-1">
+                              <div className="font-medium text-green-600">
+                                ${consumoInfo.total.toFixed(2)}
+                              </div>
+                              <div className="text-gray-500">
+                                Desde {consumoInfo.tiempo}
+                              </div>
+                              <div className="flex gap-2 mt-1">
+                                <Button variant="ghost" size="sm" className="px-2 py-1 h-7 w-fit" title="Ticket Mesa"
+                                  onClick={() => handlePrintMesaPDF(mesa.id)}>
+                                  <Printer className="h-4 w-4 mr-1" />
+                                  Ticket
+                                </Button>
+                                <Button variant="ghost" size="sm" className="px-2 py-1 h-7 w-fit" title="Comanda"
+                                  onClick={() => handlePrintComandaPDF(mesa.id)}>
+                                  <Printer className="h-4 w-4 mr-1" />
+                                  Comanda
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 text-sm">Sin consumo</span>
+                          );
+                        })()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end items-center gap-2">
+                          {mesa.estado === 'LIBRE' && mesa.activo && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleIniciarConsumo(mesa.id)}
+                              disabled={loading}
+                            >
+                              Iniciar Consumo
+                            </Button>
+                          )}
+                          {mesa.estado === 'OCUPADA' && mesa.activo && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleVerConsumo(mesa.id)}
+                            >
+                              Ver Consumo
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEdit(mesa)}
+                            disabled={!mesa.activo}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => toggleMesaStatus(mesa)}
+                            title={mesa.activo ? 'Desactivar Mesa' : 'Activar Mesa'}
+                          >
+                            {mesa.activo ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDelete(mesa.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Registro de Cambios de Estado */}

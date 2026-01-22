@@ -172,8 +172,10 @@ export const api = {
   },
 
   impresion: {
-    generarComandaPDF: async (ids: number[]) => apiClient.download(API_CONFIG.ENDPOINTS.IMPRESION_COMANDA_PDF, { ids_detalles: ids }),
+    generarComandaPDF: async (payload: any) => apiClient.download(API_CONFIG.ENDPOINTS.IMPRESION_COMANDA_PDF, payload),
     generarMesaPDF: async (consumoId: number) => apiClient.download(API_CONFIG.ENDPOINTS.IMPRESION_MESA_PDF, { id_consumo_mesa: consumoId }),
+    abrirSesion: () => apiClient.post(API_CONFIG.ENDPOINTS.IMPRESION_COMANDA_PDF.replace('/comanda/pdf', '/sesion/abrir')),
+    cerrarSesion: () => apiClient.post(API_CONFIG.ENDPOINTS.IMPRESION_COMANDA_PDF.replace('/comanda/pdf', '/sesion/cerrar')),
   },
 
   // Articulos

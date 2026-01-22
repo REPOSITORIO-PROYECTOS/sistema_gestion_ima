@@ -172,8 +172,13 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int) -> Di
             db.delete(articulo)
             eliminados += 1
 
-    # 4. GUARDAR TODOS LOS CAMBIOS EN LA BASE DE DATOS
-    # El commit se hace una sola vez al final, haciendo la operación atómica.
+    # 4. Actualizar versión de catálogo y guardar cambios
+    if config_empresa:
+        try:
+            config_empresa.catalogo_version = (config_empresa.catalogo_version or 0) + 1
+            db.add(config_empresa)
+        except Exception:
+            pass
     db.commit()
     
     print("--- Sincronización Finalizada ---")

@@ -165,6 +165,18 @@ def obtener_datos_para_ticket_cierre_detallado(db: Session, id_sesion: int, usua
     # A. Desglose de Ventas por Método de Pago
     ventas = [m for m in movimientos if m.tipo == 'VENTA']
     total_ventas = sum(v.monto for v in ventas)
+    total_propinas = 0.0
+    for v in ventas:
+        concepto = v.concepto or ""
+        if "Incluye Propina:" in concepto:
+            try:
+                start = concepto.index("Incluye Propina:") + len("Incluye Propina:")
+                end = concepto.find(")", start)
+                fragment = concepto[start:end if end != -1 else None].strip()
+                fragment = fragment.replace("$", "").replace(",", ".")
+                total_propinas += float(fragment)
+            except Exception:
+                pass
     
     total_ventas_efectivo = sum(v.monto for v in ventas if v.metodo_pago and v.metodo_pago.upper() == 'EFECTIVO')
     total_ventas_transferencia = sum(v.monto for v in ventas if v.metodo_pago and v.metodo_pago.upper() == 'TRANSFERENCIA')
@@ -194,7 +206,7 @@ def obtener_datos_para_ticket_cierre_detallado(db: Session, id_sesion: int, usua
         "empresa": sesion.usuario_apertura.empresa,
         "totales": {
             "ventas": total_ventas,
-            "propinas": total_propinas,  # Agregado al diccionario
+            "propinas": total_propinas,
             "ingresos": total_ingresos,
             "egresos": total_egresos,
         },
