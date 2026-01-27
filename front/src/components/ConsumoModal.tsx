@@ -13,6 +13,7 @@ import { API_CONFIG } from '@/lib/api-config';
 import type { ConsumoMesa, Articulo, TicketResponse } from '@/lib/types/mesas';
 import { toast } from 'sonner';
 import { routeToDepartments } from '@/lib/ticketRoutingService';
+import { buildTicketHtml, printHtml } from '@/lib/printerService';
 
 interface ConsumoModalProps {
   isOpen: boolean;

@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command"
-import { ChevronsUpDown, Lock, LockOpen } from "lucide-react"
+import { ChevronsUpDown, Lock, LockOpen, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 // Tipos
@@ -38,10 +38,13 @@ interface SeccionProductoProps {
   cantidadEscaneada: number;
   setCantidadEscaneada: (cantidad: number) => void;
   handleAgregarDesdePopover: () => void;
-  
+
   // Persistencia de producto
   persistirProducto: boolean;
   setPersistirProducto: (v: boolean) => void;
+
+  // Sincronización manual
+  onRefrescarProductos: () => void;
 }
 
 export function SeccionProducto({
@@ -50,12 +53,13 @@ export function SeccionProducto({
   open, setOpen, tipoClienteSeleccionadoId,
   popoverOpen, setPopoverOpen, productoEscaneado,
   cantidadEscaneada, setCantidadEscaneada, handleAgregarDesdePopover,
-  persistirProducto, setPersistirProducto
+  persistirProducto, setPersistirProducto,
+  onRefrescarProductos
 }: SeccionProductoProps) {
-return (
+  return (
     // Usamos un div contenedor con flex-col y gap para espaciar las secciones internas
     <div className="flex flex-col gap-6">
-      
+
       {/* --- CÓDIGO DE BARRAS ALINEADO --- */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 items-center">
         <Label htmlFor="codigo-barras" className="text-lg font-semibold text-green-900 md:text-right">
@@ -118,7 +122,10 @@ return (
         <div className="md:col-span-2 flex gap-2">
           <div className="flex-1">
             {productos.length === 0 ? (
-              <p className="text-green-900 font-semibold">Cargando...</p>
+              <div className="flex items-center text-green-900 font-semibold">
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                Cargando...
+              </div>
             ) : (
               <Popover open={open} onOpenChange={setOpen}>
                 <PopoverTrigger asChild>
@@ -150,6 +157,15 @@ return (
               </Popover>
             )}
           </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={onRefrescarProductos}
+            title="Sincronizar productos"
+          >
+            <RefreshCw className="h-4 w-4" />
+          </Button>
           <Button
             type="button"
             variant={persistirProducto ? "default" : "outline"}

@@ -995,6 +995,7 @@ function FormVentas({
             handleAgregarDesdePopover={handleAgregarDesdePopover}
             persistirProducto={persistirProducto}
             setPersistirProducto={setPersistirProducto}
+            onRefrescarProductos={refrescarProductos}
           />
 
           {/* Sección de Cantidad */}
