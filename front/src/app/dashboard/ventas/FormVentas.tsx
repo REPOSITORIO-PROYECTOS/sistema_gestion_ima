@@ -77,6 +77,7 @@ interface FormVentasProps {
     tipo: string;
     cantidad: number;
     precioTotal: number;
+    precioBase: number;
     descuentoAplicado: boolean;
     porcentajeDescuento: number;
 
@@ -136,8 +137,6 @@ function FormVentas({
   const [busquedaCliente, setBusquedaCliente] = useState("");
   const [cuitManual, setCuitManual] = useState("");
   const [cantidad, setCantidad] = useState(1); // Representa la cantidad final a agregar
-  const [descuentoPorcentual, setDescuentoPorcentual] = useState(0);
-  const [descuentoNominal, setDescuentoNominal] = useState(0);
   const [open, setOpen] = useState(false);
   const [tipoClienteSeleccionado, setTipoClienteSeleccionado] = useState(tipoCliente[0]);
   const [inputEfectivo, setInputEfectivo] = useState("");
@@ -174,8 +173,8 @@ function FormVentas({
 
 
   const totalProducto = productoSeleccionado ? getPrecioProducto(productoSeleccionado) * cantidad : 0;
-  const subtotal = totalProducto * (1 - descuentoPorcentual / 100);
-  const productoConDescuento = Math.max(0, subtotal - descuentoNominal);
+  const subtotal = totalProducto;
+  const productoConDescuento = subtotal;
 
   // Hook para cambiar el modo de venta según el producto seleccionado
   useEffect(() => {
@@ -230,9 +229,10 @@ function FormVentas({
       tipo: productoSeleccionado.nombre,
       cantidad,
       precioTotal: productoConDescuento,
-      descuentoAplicado: descuentoPorcentual > 0 || descuentoNominal > 0,
-      porcentajeDescuento: descuentoPorcentual, // Asignación explícita
-      descuentoNominal: descuentoNominal
+      precioBase: totalProducto,
+      descuentoAplicado: false,
+      porcentajeDescuento: 0,
+      descuentoNominal: 0
     });
     // Reset de campos
     if (!persistirProducto) {
@@ -240,8 +240,6 @@ function FormVentas({
       setCodigoEscaneado("");
     }
     setCantidad(1);
-    setDescuentoNominal(0);
-    setDescuentoPorcentual(0);
     setInputCantidadGranel("1");
     setInputPrecioGranel("");
 
@@ -270,8 +268,6 @@ function FormVentas({
     setCuitManual("");
     setDescuentoNominalTotal(0);
     setDescuentoSobreTotal(0);
-    setDescuentoPorcentual(0);
-    setDescuentoNominal(0);
     setObservaciones("");
     setCantidad(1);
     setInputEfectivo("");
@@ -283,14 +279,14 @@ function FormVentas({
     }
     setModoVenta('unidad');
     setCheckoutVisible(false); // <-- Ocultar la sección de checkout al resetear
-    
+
     // Foco post-venta
     setTimeout(() => {
-        if (persistirProducto) {
-            if (cantidadInputRef.current) cantidadInputRef.current.focus();
-        } else {
-            if (inputRef.current) inputRef.current.focus();
-        }
+      if (persistirProducto) {
+        if (cantidadInputRef.current) cantidadInputRef.current.focus();
+      } else {
+        if (inputRef.current) inputRef.current.focus();
+      }
     }, 100);
   }, [onLimpiarResumen, persistirProducto]);
 
@@ -350,6 +346,7 @@ function FormVentas({
               tipo: p.nombre,
               cantidad: cantidadEv,
               precioTotal: pUnit * cantidadEv,
+              precioBase: pUnit * cantidadEv,
               descuentoAplicado: false,
               porcentajeDescuento: 0,
               descuentoNominal: 0
@@ -574,7 +571,7 @@ function FormVentas({
           localStorage.setItem("catalogo_version", String(v));
           toast.success("Catálogo actualizado");
         }
-      } catch {}
+      } catch { }
     }, 5000);
     return () => clearInterval(interval);
   }, [token, refrescarProductos]);
@@ -626,7 +623,7 @@ function FormVentas({
 
       const blob = await respComp.blob();
       const url = URL.createObjectURL(blob);
-      
+
       // Descarga automática de respaldo
       const link = document.createElement('a');
       link.href = url;
@@ -640,7 +637,7 @@ function FormVentas({
       iframe.style.display = 'none';
       iframe.src = url;
       document.body.appendChild(iframe);
-      
+
       iframe.onload = () => {
         iframe.contentWindow?.print();
         setTimeout(() => {
@@ -648,7 +645,7 @@ function FormVentas({
           URL.revokeObjectURL(url);
         }, 10000); // Dar tiempo para que se envíe a la cola de impresión
       };
-      
+
       toast.success("✅ Comprobante enviado a impresión.");
       console.log(`[${new Date().toISOString()}] Impresión enviada correctamente.`);
     } catch (error) {
@@ -899,71 +896,17 @@ function FormVentas({
                 busquedaCliente={busquedaCliente}
                 setBusquedaCliente={setBusquedaCliente}
               />
-              
+
               <div className="flex flex-col gap-4 mt-4 p-4 border rounded-md bg-gray-50">
                 <Label className="font-semibold text-green-900">Configuración Adicional de Venta</Label>
                 <div className="flex flex-col gap-2">
-                   <Label>Observaciones (opcional)</Label>
-                   <Textarea 
-                     placeholder="Notas internas o para el cliente..." 
-                     value={observaciones}
-                     onChange={(e) => setObservaciones(e.target.value)}
-                     className="text-black bg-white"
-                   />
-                </div>
-                
-                <div className="flex flex-row gap-4 p-2 bg-white border border-gray-200 rounded-md">
-                    <div className="flex flex-col w-1/2">
-                        <Label className="text-xs font-semibold text-green-900 mb-1">Desc. Item (%)</Label>
-                        <Input
-                            type="number"
-                            min={0}
-                            max={100}
-                            placeholder="%"
-                            value={descuentoPorcentual === 0 ? "" : descuentoPorcentual}
-                            onChange={(e) => setDescuentoPorcentual(Math.min(parseInt(e.target.value, 10) || 0, 100))}
-                            className="text-black bg-white h-9"
-                            onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                        />
-                    </div>
-                    <div className="flex flex-col w-1/2">
-                        <Label className="text-xs font-semibold text-green-900 mb-1">Desc. Item ($)</Label>
-                        <Input
-                            type="number"
-                            min={0}
-                            placeholder="$"
-                            value={descuentoNominal === 0 ? "" : descuentoNominal}
-                            onChange={(e) => setDescuentoNominal(parseFloat(e.target.value) || 0)}
-                            className="text-black bg-white h-9"
-                            onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                        />
-                    </div>
-                </div>
-
-                <div className="flex flex-col gap-4 md:flex-row">
-                  <div className="flex flex-col gap-2 w-full md:w-1/2">
-                    <Label>Descuento Global (%)</Label>
-                    <Input 
-                      type="number" 
-                      min={0} 
-                      max={100} 
-                      value={descuentoSobreTotal === 0 ? "" : descuentoSobreTotal} 
-                      onWheel={(e) => (e.target as HTMLInputElement).blur()} 
-                      onChange={(e) => setDescuentoSobreTotal(Math.min(parseInt(e.target.value, 10) || 0, 100))} 
-                      className="w-full text-black bg-white" 
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2 w-full md:w-1/2">
-                    <Label>Descuento Global ($)</Label>
-                    <Input 
-                      type="number" 
-                      min={0} 
-                      value={descuentoNominalTotal === 0 ? "" : descuentoNominalTotal} 
-                      onWheel={(e) => (e.target as HTMLInputElement).blur()} 
-                      onChange={(e) => setDescuentoNominalTotal(Math.min(parseFloat(e.target.value) || 0, totalVenta))} 
-                      className="w-full text-black bg-white" 
-                    />
-                  </div>
+                  <Label>Observaciones (opcional)</Label>
+                  <Textarea
+                    placeholder="Notas internas o para el cliente..."
+                    value={observaciones}
+                    onChange={(e) => setObservaciones(e.target.value)}
+                    className="text-black bg-white"
+                  />
                 </div>
               </div>
 

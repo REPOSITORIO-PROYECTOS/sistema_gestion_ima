@@ -23,6 +23,7 @@ interface ProductoVendido {
   tipo: string;
   cantidad: number;
   precioTotal: number;
+  precioBase: number;
   descuentoAplicado?: boolean;
   porcentajeDescuento?: number; // %
   descuentoNominal?: number;    // $
@@ -124,11 +125,37 @@ function DashboardVenta() {
       tipo: string;
       cantidad: number;
       precioTotal: number;
+      precioBase: number;
       descuentoAplicado: boolean;
       porcentajeDescuento: number;
       descuentoNominal: number;
     }
   ) => { setProductos((prev) => [...prev, producto]); }, []);
+
+  const handleUpdateProductDiscount = useCallback((index: number, type: 'porcentaje' | 'nominal', value: number) => {
+    setProductos(prev => {
+      const newProductos = [...prev];
+      const prod = { ...newProductos[index] };
+
+      if (type === 'porcentaje') {
+        prod.porcentajeDescuento = value;
+      } else {
+        prod.descuentoNominal = value;
+      }
+
+      // Recalculate
+      const base = prod.precioBase;
+      const descPorc = prod.porcentajeDescuento || 0;
+      const descNom = prod.descuentoNominal || 0;
+
+      const subtotal = base * (1 - descPorc / 100);
+      prod.precioTotal = Math.max(0, subtotal - descNom);
+      prod.descuentoAplicado = descPorc > 0 || descNom > 0;
+
+      newProductos[index] = prod;
+      return newProductos;
+    });
+  }, []);
 
   const handleEliminarProducto = useCallback((index: number) => {
     setProductos((prev) => prev.filter((_, i) => i !== index));
@@ -229,19 +256,34 @@ function DashboardVenta() {
                   key={index}
                   className="flex flex-col md:flex-row w-full justify-between items-start md:items-center px-6 py-4 bg-emerald-100 rounded-lg text-green-950 font-semibold border-3 border-green-800 text-xl shadow-lg"
                 >
-                  <div className="flex flex-col">
+                  <div className="flex flex-col w-full gap-2">
                     <span>{prod.tipo} - x{prod.cantidad} U. - {formatearMoneda(prod.precioTotal)}</span>
 
-                    {prod.descuentoAplicado && (
-                      <span className="text-green-800 text-sm font-normal italic">
-                        Descuento aplicado: {prod.porcentajeDescuento}% OFF
-                      </span>
-                    )}
-                    {prod.descuentoAplicado && (
-                      <span className="text-green-800 text-sm font-normal italic">
-                        Descuento aplicado: - ${prod.descuentoNominal}
-                      </span>
-                    )}
+                    <div className="flex flex-row gap-4 items-center mt-1">
+                      <div className="flex flex-col w-24">
+                        <label className="text-xs font-normal text-green-800">Desc %</label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          value={prod.porcentajeDescuento || 0}
+                          onChange={(e) => handleUpdateProductDiscount(index, 'porcentaje', parseFloat(e.target.value) || 0)}
+                          className="h-8 text-sm bg-white"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                      <div className="flex flex-col w-24">
+                        <label className="text-xs font-normal text-green-800">Desc $</label>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={prod.descuentoNominal || 0}
+                          onChange={(e) => handleUpdateProductDiscount(index, 'nominal', parseFloat(e.target.value) || 0)}
+                          className="h-8 text-sm bg-white"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   <Button variant="delete" onClick={() => handleEliminarProducto(index)}>X</Button>
@@ -254,8 +296,31 @@ function DashboardVenta() {
               <div className="flex flex-col gap-4 p-6 bg-white border border-green-900 rounded-lg">
                 <h3 className="text-2xl font-semibold text-green-900">Resumen Final del Pedido</h3>
                 <p className="text-xl text-green-900"><span className="font-semibold">Total sin descuento:</span> {formatearMoneda(totalVenta)}</p>
-                <p className="text-xl text-green-400"><span className="font-semibold">Descuento sobre total (%):</span> {descuentoSobreTotal}%</p>
-                <p className="text-xl text-green-400"><span className="font-semibold">Descuento sobre total ($):</span> {formatearMoneda(descuentoNominalTotal)}</p>
+                <div className="flex flex-col gap-2 my-2">
+                  <div className="flex flex-row items-center justify-between gap-4">
+                    <span className="text-xl text-green-400 font-semibold">Descuento Global (%):</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={descuentoSobreTotal === 0 ? '' : descuentoSobreTotal}
+                      onChange={(e) => setDescuentoSobreTotal(Math.min(parseFloat(e.target.value) || 0, 100))}
+                      className="w-32 h-10 text-lg text-right"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div className="flex flex-row items-center justify-between gap-4">
+                    <span className="text-xl text-green-400 font-semibold">Descuento Global ($):</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={descuentoNominalTotal === 0 ? '' : descuentoNominalTotal}
+                      onChange={(e) => setDescuentoNominalTotal(parseFloat(e.target.value) || 0)}
+                      className="w-32 h-10 text-lg text-right"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
 
                 {metodoPago === "transferencia" && recargoTransferenciaActivo && (
                   <p className="text-xl text-red-500"><span className="font-semibold">Recargo por Transferencia:</span> {recargoTransferencia}% ({formatearMoneda(totalConDescuento * recargoTransferencia / 100)})</p>
