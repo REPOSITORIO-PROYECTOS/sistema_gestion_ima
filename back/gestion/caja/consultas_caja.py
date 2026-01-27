@@ -107,7 +107,8 @@ def obtener_todos_los_movimientos_de_caja(db: Session, usuario_actual: Usuario) 
     query = query.join(CajaSesion).where(CajaSesion.id_empresa == usuario_actual.id_empresa)
     # 3. Cargamos las relaciones necesarias de forma eficiente.
     query = query.options(
-        selectinload(CajaMovimiento.venta).selectinload(Venta.cliente)
+        selectinload(CajaMovimiento.venta).selectinload(Venta.cliente),
+        selectinload(CajaMovimiento.usuario)
     )
 
     # 4. Ordenamos los resultados por fecha, lo más reciente primero.

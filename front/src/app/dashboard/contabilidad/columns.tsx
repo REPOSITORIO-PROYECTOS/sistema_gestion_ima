@@ -25,22 +25,26 @@ export interface MovimientoAPI {
   concepto: string;
   monto: number;
   metodo_pago?: string;
-  fecha_hora: string;
+  timestamp: string; // Corregido para coincidir con el backend
+  usuario?: {
+    nombre_usuario: string;
+  };
   facturado: boolean; // Este campo parece estar duplicado, pero lo mantenemos si lo usas
   venta?: {
     id: number;
     facturada: boolean;
+    descuento_total: number;
     datos_factura: string | null;
     tipo_comprobante_solicitado: string;
     cliente: {
       id: number;
       nombre_razon_social: string;
     } | null; // El cliente puede ser nulo (Consumidor Final)
-    
+
     // ¡AÑADIMOS LA PROPIEDAD QUE FALTABA!
     articulos_vendidos: ArticuloVendido[];
   } | null; // La venta puede ser nula
-  
+
   // Este campo parece ser redundante si ya tienes venta.tipo_comprobante_solicitado
   tipo_comprobante: "comprobante" | "remito" | "presupuesto" | "factura";
 }
@@ -145,6 +149,30 @@ export const columns: ColumnDef<MovimientoAPI>[] = [
     },
   },
   {
+    accessorKey: "usuario",
+    header: "Usuario",
+    cell: ({ row }) => {
+      const user = row.original.usuario;
+      return user ? user.nombre_usuario : "—";
+    },
+  },
+  {
+    accessorKey: "descuento",
+    header: "Descuento",
+    cell: ({ row }) => {
+      const descuento = row.original.venta?.descuento_total;
+      if (!descuento || descuento <= 0) return "—";
+      return (
+        <span className="font-bold text-red-600">
+          {new Intl.NumberFormat("es-AR", {
+            style: "currency",
+            currency: "ARS",
+          }).format(descuento)}
+        </span>
+      );
+    },
+  },
+  {
     accessorFn: (row) => row.venta?.tipo_comprobante_solicitado ?? "—",
     id: "tipo_comprobante_solicitado",
     header: "Tipo Comprobante",
@@ -160,7 +188,7 @@ export const columns: ColumnDef<MovimientoAPI>[] = [
     },
   },
   {
-    accessorFn: row => row.venta?.facturada, 
+    accessorFn: row => row.venta?.facturada,
     id: "facturado",
     header: "Facturado",
     filterFn: (row, id, value) => {

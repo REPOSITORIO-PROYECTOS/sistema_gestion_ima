@@ -31,7 +31,8 @@ def registrar_venta_y_movimiento_caja(
     detalles_pago_separado: str = None,
     tipo_comprobante_solicitado: str = None,
     omitir_stock: bool = False,
-    propina: float = 0.0
+    propina: float = 0.0,
+    descuento_total: float = 0.0
 ) -> Tuple[Venta, CajaMovimiento]:
     """
     Registra una Venta, aplica recargos dinámicos según la configuración
@@ -81,6 +82,7 @@ def registrar_venta_y_movimiento_caja(
     # --- 3. CREACIÓN DE LA VENTA PRINCIPAL ---
     nueva_venta = Venta(
         total=total_final_con_recargo, # El total de la Venta SÍ incluye el recargo
+        descuento_total=descuento_total,
         id_cliente=id_cliente,
         id_usuario=usuario_actual.id,
         id_caja_sesion=id_sesion_caja,
@@ -129,21 +131,40 @@ def registrar_venta_y_movimiento_caja(
         precio_original_subtotal = item.precio_unitario * item.cantidad
         precio_unitario_final = item.precio_unitario # Por defecto, el precio no cambia
         
+        # --- CÁLCULO DE DESCUENTOS POR ÍTEM ---
+        descuento_item_total = 0.0
+        if item.descuento_especifico or item.descuento_especifico_por:
+             monto_desc_porc = precio_original_subtotal * ((item.descuento_especifico_por or 0.0) / 100.0)
+             monto_desc_nominal = item.descuento_especifico or 0.0
+             descuento_item_total = monto_desc_porc + monto_desc_nominal
+             
+             # Reducimos el precio unitario final proporcionalmente
+             if item.cantidad > 0:
+                 descuento_unitario = descuento_item_total / item.cantidad
+                 precio_unitario_final -= descuento_unitario
+
         if monto_recargo > 0 and total_venta > 0:
             # Calculamos la proporción (el "peso") que este ítem tiene en la venta original
-            proporcion_del_item = precio_original_subtotal / total_venta
+            # Usamos el precio ya descontado para la proporción si se quiere, o el original.
+            # Usualmente el recargo financiero es sobre el total a pagar.
+            # El total_venta que viene YA tiene descuentos aplicados.
+            # Así que la proporción debería ser sobre el precio neto de este item.
+            
+            subtotal_neto_item = (precio_unitario_final * item.cantidad)
+            proporcion_del_item = subtotal_neto_item / total_venta if total_venta > 0 else 0
+            
             # A este ítem le corresponde esa misma proporción del recargo total
             recargo_para_este_item = monto_recargo * proporcion_del_item
             # Distribuimos el recargo del ítem en su precio unitario
-            # Verificamos que la cantidad no sea cero para evitar divisiones por cero
             if item.cantidad > 0:
-                precio_unitario_final = item.precio_unitario + (recargo_para_este_item / item.cantidad)
+                precio_unitario_final += (recargo_para_este_item / item.cantidad)
 
         detalle = VentaDetalle(
             id_venta=nueva_venta.id,
             id_articulo=item.id_articulo,
             cantidad=item.cantidad,
-            precio_unitario=precio_unitario_final # <-- ¡Guardamos el precio unitario CON el recargo distribuido!
+            precio_unitario=precio_unitario_final, # <-- Precio final pagado (con descuentos y recargos)
+            descuento_aplicado=descuento_item_total # <-- Para auditoría
         )
         db.add(detalle)
         if afectar_stock:

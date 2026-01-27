@@ -32,11 +32,14 @@ class ArticuloVendido(BaseModel):
     id_articulo: int
     cantidad: float = Field(..., gt=0)
     precio_unitario: float = Field(..., ge=0)
+    descuento_especifico: Optional[float] = 0.0
+    descuento_especifico_por: Optional[float] = 0.0
 
 class RegistrarVentaRequest(BaseModel):
     id_cliente: Optional[int] = None
     metodo_pago: str
     total_venta: float
+    descuento_total: Optional[float] = 0.0
     paga_con: float
     articulos_vendidos: List[ArticuloVendido]
     quiere_factura: bool = False
@@ -142,12 +145,21 @@ class _InfoClienteAnidado(BaseModel):
     id: int
     nombre_razon_social: str
 
+class _InfoUsuarioMovimiento(BaseModel):
+    """
+    Sub-schema privado para representar al usuario que realizó el movimiento.
+    """
+    nombre_usuario: str
+    # nombre_completo no existe en el modelo Usuario actual
+
+
 class _InfoVentaAnidada(BaseModel):
     """
     Sub-schema privado para anidar la información clave de la venta.
     """
     id: int
     facturada: bool
+    descuento_total: float = 0.0
     datos_factura: Optional[Dict[str, Any]] = None
     tipo_comprobante_solicitado: Optional[str] = None
     cliente: Optional[_InfoClienteAnidado] = None
@@ -165,7 +177,8 @@ class MovimientoContableResponse(BaseModel):
     concepto: str
     monto: float
     metodo_pago: Optional[str] = None # Hacemos opcional para cubrir todos los casos
-    
+    usuario: Optional[_InfoUsuarioMovimiento] = None # Quién hizo el movimiento
+
     # --- Datos Anidados de la Venta (solo si el movimiento es de tipo 'VENTA') ---
     venta: Optional[_InfoVentaAnidada] = None
 

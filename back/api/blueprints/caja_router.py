@@ -100,7 +100,8 @@ def api_registrar_venta(
             id_cliente=req.id_cliente,
             pago_separado=req.pago_separado,
             detalles_pago_separado=req.detalles_pago_separado,
-            tipo_comprobante_solicitado = req.tipo_comprobante_solicitado
+            tipo_comprobante_solicitado = req.tipo_comprobante_solicitado,
+            descuento_total=req.descuento_total
         )
         db.commit()
         db.refresh(venta_creada)

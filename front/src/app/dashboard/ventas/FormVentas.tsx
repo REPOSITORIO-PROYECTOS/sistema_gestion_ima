@@ -711,10 +711,26 @@ function FormVentas({
       }
     }
 
+    // --- CÁLCULO DE DESCUENTOS PARA EL BACKEND ---
+    // 1. Calcular el precio de lista total (sin ningún descuento)
+    const totalLista = productosVendidos.reduce((acc, p) => {
+      const productoReal = productos.find(prod => prod.nombre === p.tipo);
+      const precioUnitario = productoReal ? getPrecioProducto(productoReal) : 0;
+      return acc + (precioUnitario * p.cantidad);
+    }, 0);
+
+    // 2. Calcular el total neto (lo que paga el cliente antes de recargos)
+    // totalVenta ya incluye descuentos por ítem.
+    const totalConDescuento = Math.max(0, totalVenta * (1 - (descuentoSobreTotal || 0) / 100) - (descuentoNominalTotal || 0));
+
+    // 3. El descuento total es la diferencia
+    const descuentoTotalCalculado = Math.max(0, totalLista - totalConDescuento);
+
     const ventaPayload = {
       id_cliente: tipoClienteSeleccionado.id === "0" ? 0 : clienteSeleccionado?.id ?? 0,
       metodo_pago: metodoPago.toUpperCase(),
-      total_venta: totalVenta,
+      total_venta: totalConDescuento, // Enviamos el total NETO para cálculo correcto de recargos
+      descuento_total: descuentoTotalCalculado, // Nuevo campo para historial
       paga_con: montoPagado,
       pago_separado: pagoDividido,
       detalles_pago_separado: detallePagoDividido,
