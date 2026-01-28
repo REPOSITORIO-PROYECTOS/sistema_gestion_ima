@@ -1,6 +1,7 @@
 # back/schemas/usuario_schemas.py
 
 from pydantic import BaseModel, Field
+from typing import Optional, Dict, Any
 
 class RolResponse(BaseModel):
     id: int
@@ -13,6 +14,8 @@ class UsuarioResponse(BaseModel):
     activo: bool
     rol: RolResponse # Anidamos el schema del rol para obtener sus datos
     id_empresa: int
+    configuracion: Optional[Dict[str, Any]] = None
+    
     class Config:
         from_attributes = True
         
@@ -22,3 +25,6 @@ class CambiarPasswordRequest(BaseModel):
 
 class CambiarNombreUsuarioRequest(BaseModel):
     nuevo_nombre_usuario: str = Field(min_length=3)
+
+class UsuarioConfiguracionUpdate(BaseModel):
+    configuracion: Dict[str, Any]

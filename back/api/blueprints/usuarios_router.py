@@ -1,14 +1,15 @@
 # back/api/blueprints/usuarios_router.py
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlmodel import Session
+from typing import Dict, Any
 
 # --- Módulos del Proyecto ---
 from back.database import get_db
 from back.security import obtener_usuario_actual
 from back.modelos import Usuario
 # Importamos los nuevos schemas y la lógica del manager
-from back.schemas.usuario_schemas import UsuarioResponse, CambiarPasswordRequest, CambiarNombreUsuarioRequest
+from back.schemas.usuario_schemas import UsuarioResponse, CambiarPasswordRequest, CambiarNombreUsuarioRequest, UsuarioConfiguracionUpdate
 import back.gestion.admin.admin_manager as admin_manager
 
 router = APIRouter(
@@ -71,3 +72,23 @@ def api_cambiar_nombre_usuario_propio(
     except ValueError as e:
         # Usamos 409 para un Conflicto (nombre de usuario ya existe)
         raise HTTPException(status_code=409, detail=str(e))
+
+@router.patch("/me/config", response_model=UsuarioResponse, summary="Actualizar configuración del usuario (JSON)")
+def api_actualizar_configuracion_usuario(
+    req: UsuarioConfiguracionUpdate,
+    current_user: Usuario = Depends(obtener_usuario_actual),
+    db: Session = Depends(get_db)
+):
+    """
+    Guarda o actualiza la configuración JSON del usuario (ej. enlaces personalizados).
+    """
+    try:
+        # Actualizamos el campo JSON directamente
+        current_user.configuracion = req.configuracion
+        db.add(current_user)
+        db.commit()
+        db.refresh(current_user)
+        return current_user
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al guardar configuración: {str(e)}")

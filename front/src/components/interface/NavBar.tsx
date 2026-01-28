@@ -49,6 +49,7 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
   const [logoUrl, setLogoUrl] = useState('/default-logo.png');
   const [navbarColor, setNavbarColor] = useState('bg-green-800');
   const [empresaCargada, setEmpresaCargada] = useState(false); 
+  const loadFromBackend = useCustomLinksStore((s) => s.loadFromBackend);
 
 
   // Oculta NavBar en scroll
@@ -62,6 +63,33 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, [lastScrollY]);
+  
+  // Cargar configuración de usuario al iniciar
+  useEffect(() => {
+    const fetchUserConfig = async () => {
+      if (!token) return;
+      
+      try {
+        const res = await fetch(`${API_CONFIG.BASE_URL}/users/me`, {
+           headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        
+        if (res.ok) {
+           const userData = await res.json();
+           // Si el usuario tiene configuración, la cargamos en el store
+           if (userData.configuracion) {
+              loadFromBackend(userData.configuracion);
+           }
+        }
+      } catch (error) {
+         console.error("Error fetching user config:", error);
+      }
+    };
+    
+    fetchUserConfig();
+  }, [token, loadFromBackend]);
 
   useEffect(() => {
     const obtenerEmpresa = async () => {

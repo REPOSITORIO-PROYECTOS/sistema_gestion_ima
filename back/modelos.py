@@ -36,6 +36,7 @@ class Usuario(SQLModel, table=True):
     # --- RELACIÓN CON EMPRESA ---
     id_empresa: int = Field(foreign_key="empresas.id")
     empresa: "Empresa" = Relationship(back_populates="usuarios")    
+    configuracion: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSON))
 
 class Tercero(SQLModel, table=True):
     __tablename__ = "terceros"

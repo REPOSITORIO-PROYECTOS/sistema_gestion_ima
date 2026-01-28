@@ -372,6 +372,7 @@ function FormVentas({
                 tipo: p.nombre,
                 cantidad: cantidadEv,
                 precioTotal: pUnit * cantidadEv,
+                precioBase: pUnit * cantidadEv,
                 descuentoAplicado: false,
                 porcentajeDescuento: 0,
                 descuentoNominal: 0
@@ -393,6 +394,7 @@ function FormVentas({
               tipo: nombre,
               cantidad: cantidadEv,
               precioTotal: precioTotalEv,
+              precioBase: precioTotalEv,
               descuentoAplicado: false,
               porcentajeDescuento: 0,
               descuentoNominal: 0
@@ -461,6 +463,7 @@ function FormVentas({
       tipo: productoEscaneado.nombre,
       cantidad: cantidadEscaneada,
       precioTotal: productoEscaneado.precio_venta * cantidadEscaneada,
+      precioBase: productoEscaneado.precio_venta * cantidadEscaneada,
       descuentoAplicado: false,
       porcentajeDescuento: 0,
       descuentoNominal: 0
