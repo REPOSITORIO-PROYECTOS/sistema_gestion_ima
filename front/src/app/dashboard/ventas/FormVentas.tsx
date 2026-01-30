@@ -852,6 +852,25 @@ function FormVentas({
     procesarVenta('factura');
   }, [procesarVenta]);
 
+  const handleF8 = useCallback(() => {
+    setMetodoPago('efectivo');
+    setMontoPagado(totalVentaFinal);
+    setInputEfectivo(formatearMoneda(totalVentaFinal.toString()));
+    setCheckoutVisible(true);
+    setTipoFacturacion('comprobante');
+    setAutoSubmitFlag(true);
+    toast.info("Procesando pago en EFECTIVO (F8)...");
+  }, [totalVentaFinal, setMetodoPago, setMontoPagado, formatearMoneda]);
+
+  const handleF9 = useCallback(() => {
+    setMetodoPago('transferencia');
+    setMontoPagado(totalVentaFinal);
+    setCheckoutVisible(true);
+    setTipoFacturacion('comprobante');
+    setAutoSubmitFlag(true);
+    toast.info("Procesando pago con TRANSFERENCIA (F9)...");
+  }, [totalVentaFinal, setMetodoPago, setMontoPagado]);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'F5') {
@@ -860,11 +879,17 @@ function FormVentas({
       } else if (e.key === 'F6') {
         e.preventDefault();
         handleF6();
+      } else if (e.key === 'F8') {
+        e.preventDefault();
+        handleF8();
+      } else if (e.key === 'F9') {
+        e.preventDefault();
+        handleF9();
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleF5, handleF6]);
+  }, [handleF5, handleF6, handleF8, handleF9]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
