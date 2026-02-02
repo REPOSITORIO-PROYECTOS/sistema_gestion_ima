@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Loader2 } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import {
   Tooltip,
@@ -157,6 +157,7 @@ function FormVentas({
   const [checkoutVisible, setCheckoutVisible] = useState(false);
   const checkoutSectionRef = useRef<HTMLDivElement>(null);
   const [autoSubmitFlag, setAutoSubmitFlag] = useState(false);
+  const [balanzaRetry, setBalanzaRetry] = useState(0);
 
 
   // Estados para Venta a Granel
@@ -317,12 +318,13 @@ function FormVentas({
     if (!token) return;
     let ctrl: { stop: () => Promise<void> } | null = null;
     (async () => {
+      console.log("⚖️ [FormVentas] Iniciando conexión con balanza (Intento " + balanzaRetry + ")");
       ctrl = await attachAutoScaleBridge(token);
     })();
     return () => {
       if (ctrl) ctrl.stop();
     };
-  }, [empresa, token]);
+  }, [empresa, token, balanzaRetry]);
 
 
 
@@ -913,7 +915,30 @@ function FormVentas({
 
       {/* Header del Form */}
       <div className="w-full flex flex-row justify-between items-center px-6 py-4 bg-green-700 rounded-t-xl">
-        <h4 className="text-xl font-semibold text-white">Cajero</h4>
+        <div className="flex items-center gap-3">
+          <h4 className="text-xl font-semibold text-white">Cajero</h4>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 text-white hover:bg-green-600 hover:text-white"
+                  onClick={() => {
+                    setBalanzaRetry(p => p + 1);
+                    toast.info("Reconectando balanza...");
+                  }}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Reconectar Balanza</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
         <p className="text-xl font-semibold text-white md:hidden">${totalVenta.toFixed(2)}</p>
       </div>
 

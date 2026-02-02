@@ -74,6 +74,11 @@ class ApiClient {
         },
       });
       if (!response.ok) {
+        if (response.status === 401) {
+          useAuthStore.getState().logout();
+          if (typeof window !== 'undefined') window.location.href = '/';
+          throw new Error("Sesión expirada");
+        }
         try {
           const err = await response.json();
           throw new Error(err?.detail || `HTTP ${response.status}: ${response.statusText}`);

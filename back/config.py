@@ -83,7 +83,7 @@ AFIP_KEY: str = os.getenv("AFIP_KEY")
 AFIP_PRODUCTION: bool = os.getenv("AFIP_PRODUCTION", "false").lower() == "true"
     
     # URL del microservicio de facturación
-FACTURACION_API_URL: str = os.getenv("FACTURACION_API_URL", "http://localhost:8002/afipws/facturador")
+FACTURACION_API_URL: str = os.getenv("FACTURACION_API_URL", "http://localhost:8008/facturador/facturar-por-cantidad")
 
 #===========================FIN FACTURADOR=========================================
 

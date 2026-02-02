@@ -18,8 +18,12 @@ export async function attachAutoScaleBridge(token: string, onData?: (data: unkno
 
   const opened: { port: SerialPort; reader: ReadableStreamDefaultReader<string> }[] = []
   let lastSent = 0
+  let isStopping = false
 
   async function openPort(port: SerialPort) {
+    if (isStopping) return;
+    if (opened.some(x => x.port === port)) return;
+
     console.log("🔌 [Balanza] Abriendo puerto serie...");
     try {
       await port.open({ baudRate: baud })
@@ -152,6 +156,7 @@ export async function attachAutoScaleBridge(token: string, onData?: (data: unkno
     const p = e.target as unknown as SerialPort
     const idx = opened.findIndex(x => x.port === p)
     if (idx >= 0) {
+      console.log("🔌 [Balanza] Evento disconnect detectado.");
       try {
         await opened[idx].reader.cancel()
       } catch { }
@@ -164,6 +169,8 @@ export async function attachAutoScaleBridge(token: string, onData?: (data: unkno
 
   return {
     stop: async () => {
+      isStopping = true;
+      console.log("🛑 [Balanza] Deteniendo conexión...");
       for (const { port, reader } of opened) {
         try {
           await reader.cancel()

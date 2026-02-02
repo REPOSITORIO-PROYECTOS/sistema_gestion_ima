@@ -9,23 +9,20 @@ from datetime import datetime
 
 from enum import Enum
 # --- Importaciones de la aplicación ---
+from back import config
 from back.cliente_boveda import ClienteBoveda
 from back.schemas.comprobante_schemas import TransaccionData, ReceptorData, EmisorData
 from typing import Dict, Any
 from back.modelos import Venta
 
 TASA_IVA_21 = 0.21
-# --- Carga de Configuración ---
-# Carga las variables desde el archivo .env.ima ubicado en el directorio padre 'back'
-DOTENV_IMA_PATH = os.path.join(os.path.dirname(__file__), '..', '.env.ima')
-load_dotenv(dotenv_path=DOTENV_IMA_PATH)
 
 # Configuración para la Bóveda de Secretos
-BOVEDA_URL = os.getenv("BOVEDA_URL")
-BOVEDA_API_KEY = os.getenv("BOVEDA_API_KEY_INTERNA")
+BOVEDA_URL = config.URL_BOVEDA
+BOVEDA_API_KEY = config.API_KEY_INTERNA
 
 # Configuración para el Microservicio de Facturación Real
-FACTURACION_API_URL = os.getenv("FACTURACION_API_URL")
+FACTURACION_API_URL = config.FACTURACION_API_URL
 
 # Verificación de configuración crítica al iniciar la aplicación
 if not all([BOVEDA_URL, BOVEDA_API_KEY, FACTURACION_API_URL]):
@@ -167,22 +164,8 @@ def generar_factura_para_venta(
     if not FACTURACION_API_URL:
         raise ValueError("La URL del microservicio de facturación (FACTURACION_API_URL) no está configurada.")
 
-    print(f"Obteniendo credenciales para el CUIT {emisor_data.cuit} desde la bóveda...")
-    try:
-        secreto_emisor = cliente_boveda.obtener_secreto(emisor_data.cuit)
-        if not secreto_emisor:
-            raise ValueError(f"No se encontraron credenciales en la bóveda para el CUIT {emisor_data.cuit}.")
-        print("Credenciales obtenidas con éxito de la bóveda.")
-        
-        credenciales = {
-            "cuit": emisor_data.cuit,
-            "certificado": secreto_emisor.certificado,
-            "clave_privada": secreto_emisor.clave_privada
-        }
-    
-    except (ConnectionError, PermissionError) as e:
-        print(f"ERROR CRÍTICO: No se pudo conectar a la bóveda. Detalle: {e}")
-        raise RuntimeError(f"El servicio de bóveda de secretos no está disponible o la API Key es incorrecta.")
+    # Ya no obtenemos credenciales manualmente, delegamos al servicio de facturación
+    # que las obtendrá de la bóveda usando el CUIT emisor.
     
     print("Preparando datos de la factura con lógica dinámica...")
 
@@ -194,14 +177,22 @@ def generar_factura_para_venta(
     except (KeyError, AttributeError):
         raise ValueError(f"La condición de IVA del emisor '{emisor_data.condicion_iva}' no es válida o no está soportada.")
 
+    nombre_receptor = "Consumidor Final"
+    domicilio_receptor = "-"
+    condicion_iva_receptor_str = "CONSUMIDOR_FINAL"
+
     if cliente_data and cliente_data.cuit_o_dni and cliente_data.cuit_o_dni != "0":
         documento = cliente_data.cuit_o_dni
         tipo_documento_receptor = TipoDocumento.CUIT if len(documento) == 11 else TipoDocumento.DNI
+        nombre_receptor = getattr(cliente_data, "nombre", "Cliente") or "Cliente"
+        domicilio_receptor = getattr(cliente_data, "domicilio", "-") or "-"
+        
         try:
             if not cliente_data.condicion_iva:
                 raise ValueError("La condición de IVA del receptor es obligatoria para clientes identificados.")
             cond_receptor_str = cliente_data.condicion_iva.upper().replace(' ', '_')
             condicion_receptor = CondicionIVA[cond_receptor_str]
+            condicion_iva_receptor_str = cliente_data.condicion_iva # Usamos el string original o mapeado según convenga
         except (KeyError, AttributeError):
              raise ValueError(f"La condición de IVA del receptor '{cliente_data.condicion_iva}' no es válida o no está soportada.")
     else: 
@@ -232,27 +223,32 @@ def generar_factura_para_venta(
     )
     print(f"Lógica determinada: {logica_factura}")
 
-    datos_factura = {
-        "tipo_afip": logica_factura["tipo_afip"],
-        "punto_venta": emisor_data.punto_venta,
-        "tipo_documento": tipo_documento_receptor.value,
-        "documento": documento,
+    # Construcción del payload para el endpoint /facturar-por-cantidad (List[InvoiceItemPayload])
+    invoice_payload = {
         "total": total,
-        "id_condicion_iva": condicion_receptor.value,
-        "neto": logica_factura["neto"],
-        "iva": logica_factura["iva"],
+        "cliente_data": {
+            "cuit_o_dni": documento,
+            "nombre_razon_social": nombre_receptor,
+            "domicilio": domicilio_receptor,
+            "condicion_iva": condicion_iva_receptor_str
+        },
+        "emisor_cuit": str(emisor_data.cuit),
+        "punto_venta": emisor_data.punto_venta,
+        "tipo_forzado": logica_factura["tipo_afip"],
+        "conceptos": [
+             {
+                 "descripcion": "Venta de productos/servicios",
+                 "cantidad": 1,
+                 "precio_unitario": total,
+                 "subtotal": total,
+                 "tasa_iva": TASA_IVA_21 # Por defecto 21%, idealmente debería venir de la venta
+             }
+        ]
     }
-    print(f"LLAS CREDENCIALES QUE ESTOY ENVIANDO SON : {credenciales}")
-    print(f"LOS DATOS QUE LE ESTOY ENVIANDO A FACTURAR SON : {datos_factura}")
 
-    payload = {
-        "credenciales": credenciales,
-        "datos_factura": datos_factura,
-        "generar_qr": True  # <-- PASO 1: Solicitar explícitamente el QR
-    }
+    # Enviar como lista
+    payload = [invoice_payload]
     
-
-
     print(f"Enviando petición al microservicio de facturación en: {FACTURACION_API_URL}")
     
     # Sistema de reintentos para errores SSL de AFIP
@@ -264,17 +260,28 @@ def generar_factura_para_venta(
     for intento in range(max_intentos):
         try:
             print(f"Intento {intento + 1} de {max_intentos}")
-            # Log del tipo AFIP que estamos enviando
-            print(f"Enviando a microservicio con tipo_afip={datos_factura.get('tipo_afip')}")
+            
+            # --- AUTH: Enviamos API Key interna para autenticación ---
+            headers = {
+                "X-API-KEY": BOVEDA_API_KEY, # Reutilizamos la misma key interna
+                "Content-Type": "application/json"
+            }
+            
             response = requests.post(
                 FACTURACION_API_URL,
                 json=payload,
+                headers=headers,
                 timeout=30,  # Aumentamos timeout
             )
         
             response.raise_for_status() 
             
-            resultado_afip = response.json()
+            # La respuesta es una LISTA de resultados
+            resultados_lista = response.json()
+            if not resultados_lista or len(resultados_lista) == 0:
+                raise ValueError("Respuesta vacía del servicio de facturación")
+                
+            resultado_afip = resultados_lista[0]
             print(f"SERVICIO EXTERNO - Respuesta exitosa del microservicio de facturación: {resultado_afip}")
             print(f"SERVICIO EXTERNO - Campos recibidos: {list(resultado_afip.keys())}")
             
