@@ -504,6 +504,7 @@ class ConsumoMesaDetalle(SQLModel, table=True):
     id_consumo_mesa: int = Field(foreign_key="consumo_mesa.id")
     id_articulo: int = Field(foreign_key="articulos.id")
     impreso: bool = Field(default=False)
+    estado_cocina: str = Field(default="PENDIENTE") # PENDIENTE, LISTO, ENTREGADO
     observacion: Optional[str] = Field(default=None) # Nueva columna para observaciones
     consumo: "ConsumoMesa" = Relationship(back_populates="detalles")
     articulo: "Articulo" = Relationship()

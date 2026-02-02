@@ -355,3 +355,37 @@ def unir_mesas(db: Session, id_empresa: int, source_mesa_ids: List[int], target_
     ))
     db.commit()
     return total_movidos
+
+# ===================================================================
+# === FUNCIONES PARA GESTIÓN DE COCINA
+# ===================================================================
+
+def obtener_items_cocina(db: Session, id_empresa: int) -> List[ConsumoMesaDetalle]:
+    """
+    Obtiene items para la vista de cocina.
+    Devuelve items de mesas activas (ABIERTO/CERRADO) que estén en estado PENDIENTE o LISTO.
+    """
+    statement = select(ConsumoMesaDetalle).join(ConsumoMesa).where(
+        ConsumoMesa.id_empresa == id_empresa,
+        ConsumoMesa.estado.in_(["ABIERTO", "CERRADO"]),
+        ConsumoMesaDetalle.estado_cocina.in_(["PENDIENTE", "LISTO", "EN_PREPARACION"])
+    ).options(
+        selectinload(ConsumoMesaDetalle.articulo).selectinload(Articulo.categoria),
+        selectinload(ConsumoMesaDetalle.consumo).selectinload(ConsumoMesa.mesa)
+    ).order_by(ConsumoMesaDetalle.id.asc())
+    return db.exec(statement).all()
+
+def actualizar_estado_item_cocina(db: Session, id_detalle: int, nuevo_estado: str, id_empresa: int) -> Optional[ConsumoMesaDetalle]:
+    """Actualiza el estado de cocina de un item."""
+    statement = select(ConsumoMesaDetalle).join(ConsumoMesa).where(
+        ConsumoMesaDetalle.id == id_detalle,
+        ConsumoMesa.id_empresa == id_empresa
+    )
+    detalle = db.exec(statement).first()
+    if not detalle:
+        return None
+        
+    detalle.estado_cocina = nuevo_estado
+    db.commit()
+    db.refresh(detalle)
+    return detalle

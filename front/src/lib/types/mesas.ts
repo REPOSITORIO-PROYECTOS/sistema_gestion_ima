@@ -48,6 +48,7 @@ export interface ConsumoMesaDetalle {
   articulo?: Articulo;
   subtotal?: number;
   observacion?: string;
+  estado_cocina?: 'PENDIENTE' | 'EN_PREPARACION' | 'LISTO' | 'ENTREGADO';
 }
 
 export interface Articulo {
@@ -108,4 +109,8 @@ export interface ConsumoDetalleCreate {
   precio_unitario: number;
   descuento_aplicado?: number;
   observacion?: string;
+}
+
+export interface ConsumoMesaDetallePopulated extends ConsumoMesaDetalle {
+  consumo?: ConsumoMesa;
 }

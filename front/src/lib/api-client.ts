@@ -169,6 +169,12 @@ export const api = {
     marcarImpreso: (ids: number[]) => apiClient.post(API_CONFIG.ENDPOINTS.COMANDAS_MARCAR_IMPRESO, { ids_detalles: ids }),
   },
 
+  // Cocina
+  cocina: {
+    getItems: () => apiClient.get(API_CONFIG.ENDPOINTS.COCINA_ITEMS),
+    updateEstado: (id: number, nuevoEstado: string) => apiClient.put(API_CONFIG.ENDPOINTS.COCINA_UPDATE_ESTADO(id), { nuevo_estado: nuevoEstado }),
+  },
+
   // Comprobantes
   comprobantes: {
     generarPDF: async (payload: any) => apiClient.download(API_CONFIG.ENDPOINTS.COMPROBANTES_GENERAR, payload),

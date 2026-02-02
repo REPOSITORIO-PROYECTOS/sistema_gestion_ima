@@ -19,7 +19,8 @@ from back.schemas.mesa_schemas import (
     ConsumoMesaCreate, ConsumoMesaUpdate, ConsumoMesaRead,
     ConsumoMesaDetalleCreate, TicketMesaRequest, TicketResponse,
     ConsumoMesaCierreRequest, ConsumoMesaFacturarRequest,
-    ConsumoMesaDetallePopulated, MarcarImpresoRequest, UnirMesasRequest
+    ConsumoMesaDetallePopulated, MarcarImpresoRequest, UnirMesasRequest,
+    UpdateEstadoCocinaRequest
 )
 from back.schemas.caja_schemas import RespuestaGenerica
 
@@ -228,3 +229,30 @@ def api_unir_mesas(
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error al unir mesas: {str(e)}")
+
+# ===================================================================
+# === ENDPOINTS PARA GESTIÓN DE COCINA (NUEVO)
+# ===================================================================
+
+@router.get("/cocina/items", response_model=List[ConsumoMesaDetallePopulated])
+def api_get_items_cocina(
+    current_user: Usuario = Depends(obtener_usuario_actual),
+    db: Session = Depends(get_db)
+):
+    """Obtiene items para la vista de cocina."""
+    return mesas_manager.obtener_items_cocina(db, current_user.id_empresa)
+
+@router.put("/cocina/items/{id_detalle}/estado", response_model=ConsumoMesaDetallePopulated)
+def api_update_estado_cocina(
+    id_detalle: int,
+    request: UpdateEstadoCocinaRequest,
+    current_user: Usuario = Depends(obtener_usuario_actual),
+    db: Session = Depends(get_db)
+):
+    """Actualiza el estado de cocina de un item."""
+    detalle = mesas_manager.actualizar_estado_item_cocina(
+        db, id_detalle, request.nuevo_estado, current_user.id_empresa
+    )
+    if not detalle:
+        raise HTTPException(status_code=404, detail="Item no encontrado")
+    return detalle

@@ -48,6 +48,18 @@ function DashboardVenta() {
   const [vuelto, setVuelto] = useState<number>(0);
   const { recargoTransferenciaActivo, recargoTransferencia, recargoBancarioActivo, recargoBancario } = useFacturacionStore();
 
+  // Limpiar estado cuando se cierra la caja
+  useEffect(() => {
+    if (!cajaAbierta) {
+      setProductos([]);
+      setDescuentoSobreTotal(0);
+      setDescuentoNominalTotal(0);
+      setMetodoPago("efectivo");
+      setMontoPagado(0);
+      setVuelto(0);
+    }
+  }, [cajaAbierta]);
+
 
   // Hook para calcular fecha y hora en vivo
   useEffect(() => {

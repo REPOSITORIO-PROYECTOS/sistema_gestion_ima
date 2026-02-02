@@ -30,6 +30,9 @@ class MesaRead(MesaBase):
     class Config:
         from_attributes = True
 
+class UpdateEstadoCocinaRequest(BaseModel):
+    nuevo_estado: str
+
 # ===================================================================
 # === SCHEMAS PARA CONSUMO EN MESAS
 # ===================================================================
@@ -40,6 +43,7 @@ class ConsumoMesaDetalleBase(BaseModel):
     precio_unitario: float
     descuento_aplicado: Optional[float] = 0.0
     observacion: Optional[str] = None
+    estado_cocina: Optional[str] = "PENDIENTE"
 
 class ConsumoMesaDetalleCreate(ConsumoMesaDetalleBase):
     pass
@@ -48,6 +52,7 @@ class ConsumoMesaDetalleRead(ConsumoMesaDetalleBase):
     id: int
     id_consumo_mesa: int
     impreso: bool = False
+    estado_cocina: str
 
     class Config:
         from_attributes = True

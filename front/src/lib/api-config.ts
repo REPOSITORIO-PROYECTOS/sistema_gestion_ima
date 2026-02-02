@@ -33,6 +33,10 @@ export const API_CONFIG = {
     IMPRESION_COMANDA_PDF: '/impresion/comanda/pdf',
     IMPRESION_MESA_PDF: '/impresion/mesa/pdf',
 
+    // Cocina
+    COCINA_ITEMS: '/mesas/cocina/items',
+    COCINA_UPDATE_ESTADO: (id: number) => `/mesas/cocina/items/${id}/estado`,
+
     // Comprobantes
     COMPROBANTES_GENERAR: '/comprobantes/generar',
     COMPROBANTES_AGRUPAR: '/comprobantes/agrupar',
