@@ -32,6 +32,27 @@ router = APIRouter(
 # === ENDPOINTS DE LECTURA (GET) - Rutas mantenidas
 # ===================================================================
 
+@router.get("/buscar", response_model=List[ArticuloRead], summary="Buscar artículos por término aproximado")
+def api_buscar_articulos(
+    termino: str = Query(default=""),
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=500),
+    current_user: Usuario = Depends(obtener_usuario_actual),
+    db: Session = Depends(get_db)
+):
+    """
+    Búsqueda aproximada por descripción, código interno y códigos de barras.
+    Limita resultados para evitar cargas pesadas en frontend.
+    """
+    resultados = articulos_manager.buscar_articulos_por_termino(
+        db=db,
+        id_empresa_actual=current_user.id_empresa,
+        termino=termino,
+        skip=skip,
+        limit=limit
+    )
+    return [ArticuloRead.model_validate(a) for a in resultados]
+
 @router.get("/obtener_todos", response_model=List[ArticuloReadConCodigos])
 def api_get_all_articulos(
     current_user: Usuario = Depends(obtener_usuario_actual),

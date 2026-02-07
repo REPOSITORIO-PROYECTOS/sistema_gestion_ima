@@ -4,7 +4,8 @@ import type {
   MesaUpdate,
   ConsumoCreate,
   ConsumoDetalleCreate,
-  TicketRequest
+  TicketRequest,
+  ConsumoMesaDetallePopulated
 } from './types/mesas';
 import { useAuthStore } from './authStore';
 
@@ -171,8 +172,8 @@ export const api = {
 
   // Cocina
   cocina: {
-    getItems: () => apiClient.get(API_CONFIG.ENDPOINTS.COCINA_ITEMS),
-    updateEstado: (id: number, nuevoEstado: string) => apiClient.put(API_CONFIG.ENDPOINTS.COCINA_UPDATE_ESTADO(id), { nuevo_estado: nuevoEstado }),
+    getItems: () => apiClient.get<ConsumoMesaDetallePopulated[]>(API_CONFIG.ENDPOINTS.COCINA_ITEMS),
+    updateEstado: (id: number, nuevoEstado: string) => apiClient.put<ConsumoMesaDetallePopulated>(API_CONFIG.ENDPOINTS.COCINA_UPDATE_ESTADO(id), { nuevo_estado: nuevoEstado }),
   },
 
   // Comprobantes
@@ -193,6 +194,8 @@ export const api = {
   articulos: {
     getAll: (empresaId: number) => apiClient.get(`${API_CONFIG.ENDPOINTS.PRODUCTOS}?empres-id=${empresaId}`),
     getById: (id: number) => apiClient.get(API_CONFIG.ENDPOINTS.ARTICULO_BY_ID(id)),
+    buscar: (termino: string, limit: number = 20, skip: number = 0) =>
+      apiClient.get(`${API_CONFIG.ENDPOINTS.ARTICULOS_BUSCAR}?termino=${encodeURIComponent(termino)}&limit=${limit}&skip=${skip}`),
   },
 
   // Caja

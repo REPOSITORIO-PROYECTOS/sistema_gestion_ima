@@ -38,12 +38,12 @@ class TablasHandler:
     
     def obtener_google_sheet_id(self) -> str:
         config = self.db.get(ConfiguracionEmpresa, self.id_empresa)
-        if not config or not config.link_google_sheets:
-            raise ValueError(f"No se encontró link_google_sheets para la empresa ID {self.id_empresa}")
-
-        sheet_link = config.link_google_sheets.strip()
-       
-        return sheet_link
+        if config and config.link_google_sheets:
+            return config.link_google_sheets.strip()
+        if GOOGLE_SHEET_ID:
+            print(f"ADVERTENCIA: Usando GOOGLE_SHEET_ID global como fallback para empresa {self.id_empresa}")
+            return GOOGLE_SHEET_ID.strip()
+        raise ValueError(f"No se encontró link_google_sheets para la empresa ID {self.id_empresa} y no hay GOOGLE_SHEET_ID global configurado.")
 
 
 

@@ -76,8 +76,33 @@ def facturar_lote_de_ventas(
 
     # --- FASE 3: PREPARACIÓN Y LLAMADA A AFIP (sin cambios) ---
     # (Tu lógica existente para obtener credenciales y datos del emisor/receptor es correcta)
-    emisor_data = EmisorData(...)
-    receptor_data = ReceptorData.model_validate(cliente_db) if cliente_db else ReceptorData(...)
+    id_empresa_actual = usuario_actual.id_empresa
+    config_empresa_db = db.query(ConfiguracionEmpresa).filter(ConfiguracionEmpresa.id_empresa == id_empresa_actual).first()
+    if not config_empresa_db or not usuario_actual.empresa.cuit or not config_empresa_db.afip_punto_venta_predeterminado:
+        raise ValueError(f"La configuración del emisor para la empresa ID {id_empresa_actual} es incompleta.")
+
+    cuit_emisor = usuario_actual.empresa.cuit
+    try:
+        headers = {"X-API-KEY": API_KEY_INTERNA}
+        respuesta_boveda = requests.get(f"{URL_BOVEDA}/secretos/{cuit_emisor}", headers=headers, timeout=10)
+        respuesta_boveda.raise_for_status()
+        credenciales = respuesta_boveda.json()
+    except requests.RequestException as e:
+        raise RuntimeError(f"No se pudo comunicar con la Bóveda de Secretos: {e}")
+
+    emisor_data = EmisorData(
+        cuit=cuit_emisor,
+        razon_social=usuario_actual.empresa.nombre_legal,
+        domicilio=config_empresa_db.direccion_negocio,
+        punto_venta=config_empresa_db.afip_punto_venta_predeterminado,
+        condicion_iva=config_empresa_db.afip_condicion_iva,
+        afip_certificado=credenciales.get("certificado"),
+        afip_clave_privada=credenciales.get("clave_privada")
+    )
+
+    receptor_data = ReceptorData.model_validate(cliente_db, from_attributes=True) if cliente_db else ReceptorData(
+        nombre_razon_social="Consumidor Final", cuit_o_dni="0", domicilio="", condicion_iva="CONSUMIDOR_FINAL"
+    )
 
     # Creamos la venta "virtual" que consolida el total.
     venta_consolidada_para_afip = Venta(total=total_a_facturar)

@@ -45,6 +45,7 @@ export const API_CONFIG = {
     // Productos (para consumos)
     PRODUCTOS: '/articulos/obtener_todos',
     ARTICULO_BY_ID: (id: number) => `/articulos/obtener/${id}`,
+    ARTICULOS_BUSCAR: '/articulos/buscar',
 
     // Caja
     CAJA_ESTADO: '/caja/estado-actual',

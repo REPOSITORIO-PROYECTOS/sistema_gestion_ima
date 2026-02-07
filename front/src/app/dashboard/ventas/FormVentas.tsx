@@ -442,10 +442,24 @@ function FormVentas({
           unidad_venta: data.unidad_venta || 'Unidad'
         };
 
-        setProductoEscaneado(productoAdaptado);
-        setCantidadEscaneada(1);
-        setPopoverOpen(true);
+        const precioUnitario =
+          tipoClienteSeleccionado.id === "0"
+            ? productoAdaptado.precio_venta
+            : productoAdaptado.venta_negocio;
+
+        onAgregarProducto({
+          tipo: productoAdaptado.nombre,
+          cantidad: 1,
+          precioTotal: precioUnitario * 1,
+          precioBase: precioUnitario * 1,
+          descuentoAplicado: false,
+          porcentajeDescuento: 0,
+          descuentoNominal: 0
+        });
+
         setCodigoEscaneado('');
+        inputRef.current?.focus();
+        toast.success("Producto agregado automáticamente");
 
       } catch (error) {
         console.error(error);
@@ -707,6 +721,9 @@ function FormVentas({
 
     // Determinar un tipo_comprobante_solicitado más específico
     let tipoSolicitadoPayload = tipo.toLowerCase();
+    if (tipo === "comprobante") {
+      tipoSolicitadoPayload = "recibo";
+    }
     const cuitReceptor = tipoClienteSeleccionado.id === "0" ? (cuitManual || "0") : (clienteSeleccionado?.cuit || clienteSeleccionado?.identificacion_fiscal || "0");
     if (tipo === "factura") {
       if (cuitReceptor && cuitReceptor.toString().length === 11) {
@@ -873,6 +890,15 @@ function FormVentas({
     toast.info("Procesando pago con TRANSFERENCIA (F9)...");
   }, [totalVentaFinal, setMetodoPago, setMontoPagado]);
 
+  const handleF10 = useCallback(() => {
+    setMetodoPago('bancario');
+    setMontoPagado(totalVentaFinal);
+    setCheckoutVisible(true);
+    setTipoFacturacion('comprobante');
+    setAutoSubmitFlag(true);
+    toast.info("Procesando pago con POS (F10)...");
+  }, [totalVentaFinal, setMetodoPago, setMontoPagado]);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'F5') {
@@ -887,11 +913,14 @@ function FormVentas({
       } else if (e.key === 'F9') {
         e.preventDefault();
         handleF9();
+      } else if (e.key === 'F10') {
+        e.preventDefault();
+        handleF10();
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleF5, handleF6, handleF8, handleF9]);
+  }, [handleF5, handleF6, handleF8, handleF9, handleF10]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -920,10 +949,10 @@ function FormVentas({
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
                   className="h-8 w-8 text-white hover:bg-green-600 hover:text-white"
                   onClick={() => {
                     setBalanzaRetry(p => p + 1);

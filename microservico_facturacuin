@@ -1,0 +1,349 @@
+================================================================================
+GUÍA DE CONSUMO DEL MICROSERVICIO AFIP (MULTI-CUIT) - BACKEND CLIENTE
+================================================================================
+
+OBJETIVO:
+Instrucciones claras para invocar correctamente el endpoint de facturación del microservicio AFIP usando credenciales dinámicas (multi-tenant) y evitar el uso de un CUIT fijo.
+
+--------------------------------------------------------------------------------
+0. ESTADO Y VERIFICACIÓN DEL SERVICIO
+--------------------------------------------------------------------------------
+El servicio se ejecuta en Docker y por seguridad escucha SOLO en la interfaz local (127.0.0.1).
+
+Verificar que el servicio está corriendo:
+  $ docker ps
+  Debe mostrar el contenedor 'servicio_afip-afip_service-1' con estado 'Up' y puerto '127.0.0.1:8002->8002/tcp'.
+
+Verificar salud del servicio (Healthcheck):
+  $ curl http://127.0.0.1:8002/afipws/test
+  Respuesta esperada: {"test": "ok"}
+
+NOTA IMPORTANTE DE SEGURIDAD:
+El servicio no está expuesto a la red externa (0.0.0.0).
+- Si se consume desde el mismo host: Usar http://127.0.0.1:8002
+- Si se consume desde otro contenedor Docker en la misma red: Usar http://afip_service:8002
+
+--------------------------------------------------------------------------------
+0.1. CONFIGURACIÓN EXTRA PARA SERVICIOS CONSUMIDORES (DOCKER)
+--------------------------------------------------------------------------------
+Si tu aplicación consumidora (ej. 'backend-api') corre en otro contenedor Docker, DEBES conectarla a la misma red para que pueda ver a este servicio.
+
+1. Asegúrate de que la red compartida exista (ya fue creada):
+   $ docker network create red_afip || true
+
+2. Edita el 'docker-compose.yml' de tu aplicación consumidora y agrega la red externa:
+
+   networks:
+     red_afip:
+       external: true
+
+3. Asigna esa red a tu servicio consumidor:
+
+   services:
+     tu_app_backend:
+       ...
+       networks:
+         - default
+         - red_afip
+
+4. Configura la URL de consumo en tu app:
+   AFIP_SERVICE_URL=http://afip_service:8002
+
+--------------------------------------------------------------------------------
+1. ENDPOINT PRINCIPAL DE FACTURACIÓN Y NOTAS
+--------------------------------------------------------------------------------
+Método: POST
+Ruta:   /afipws/facturador
+Header: Content-Type: application/json
+
+Estructura OBLIGATORIA del payload (factura o nota):
+{
+  "credenciales": {
+    "cuit": "30718331680",
+    "certificado": "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----",
+    "clave_privada": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+  },
+  "datos_factura": {
+    "tipo_afip": 11,
+    "punto_venta": 4,
+    "tipo_documento": 96,
+    "documento": "11111111",
+    "total": 1000.0,
+    "neto": 1000.0,
+    "iva": 0.0,
+    "id_condicion_iva": 5
+  }
+}
+
+Campos mínimos requeridos:
+- credenciales.cuit (11 dígitos)
+- credenciales.certificado (PEM completo)
+- credenciales.clave_privada (PEM completo)
+- datos_factura.tipo_afip
+- datos_factura.punto_venta
+- datos_factura.tipo_documento
+- datos_factura.documento
+- datos_factura.total (> 0)
+- datos_factura.id_condicion_iva
+
+Opcionales según caso:
+- neto / iva / neto105 / iva105
+- asociado_tipo_afip / asociado_punto_venta / asociado_numero_comprobante / asociado_fecha_comprobante (OBLIGATORIOS si es Nota Crédito/Débito)
+
+--------------------------------------------------------------------------------
+2. TABLA RESUMEN TIPOS DE COMPROBANTE (tipo_afip)
+--------------------------------------------------------------------------------
+1  = Factura A      (IVA discriminado)
+6  = Factura B      (IVA discriminado)
+11 = Factura C      (IVA = 0, total pasa a neto)
+3 / 8 / 13 = Notas de Crédito A / B / C (requieren datos asociado_*)
+2 / 7 / 12 = Notas de Débito  A / B / C (requieren datos asociado_*)
+
+Regla Factura C (11): ignorar IVA enviado y poner IVA = 0 (microservicio ya lo hace).
+
+--------------------------------------------------------------------------------
+3. VALIDACIONES PREVIAS (DEL LADO DEL BACKEND CLIENTE)
+--------------------------------------------------------------------------------
+Antes de enviar:
+[ ] CUIT formato ^\d{11}$
+[ ] Cert y Key contienen encabezados/footers PEM
+[ ] total > 0
+[ ] Si A/B: neto + iva coherentes
+[ ] Si C: forzar iva = 0
+[ ] Si nota crédito/débito: todos los campos asociado_*
+[ ] Documento numérico si tipo_documento != 99
+[ ] punto_venta int
+[ ] tipo_afip permitido
+
+--------------------------------------------------------------------------------
+4. EJEMPLOS
+--------------------------------------------------------------------------------
+Ejemplo curl (Factura C):
+curl -s -X POST http://HOST:PUERTO/afipws/facturador \
+  -H "Content-Type: application/json" \
+  -d @factura_c.json | jq
+
+Contenido factura_c.json:
+{
+  "credenciales": {
+    "cuit": "30718331680",
+    "certificado": "-----BEGIN CERTIFICATE-----\nMIIC...\n-----END CERTIFICATE-----",
+    "clave_privada": "-----BEGIN PRIVATE KEY-----\nMIIE...\n-----END PRIVATE KEY-----"
+  },
+  "datos_factura": {
+    "tipo_afip": 11,
+    "punto_venta": 4,
+    "tipo_documento": 96,
+    "documento": "11111111",
+    "total": 1.0,
+    "neto": 1.0,
+    "iva": 0.0,
+    "id_condicion_iva": 5
+  }
+}
+
+Ejemplo curl (Nota de Crédito C sobre Factura C asociada):
+curl -s -X POST http://HOST:PUERTO/afipws/facturador \
+  -H "Content-Type: application/json" \
+  -d @nota_credito_c.json | jq
+
+Contenido nota_credito_c.json:
+{
+  "credenciales": {
+    "cuit": "30718331680",
+    "certificado": "-----BEGIN CERTIFICATE-----\nMIIC...\n-----END CERTIFICATE-----",
+    "clave_privada": "-----BEGIN PRIVATE KEY-----\nMIIE...\n-----END PRIVATE KEY-----"
+  },
+  "datos_factura": {
+    "tipo_afip": 13,
+    "punto_venta": 4,
+    "tipo_documento": 96,
+    "documento": "11111111",
+    "total": 1000.0,
+    "neto": 1000.0,
+    "iva": 0.0,
+    "id_condicion_iva": 5,
+    "asociado_tipo_afip": 11,
+    "asociado_punto_venta": 4,
+    "asociado_numero_comprobante": 32,
+    "asociado_fecha_comprobante": "2025-09-24"
+  }
+}
+
+Ejemplo Python (requests):
+import requests
+payload = { ... }  # Igual estructura arriba
+r = requests.post("http://HOST:PUERTO/afipws/facturador", json=payload, timeout=40)
+print(r.status_code, r.json())
+
+Ejemplo curl (Nota de Crédito A sobre Factura A asociada):
+curl -s -X POST http://HOST:PUERTO/afipws/facturador \
+  -H "Content-Type: application/json" \
+  -d @nota_credito_a.json | jq
+
+Contenido nota_credito_a.json:
+{
+  "credenciales": {
+    "cuit": "30718331680",
+    "certificado": "-----BEGIN CERTIFICATE-----\nMIIC...\n-----END CERTIFICATE-----",
+    "clave_privada": "-----BEGIN PRIVATE KEY-----\nMIIE...\n-----END PRIVATE KEY-----"
+  },
+  "datos_factura": {
+    "tipo_afip": 3,
+    "punto_venta": 4,
+    "tipo_documento": 80,
+    "documento": "20123456789",
+    "total": 1210.0,
+    "neto": 1000.0,
+    "iva": 210.0,
+    "id_condicion_iva": 1,
+    "asociado_tipo_afip": 1,
+    "asociado_punto_venta": 4,
+    "asociado_numero_comprobante": 123,
+    "asociado_fecha_comprobante": "2025-09-24"
+  }
+}
+
+Ejemplo curl (Nota de Crédito B sobre Factura B asociada):
+curl -s -X POST http://HOST:PUERTO/afipws/facturador \
+  -H "Content-Type: application/json" \
+  -d @nota_credito_b.json | jq
+
+Contenido nota_credito_b.json:
+{
+  "credenciales": {
+    "cuit": "30718331680",
+    "certificado": "-----BEGIN CERTIFICATE-----\nMIIC...\n-----END CERTIFICATE-----",
+    "clave_privada": "-----BEGIN PRIVATE KEY-----\nMIIE...\n-----END PRIVATE KEY-----"
+  },
+  "datos_factura": {
+    "tipo_afip": 8,
+    "punto_venta": 4,
+    "tipo_documento": 80,
+    "documento": "20123456789",
+    "total": 1210.0,
+    "neto": 1000.0,
+    "iva": 210.0,
+    "id_condicion_iva": 5,
+    "asociado_tipo_afip": 6,
+    "asociado_punto_venta": 4,
+    "asociado_numero_comprobante": 456,
+    "asociado_fecha_comprobante": "2025-09-24"
+  }
+}
+
+--------------------------------------------------------------------------------
+5. RESPUESTA TÍPICA EXITOSA
+--------------------------------------------------------------------------------
+{
+  "tipo_documento": 96,
+  "documento": "11111111",
+  "tipo_afip": 11,
+  "punto_venta": 4,
+  "total": 1.0,
+  "exento": 0.0,
+  "neto": 1.0,
+  "neto105": 0.0,
+  "iva": 0.0,
+  "iva105": 0.0,
+  "resultado": "A",
+  "cae": "75399328607897",
+  "vencimiento_cae": "20251004",
+  "numero_comprobante": 32,
+  "fecha_comprobante": "2025-09-24",
+  "asociado_tipo_afip": null,
+  "asociado_punto_venta": null,
+  "asociado_numero_comprobante": null,
+  "asociado_fecha_comprobante": null,
+  "id_condicion_iva": 5
+}
+
+Campos recomendados para persistir:
+- cae, vencimiento_cae
+- numero_comprobante, punto_venta, tipo_afip
+- fecha_comprobante
+- cuit_emisor (el que ustedes resolvieron, viene del payload)
+- documento / tipo_documento
+- total / neto / iva
+- raw_response (JSON serializado)
+
+IMPORTANTE: Si agregan campos propios (created_at, etc.), convertir datetime a string antes de serializar.
+
+--------------------------------------------------------------------------------
+6. ERRORES COMUNES
+--------------------------------------------------------------------------------
+Problema: Siempre mismo CUIT en respuesta.
+Causa: Reutilizan un único par credenciales. 
+Acción: Lookup dinámico por emisor antes de cada POST.
+
+Problema: TypeError datetime no serializable.
+Acción: usar objeto.isoformat() antes de json.dumps.
+
+Problema: AFIP rechazó factura (token fechas).
+Acción: reenviar (el microservicio ya renueva token internamente).
+
+Problema: IVA en Factura C distinto de 0.
+Accin: eliminar/forzar a 0 antes de enviar.
+
+Problema: "Clave privada en formato PEM inválida o no soportada" (400).
+Accin: usar una clave compatible (RSA/PKCS#8 sin passphrase). Convertir si es necesario:
+openssl pkcs8 -topk8 -nocrypt -in original.key -out compatible.key
+
+Problema: Nota de Crédito/Débito sin datos asociado_*.
+Accin: enviar todos los campos asociado_*: tipo, punto_venta, numero_comprobante y fecha (YYYY-MM-DD o YYYYMMDD).
+
+--------------------------------------------------------------------------------
+7. CHECKLIST DE ADOPCIÓN MULTI-CUIT
+--------------------------------------------------------------------------------
+[ ] Lookup dinámico de credenciales implementado
+[ ] Logging previo: cuit + punto_venta + tipo_afip
+[ ] Prueba con 2 CUIT distintos (secuencial)
+[ ] Prueba con 2 CUIT distintos (paralelo)
+[ ] Prueba Factura C y Factura A
+[ ] Prueba Nota de Crédito/Débito con asociado_*
+[ ] Persistencia sin errores de serialización
+[ ] raw_response guardado intacto
+
+--------------------------------------------------------------------------------
+8. PSEUDOCÓDIGO FLUJO INTERNO (RECOMENDADO)
+--------------------------------------------------------------------------------
+# obtener datos de negocio → determinar emisor
+cred = obtener_credenciales(emisor_id)  # {cuit, certificado, clave}
+payload = construir_payload(cred, datos_factura)
+validar(payload)
+resp = post_afip(payload)
+if resp["resultado"] != "A": manejar_rechazo(resp)
+persistir(resp, cred["cuit"])  # convertir datetimes propios
+return resp
+
+--------------------------------------------------------------------------------
+9. QUÉ NO HACER
+--------------------------------------------------------------------------------
+- Hardcodear un solo CUIT para todos.
+- Cachear indefinidamente certificado/clave de un solo emisor.
+- Enviar payload sin el bloque "credenciales".
+- Alterar campos de la respuesta original antes de guardarla (solo enriquecer afuera).
+- Suponer que punto de venta = 1 siempre.
+
+--------------------------------------------------------------------------------
+10. VALIDACIÓN DE CERT Y KEY (OPCIONAL LADO CLIENTE)
+--------------------------------------------------------------------------------
+from cryptography import x509
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.backends import default_backend
+
+def fingerprint_cert(pem):
+    cert = x509.load_pem_x509_certificate(pem.encode(), default_backend())
+    return cert.fingerprint(hashes.SHA1()).hex()
+
+def validar_key(priv_pem):
+    serialization.load_pem_private_key(priv_pem.encode(), password=None, backend=default_backend())
+
+--------------------------------------------------------------------------------
+11. MENSAJE RESUMEN PARA EQUIPO
+--------------------------------------------------------------------------------
+Cada emisión (factura o nota) debe enviarse con credenciales completas (CUIT + certificado + clave). El endpoint es único (`/afipws/facturador`); la operación se define por `tipo_afip`. Para notas de crédito/débito, los campos `asociado_*` son obligatorios. Si siempre se ve el mismo CUIT, el backend no está haciendo lookup dinámico. La respuesta incluye todos los campos necesarios para persistencia fiscal. Cualquier datetime propio debe serializarse antes de guardarlo.
+
+--------------------------------------------------------------------------------
+FIN DEL DOCUMENTO
+--------------------------------------------------------------------------------

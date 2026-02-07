@@ -101,9 +101,11 @@ def registrar_venta_y_movimiento_caja(
     afectar_stock = False
     afectar_caja = False
     
-    tipo_lower = tipo_comprobante_solicitado.lower()
+    tipo_lower = (tipo_comprobante_solicitado or "").lower()
+    if tipo_lower == "comprobante":
+        tipo_lower = "recibo"
 
-    if tipo_lower in ["factura", "recibo", "comprobante interno", "ticket"]:
+    if tipo_lower in ["factura", "recibo", "comprobante interno", "ticket", "comprobante"]:
         print("   -> DECISIÓN: Afectar STOCK y CAJA.")
         afectar_stock = True
         afectar_caja = True

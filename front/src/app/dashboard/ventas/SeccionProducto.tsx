@@ -1,12 +1,13 @@
 "use client"
 
-import { LegacyRef } from "react"
+import { LegacyRef, useEffect, useRef, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command"
-import { ChevronsUpDown, Lock, LockOpen, RefreshCw } from "lucide-react"
+import { Command, CommandEmpty, CommandGroup, CommandItem, CommandInput } from "@/components/ui/command"
+import { ChevronsUpDown, ChevronsDown, RefreshCw, Lock } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { api } from "@/lib/api-client"
 
 // Tipos
 type Producto = {
@@ -17,6 +18,14 @@ type Producto = {
   stock_actual: number;
   unidad_venta: string;
 };
+type MinimalArticulo = {
+  id: number;
+  descripcion: string;
+  precio_venta: number;
+  venta_negocio?: number;
+  stock_actual?: number;
+  unidad_venta?: string;
+}
 
 // Props que el componente recibe del orquestador (FormVentas)
 interface SeccionProductoProps {
@@ -31,7 +40,6 @@ interface SeccionProductoProps {
   setOpen: (open: boolean) => void;
   tipoClienteSeleccionadoId: string;
 
-  // Nuevas props para el Popover de cantidad
   popoverOpen: boolean;
   setPopoverOpen: (open: boolean) => void;
   productoEscaneado: Producto | null;
@@ -39,34 +47,84 @@ interface SeccionProductoProps {
   setCantidadEscaneada: (cantidad: number) => void;
   handleAgregarDesdePopover: () => void;
 
-  // Persistencia de producto
   persistirProducto: boolean;
   setPersistirProducto: (v: boolean) => void;
 
-  // Sincronización manual
   onRefrescarProductos: () => void;
 }
 
-export function SeccionProducto({
-  inputRef, codigo, setCodigoEscaneado, handleKeyDown,
-  productos, productoSeleccionado, setProductoSeleccionado,
-  open, setOpen, tipoClienteSeleccionadoId,
-  popoverOpen, setPopoverOpen, productoEscaneado,
-  cantidadEscaneada, setCantidadEscaneada, handleAgregarDesdePopover,
-  persistirProducto, setPersistirProducto,
-  onRefrescarProductos
-}: SeccionProductoProps) {
+export function SeccionProducto(props: SeccionProductoProps) {
+  const {
+    inputRef,
+    codigo,
+    setCodigoEscaneado,
+    handleKeyDown,
+    productos,
+    productoSeleccionado,
+    setProductoSeleccionado,
+    popoverOpen,
+    setPopoverOpen,
+    persistirProducto,
+    setPersistirProducto,
+    onRefrescarProductos,
+  } = props
+
+  const [matches, setMatches] = useState<Producto[]>([])
+  const [loading, setLoading] = useState(false)
+  const debounceRef = useRef<number | undefined>(undefined)
+
+  useEffect(() => {
+    const q = (codigo || "").trim().toLowerCase()
+    window.clearTimeout(debounceRef.current)
+    debounceRef.current = window.setTimeout(async () => {
+      setLoading(true)
+      const limit = q ? 20 : 100
+      const resp = await api.articulos.buscar(q, limit)
+      const data = (resp.success ? (resp.data as MinimalArticulo[]) : []) || []
+      const mapped: Producto[] = data.map((a) => ({
+        id: String(a.id),
+        nombre: a.descripcion,
+        precio_venta: a.precio_venta,
+        venta_negocio: a.venta_negocio ?? a.precio_venta,
+        stock_actual: a.stock_actual ?? 0,
+        unidad_venta: a.unidad_venta ?? "unidad",
+      }))
+      setMatches(mapped)
+      setLoading(false)
+    }, 250)
+
+    return () => window.clearTimeout(debounceRef.current)
+  }, [codigo, setPopoverOpen])
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && matches.length > 0) {
+      e.preventDefault()
+      setProductoSeleccionado(matches[0])
+      setCodigoEscaneado(matches[0].nombre)
+      setPopoverOpen(false)
+      return
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault()
+      const all = productos.slice(0, 200)
+      setMatches(all)
+      setPopoverOpen(true)
+      return
+    }
+    handleKeyDown(e)
+  }
+
   return (
     // Usamos un div contenedor con flex-col y gap para espaciar las secciones internas
     <div className="flex flex-col gap-6">
 
-      {/* --- CÓDIGO DE BARRAS ALINEADO --- */}
+      {/* --- ÚNICO INPUT: CÓDIGO / TEXTO DEL SCANNER --- */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 items-center">
         <Label htmlFor="codigo-barras" className="text-lg font-semibold text-green-900 md:text-right">
-          Código de Barras
+          Escáner / Código
         </Label>
-        <div className="md:col-span-2">
-          <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+          <div className="md:col-span-2 flex gap-2">
             <PopoverTrigger asChild>
               <Input
                 id="codigo-barras"
@@ -74,108 +132,122 @@ export function SeccionProducto({
                 type="text"
                 value={codigo}
                 onChange={(e) => setCodigoEscaneado(e.target.value)}
-                onKeyDown={handleKeyDown}
+                onKeyDown={onKeyDown}
+                onFocus={() => {
+                  setLoading(true)
+                  api.articulos.buscar("", 100).then((resp) => {
+                    const data = (resp.success ? (resp.data as MinimalArticulo[]) : []) || []
+                    const mapped: Producto[] = data.map((a) => ({
+                      id: String(a.id),
+                      nombre: a.descripcion,
+                      precio_venta: a.precio_venta,
+                      venta_negocio: a.venta_negocio ?? a.precio_venta,
+                      stock_actual: a.stock_actual ?? 0,
+                      unidad_venta: a.unidad_venta ?? "unidad",
+                    }))
+                    setMatches(mapped)
+                    setPopoverOpen(true)
+                  }).finally(() => setLoading(false))
+                }}
                 className="border w-full"
                 autoFocus
+                placeholder="Escanee o escriba nombre y presione Enter"
               />
             </PopoverTrigger>
-            <PopoverContent className="w-80">
-              {productoEscaneado && (
-                <div className="grid gap-4">
-                  <div className="space-y-2">
-                    <h4 className="font-medium leading-none">Agregar Producto</h4>
-                    <p className="text-sm text-muted-foreground">{productoEscaneado.nombre}</p>
-                  </div>
-                  <div className="grid gap-2">
-                    <div className="grid grid-cols-3 items-center gap-4">
-                      <Label htmlFor="cantidad-popover">Cantidad</Label>
-                      <Input
-                        id="cantidad-popover"
-                        type="number"
-                        min={1}
-                        value={cantidadEscaneada}
-                        onChange={(e) => setCantidadEscaneada(Number(e.target.value))}
-                        className="col-span-2 h-8"
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleAgregarDesdePopover();
-                          }
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <Button onClick={handleAgregarDesdePopover}>Agregar</Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setLoading(true)
+                api.articulos.buscar("", 200).then((resp) => {
+                  const data = (resp.success ? (resp.data as MinimalArticulo[]) : []) || []
+                  const mapped: Producto[] = data.map((a) => ({
+                    id: String(a.id),
+                    nombre: a.descripcion,
+                    precio_venta: a.precio_venta,
+                    venta_negocio: a.venta_negocio ?? a.precio_venta,
+                    stock_actual: a.stock_actual ?? 0,
+                    unidad_venta: a.unidad_venta ?? "unidad",
+                  }))
+                  setMatches(mapped)
+                  setPopoverOpen(true)
+                }).finally(() => setLoading(false))
+              }}
+              aria-label="Ver todos"
+            >
+              <ChevronsDown className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                onRefrescarProductos()
+                setLoading(true)
+                api.articulos.buscar("", 100).then((resp) => {
+                  const data = (resp.success ? (resp.data as MinimalArticulo[]) : []) || []
+                  const mapped: Producto[] = data.map((a) => ({
+                    id: String(a.id),
+                    nombre: a.descripcion,
+                    precio_venta: a.precio_venta,
+                    venta_negocio: a.venta_negocio ?? a.precio_venta,
+                    stock_actual: a.stock_actual ?? 0,
+                    unidad_venta: a.unidad_venta ?? "unidad",
+                  }))
+                  setMatches(mapped)
+                  setPopoverOpen(true)
+                }).finally(() => setLoading(false))
+              }}
+              aria-label="Sincronizar productos"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant={persistirProducto ? "default" : "outline"}
+              onClick={() => setPersistirProducto(!persistirProducto)}
+              aria-label="Bloquear producto seleccionado"
+            >
+              <Lock className="h-4 w-4" />
+            </Button>
+          </div>
+          <PopoverContent className="p-0 w-[min(520px,85vw)] max-h-[50vh] overflow-auto" align="start">
+            <Command>
+              {productoSeleccionado && (
+                <div className="px-3 py-2 text-sm flex items-center justify-between border-b">
+                  <span className="truncate">{productoSeleccionado.nombre}</span>
+                  <span className="text-muted-foreground">${productoSeleccionado.precio_venta.toFixed(2)}</span>
                 </div>
               )}
-            </PopoverContent>
-          </Popover>
-        </div>
-      </div>
-
-      {/* --- PRODUCTO ALINEADO --- */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 items-center">
-        <Label className="text-xl font-semibold text-green-900 md:text-right">
-          Producto
-        </Label>
-        <div className="md:col-span-2 flex gap-2">
-          <div className="flex-1">
-            {productos.length === 0 ? (
-              <div className="flex items-center text-green-900 font-semibold">
-                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                Cargando...
-              </div>
-            ) : (
-              <Popover open={open} onOpenChange={setOpen}>
-                <PopoverTrigger asChild>
-                  <button
-                    aria-label="Seleccionar un producto"
-                    role="combobox"
-                    aria-expanded={open}
-                    aria-controls="productos-lista"
-                    className="w-full justify-between text-left cursor-pointer border px-3 py-2 rounded-md shadow-sm bg-white text-black flex items-center"
-                    onClick={() => setOpen(!open)}
+              <CommandInput
+                value={codigo}
+                onValueChange={(v) => setCodigoEscaneado(v)}
+                placeholder="Buscar producto..."
+              />
+              <CommandEmpty>{loading ? "Buscando..." : "No hay resultados"}</CommandEmpty>
+              <CommandGroup heading="Productos">
+                {matches.map((prod) => (
+                  <CommandItem
+                    key={prod.id}
+                    value={prod.nombre}
+                    onSelect={() => {
+                      setProductoSeleccionado(prod)
+                      setCodigoEscaneado(prod.nombre)
+                      setPopoverOpen(false)
+                    }}
                   >
-                    {productoSeleccionado ? `${productoSeleccionado.nombre} - $${tipoClienteSeleccionadoId === "1" ? productoSeleccionado.venta_negocio : productoSeleccionado.precio_venta}` : "Seleccionar producto"}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent side="bottom" align="start" className="w-full p-0 max-h-64 overflow-y-auto z-50" sideOffset={8}>
-                  <Command id="productos-lista">
-                    <CommandInput placeholder="Buscar producto..." />
-                    <CommandEmpty>No se encontró ningún producto.</CommandEmpty>
-                    <CommandGroup>
-                      {productos.map((p) => (
-                        <CommandItem key={p.id} value={p.nombre} className="pl-2 pr-4 py-2 text-sm text-black cursor-pointer" onSelect={() => { setProductoSeleccionado(p); setOpen(false); }}>
-                          <span className="truncate">{p.nombre} | ${tipoClienteSeleccionadoId === "1" ? p.venta_negocio : p.precio_venta} | Stock: {p.stock_actual}</span>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            )}
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={onRefrescarProductos}
-            title="Sincronizar productos"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant={persistirProducto ? "default" : "outline"}
-            size="icon"
-            onClick={() => setPersistirProducto(!persistirProducto)}
-            title={persistirProducto ? "Producto persistente (No se borrará al agregar)" : "Producto se limpiará al agregar"}
-          >
-            {persistirProducto ? <Lock className="h-4 w-4" /> : <LockOpen className="h-4 w-4" />}
-          </Button>
-        </div>
+                    <div className="flex items-center justify-between w-full">
+                      <span className="truncate">{prod.nombre}</span>
+                      <span className="text-muted-foreground flex items-center gap-1">
+                        <ChevronsUpDown className="h-4 w-4" />
+                        ${prod.precio_venta.toFixed(2)}
+                      </span>
+                    </div>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </Command>
+          </PopoverContent>
+        </Popover>
       </div>
     </div>
   );
