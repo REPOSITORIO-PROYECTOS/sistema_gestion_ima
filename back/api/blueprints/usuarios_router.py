@@ -92,3 +92,14 @@ def api_actualizar_configuracion_usuario(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error al guardar configuración: {str(e)}")
+
+
+@router.get("/me/config", summary="Obtener configuración del usuario actual")
+def api_obtener_configuracion_usuario(
+    current_user: Usuario = Depends(obtener_usuario_actual)
+):
+    """
+    Obtiene la configuración JSON del usuario autenticado (ej. enlaces personalizados).
+    Devuelve directamente el objeto configuracion o un dict vacío si no existe.
+    """
+    return current_user.configuracion or {}

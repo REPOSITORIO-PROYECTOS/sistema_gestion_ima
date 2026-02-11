@@ -117,7 +117,7 @@ class Articulo(SQLModel, table=True):
     activo: bool = Field(default=True)
     es_combo: bool = Field(default=False)
     maneja_lotes: bool = Field(default=False)
-    ubicacion: str = Field(default=None)
+    ubicacion: Optional[str] = Field(default="Sin definir")
     
     id_categoria: Optional[int] = Field(default=None, foreign_key="categorias.id")
     id_marca: Optional[int] = Field(default=None, foreign_key="marcas.id")
@@ -136,8 +136,8 @@ class Articulo(SQLModel, table=True):
     
     componentes_combo: List["ArticuloCombo"] = Relationship(back_populates="combo_padre", sa_relationship_kwargs={'primaryjoin': 'Articulo.id == ArticuloCombo.id_articulo_padre'})
     parte_de_combos: List["ArticuloCombo"] = Relationship(back_populates="componente_hijo", sa_relationship_kwargs={'primaryjoin': 'Articulo.id == ArticuloCombo.id_articulo_hijo'})
-    # Relación con códigos de barras
-    codigos_barras: List["ArticuloCodigo"] = Relationship(back_populates="articulo")
+    # Relación con códigos de barras (viewonly=True para evitar conflictos en sincronización)
+    codigos_barras: List["ArticuloCodigo"] = Relationship(back_populates="articulo", sa_relationship_kwargs={"viewonly": True})
 
     # --- CAMPO Y RELACIÓN AÑADIDOS PARA MULTI-EMPRESA ---
     # Asumo que Empresa ya existe en este archivo.

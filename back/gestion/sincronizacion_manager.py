@@ -9,7 +9,7 @@ fuente única de verdad de la aplicación.
 
 from fastapi import HTTPException, status
 from sqlmodel import Session, select
-from typing import List, Dict, Any, Type
+from typing import List, Dict, Any, Type, Optional
 
 # Importamos los modelos de nuestra base de datos con los que vamos a trabajar
 from back.modelos import Articulo, Categoria, Marca, ConfiguracionEmpresa
@@ -42,12 +42,15 @@ def _obtener_o_crear_relacion(db: Session, id_empresa: int, modelo: Type[Any], n
         return nueva_instancia
 
 
-def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int) -> Dict[str, Any]:
+def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int, nombre_hoja: Optional[str] = None) -> Dict[str, Any]:
     """
     Orquesta el proceso completo de sincronización de artículos.
-    1. Obtiene el link del Google Sheet desde la configuración de la empresa.
-    2. Lee los datos del Sheet usando el TablasHandler.
-    3. Itera sobre cada fila y decide si crear un nuevo artículo en SQL o actualizar uno existente.
+    Ahora con mapeo automático flexible de columnas.
+    
+    Args:
+        db: Sesión de base de datos
+        id_empresa_actual: ID de la empresa
+        nombre_hoja: Nombre específico de la hoja (opcional, buscará automáticamente)
     """
     print(f"--- Iniciando Sincronización de Artículos para Empresa ID: {id_empresa_actual} ---")
     
@@ -58,20 +61,27 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int) -> Di
             status_code=status.HTTP_412_PRECONDITION_FAILED,
             detail="Operación fallida: La empresa no tiene un Google Sheet configurado."
         )
-    link_de_la_empresa = config_empresa.link_google_sheets
 
-    # 2. LEER DATOS DEL GOOGLE SHEET
-    handler = TablasHandler(google_sheet_id=link_de_la_empresa)
-    articulos_del_sheet = handler.cargar_articulos()
+    # 2. LEER DATOS DEL GOOGLE SHEET (ya mapeados a formato estándar)
+    handler = TablasHandler(id_empresa=id_empresa_actual, db=db)
+    articulos_del_sheet = handler.cargar_articulos(nombre_hoja=nombre_hoja)
 
     if not articulos_del_sheet:
-        return {"mensaje": "Sincronización finalizada. No se encontraron artículos en el Google Sheet.", "creados": 0, "actualizados": 0, "errores": 0}
+        return {
+            "mensaje": "No se encontraron artículos en el Google Sheet.",
+            "leidos_de_sheet": 0,
+            "creados_en_db": 0,
+            "actualizados_en_db": 0,
+            "eliminados_en_db": 0,
+            "filas_con_error": 0
+        }
 
     print(f"Se encontraron {len(articulos_del_sheet)} filas en Google Sheets. Procesando...")
     
     # Contadores para el reporte final
     creados = 0
     actualizados = 0
+    eliminados = 0
     filas_con_error = 0
     
     # Set para rastrear los códigos que SÍ existen en el sheet
@@ -79,28 +89,50 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int) -> Di
 
     # 3. PROCESAR CADA FILA Y SINCRONIZAR
     for i, fila_sheet in enumerate(articulos_del_sheet):
-        # Depuración: Imprimir claves de la primera fila para verificar nombres de columnas
+        # Debug en la primera fila
         if i == 0:
-            print(f"DEBUG: Claves encontradas en la primera fila del Sheet: {list(fila_sheet.keys())}")
+            print(f"DEBUG: Campos mapeados disponibles: {[k for k in fila_sheet.keys() if k != '_fila_original']}")
 
         try:
-            # --- Lectura Segura de Columnas ---
-            # Intentamos leer 'codigo_interno', si no existe probamos 'Código' o 'codigo'
-            raw_codigo = fila_sheet.get('codigo_interno') or fila_sheet.get('Código') or fila_sheet.get('codigo')
-            
-            # Normalización del código: convertir a string y quitar espacios
-            codigo_interno = str(raw_codigo).strip() if raw_codigo else None
-            
+            # Ya tiene formato estándar gracias al mapeo
+            codigo_interno = fila_sheet.get('codigo_interno')
             descripcion = fila_sheet.get('descripcion')
             
-            # Si el código o la descripción no existen, la fila es inválida.
+            # Normalización del código
+            if codigo_interno:
+                codigo_interno = str(codigo_interno).strip()
+            
+            # Validación básica
             if not codigo_interno or not descripcion:
-                print(f"Error en fila {i+2}: Código ('{raw_codigo}') o descripción vacíos. Saltando.")
+                print(f"⚠️ Fila {i+2}: Código o descripción vacíos. Saltando.")
                 filas_con_error += 1
                 continue
 
             # Agregamos el código al set de códigos válidos (normalizado)
             codigos_en_sheet.add(codigo_interno)
+
+            # Obtener valores numéricos seguros
+            precio_costo = fila_sheet.get('precio_costo', 0) or 0
+            precio_venta = fila_sheet.get('precio_venta', 0) or 0
+            venta_negocio = fila_sheet.get('venta_negocio', 0) or 0
+            stock_actual = fila_sheet.get('stock_actual', 0) or 0
+            tasa_iva = fila_sheet.get('tasa_iva', 0.21) or 0.21
+            ubicacion = fila_sheet.get('ubicacion', 'Sin definir') or 'Sin definir'
+            unidad_venta = fila_sheet.get('unidad_venta', 'Unidad') or 'Unidad'
+            
+            try:
+                precio_costo = float(precio_costo)
+                precio_venta = float(precio_venta)
+                venta_negocio = float(venta_negocio)
+                stock_actual = float(stock_actual)
+                tasa_iva = float(tasa_iva)
+            except (ValueError, TypeError):
+                print(f"⚠️ Fila {i+2}: Error en conversión de números. Usando valores por defecto.")
+                precio_costo = 0.0
+                precio_venta = 0.0
+                venta_negocio = 0.0
+                stock_actual = 0.0
+                tasa_iva = 0.21
 
             # --- Lógica de UPSERT (Update or Insert) ---
             articulo_existente = db.exec(
@@ -116,40 +148,62 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int) -> Di
 
             if articulo_existente:
                 # --- ACTUALIZAR ARTÍCULO EXISTENTE ---
-                print(f"Actualizando artículo: {codigo_interno} - {descripcion}")
+                print(f"  ✏️ Actualizando: {codigo_interno} - {descripcion}")
                 articulo_existente.descripcion = descripcion
-                articulo_existente.precio_costo = float(fila_sheet.get('precio_costo', 0.0))
-                articulo_existente.precio_venta = float(fila_sheet.get('precio_venta', 0.0))
-                articulo_existente.stock_actual = float(fila_sheet.get('stock_actual', 0.0))
-                articulo_existente.tasa_iva = float(fila_sheet.get('tasa_iva', 0.21))
-                # Asigna las relaciones
-                articulo_existente.categoria = categoria_obj
-                articulo_existente.marca = marca_obj
+                articulo_existente.precio_costo = precio_costo
+                articulo_existente.precio_venta = precio_venta
+                articulo_existente.venta_negocio = venta_negocio
+                articulo_existente.stock_actual = stock_actual
+                articulo_existente.tasa_iva = tasa_iva
+                articulo_existente.ubicacion = ubicacion
+                articulo_existente.unidad_venta = unidad_venta
+                if categoria_obj:
+                    articulo_existente.categoria = categoria_obj
+                if marca_obj:
+                    articulo_existente.marca = marca_obj
                 
                 db.add(articulo_existente)
                 actualizados += 1
             else:
                 # --- CREAR NUEVO ARTÍCULO ---
-                print(f"Creando nuevo artículo: {codigo_interno} - {descripcion}")
+                print(f"  ✨ Creando nuevo: {codigo_interno} - {descripcion}")
                 nuevo_articulo = Articulo(
                     id_empresa=id_empresa_actual,
                     codigo_interno=codigo_interno,
                     descripcion=descripcion,
-                    precio_costo=float(fila_sheet.get('precio_costo', 0.0)),
-                    precio_venta=float(fila_sheet.get('precio_venta', 0.0)),
-                    stock_actual=float(fila_sheet.get('stock_actual', 0.0)),
-                    tasa_iva=float(fila_sheet.get('tasa_iva', 0.21)),
-                    # Asigna las relaciones
-                    categoria=categoria_obj,
-                    marca=marca_obj
+                    precio_costo=precio_costo,
+                    precio_venta=precio_venta,
+                    venta_negocio=venta_negocio,
+                    stock_actual=stock_actual,
+                    tasa_iva=tasa_iva,
+                    ubicacion=ubicacion,
+                    unidad_venta=unidad_venta,
+                    id_categoria=categoria_obj.id if categoria_obj else None,
+                    id_marca=marca_obj.id if marca_obj else None
                 )
                 db.add(nuevo_articulo)
                 creados += 1
         
         except Exception as e:
             print(f"Error fatal procesando la fila {i+2} ({fila_sheet.get('codigo_interno')}): {e}")
-            filas_con_error += 1
-            
+            filas_con_error += 1    
+    
+    # --- COMMIT 1: Guardar artículos nuevos/actualizados PRIMERO ---
+    try:
+        db.commit()
+        print(f"✅ {creados + actualizados} artículos procesados y guardados correctamente.")
+    except Exception as e:
+        print(f"⚠️ Error durante commit de artículos: {e}")
+        db.rollback()
+        return {
+            "mensaje": f"Error durante sincronización: {str(e)}",
+            "leidos_de_sheet": len(articulos_del_sheet),
+            "creados_en_db": creados,
+            "actualizados_en_db": actualizados,
+            "eliminados_en_db": 0,
+            "filas_con_error": filas_con_error
+        }
+    
     # --- Lógica de Eliminación (Delete) ---
     # Eliminar artículos que están en la DB pero NO en el Sheet
     # Esto cumple con el requerimiento: "si no esta en el drive se tiene que borrar"
@@ -179,7 +233,18 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int) -> Di
             db.add(config_empresa)
         except Exception:
             pass
-    db.commit()
+    
+    # --- COMMIT 2: Guardar eliminaciones ---
+    try:
+        db.commit()
+        print("✅ Sincronización completada exitosamente.")
+    except Exception as e:
+        print(f"⚠️ Error no crítico durante commit de eliminaciones (ignorado): {type(e).__name__}")
+        # No hacer rollback para preservar los cambios de artículos que ya fueron guardados
+        try:
+            db.rollback()
+        except:
+            pass
     
     print("--- Sincronización Finalizada ---")
     

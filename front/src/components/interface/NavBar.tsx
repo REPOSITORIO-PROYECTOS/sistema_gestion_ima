@@ -36,10 +36,11 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
 
   const pathname = usePathname();
   const router = useRouter();
-  const usuario = useAuthStore((state) => state.usuario); 
+  const usuario = useAuthStore((state) => state.usuario);
   const token = useAuthStore((state) => state.token);
   const customLinks = useCustomLinksStore((s) => s.links);
   const mesasEnabled = useFeaturesStore((s) => s.mesasEnabled);
+  const setMesasEnabled = useFeaturesStore((s) => s.setMesasEnabled);
 
   // Scroll y ocultación del Nav
   const [show, setShow] = useState(true);
@@ -48,7 +49,7 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
   // Los cambios de edicion de UI en gestion_negocio se renderizan aca:
   const [logoUrl, setLogoUrl] = useState('/default-logo.png');
   const [navbarColor, setNavbarColor] = useState('bg-green-800');
-  const [empresaCargada, setEmpresaCargada] = useState(false); 
+  const [empresaCargada, setEmpresaCargada] = useState(false);
   const loadFromBackend = useCustomLinksStore((s) => s.loadFromBackend);
 
 
@@ -63,31 +64,38 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, [lastScrollY]);
-  
+
   // Cargar configuración de usuario al iniciar
   useEffect(() => {
     const fetchUserConfig = async () => {
       if (!token) return;
-      
+
       try {
-        const res = await fetch(`${API_CONFIG.BASE_URL}/users/me`, {
-           headers: {
+        // Obtener la configuración directamente del endpoint de config
+        const res = await fetch(`${API_CONFIG.BASE_URL}/users/me/config`, {
+          headers: {
             Authorization: `Bearer ${token}`,
           },
         });
-        
+
         if (res.ok) {
-           const userData = await res.json();
-           // Si el usuario tiene configuración, la cargamos en el store
-           if (userData.configuracion) {
-              loadFromBackend(userData.configuracion);
-           }
+          const configuracion = await res.json();
+          console.log("👤 Configuración del usuario cargada:", configuracion);
+
+          if (configuracion && typeof configuracion === 'object') {
+            console.log("⚙️ Aplicando configuración al store:", configuracion);
+            loadFromBackend(configuracion);
+          } else {
+            console.warn("⚠️ Configuración vacía o inválida");
+          }
+        } else {
+          console.error("❌ Error al obtener configuración:", res.status);
         }
       } catch (error) {
-         console.error("Error fetching user config:", error);
+        console.error("Error fetching user config:", error);
       }
     };
-    
+
     fetchUserConfig();
   }, [token, loadFromBackend]);
 
@@ -110,16 +118,26 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
         const staticBase = apiBase.endsWith('/api') ? apiBase.slice(0, -4) : apiBase;
         setLogoUrl(`${staticBase}${data.ruta_logo}`);
 
+        // Cargar estado de mesas habilitadas (desde aclaraciones_legales)
+        if (data.aclaraciones_legales) {
+          const mesasValue = data.aclaraciones_legales.mesas_enabled;
+          const mesasHabilitadas = String(mesasValue) === "true";
+          console.log("📊 Valor mesas_enabled del backend:", mesasValue, "→ Resultado boolean:", mesasHabilitadas);
+          setMesasEnabled(mesasHabilitadas);
+        } else {
+          console.warn("⚠️ No hay aclaraciones_legales en los datos de empresa");
+        }
+
         // Actualizar la store global
         useEmpresaStore.getState().setEmpresa(data);
 
       } catch (error) {
         console.error('Error al cargar datos de empresa:', error);
-        setNavbarColor('bg-green-800'); 
+        setNavbarColor('bg-green-800');
         setLogoUrl('/default-logo.png');
-        
+
       } finally {
-        setEmpresaCargada(true); 
+        setEmpresaCargada(true);
       }
     };
 
@@ -140,19 +158,19 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
 
   // Detecta las iniciales del nombre_usuario para display en avatar
   const avatarText = usuario?.nombre_usuario
-  ? usuario.nombre_usuario.slice(0, 2).toUpperCase()
-  : 'US';
+    ? usuario.nombre_usuario.slice(0, 2).toUpperCase()
+    : 'US';
 
   // ✅ Evitar render hasta que esté todo listo
   if (!empresaCargada || !navbarColor || !logoUrl) {
-    return null; 
+    return null;
   }
 
   return (
     <nav className={`fixed top-0 z-10 w-full transition-transform duration-300 ${show ? 'translate-y-0' : '-translate-y-full'}`}>
-      
+
       <div className={`${navbarColor} shadow px-4 py-4 flex justify-between items-center`}>
-        
+
         {/* Logo */}
         <a href="/dashboard" title="Dashboard" className="text-xl font-bold flex items-center gap-2">
           <Image
@@ -168,7 +186,7 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
         {/* Menú de secciones - responsivo */}
         <NavigationMenu className="hidden md:block">
           <NavigationMenuList className="flex space-x-4">
-            {links.filter(l => (mesasEnabled ? true : !l.href.startsWith('/dashboard/mesas'))).map(({ href, name, roles }) => {
+            {links.filter(l => (mesasEnabled ? true : !l.href.startsWith('/dashboard/mesas') && !l.href.startsWith('/dashboard/cocina'))).map(({ href, name, roles }) => {
               const isActive = pathname.startsWith(href);
               const isAllowed = roles.includes(role);
 
@@ -228,7 +246,7 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                   {usuario?.nombre_usuario}
                 </DropdownMenuItem>
 
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   className="text-black cursor-pointer"
                   onClick={() => router.push('/dashboard/panel_usuario')}
                 >
@@ -237,7 +255,7 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
 
                 <DropdownMenuSeparator />
 
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   className="text-red-600"
                   onClick={() => {
                     useAuthStore.getState().logout();           // Limpia auth
@@ -248,14 +266,14 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                   Cerrar Sesión
                 </DropdownMenuItem>
 
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   className="cursor-pointer"
                   onClick={() => router.push('/dashboard/gestion_usuarios')}
                 >
                   Gestión de Usuarios
                 </DropdownMenuItem>
 
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   className="cursor-pointer"
                   onClick={() => { router.push('/dashboard/gestion_de_negocio'); }}
                 >
@@ -275,12 +293,12 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-white">
-                
+
                 <DropdownMenuItem className="text-gray-600 cursor-pointer">
                   {usuario?.nombre_usuario}
                 </DropdownMenuItem>
 
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   className="text-black cursor-pointer"
                   onClick={() => router.push('/dashboard/panel_usuario')}
                 >
@@ -289,7 +307,7 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
 
                 <DropdownMenuSeparator />
 
-                {links.filter(l => (mesasEnabled ? true : !l.href.startsWith('/dashboard/mesas'))).map(({ href, name, roles }) => {
+                {links.filter(l => (mesasEnabled ? true : !l.href.startsWith('/dashboard/mesas') && !l.href.startsWith('/dashboard/cocina'))).map(({ href, name, roles }) => {
                   const isAllowed = roles.includes(role);
                   return (
                     <DropdownMenuItem key={href} asChild>
@@ -298,11 +316,10 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                         onClick={(e) => {
                           if (!isAllowed) e.preventDefault();
                         }}
-                        className={`block py-2 text-sm ${
-                          isAllowed
-                            ? 'text-green-900 hover:bg-green-100'
-                            : 'text-gray-400 cursor-not-allowed'
-                        }`}
+                        className={`block py-2 text-sm ${isAllowed
+                          ? 'text-green-900 hover:bg-green-100'
+                          : 'text-gray-400 cursor-not-allowed'
+                          }`}
                       >
                         {name}
                       </a>
@@ -315,9 +332,8 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                       href={cl.url || "#"}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={`block py-2 text-sm ${
-                        cl.url ? 'text-green-900 hover:bg-green-100' : 'text-gray-400 cursor-not-allowed'
-                      }`}
+                      className={`block py-2 text-sm ${cl.url ? 'text-green-900 hover:bg-green-100' : 'text-gray-400 cursor-not-allowed'
+                        }`}
                     >
                       {cl.name || `Enlace ${cl.id}`}
                     </a>
@@ -326,7 +342,7 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
 
                 <DropdownMenuSeparator />
 
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   className="text-red-600"
                   onClick={() => {
                     useAuthStore.getState().logout();           // Limpia auth
@@ -337,13 +353,13 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                   Cerrar Sesión
                 </DropdownMenuItem>
 
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   onClick={() => { router.push('/dashboard/gestion_usuarios'); }}
                 >
                   Gestión de Usuarios
                 </DropdownMenuItem>
 
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   onClick={() => { router.push('/dashboard/gestion_de_negocio'); }}
                 >
                   Gestión de Negocio
