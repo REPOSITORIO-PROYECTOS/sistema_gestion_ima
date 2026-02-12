@@ -68,6 +68,14 @@ def startup_event():
         print(f"⚠️ No se pudieron crear tablas automáticamente: {e}")
 
 
+@app.on_event("shutdown")
+def shutdown_event():
+    """
+    Código que se ejecuta al detener la API.
+    """
+    print("--- Evento de Cierre de la API ---")
+
+
 # --- Inclusión de Routers ---
 # Aquí es donde conectamos los archivos de endpoints a la aplicación principal.
 app.include_router(caja_router.router)

@@ -292,15 +292,25 @@ class TablasHandler:
         """
         mapeada = {}
         
-        # Mapeo de código
+        # Mapeo de código - IMPORTANTE: Mantener la clave 'Código' original
         col_codigo = self._encontrar_columna(encabezados, ['codigo_interno', 'codigo', 'código', 'code'])
         if col_codigo:
-            mapeada['codigo_interno'] = fila.get(col_codigo)
+            codigo_valor = fila.get(col_codigo)
+            mapeada['codigo_interno'] = codigo_valor
+            mapeada['Código'] = codigo_valor  # ← Mantener para compatibilidad con sincronización
         
-        # Mapeo de descripción
-        col_desc = self._encontrar_columna(encabezados, ['descripcion', 'descripción', 'nombre', 'name', 'descripción_corta'])
-        if col_desc:
-            mapeada['descripcion'] = fila.get(col_desc)
+        # Mapeo de descripción con fallback a 'nombre' si está vacía
+        # Primero intenta columna 'Descripción' explícitamente
+        col_desc = self._encontrar_columna(encabezados, ['descripcion', 'descripción', 'descripción_corta'])
+        valor_desc = fila.get(col_desc, '').strip() if col_desc else ''
+        
+        # Si 'Descripción' está vacía, usa 'nombre' como fallback
+        if not valor_desc:
+            col_nombre = self._encontrar_columna(encabezados, ['nombre', 'name'])
+            if col_nombre:
+                valor_desc = fila.get(col_nombre, '').strip()
+        
+        mapeada['descripcion'] = valor_desc if valor_desc else ''
         
         # Mapeo de precio de venta - intenta múltiples fuentes
         col_precio_venta = None

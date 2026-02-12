@@ -182,7 +182,15 @@ def sincronizar_articulos_desde_sheets(db: Session, id_empresa_actual: int) -> D
     codigos_barras_db_objetos = db.exec(query_codigos).all()
     codigos_barras_db_dict = {cb.codigo: cb for cb in codigos_barras_db_objetos}
     
-    resumen = {"creados": 0, "actualizados": 0, "sin_cambios": 0, "errores": 0}
+    resumen = {
+        "leidos": len(articulos_sheets), 
+        "creados": 0, 
+        "actualizados": 0, 
+        "sin_cambios": 0, 
+        "errores": 0,
+        "eliminados": 0,
+        "no_eliminados_con_movimientos": 0
+    }
 
     # 5. BUCLE PRINCIPAL DE SINCRONIZACIÓN (Lógica de artículo sin cambios)
     for articulo_sheet in articulos_sheets:
@@ -191,10 +199,10 @@ def sincronizar_articulos_desde_sheets(db: Session, id_empresa_actual: int) -> D
             articulo_existente = articulos_db_dict.get(codigo_interno)
             
             datos_limpios = {
-                "descripcion": str(articulo_sheet.get("nombre", "Sin Descripción")).strip(),
-                "precio_venta": limpiar_precio(articulo_sheet.get("precio", 0)),
-                "venta_negocio": limpiar_precio(articulo_sheet.get("precio negocio", 0)),
-                "stock_actual": limpiar_precio(articulo_sheet.get("cantidad", 0)),
+                "descripcion": str(articulo_sheet.get("descripcion", "Sin Descripción")).strip(),
+                "precio_venta": limpiar_precio(articulo_sheet.get("precio_venta", 0)),
+                "venta_negocio": limpiar_precio(articulo_sheet.get("venta_negocio", 0)),
+                "stock_actual": limpiar_precio(articulo_sheet.get("stock_actual", 0)),
                 "activo": str(articulo_sheet.get("Activo", "TRUE")).strip().upper() == "TRUE",
                 "id_empresa": id_empresa_actual,
                 "ubicacion": str(articulo_sheet.get("ubicacion", "Sin informacion")).strip(),
@@ -289,19 +297,39 @@ def sincronizar_articulos_desde_sheets(db: Session, id_empresa_actual: int) -> D
     # --- BLOQUE DE ELIMINACIÓN (Nuevo) ---
     print("--- Verificando eliminaciones de artículos obsoletos ---")
     eliminados = 0
+    no_eliminados_con_movimientos = 0
     # Obtenemos los códigos que SÍ están en el sheet (ya procesados en articulos_sheets_unicos)
     codigos_validos_sheet = set(articulos_sheets_unicos.keys())
+    
+    # Importar modelos de venta y compra para verificar movimientos
+    from back.modelos import VentaDetalle, CompraDetalle
+    from sqlalchemy import func
     
     # Recorremos todos los artículos que teníamos en la DB al inicio
     # Nota: articulos_db_dict tiene {codigo: objeto}
     for codigo_db, articulo_db in articulos_db_dict.items():
         # Normalizamos por seguridad, aunque ya deberían estar normalizados en el dict
         if codigo_db not in codigos_validos_sheet:
-            print(f"Eliminando artículo obsoleto (no encontrado en Sheet): '{codigo_db}' - {articulo_db.descripcion}")
-            db.delete(articulo_db)
-            eliminados += 1
+            # PROTECCIÓN: Verificar si el artículo tiene movimientos (ventas o compras)
+            tiene_ventas = db.exec(
+                select(func.count()).select_from(VentaDetalle).where(VentaDetalle.id_articulo == articulo_db.id)
+            ).first()
+            
+            tiene_compras = db.exec(
+                select(func.count()).select_from(CompraDetalle).where(CompraDetalle.id_articulo == articulo_db.id)
+            ).first()
+            
+            # Si tiene movimientos, no eliminamos
+            if (tiene_ventas and tiene_ventas > 0) or (tiene_compras and tiene_compras > 0):
+                print(f"🔒 PROTEGIDO: No eliminando artículo '{codigo_db}' (tiene {tiene_ventas or 0} ventas, {tiene_compras or 0} compras)")
+                no_eliminados_con_movimientos += 1
+            else:
+                print(f"Eliminando artículo obsoleto (no encontrado en Sheet): '{codigo_db}' - {articulo_db.descripcion}")
+                db.delete(articulo_db)
+                eliminados += 1
             
     resumen["eliminados"] = eliminados
+    resumen["no_eliminados_con_movimientos"] = no_eliminados_con_movimientos
     # -------------------------------------
 
     # 6. COMMIT FINAL DE LA TRANSACCIÓN (Sin cambios)
