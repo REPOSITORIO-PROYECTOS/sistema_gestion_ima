@@ -1,0 +1,2468 @@
+--- Cargando config.py (Versión Explícita) ---
+DEBUG_CFG: Intentando cargar .env desde: '/home/sgi_user/proyectos/sistema_gestion_ima/.env'
+DEBUG_CFG: Configuración cargada. Usando GOOGLE_SERVICE_ACCOUNT_FILE='credencial_IA.json'
+
+######################################################################
+# DIAGNÓSTICO DE CONFIGURACIÓN DE GOOGLE SHEETS
+# Sistema de Gestión IMA
+######################################################################
+2026-02-12 10:01:36,697 INFO sqlalchemy.engine.Engine SELECT DATABASE()
+2026-02-12 10:01:36,698 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-12 10:01:36,698 INFO sqlalchemy.engine.Engine SELECT @@sql_mode
+2026-02-12 10:01:36,698 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-12 10:01:36,699 INFO sqlalchemy.engine.Engine SELECT @@lower_case_table_names
+2026-02-12 10:01:36,699 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-12 10:01:36,700 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-02-12 10:01:36,774 INFO sqlalchemy.engine.Engine SELECT configuracion_empresa.cuit, configuracion_empresa.id_empresa, configuracion_empresa.link_google_sheets, configuracion_empresa.link_visual_1, configuracion_empresa.link_visual_2, configuracion_empresa.link_visual_3, configuracion_empresa.nombre_negocio, configuracion_empresa.color_principal, configuracion_empresa.ruta_logo, configuracion_empresa.ruta_icono, configuracion_empresa.recargo_transferencia, configuracion_empresa.concepto_recargo_transferencia, configuracion_empresa.recargo_banco, configuracion_empresa.concepto_recargo_banco, configuracion_empresa.formato_comprobante_predeterminado, configuracion_empresa.afip_condicion_iva, configuracion_empresa.afip_punto_venta_predeterminado, configuracion_empresa.limite_consumidor_final, configuracion_empresa.aclaraciones_legales, configuracion_empresa.direccion_negocio, configuracion_empresa.telefono_negocio, configuracion_empresa.mail_negocio, configuracion_empresa.afip_certificado_encrypted, configuracion_empresa.afip_clave_privada_encrypted, configuracion_empresa.catalogo_version 
+FROM configuracion_empresa 
+WHERE configuracion_empresa.link_google_sheets IS NOT NULL AND configuracion_empresa.link_google_sheets != %(link_google_sheets_1)s
+2026-02-12 10:01:36,774 INFO sqlalchemy.engine.Engine [generated in 0.00028s] {'link_google_sheets_1': ''}
+
+✅ Se encontraron 18 empresa(s) con Google Sheets configurado
+
+
+======================================================================
+🏢 EMPRESA: Jugos Swing (ID: 1)
+======================================================================
+📋 Google Sheet ID: 1yNrBzxXga0TpFOpMcAQw6xvQ2dSa0TC9P7F88eOLveM
+✅ Documento encontrado: 'IMA Swing Jugos v25.51'
+
+📄 Hojas disponibles (127):
+   - COMPROMETIDOS
+   - QR
+   - USUARIOS
+   - ImagenLogin
+   - FPAGO
+   - LIDER
+   - TABLERO
+   - PRODUCTOS
+   - EGRESOS
+   - RUTAS
+   - Cash-flow
+   - PEDIDO
+   - PEDIDOS_DETALLE
+   - DESTINATARIOS
+   - PEDIDOS_BIDONES
+   - REPARTIDORES
+   - PRODUCCION
+   - INGREDIENTES
+   - RENDICION
+   - links
+   - Mermas
+   - CTACTE
+   - ALARMAS
+   - CCP
+   - RP
+   - Punto de Equilibrio
+   - MENSUAL
+   - E RDO 1
+   - E RDO 2
+   - FAQs
+   - stock
+   - pedidos
+   - clientes
+   - MOVIMIENTOS
+   - repartidor
+   - proveedores
+   - cuenta-corriente
+   - mails
+   - CARGA
+   - INGRESOS
+   - Saldos
+   - BIBLIOTECA DIGITAL
+   - AUX
+   - SVG
+   - Angulos
+   - UserInputs
+   - AUX2
+   - RESTAURANTE
+   - CUADRO
+   - PLAN gral
+   - Plan Detallado
+   - SEGUIMIENTO
+   - ING
+   - CapINI-Efectivo
+   - CapINI-MP
+   - CapINI-Bancos
+   - INICIAL
+   - HOME
+   - Copia de HOME
+   - HOME REP
+   - Hoja 68
+   - EFECTIVO
+   - TARJETAS
+   - MP
+   - BC
+   - PEYA-BC
+   - OTROS
+   - ABOGADO
+   - ADMINISTRATIVOS
+   - IVAVentas
+   - IIBB
+   - IVACompras
+   - ACTIVOS
+   - AFIP931
+   - ALQUILER
+   - CATEGORIAS
+   - PROVEEDOR
+   - SUBCATEGORIA
+   - MEDIOS DE PAGO
+   - CONTADOR
+   - EE
+   - GAS
+   - INVERSIONES
+   - BANCARIOS
+   - BRUTOS
+   - IMP
+   - MTTO
+   - PLANES
+   - PRESTAMOS
+   - PUBLICIDAD
+   - SEGUROS
+   - SINDICATO
+   - SISTEMAS
+   - DUEÑO1
+   - CCSimo
+   - CCM Ester
+   - CCM Gera
+   - MERMASMES
+   - DUEÑO2
+   - DUEÑO3
+   - SUELDOS
+   - GS FJ EXP
+   - TL
+   - IVA
+   - DEUDA
+   - GS EF
+   - AADI-CAPIF
+   - RETIROS
+   - GS VAR
+   - GS EL
+   - GS EL OTROS
+   - Reportes
+   - auxapp
+   - auxPV
+   - CalcPrecios
+   - costoprod
+   - DIAS
+   - CONTROL_STOCK_CAMIONETA
+   - CUADRE_CAJA
+   - Estados Pedido
+   - STOCK_CAMIONETA
+   - RECARGAS_CAMIONETA
+   - BAJAS
+   - TRASPASOS_CAMIONETA
+   - BUZON
+   - USUARIOS2
+   - CONFIG
+
+──────────────────────────────────────────────────────────────────────
+🔍 ANÁLISIS DE HOJA 'stock':
+──────────────────────────────────────────────────────────────────────
+✅ Hoja 'stock' encontrada
+
+📋 Columnas detectadas (51):
+    1. 'id producto'
+    2. 'Código'
+    3. 'nombre'
+    4. 'precio'
+    5. 'precio negocio'
+    6. 'Descripción'
+    7. 'cantidad'
+    8. 'unidad'
+    9. 'tipo de envase'
+   10. 'Activo'
+   11. 'Etiqueta Visual'
+   12. 'Destino Final'
+   13. 'Observaciones'
+   14. 'Codigo de barras'
+   15. 'Disp Minima'
+   16. 'ubicacion'
+   17. 'S1'
+   18. 'S2'
+   19. 'S3'
+   20. 'S4'
+   21. 'S5'
+   22. 'S6'
+   23. 'S7'
+   24. 'S8'
+   25. 'S9'
+   26. 'S10'
+   27. 'Planificado Lunes'
+   28. 'Comprometido Lunes'
+   29. 'A Fabricar Lunes'
+   30. 'Terminado Lunes'
+   31. 'Planificado Martes'
+   32. 'Comprometido Martes'
+   33. 'A Fabricar Martes'
+   34. 'Terminado Martes'
+   35. 'Planificado Miercoles'
+   36. 'Comprometido Miercoles'
+   37. 'A Fabricar Miercoles'
+   38. 'Terminado MIercoles'
+   39. 'Planificado Jueves'
+   40. 'Comprometido  Jueves'
+   41. 'A Fabricar Jueves'
+   42. 'Terminado Jueves'
+   43. 'Planificado Viernes'
+   44. 'Comprometido Viernes'
+   45. 'A Fabricar Viernes'
+   46. 'Terminado Viernes'
+   47. 'Planificado Sabado'
+   48. 'Comprometido Sabado'
+   49. 'A Fabricar Sabado'
+   50. 'Terminado Sabado'
+   51. 'Mostrar en Produccion'
+
+🔍 MAPEO AUTOMÁTICO DE COLUMNAS:
+   ✅ Código/ID            → 'Código'
+   ✅ Stock                → 'cantidad'
+   ✅ Descripción          → 'nombre'
+   ✅ Precio Venta         → 'precio'
+   ⚠️  Precio Costo         → NO DETECTADA
+   ✅ Ubicación            → 'ubicacion'
+
+📊 MUESTRA DE DATOS (primeras 3 filas):
+
+   Fila 1:
+      id producto: 1
+      Código: 10NAR
+      nombre: 10L jugo Naranja
+      precio: $19.000
+      precio negocio: $14.500
+
+   Fila 2:
+      id producto: 2
+      Código: 5NAR
+      nombre: 5L jugo Naranja
+      precio: $10.500
+      precio negocio: $8.500
+
+   Fila 3:
+      id producto: 3
+      Código: 1NAR
+      nombre: 1L Jugo de Naranja
+      precio: $4.500
+      precio negocio: $4.000
+
+──────────────────────────────────────────────────────────────────────
+✅ RESULTADO: Configuración CORRECTA - Stock se puede sincronizar
+
+======================================================================
+🏢 EMPRESA: Ferretería Bruzzone Suc 2 (ID: 9)
+======================================================================
+📋 Google Sheet ID: 1qTKPeK2AkcibeeUY1-dPlcKXiVsX4Ke2lBMhS9fMW8A
+✅ Documento encontrado: 'IMA Ferr Bruzzone S2 v581'
+
+📄 Hojas disponibles (101):
+   - QR
+   - clientes
+   - MOVIMIENTOS
+   - PROVEEDORES
+   - stock
+   - USUARIOS
+   - ImagenLogin
+   - INGRESOS
+   - EGRESOS
+   - TABLERO
+   - LIDER
+   - links
+   - Mermas
+   - CTACTE
+   - ALARMAS
+   - CCP
+   - RP
+   - Cash-flow
+   - Punto de Equilibrio
+   - DESTINATARIOS
+   - MENSUAL
+   - Saldos
+   - E RDO 1
+   - E RDO 2
+   - BIBLIOTECA DIGITAL
+   - AUX
+   - SVG
+   - Angulos
+   - UserInputs
+   - AUX2
+   - RESTAURANTE
+   - CUADRO
+   - PLAN gral
+   - Plan Detallado
+   - SEGUIMIENTO
+   - ING
+   - CapINI-Efectivo
+   - CapINI-MP
+   - CapINI-Bancos
+   - INICIAL
+   - HOME
+   - Copia de HOME
+   - EFECTIVO
+   - TARJETAS
+   - MP
+   - BC
+   - PEYA-BC
+   - OTROS
+   - ABOGADO
+   - ADMINISTRATIVOS
+   - IVAVentas
+   - IIBB
+   - IVACompras
+   - ACTIVOS
+   - AFIP931
+   - ALQUILER
+   - CATEGORIAS
+   - PROVEEDOR
+   - SUBCATEGORIA
+   - MEDIOS DE PAGO
+   - CONTADOR
+   - EE
+   - GAS
+   - INVERSIONES
+   - BANCARIOS
+   - BRUTOS
+   - IMP
+   - MTTO
+   - PLANES
+   - PRESTAMOS
+   - PUBLICIDAD
+   - SEGUROS
+   - SINDICATO
+   - SISTEMAS
+   - DUEÑO1
+   - CCSimo
+   - CCM Ester
+   - CCM Gera
+   - MERMASMES
+   - DUEÑO2
+   - DUEÑO3
+   - SUELDOS
+   - GS FJ EXP
+   - TL
+   - IVA
+   - DEUDA
+   - GS EF
+   - AADI-CAPIF
+   - RETIROS
+   - GS VAR
+   - GS EL
+   - GS EL OTROS
+   - Reportes
+   - VALORACION
+   - VALORACION EJ
+   - INDEMNIZACIONES
+   - auxapp
+   - auxPV
+   - CalcPrecios
+   - costoprod
+   - DIAS
+
+──────────────────────────────────────────────────────────────────────
+🔍 ANÁLISIS DE HOJA 'stock':
+──────────────────────────────────────────────────────────────────────
+✅ Hoja 'stock' encontrada
+
+📋 Columnas detectadas (27):
+    1. 'id producto'
+    2. 'Código'
+    3. 'nombre'
+    4. 'precio'
+    5. 'precio negocio'
+    6. 'Descripción'
+    7. 'cantidad'
+    8. 'unidad'
+    9. 'ubicacion'
+   10. 'tipo de envase'
+   11. 'Activo'
+   12. 'Etiqueta Visual'
+   13. 'Destino Final'
+   14. 'Observaciones'
+   15. 'Codigo de barras'
+   16. 'Imagen'
+   17. 'Barras'
+   18. 'Cant Minima'
+   19. 'Proveedor 1'
+   20. 'Costo 1'
+   21. 'Proveedor 2'
+   22. 'Costo 2'
+   23. 'Proveedor 3'
+   24. 'Costo 3'
+   25. 'CB3'
+   26. 'CB2'
+   27. 'CB 1'
+
+🔍 MAPEO AUTOMÁTICO DE COLUMNAS:
+   ✅ Código/ID            → 'Código'
+   ✅ Stock                → 'cantidad'
+   ✅ Descripción          → 'nombre'
+   ✅ Precio Venta         → 'precio'
+   ⚠️  Precio Costo         → NO DETECTADA
+   ✅ Ubicación            → 'ubicacion'
+
+📊 MUESTRA DE DATOS (primeras 3 filas):
+
+   Fila 1:
+      id producto: 1
+      Código: LAB00011
+      nombre: MAZA 1 kg
+      precio: 1000
+      precio negocio: 1000
+
+   Fila 2:
+      id producto: 2
+      Código: LAB00013
+      nombre: MAZA 11/2 kg
+      precio: 1000
+      precio negocio: 1000
+
+   Fila 3:
+      id producto: 3
+      Código: 572
+      nombre: SET DE PUNTAS 71-860
+      precio: 1000
+      precio negocio: 1000
+
+──────────────────────────────────────────────────────────────────────
+✅ RESULTADO: Configuración CORRECTA - Stock se puede sincronizar
+
+======================================================================
+🏢 EMPRESA: AUTOSERVICIO LOURDES (ID: 13)
+======================================================================
+📋 Google Sheet ID: 1aWWvDZmoGRqPfSsXzrSzFdCmooVQvOcLjCfzzDg5YdA
+✅ Documento encontrado: 'IMA Dist El Negro v582'
+
+📄 Hojas disponibles (103):
+   - QR
+   - clientes
+   - MOVIMIENTOS
+   - stock
+   - CatyProd
+   - USUARIOS
+   - ImagenLogin
+   - INGRESOS
+   - EGRESOS
+   - PROVEEDORES
+   - TABLERO
+   - LIDER
+   - links
+   - Mermas
+   - CTACTE
+   - ALARMAS
+   - CCP
+   - RP
+   - Cash-flow
+   - Punto de Equilibrio
+   - DESTINATARIOS
+   - MENSUAL
+   - Saldos
+   - E RDO 1
+   - E RDO 2
+   - BIBLIOTECA DIGITAL
+   - AUX
+   - SVG
+   - Angulos
+   - UserInputs
+   - AUX2
+   - RESTAURANTE
+   - CUADRO
+   - PLAN gral
+   - Plan Detallado
+   - SEGUIMIENTO
+   - ING
+   - CapINI-Efectivo
+   - CapINI-MP
+   - CapINI-Bancos
+   - INICIAL
+   - HOME
+   - Copia de HOME
+   - EFECTIVO
+   - TARJETAS
+   - MP
+   - BC
+   - PEYA-BC
+   - OTROS
+   - ABOGADO
+   - ADMINISTRATIVOS
+   - IVAVentas
+   - IIBB
+   - IVACompras
+   - ACTIVOS
+   - AFIP931
+   - ALQUILER
+   - CATEGORIAS
+   - PROVEEDOR
+   - SUBCATEGORIA
+   - MEDIOS DE PAGO
+   - CONTADOR
+   - EE
+   - GAS
+   - INVERSIONES
+   - BANCARIOS
+   - BRUTOS
+   - IMP
+   - MTTO
+   - PLANES
+   - PRESTAMOS
+   - PUBLICIDAD
+   - SEGUROS
+   - SINDICATO
+   - SISTEMAS
+   - DUEÑO1
+   - CCSimo
+   - CCM Ester
+   - CCM Gera
+   - MERMASMES
+   - DUEÑO2
+   - DUEÑO3
+   - SUELDOS
+   - GS FJ EXP
+   - TL
+   - IVA
+   - DEUDA
+   - de baja
+   - GS EF
+   - AADI-CAPIF
+   - RETIROS
+   - GS VAR
+   - GS EL
+   - GS EL OTROS
+   - Reportes
+   - VALORACION
+   - VALORACION EJ
+   - INDEMNIZACIONES
+   - auxapp
+   - auxPV
+   - CalcPrecios
+   - costoprod
+   - DIAS
+
+──────────────────────────────────────────────────────────────────────
+🔍 ANÁLISIS DE HOJA 'stock':
+──────────────────────────────────────────────────────────────────────
+✅ Hoja 'stock' encontrada
+
+📋 Columnas detectadas (30):
+    1. 'id producto'
+    2. 'Código'
+    3. 'nombre'
+    4. 'precio'
+    5. 'precio negocio'
+    6. 'Descripción'
+    7. 'cantidad'
+    8. 'unidad'
+    9. 'ubicacion'
+   10. 'tipo de envase'
+   11. 'Activo'
+   12. 'Etiqueta Visual'
+   13. 'Destino Final'
+   14. 'Observaciones'
+   15. 'Codigo de barras'
+   16. 'CODIGO DE BARRA 1'
+   17. 'CODIGO DE BARRA 2'
+   18. 'CODIGO DE BARRA 3'
+   19. 'Imagen'
+   20. 'Barras'
+   21. 'Cant Minima'
+   22. 'Proveedor 1'
+   23. 'Costo 1'
+   24. 'Proveedor 2'
+   25. 'Costo 2'
+   26. 'Proveedor 3'
+   27. 'Costo 3'
+   28. 'Categoria'
+   29. 'Porcentaje Minorista'
+   30. 'Porcentaje Mayorista'
+
+🔍 MAPEO AUTOMÁTICO DE COLUMNAS:
+   ✅ Código/ID            → 'Código'
+   ✅ Stock                → 'cantidad'
+   ✅ Descripción          → 'nombre'
+   ✅ Precio Venta         → 'precio'
+   ⚠️  Precio Costo         → NO DETECTADA
+   ✅ Ubicación            → 'ubicacion'
+
+📊 MUESTRA DE DATOS (primeras 3 filas):
+
+   Fila 1:
+      id producto: 1
+      Código: e4801640
+      nombre: 7up lata 354cc
+      precio: 1200.0
+      precio negocio: 1020.83
+
+   Fila 2:
+      id producto: 2
+      Código: c7c2bce6
+      nombre: aceite doña emilia x 950ml
+      precio: 1950.0
+      precio negocio: 1950.0
+
+   Fila 3:
+      id producto: 3
+      Código: e83031ff
+      nombre: aceite legitimo x 950ml
+      precio:  $ 2.900,00 
+      precio negocio:  $ 2.700,00 
+
+──────────────────────────────────────────────────────────────────────
+✅ RESULTADO: Configuración CORRECTA - Stock se puede sincronizar
+
+======================================================================
+🏢 EMPRESA: Empresa 14 (ID: 14)
+======================================================================
+📋 Google Sheet ID: asdasdasdasd
+❌ No se encontró el documento (verifica el ID)
+
+======================================================================
+🏢 EMPRESA: Empresa 15 (ID: 15)
+======================================================================
+📋 Google Sheet ID: assd
+❌ No se encontró el documento (verifica el ID)
+
+======================================================================
+🏢 EMPRESA: Empresa 16 (ID: 16)
+======================================================================
+📋 Google Sheet ID: 1C6CkFCiQvmu-NpBnqV01L73aYzE9D8JEsf7WM4Gi5mo
+✅ Documento encontrado: 'IMA ComoenCasa Centro - v25.31'
+
+📄 Hojas disponibles (102):
+   - QR
+   - USUARIOS
+   - ImagenLogin
+   - usuarios_admins
+   - clientes
+   - MOVIMIENTOS
+   - PROVEEDORES
+   - stock
+   - LIDER
+   - links
+   - Mermas
+   - CTACTE
+   - DESTINATARIOS
+   - ALARMAS
+   - Punto de Equilibrio
+   - TABLERO
+   - RP
+   - Saldos
+   - Cash-flow
+   - MENSUAL
+   - E RDO 1
+   - E RDO 2
+   - Hoja 46
+   - BIBLIOTECA DIGITAL
+   - INGRESOS
+   - SUCURSAL
+   - AUX
+   - AUX2
+   - EGRESOS
+   - CCP
+   - CUADRE DE CAJA
+   - RESTAURANTE
+   - CUADRO
+   - PLAN gral
+   - Plan Detallado
+   - SEGUIMIENTO
+   - ING
+   - CapINI-Efectivo
+   - CapINI-MP
+   - CapINI-Bancos
+   - INICIAL
+   - HOME
+   - Copia de HOME 1
+   - EFECTIVO
+   - TARJETAS
+   - MP
+   - BC
+   - PEYA-BC
+   - OTROS
+   - ABOGADO
+   - ADMINISTRATIVOS
+   - IVAVentas
+   - IIBB
+   - IVACompras
+   - ACTIVOS
+   - AFIP931
+   - ALQUILER
+   - CATEGORIAS
+   - PROVEEDOR
+   - SUBCATEGORIA
+   - MEDIOS DE PAGO
+   - CONTADOR
+   - EE
+   - GAS
+   - INVERSIONES
+   - BANCARIOS
+   - BRUTOS
+   - IMP
+   - MTTO
+   - PLANES
+   - PRESTAMOS
+   - PUBLICIDAD
+   - SEGUROS
+   - SINDICATO
+   - SISTEMAS
+   - DUEÑO1
+   - CCSimo
+   - CCM Ester
+   - CCM Gera
+   - MERMASMES
+   - DUEÑO2
+   - DUEÑO3
+   - SUELDOS
+   - GS FJ EXP
+   - TL
+   - IVA
+   - DEUDA
+   - GS EF
+   - AADI-CAPIF
+   - RETIROS
+   - GS VAR
+   - GS EL
+   - GS EL OTROS
+   - Reportes
+   - VALORACION
+   - VALORACION EJ
+   - INDEMNIZACIONES
+   - auxapp
+   - auxPV
+   - CalcPrecios
+   - costoprod
+   - DIAS
+
+──────────────────────────────────────────────────────────────────────
+🔍 ANÁLISIS DE HOJA 'stock':
+──────────────────────────────────────────────────────────────────────
+✅ Hoja 'stock' encontrada
+
+📋 Columnas detectadas (25):
+    1. 'id producto'
+    2. 'Código'
+    3. 'nombre'
+    4. 'precio'
+    5. 'precio negocio'
+    6. 'Descripción'
+    7. 'cantidad'
+    8. 'unidad'
+    9. 'ubicacion'
+   10. 'tipo de envase'
+   11. 'Activo'
+   12. 'Observaciones'
+   13. 'Codigo de barras'
+   14. 'CODIGO DE BARRA 1'
+   15. 'CODIGO DE BARRA 2'
+   16. 'CODIGO DE BARRA 3'
+   17. 'Imagen'
+   18. 'Barras'
+   19. 'Cant Minima'
+   20. 'Proveedor 1'
+   21. 'Costo 1'
+   22. 'Proveedor 2'
+   23. 'Costo 2'
+   24. 'Proveedor 3'
+   25. 'Costo 3'
+
+🔍 MAPEO AUTOMÁTICO DE COLUMNAS:
+   ✅ Código/ID            → 'Código'
+   ✅ Stock                → 'cantidad'
+   ✅ Descripción          → 'nombre'
+   ✅ Precio Venta         → 'precio'
+   ⚠️  Precio Costo         → NO DETECTADA
+   ✅ Ubicación            → 'ubicacion'
+
+📊 MUESTRA DE DATOS (primeras 3 filas):
+
+   Fila 1:
+      id producto: 1
+      Código: 0024d234
+      nombre: Comida por Kilo
+      precio: 11300
+      precio negocio: 
+
+──────────────────────────────────────────────────────────────────────
+✅ RESULTADO: Configuración CORRECTA - Stock se puede sincronizar
+
+======================================================================
+🏢 EMPRESA: Empresa 21 (ID: 21)
+======================================================================
+📋 Google Sheet ID: 13nJbSTZA9wjxaOajKndjEwM9ceZjs5BXWiNrMtEMTBQ
+✅ Documento encontrado: 'IMA ComoenCasaResto - v24.91'
+
+📄 Hojas disponibles (101):
+   - QR
+   - MOVIMIENTOS
+   - clientes
+   - PROVEEDORES
+   - stock
+   - USUARIOS
+   - ImagenLogin
+   - usuarios_admins
+   - LIDER
+   - links
+   - Mermas
+   - CTACTE
+   - DESTINATARIOS
+   - ALARMAS
+   - Punto de Equilibrio
+   - TABLERO
+   - RP
+   - Saldos
+   - Cash-flow
+   - MENSUAL
+   - E RDO 1
+   - E RDO 2
+   - BIBLIOTECA DIGITAL
+   - INGRESOS
+   - SUCURSAL
+   - AUX
+   - AUX2
+   - EGRESOS
+   - CCP
+   - CUADRE DE CAJA
+   - RESTAURANTE
+   - CUADRO
+   - PLAN gral
+   - Plan Detallado
+   - SEGUIMIENTO
+   - ING
+   - CapINI-Efectivo
+   - CapINI-MP
+   - CapINI-Bancos
+   - INICIAL
+   - HOME
+   - Copia de HOME
+   - EFECTIVO
+   - TARJETAS
+   - MP
+   - BC
+   - PEYA-BC
+   - OTROS
+   - ABOGADO
+   - ADMINISTRATIVOS
+   - IVAVentas
+   - IIBB
+   - IVACompras
+   - ACTIVOS
+   - AFIP931
+   - ALQUILER
+   - CATEGORIAS
+   - PROVEEDOR
+   - SUBCATEGORIA
+   - MEDIOS DE PAGO
+   - CONTADOR
+   - EE
+   - GAS
+   - INVERSIONES
+   - BANCARIOS
+   - BRUTOS
+   - IMP
+   - MTTO
+   - PLANES
+   - PRESTAMOS
+   - PUBLICIDAD
+   - SEGUROS
+   - SINDICATO
+   - SISTEMAS
+   - DUEÑO1
+   - CCSimo
+   - CCM Ester
+   - CCM Gera
+   - MERMASMES
+   - DUEÑO2
+   - DUEÑO3
+   - SUELDOS
+   - GS FJ EXP
+   - TL
+   - IVA
+   - DEUDA
+   - GS EF
+   - AADI-CAPIF
+   - RETIROS
+   - GS VAR
+   - GS EL
+   - GS EL OTROS
+   - Reportes
+   - VALORACION
+   - VALORACION EJ
+   - INDEMNIZACIONES
+   - auxapp
+   - auxPV
+   - CalcPrecios
+   - costoprod
+   - DIAS
+
+──────────────────────────────────────────────────────────────────────
+🔍 ANÁLISIS DE HOJA 'stock':
+──────────────────────────────────────────────────────────────────────
+✅ Hoja 'stock' encontrada
+
+📋 Columnas detectadas (27):
+    1. 'id producto'
+    2. 'Código'
+    3. 'nombre'
+    4. 'precio'
+    5. 'precio negocio'
+    6. 'Descripción'
+    7. 'cantidad'
+    8. 'unidad'
+    9. 'ubicacion'
+   10. 'tipo de envase'
+   11. 'Activo'
+   12. 'Etiqueta Visual'
+   13. 'Destino Final'
+   14. 'Observaciones'
+   15. 'Codigo de barras'
+   16. 'CODIGO DE BARRA 1'
+   17. 'CODIGO DE BARRA 2'
+   18. 'CODIGO DE BARRA 3'
+   19. 'Imagen'
+   20. 'Barras'
+   21. 'Cant Minima'
+   22. 'Proveedor 1'
+   23. 'Costo 1'
+   24. 'Proveedor 2'
+   25. 'Costo 2'
+   26. 'Proveedor 3'
+   27. 'Costo 3'
+
+🔍 MAPEO AUTOMÁTICO DE COLUMNAS:
+   ✅ Código/ID            → 'Código'
+   ✅ Stock                → 'cantidad'
+   ✅ Descripción          → 'nombre'
+   ✅ Precio Venta         → 'precio'
+   ⚠️  Precio Costo         → NO DETECTADA
+   ✅ Ubicación            → 'ubicacion'
+
+📊 MUESTRA DE DATOS (primeras 3 filas):
+
+   Fila 1:
+      id producto: 1
+      Código: COM-KG
+      nombre: Comida por Kilo
+      precio: 13900
+      precio negocio: 13500
+
+   Fila 2:
+      id producto: 2
+      Código: BEB-01
+      nombre: Agua mineral 1.5 L
+      precio: 2500
+      precio negocio: 2500
+
+   Fila 3:
+      id producto: 3
+      Código: BEB-02
+      nombre: Gaseosa (sin detalle en el cartel) 1.5 L
+      precio: 3800
+      precio negocio: 3600
+
+──────────────────────────────────────────────────────────────────────
+✅ RESULTADO: Configuración CORRECTA - Stock se puede sincronizar
+
+======================================================================
+🏢 EMPRESA: Empresa 23 (ID: 23)
+======================================================================
+📋 Google Sheet ID: 1yNrBzxXga0TpFOpMcAQw6xvQ2dSa0TC9P7F88eOLveM
+✅ Documento encontrado: 'IMA Swing Jugos v25.51'
+
+📄 Hojas disponibles (127):
+   - COMPROMETIDOS
+   - QR
+   - USUARIOS
+   - ImagenLogin
+   - FPAGO
+   - LIDER
+   - TABLERO
+   - PRODUCTOS
+   - EGRESOS
+   - RUTAS
+   - Cash-flow
+   - PEDIDO
+   - PEDIDOS_DETALLE
+   - DESTINATARIOS
+   - PEDIDOS_BIDONES
+   - REPARTIDORES
+   - PRODUCCION
+   - INGREDIENTES
+   - RENDICION
+   - links
+   - Mermas
+   - CTACTE
+   - ALARMAS
+   - CCP
+   - RP
+   - Punto de Equilibrio
+   - MENSUAL
+   - E RDO 1
+   - E RDO 2
+   - FAQs
+   - stock
+   - pedidos
+   - clientes
+   - MOVIMIENTOS
+   - repartidor
+   - proveedores
+   - cuenta-corriente
+   - mails
+   - CARGA
+   - INGRESOS
+   - Saldos
+   - BIBLIOTECA DIGITAL
+   - AUX
+   - SVG
+   - Angulos
+   - UserInputs
+   - AUX2
+   - RESTAURANTE
+   - CUADRO
+   - PLAN gral
+   - Plan Detallado
+   - SEGUIMIENTO
+   - ING
+   - CapINI-Efectivo
+   - CapINI-MP
+   - CapINI-Bancos
+   - INICIAL
+   - HOME
+   - Copia de HOME
+   - HOME REP
+   - Hoja 68
+   - EFECTIVO
+   - TARJETAS
+   - MP
+   - BC
+   - PEYA-BC
+   - OTROS
+   - ABOGADO
+   - ADMINISTRATIVOS
+   - IVAVentas
+   - IIBB
+   - IVACompras
+   - ACTIVOS
+   - AFIP931
+   - ALQUILER
+   - CATEGORIAS
+   - PROVEEDOR
+   - SUBCATEGORIA
+   - MEDIOS DE PAGO
+   - CONTADOR
+   - EE
+   - GAS
+   - INVERSIONES
+   - BANCARIOS
+   - BRUTOS
+   - IMP
+   - MTTO
+   - PLANES
+   - PRESTAMOS
+   - PUBLICIDAD
+   - SEGUROS
+   - SINDICATO
+   - SISTEMAS
+   - DUEÑO1
+   - CCSimo
+   - CCM Ester
+   - CCM Gera
+   - MERMASMES
+   - DUEÑO2
+   - DUEÑO3
+   - SUELDOS
+   - GS FJ EXP
+   - TL
+   - IVA
+   - DEUDA
+   - GS EF
+   - AADI-CAPIF
+   - RETIROS
+   - GS VAR
+   - GS EL
+   - GS EL OTROS
+   - Reportes
+   - auxapp
+   - auxPV
+   - CalcPrecios
+   - costoprod
+   - DIAS
+   - CONTROL_STOCK_CAMIONETA
+   - CUADRE_CAJA
+   - Estados Pedido
+   - STOCK_CAMIONETA
+   - RECARGAS_CAMIONETA
+   - BAJAS
+   - TRASPASOS_CAMIONETA
+   - BUZON
+   - USUARIOS2
+   - CONFIG
+
+──────────────────────────────────────────────────────────────────────
+🔍 ANÁLISIS DE HOJA 'stock':
+──────────────────────────────────────────────────────────────────────
+✅ Hoja 'stock' encontrada
+
+📋 Columnas detectadas (51):
+    1. 'id producto'
+    2. 'Código'
+    3. 'nombre'
+    4. 'precio'
+    5. 'precio negocio'
+    6. 'Descripción'
+    7. 'cantidad'
+    8. 'unidad'
+    9. 'tipo de envase'
+   10. 'Activo'
+   11. 'Etiqueta Visual'
+   12. 'Destino Final'
+   13. 'Observaciones'
+   14. 'Codigo de barras'
+   15. 'Disp Minima'
+   16. 'ubicacion'
+   17. 'S1'
+   18. 'S2'
+   19. 'S3'
+   20. 'S4'
+   21. 'S5'
+   22. 'S6'
+   23. 'S7'
+   24. 'S8'
+   25. 'S9'
+   26. 'S10'
+   27. 'Planificado Lunes'
+   28. 'Comprometido Lunes'
+   29. 'A Fabricar Lunes'
+   30. 'Terminado Lunes'
+   31. 'Planificado Martes'
+   32. 'Comprometido Martes'
+   33. 'A Fabricar Martes'
+   34. 'Terminado Martes'
+   35. 'Planificado Miercoles'
+   36. 'Comprometido Miercoles'
+   37. 'A Fabricar Miercoles'
+   38. 'Terminado MIercoles'
+   39. 'Planificado Jueves'
+   40. 'Comprometido  Jueves'
+   41. 'A Fabricar Jueves'
+   42. 'Terminado Jueves'
+   43. 'Planificado Viernes'
+   44. 'Comprometido Viernes'
+   45. 'A Fabricar Viernes'
+   46. 'Terminado Viernes'
+   47. 'Planificado Sabado'
+   48. 'Comprometido Sabado'
+   49. 'A Fabricar Sabado'
+   50. 'Terminado Sabado'
+   51. 'Mostrar en Produccion'
+
+🔍 MAPEO AUTOMÁTICO DE COLUMNAS:
+   ✅ Código/ID            → 'Código'
+   ✅ Stock                → 'cantidad'
+   ✅ Descripción          → 'nombre'
+   ✅ Precio Venta         → 'precio'
+   ⚠️  Precio Costo         → NO DETECTADA
+   ✅ Ubicación            → 'ubicacion'
+
+📊 MUESTRA DE DATOS (primeras 3 filas):
+
+   Fila 1:
+      id producto: 1
+      Código: 10NAR
+      nombre: 10L jugo Naranja
+      precio: $19.000
+      precio negocio: $14.500
+
+   Fila 2:
+      id producto: 2
+      Código: 5NAR
+      nombre: 5L jugo Naranja
+      precio: $10.500
+      precio negocio: $8.500
+
+   Fila 3:
+      id producto: 3
+      Código: 1NAR
+      nombre: 1L Jugo de Naranja
+      precio: $4.500
+      precio negocio: $4.000
+
+──────────────────────────────────────────────────────────────────────
+✅ RESULTADO: Configuración CORRECTA - Stock se puede sincronizar
+
+======================================================================
+🏢 EMPRESA: Empresa 24 (ID: 24)
+======================================================================
+📋 Google Sheet ID: 1jDd784ApjPGyI7jsFF_bwPhupsBid-yGSJ9K4hOUaqo
+❌ Error al abrir documento: 
+
+======================================================================
+🏢 EMPRESA: Odonto Desing  (ID: 25)
+======================================================================
+📋 Google Sheet ID: 1WCJqOoeVR4HZI7-UeXai_zW10s9jrrHWvBVa8ud9s6o
+✅ Documento encontrado: 'IMA Odonto Desing v591'
+
+📄 Hojas disponibles (109):
+   - QR
+   - DESTINATARIOS
+   - USUARIOS
+   - ImagenLogin
+   - TABLERO
+   - LIDER
+   - links
+   - Mermas
+   - CTACTE
+   - ALARMAS
+   - CCP
+   - RP
+   - Cash-flow
+   - Punto de Equilibrio
+   - MENSUAL
+   - Saldos
+   - E RDO 1
+   - E RDO 2
+   - INGRESOS
+   - EGRESOS
+   - clientes
+   - MOVIMIENTOS
+   - PROVEEDORES
+   - stock
+   - BIBLIOTECA DIGITAL
+   - AUX
+   - SVG
+   - Angulos
+   - UserInputs
+   - AUX2
+   - RESTAURANTE
+   - CUADRO
+   - PLAN gral
+   - Plan Detallado
+   - SEGUIMIENTO
+   - ING
+   - CapINI-Efectivo
+   - CapINI-MP
+   - CapINI-Bancos
+   - INICIAL
+   - HOME
+   - Copia de HOME
+   - PRESUPUESTOS
+   - SERVICIOS_PRESUPUESTADOS
+   - PROTESIS
+   - PROTESISTAS
+   - TIPO_PROTESIS
+   - PROFESIONALES
+   - HISTORIA_CLINICA
+   - ALERGIAS_Y_ALERTAS
+   - EFECTIVO
+   - TARJETAS
+   - MP
+   - BC
+   - PEYA-BC
+   - OTROS
+   - ABOGADO
+   - ADMINISTRATIVOS
+   - IVAVentas
+   - IIBB
+   - IVACompras
+   - ACTIVOS
+   - AFIP931
+   - ALQUILER
+   - CATEGORIAS
+   - PROVEEDOR
+   - SUBCATEGORIA
+   - MEDIOS DE PAGO
+   - CONTADOR
+   - EE
+   - GAS
+   - INVERSIONES
+   - BANCARIOS
+   - BRUTOS
+   - IMP
+   - MTTO
+   - PLANES
+   - PRESTAMOS
+   - PUBLICIDAD
+   - SEGUROS
+   - SINDICATO
+   - SISTEMAS
+   - DUEÑO1
+   - CCSimo
+   - CCM Ester
+   - CCM Gera
+   - MERMASMES
+   - DUEÑO2
+   - DUEÑO3
+   - SUELDOS
+   - GS FJ EXP
+   - TL
+   - IVA
+   - DEUDA
+   - GS EF
+   - AADI-CAPIF
+   - RETIROS
+   - GS VAR
+   - GS EL
+   - GS EL OTROS
+   - Reportes
+   - VALORACION
+   - VALORACION EJ
+   - INDEMNIZACIONES
+   - auxapp
+   - auxPV
+   - CalcPrecios
+   - costoprod
+   - DIAS
+
+──────────────────────────────────────────────────────────────────────
+🔍 ANÁLISIS DE HOJA 'stock':
+──────────────────────────────────────────────────────────────────────
+✅ Hoja 'stock' encontrada
+
+📋 Columnas detectadas (28):
+    1. 'id producto'
+    2. 'Código'
+    3. 'nombre'
+    4. 'precio'
+    5. 'precio negocio'
+    6. 'Descripción'
+    7. 'cantidad'
+    8. 'unidad'
+    9. 'ubicacion'
+   10. 'tipo de envase'
+   11. 'Activo'
+   12. 'Etiqueta Visual'
+   13. 'Destino Final'
+   14. 'Observaciones'
+   15. 'CODIGO DE BARRA 1'
+   16. 'CODIGO DE BARRA 2'
+   17. 'CODIGO DE BARRA 3'
+   18. 'Imagen'
+   19. 'Barras'
+   20. 'Cant Minima'
+   21. 'Proveedor 1'
+   22. 'Costo 1'
+   23. 'Proveedor 2'
+   24. 'Costo 2'
+   25. 'Proveedor 3'
+   26. 'Costo 3'
+   27. 'ID_Servicio'
+   28. 'Categoria'
+
+🔍 MAPEO AUTOMÁTICO DE COLUMNAS:
+   ✅ Código/ID            → 'Código'
+   ✅ Stock                → 'cantidad'
+   ✅ Descripción          → 'nombre'
+   ✅ Precio Venta         → 'precio'
+   ⚠️  Precio Costo         → NO DETECTADA
+   ✅ Ubicación            → 'ubicacion'
+
+📊 MUESTRA DE DATOS (primeras 3 filas):
+
+   Fila 1:
+      id producto: 21122
+      Código: 69bc53d5
+      nombre: Blanqueo
+      precio: 300000
+      precio negocio: 
+
+   Fila 2:
+      id producto: 21123
+      Código: 1f9367fe
+      nombre: Reparacion Dental
+      precio: 60000
+      precio negocio: 
+
+   Fila 3:
+      id producto: 21124
+      Código: e70b436d
+      nombre: Blanqueo Gustavo
+      precio: 350000
+      precio negocio: 
+
+──────────────────────────────────────────────────────────────────────
+✅ RESULTADO: Configuración CORRECTA - Stock se puede sincronizar
+
+======================================================================
+🏢 EMPRESA: epsilon tattoo (ID: 26)
+======================================================================
+📋 Google Sheet ID: 1lSeM21AxUJyrfrE7a7-Ym3sLJqWkQVQglzMhGVDlBXg
+✅ Documento encontrado: 'IMA Fressia v582'
+
+📄 Hojas disponibles (102):
+   - QR
+   - clientes
+   - MOVIMIENTOS
+   - stock
+   - CatyProd
+   - USUARIOS
+   - ImagenLogin
+   - INGRESOS
+   - EGRESOS
+   - PROVEEDORES
+   - TABLERO
+   - LIDER
+   - links
+   - Mermas
+   - CTACTE
+   - ALARMAS
+   - CCP
+   - RP
+   - Cash-flow
+   - Punto de Equilibrio
+   - DESTINATARIOS
+   - MENSUAL
+   - Saldos
+   - E RDO 1
+   - E RDO 2
+   - BIBLIOTECA DIGITAL
+   - AUX
+   - SVG
+   - Angulos
+   - UserInputs
+   - AUX2
+   - RESTAURANTE
+   - CUADRO
+   - PLAN gral
+   - Plan Detallado
+   - SEGUIMIENTO
+   - ING
+   - CapINI-Efectivo
+   - CapINI-MP
+   - CapINI-Bancos
+   - INICIAL
+   - HOME
+   - Copia de HOME
+   - EFECTIVO
+   - TARJETAS
+   - MP
+   - BC
+   - PEYA-BC
+   - OTROS
+   - ABOGADO
+   - ADMINISTRATIVOS
+   - IVAVentas
+   - IIBB
+   - IVACompras
+   - ACTIVOS
+   - AFIP931
+   - ALQUILER
+   - CATEGORIAS
+   - PROVEEDOR
+   - SUBCATEGORIA
+   - MEDIOS DE PAGO
+   - CONTADOR
+   - EE
+   - GAS
+   - INVERSIONES
+   - BANCARIOS
+   - BRUTOS
+   - IMP
+   - MTTO
+   - PLANES
+   - PRESTAMOS
+   - PUBLICIDAD
+   - SEGUROS
+   - SINDICATO
+   - SISTEMAS
+   - DUEÑO1
+   - CCSimo
+   - CCM Ester
+   - CCM Gera
+   - MERMASMES
+   - DUEÑO2
+   - DUEÑO3
+   - SUELDOS
+   - GS FJ EXP
+   - TL
+   - IVA
+   - DEUDA
+   - GS EF
+   - AADI-CAPIF
+   - RETIROS
+   - GS VAR
+   - GS EL
+   - GS EL OTROS
+   - Reportes
+   - VALORACION
+   - VALORACION EJ
+   - INDEMNIZACIONES
+   - auxapp
+   - auxPV
+   - CalcPrecios
+   - costoprod
+   - DIAS
+
+──────────────────────────────────────────────────────────────────────
+🔍 ANÁLISIS DE HOJA 'stock':
+──────────────────────────────────────────────────────────────────────
+✅ Hoja 'stock' encontrada
+
+📋 Columnas detectadas (30):
+    1. 'id producto'
+    2. 'Código'
+    3. 'nombre'
+    4. 'precio'
+    5. 'precio negocio'
+    6. 'Descripción'
+    7. 'cantidad'
+    8. 'unidad'
+    9. 'ubicacion'
+   10. 'tipo de envase'
+   11. 'Activo'
+   12. 'Etiqueta Visual'
+   13. 'Destino Final'
+   14. 'Observaciones'
+   15. 'Codigo de barras'
+   16. 'CODIGO DE BARRA 1'
+   17. 'CODIGO DE BARRA 2'
+   18. 'CODIGO DE BARRA 3'
+   19. 'Imagen'
+   20. 'Barras'
+   21. 'Cant Minima'
+   22. 'Proveedor 1'
+   23. 'Costo 1'
+   24. 'Proveedor 2'
+   25. 'Costo 2'
+   26. 'Proveedor 3'
+   27. 'Costo 3'
+   28. 'Categoria'
+   29. 'Porcentaje Minorista'
+   30. 'Porcentaje Mayorista'
+
+🔍 MAPEO AUTOMÁTICO DE COLUMNAS:
+   ✅ Código/ID            → 'Código'
+   ✅ Stock                → 'cantidad'
+   ✅ Descripción          → 'nombre'
+   ✅ Precio Venta         → 'precio'
+   ⚠️  Precio Costo         → NO DETECTADA
+   ✅ Ubicación            → 'ubicacion'
+
+📊 MUESTRA DE DATOS (primeras 3 filas):
+
+   Fila 1:
+      id producto: 1
+      Código: 1780304c
+      nombre: Perfume 250ml
+      precio:  $ 30.000,00 
+      precio negocio:  $ 30.000,00 
+
+   Fila 2:
+      id producto: 2
+      Código: bd1d81d3
+      nombre: Shorts jeans caleta (doblete) Talle 38 40 42
+      precio:  $ 30.000,00 
+      precio negocio:  $ 30.000,00 
+
+   Fila 3:
+      id producto: 3
+      Código: 2f3a69e0
+      nombre: Shorts jeans tachas (luz clea) talle ,36,38,40,42,44,46
+      precio:  $ 30.000,00 
+      precio negocio:  $ 30.000,00 
+
+──────────────────────────────────────────────────────────────────────
+✅ RESULTADO: Configuración CORRECTA - Stock se puede sincronizar
+
+======================================================================
+🏢 EMPRESA: Empresa 27 (ID: 27)
+======================================================================
+📋 Google Sheet ID: 1UTPvjsz4gdF1E953X3qkmdmnj03opg8IFmU1I2n-XOs
+✅ Documento encontrado: 'IMA RYG Lavadero - v24.91'
+
+📄 Hojas disponibles (109):
+   - QR
+   - clientes
+   - MOVIMIENTOS
+   - PROVEEDORES
+   - stock
+   - INGRESOS
+   - de baja
+   - USUARIOS
+   - ImagenLogin
+   - usuarios_admins
+   - LIDER
+   - links
+   - Mermas
+   - CTACTE
+   - DESTINATARIOS
+   - ALARMAS
+   - Punto de Equilibrio
+   - TABLERO
+   - VENTAS
+   - WEBHOOK
+   - HORARIOS
+   - RESUMEN SALARIOS
+   - VEHICULOS
+   - EMPLEADOS
+   - SALARIOS
+   - LAVADOS
+   - PAGOS EMPLEADOS
+   - CCP
+   - RP
+   - Saldos
+   - Cash-flow
+   - MENSUAL
+   - E RDO 1
+   - E RDO 2
+   - BIBLIOTECA DIGITAL
+   - AUX
+   - AUX2
+   - EGRESOS
+   - RESTAURANTE
+   - CUADRO
+   - PLAN gral
+   - Plan Detallado
+   - SEGUIMIENTO
+   - ING
+   - CapINI-Efectivo
+   - CapINI-MP
+   - CapINI-Bancos
+   - INICIAL
+   - HOME
+   - Seg Home
+   - EFECTIVO
+   - TARJETAS
+   - MP
+   - BC
+   - PEYA-BC
+   - OTROS
+   - ABOGADO
+   - ADMINISTRATIVOS
+   - IVAVentas
+   - IIBB
+   - IVACompras
+   - ACTIVOS
+   - AFIP931
+   - ALQUILER
+   - CATEGORIAS
+   - PROVEEDOR
+   - SUBCATEGORIA
+   - MEDIOS DE PAGO
+   - CONTADOR
+   - EE
+   - GAS
+   - INVERSIONES
+   - BANCARIOS
+   - BRUTOS
+   - IMP
+   - MTTO
+   - PLANES
+   - PRESTAMOS
+   - PUBLICIDAD
+   - SEGUROS
+   - SINDICATO
+   - SISTEMAS
+   - DUEÑO1
+   - CCSimo
+   - CCM Ester
+   - CCM Gera
+   - MERMASMES
+   - DUEÑO2
+   - DUEÑO3
+   - SUELDOS
+   - GS FJ EXP
+   - TL
+   - IVA
+   - DEUDA
+   - GS EF
+   - AADI-CAPIF
+   - RETIROS
+   - GS VAR
+   - GS EL
+   - GS EL OTROS
+   - Reportes
+   - VALORACION
+   - VALORACION EJ
+   - INDEMNIZACIONES
+   - auxapp
+   - auxPV
+   - CalcPrecios
+   - costoprod
+   - DIAS
+
+──────────────────────────────────────────────────────────────────────
+🔍 ANÁLISIS DE HOJA 'stock':
+──────────────────────────────────────────────────────────────────────
+✅ Hoja 'stock' encontrada
+
+📋 Columnas detectadas (30):
+    1. 'id producto'
+    2. 'Código'
+    3. 'nombre'
+    4. 'precio'
+    5. 'precio negocio'
+    6. 'Descripción'
+    7. 'cantidad'
+    8. 'unidad'
+    9. 'ubicacion'
+   10. 'tipo de envase'
+   11. 'Activo'
+   12. 'Etiqueta Visual'
+   13. 'Destino Final'
+   14. 'Observaciones'
+   15. 'Codigo de barras'
+   16. 'CODIGO DE BARRA 1'
+   17. 'CODIGO DE BARRA 2'
+   18. 'CODIGO DE BARRA 3'
+   19. 'Imagen'
+   20. 'Barras'
+   21. 'Cant Minima'
+   22. 'Proveedor 1'
+   23. 'Costo 1'
+   24. 'Proveedor 2'
+   25. 'Costo 2'
+   26. 'Proveedor 3'
+   27. 'Costo 3'
+   28. 'Categoria'
+   29. 'Porcentaje Minorista'
+   30. 'Porcentaje Mayorista'
+
+🔍 MAPEO AUTOMÁTICO DE COLUMNAS:
+   ✅ Código/ID            → 'Código'
+   ✅ Stock                → 'cantidad'
+   ✅ Descripción          → 'nombre'
+   ✅ Precio Venta         → 'precio'
+   ⚠️  Precio Costo         → NO DETECTADA
+   ✅ Ubicación            → 'ubicacion'
+
+📊 MUESTRA DE DATOS (primeras 3 filas):
+
+   Fila 1:
+      id producto: 1
+      Código: 1
+      nombre: AUTO
+      precio: 10000
+      precio negocio: 10000
+
+   Fila 2:
+      id producto: 2
+      Código: 2
+      nombre: CAMIONETA
+      precio: 14000
+      precio negocio: 14000
+
+   Fila 3:
+      id producto: 3
+      Código: 3
+      nombre: COMBI
+      precio: 25000
+      precio negocio: 25000
+
+──────────────────────────────────────────────────────────────────────
+✅ RESULTADO: Configuración CORRECTA - Stock se puede sincronizar
+
+======================================================================
+🏢 EMPRESA: MAZLA GREEN S.A.S. (ID: 28)
+======================================================================
+📋 Google Sheet ID: 11G8Lf9QoKDWQaXyswg4lXdTTx7kDDKrRLJ6yj_s_0Vw
+✅ Documento encontrado: 'IMA Mazla Green 1 v582POS'
+
+📄 Hojas disponibles (102):
+   - QR
+   - clientes
+   - MOVIMIENTOS
+   - stock
+   - CatyProd
+   - USUARIOS
+   - ImagenLogin
+   - INGRESOS
+   - EGRESOS
+   - PROVEEDORES
+   - TABLERO
+   - LIDER
+   - links
+   - Mermas
+   - CTACTE
+   - ALARMAS
+   - CCP
+   - RP
+   - Cash-flow
+   - Punto de Equilibrio
+   - DESTINATARIOS
+   - MENSUAL
+   - Saldos
+   - E RDO 1
+   - E RDO 2
+   - BIBLIOTECA DIGITAL
+   - AUX
+   - SVG
+   - Angulos
+   - UserInputs
+   - AUX2
+   - RESTAURANTE
+   - CUADRO
+   - PLAN gral
+   - Plan Detallado
+   - SEGUIMIENTO
+   - ING
+   - CapINI-Efectivo
+   - CapINI-MP
+   - CapINI-Bancos
+   - INICIAL
+   - HOME
+   - Copia de HOME
+   - EFECTIVO
+   - TARJETAS
+   - MP
+   - BC
+   - PEYA-BC
+   - OTROS
+   - ABOGADO
+   - ADMINISTRATIVOS
+   - IVAVentas
+   - IIBB
+   - IVACompras
+   - ACTIVOS
+   - AFIP931
+   - ALQUILER
+   - CATEGORIAS
+   - PROVEEDOR
+   - SUBCATEGORIA
+   - MEDIOS DE PAGO
+   - CONTADOR
+   - EE
+   - GAS
+   - INVERSIONES
+   - BANCARIOS
+   - BRUTOS
+   - IMP
+   - MTTO
+   - PLANES
+   - PRESTAMOS
+   - PUBLICIDAD
+   - SEGUROS
+   - SINDICATO
+   - SISTEMAS
+   - DUEÑO1
+   - CCSimo
+   - CCM Ester
+   - CCM Gera
+   - MERMASMES
+   - DUEÑO2
+   - DUEÑO3
+   - SUELDOS
+   - GS FJ EXP
+   - TL
+   - IVA
+   - DEUDA
+   - GS EF
+   - AADI-CAPIF
+   - RETIROS
+   - GS VAR
+   - GS EL
+   - GS EL OTROS
+   - Reportes
+   - VALORACION
+   - VALORACION EJ
+   - INDEMNIZACIONES
+   - auxapp
+   - auxPV
+   - CalcPrecios
+   - costoprod
+   - DIAS
+
+──────────────────────────────────────────────────────────────────────
+🔍 ANÁLISIS DE HOJA 'stock':
+──────────────────────────────────────────────────────────────────────
+✅ Hoja 'stock' encontrada
+
+📋 Columnas detectadas (30):
+    1. 'id producto'
+    2. 'Código'
+    3. 'nombre'
+    4. 'precio'
+    5. 'precio negocio'
+    6. 'Descripción'
+    7. 'cantidad'
+    8. 'unidad'
+    9. 'ubicacion'
+   10. 'tipo de envase'
+   11. 'Activo'
+   12. 'Etiqueta Visual'
+   13. 'Destino Final'
+   14. 'Observaciones'
+   15. 'Codigo de barras'
+   16. 'CODIGO DE BARRA 1'
+   17. 'CODIGO DE BARRA 2'
+   18. 'CODIGO DE BARRA 3'
+   19. 'Imagen'
+   20. 'Barras'
+   21. 'Cant Minima'
+   22. 'Proveedor 1'
+   23. 'Costo 1'
+   24. 'Proveedor 2'
+   25. 'Costo 2'
+   26. 'Proveedor 3'
+   27. 'Costo 3'
+   28. 'Categoria'
+   29. 'Porcentaje Minorista'
+   30. 'Porcentaje Mayorista'
+
+🔍 MAPEO AUTOMÁTICO DE COLUMNAS:
+   ✅ Código/ID            → 'Código'
+   ✅ Stock                → 'cantidad'
+   ✅ Descripción          → 'nombre'
+   ✅ Precio Venta         → 'precio'
+   ⚠️  Precio Costo         → NO DETECTADA
+   ✅ Ubicación            → 'ubicacion'
+
+📊 MUESTRA DE DATOS (primeras 3 filas):
+
+   Fila 1:
+      id producto: 1
+Traceback (most recent call last):
+  File "/home/sgi_user/proyectos/sistema_gestion_ima/diagnostico_columnas_sheets.py", line 70, in diagnosticar_empresa
+    encabezados = worksheet_stock.row_values(1)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sgi_user/proyectos/sistema_gestion_ima/venv/lib/python3.12/site-packages/gspread/worksheet.py", line 686, in row_values
+    data = self.get(
+           ^^^^^^^^^
+  File "/home/sgi_user/proyectos/sistema_gestion_ima/venv/lib/python3.12/site-packages/gspread/worksheet.py", line 958, in get
+    response = self.client.values_get(
+               ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sgi_user/proyectos/sistema_gestion_ima/venv/lib/python3.12/site-packages/gspread/http_client.py", line 236, in values_get
+    r = self.request("get", url, params=params)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sgi_user/proyectos/sistema_gestion_ima/venv/lib/python3.12/site-packages/gspread/http_client.py", line 128, in request
+    raise APIError(response)
+gspread.exceptions.APIError: APIError: [429]: Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:21539055019'.
+      Código: FER-BCA-750
+      nombre: Producto Prueba
+      precio:  $ 120,00 
+      precio negocio:  $ 150,00 
+
+   Fila 2:
+      id producto: 
+      Código: 
+      nombre: 
+      precio: 
+      precio negocio: 
+
+   Fila 3:
+      id producto: 
+      Código: 
+      nombre: 
+      precio: 
+      precio negocio: 
+
+──────────────────────────────────────────────────────────────────────
+✅ RESULTADO: Configuración CORRECTA - Stock se puede sincronizar
+
+======================================================================
+🏢 EMPRESA: MARKET VALLEJOS (ID: 29)
+======================================================================
+📋 Google Sheet ID: 1O6zNdwahQZKGecBPvwAH3GjlvG7QMNiJCZnHoPLeatM
+✅ Documento encontrado: 'IMA Market Vallejos v582'
+
+📄 Hojas disponibles (102):
+   - QR
+   - clientes
+   - MOVIMIENTOS
+   - stock
+   - CatyProd
+   - USUARIOS
+   - ImagenLogin
+   - INGRESOS
+   - EGRESOS
+   - PROVEEDORES
+   - TABLERO
+   - LIDER
+   - links
+   - Mermas
+   - CTACTE
+   - ALARMAS
+   - CCP
+   - RP
+   - Cash-flow
+   - Punto de Equilibrio
+   - DESTINATARIOS
+   - MENSUAL
+   - Saldos
+   - E RDO 1
+   - E RDO 2
+   - BIBLIOTECA DIGITAL
+   - AUX
+   - SVG
+   - Angulos
+   - UserInputs
+   - AUX2
+   - RESTAURANTE
+   - CUADRO
+   - PLAN gral
+   - Plan Detallado
+   - SEGUIMIENTO
+   - ING
+   - CapINI-Efectivo
+   - CapINI-MP
+   - CapINI-Bancos
+   - INICIAL
+   - HOME
+   - Copia de HOME
+   - EFECTIVO
+   - TARJETAS
+   - MP
+   - BC
+   - PEYA-BC
+   - OTROS
+   - ABOGADO
+   - ADMINISTRATIVOS
+   - IVAVentas
+   - IIBB
+   - IVACompras
+   - ACTIVOS
+   - AFIP931
+   - ALQUILER
+   - CATEGORIAS
+   - PROVEEDOR
+   - SUBCATEGORIA
+   - MEDIOS DE PAGO
+   - CONTADOR
+   - EE
+   - GAS
+   - INVERSIONES
+   - BANCARIOS
+   - BRUTOS
+   - IMP
+   - MTTO
+   - PLANES
+   - PRESTAMOS
+   - PUBLICIDAD
+   - SEGUROS
+   - SINDICATO
+   - SISTEMAS
+   - DUEÑO1
+   - CCSimo
+   - CCM Ester
+   - CCM Gera
+   - MERMASMES
+   - DUEÑO2
+   - DUEÑO3
+   - SUELDOS
+   - GS FJ EXP
+   - TL
+   - IVA
+   - DEUDA
+   - GS EF
+   - AADI-CAPIF
+   - RETIROS
+   - GS VAR
+   - GS EL
+   - GS EL OTROS
+   - Reportes
+   - VALORACION
+   - VALORACION EJ
+   - INDEMNIZACIONES
+   - auxapp
+   - auxPV
+   - CalcPrecios
+   - costoprod
+   - DIAS
+
+──────────────────────────────────────────────────────────────────────
+🔍 ANÁLISIS DE HOJA 'stock':
+──────────────────────────────────────────────────────────────────────
+✅ Hoja 'stock' encontrada
+❌ Error inesperado: APIError: [429]: Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:21539055019'.
+
+======================================================================
+🏢 EMPRESA: DEMO IMA POS (ID: 30)
+======================================================================
+📋 Google Sheet ID: 1lYi2BEg2IxSLA420cIfKkyqW_pdDbetg5RGjKgxoBwE
+✅ Documento encontrado: 'IMA Demo v582'
+
+📄 Hojas disponibles (103):
+   - QR
+   - Piezas
+   - Cortes
+   - USUARIOS
+   - ImagenLogin
+   - INGRESOS
+   - EGRESOS
+   - LIDER
+   - links
+   - Mermas
+   - CTACTE
+   - ALARMAS
+   - DESTINATARIOS
+   - Punto de Equilibrio
+   - CCP
+   - TABLERO
+   - RP
+   - Cash-flow
+   - MENSUAL
+   - E RDO 1
+   - E RDO 2
+   - clientes
+   - MOVIMIENTOS
+   - PROVEEDORES
+   - stock
+   - Saldos
+   - BIBLIOTECA DIGITAL
+   - AUX
+   - SVG
+   - Angulos
+   - UserInputs
+   - AUX2
+   - RESTAURANTE
+   - CUADRO
+   - PLAN gral
+   - Plan Detallado
+   - SEGUIMIENTO
+   - ING
+   - CapINI-Efectivo
+   - CapINI-MP
+   - CapINI-Bancos
+   - INICIAL
+   - HOME
+   - Copia de HOME
+   - EFECTIVO
+   - TARJETAS
+   - MP
+   - BC
+   - PEYA-BC
+   - OTROS
+   - ABOGADO
+   - ADMINISTRATIVOS
+   - IVAVentas
+   - IIBB
+   - IVACompras
+   - ACTIVOS
+   - AFIP931
+   - ALQUILER
+   - CATEGORIAS
+   - PROVEEDOR
+   - SUBCATEGORIA
+   - MEDIOS DE PAGO
+   - CONTADOR
+   - EE
+   - GAS
+   - INVERSIONES
+   - BANCARIOS
+   - BRUTOS
+   - IMP
+   - MTTO
+   - PLANES
+   - PRESTAMOS
+   - PUBLICIDAD
+   - SEGUROS
+   - SINDICATO
+   - SISTEMAS
+   - DUEÑO1
+   - CCSimo
+   - CCM Ester
+   - CCM Gera
+   - MERMASMES
+   - DUEÑO2
+   - DUEÑO3
+   - SUELDOS
+   - GS FJ EXP
+   - TL
+   - IVA
+   - DEUDA
+   - GS EF
+   - AADI-CAPIF
+   - RETIROS
+   - GS VAR
+   - GS EL
+   - GS EL OTROS
+   - Reportes
+   - VALORACION
+   - VALORACION EJ
+   - INDEMNIZACIONES
+   - auxapp
+   - auxPV
+   - CalcPrecios
+   - costoprod
+   - DIAS
+
+──────────────────────────────────────────────────────────────────────
+🔍 ANÁLISIS DE HOJA 'stock':
+──────────────────────────────────────────────────────────────────────
+✅ Hoja 'stock' encontrada
+
+📋 Columnas detectadas (27):
+    1. 'id producto'
+    2. 'Código'
+    3. 'nombre'
+    4. 'precio'
+    5. 'precio negocio'
+    6. 'Descripción'
+    7. 'cantidad'
+    8. 'unidad'
+    9. 'ubicacion'
+   10. 'tipo de envase'
+   11. 'Activo'
+   12. 'Etiqueta Visual'
+   13. 'Destino Final'
+   14. 'Observaciones'
+   15. 'Codigo de barras'
+   16. 'CODIGO DE BARRA 1'
+   17. 'CODIGO DE BARRA 2'
+   18. 'CODIGO DE BARRA 3'
+   19. 'Imagen'
+   20. 'Barras'
+   21. 'Cant Minima'
+   22. 'Proveedor 1'
+   23. 'Costo 1'
+   24. 'Proveedor 2'
+   25. 'Costo 2'
+   26. 'Proveedor 3'
+   27. 'Costo 3'
+
+🔍 MAPEO AUTOMÁTICO DE COLUMNAS:
+   ✅ Código/ID            → 'Código'
+   ✅ Stock                → 'cantidad'
+   ✅ Descripción          → 'nombre'
+   ✅ Precio Venta         → 'precio'
+   ⚠️  Precio Costo         → NO DETECTADA
+   ✅ Ubicación            → 'ubicacion'
+
+📊 MUESTRA DE DATOS (primeras 3 filas):
+
+   Fila 1:
+      id producto: 1
+      Código: FER-BCA-750
+      nombre: Fernet Branca 750cc
+      precio: 12000
+      precio negocio: 9000
+
+   Fila 2:
+      id producto: 2
+      Código: XP-58IIH BT
+      nombre: Impresora Termica XPrinter
+      precio: 49500
+      precio negocio: 38500
+
+   Fila 3:
+      id producto: 3
+      Código: 77907509
+      nombre: Chocolate dos corazones x26gr
+      precio: 1900
+      precio negocio: 1200
+
+──────────────────────────────────────────────────────────────────────
+✅ RESULTADO: Configuración CORRECTA - Stock se puede sincronizar
+
+======================================================================
+🏢 EMPRESA: DON BARRY - Comidas con gusto (ID: 31)
+======================================================================
+📋 Google Sheet ID: 1pqccdKi9rU1ZRNI72V0se90vCm9wW5mvpnkkIonL1I4
+❌ Error al abrir documento: APIError: [429]: Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:21539055019'.
+
+======================================================================
+🏢 EMPRESA: Fressia (ID: 32)
+======================================================================
+📋 Google Sheet ID: 1lSeM21AxUJyrfrE7a7-Ym3sLJqWkQVQglzMhGVDlBXg
+✅ Documento encontrado: 'IMA Fressia v582'
+
+📄 Hojas disponibles (102):
+   - QR
+   - clientes
+   - MOVIMIENTOS
+   - stock
+   - CatyProd
+   - USUARIOS
+   - ImagenLogin
+   - INGRESOS
+   - EGRESOS
+   - PROVEEDORES
+   - TABLERO
+   - LIDER
+   - links
+   - Mermas
+   - CTACTE
+   - ALARMAS
+   - CCP
+   - RP
+   - Cash-flow
+   - Punto de Equilibrio
+   - DESTINATARIOS
+   - MENSUAL
+   - Saldos
+   - E RDO 1
+   - E RDO 2
+   - BIBLIOTECA DIGITAL
+   - AUX
+   - SVG
+   - Angulos
+   - UserInputs
+   - AUX2
+   - RESTAURANTE
+   - CUADRO
+   - PLAN gral
+   - Plan Detallado
+   - SEGUIMIENTO
+Traceback (most recent call last):
+  File "/home/sgi_user/proyectos/sistema_gestion_ima/diagnostico_columnas_sheets.py", line 55, in diagnosticar_empresa
+    worksheets = sheet.worksheets()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/home/sgi_user/proyectos/sistema_gestion_ima/venv/lib/python3.12/site-packages/gspread/spreadsheet.py", line 298, in worksheets
+    sheet_data = self.fetch_sheet_metadata()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sgi_user/proyectos/sistema_gestion_ima/venv/lib/python3.12/site-packages/gspread/spreadsheet.py", line 230, in fetch_sheet_metadata
+    return self.client.fetch_sheet_metadata(self.id, params=params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sgi_user/proyectos/sistema_gestion_ima/venv/lib/python3.12/site-packages/gspread/http_client.py", line 305, in fetch_sheet_metadata
+    r = self.request("get", url, params=params)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sgi_user/proyectos/sistema_gestion_ima/venv/lib/python3.12/site-packages/gspread/http_client.py", line 128, in request
+    raise APIError(response)
+gspread.exceptions.APIError: APIError: [429]: Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:21539055019'.
+   - ING
+   - CapINI-Efectivo
+   - CapINI-MP
+   - CapINI-Bancos
+   - INICIAL
+   - HOME
+   - Copia de HOME
+   - EFECTIVO
+   - TARJETAS
+   - MP
+   - BC
+   - PEYA-BC
+   - OTROS
+   - ABOGADO
+   - ADMINISTRATIVOS
+   - IVAVentas
+   - IIBB
+   - IVACompras
+   - ACTIVOS
+   - AFIP931
+   - ALQUILER
+   - CATEGORIAS
+   - PROVEEDOR
+   - SUBCATEGORIA
+   - MEDIOS DE PAGO
+   - CONTADOR
+   - EE
+   - GAS
+   - INVERSIONES
+   - BANCARIOS
+   - BRUTOS
+   - IMP
+   - MTTO
+   - PLANES
+   - PRESTAMOS
+   - PUBLICIDAD
+   - SEGUROS
+   - SINDICATO
+   - SISTEMAS
+   - DUEÑO1
+   - CCSimo
+   - CCM Ester
+   - CCM Gera
+   - MERMASMES
+   - DUEÑO2
+   - DUEÑO3
+   - SUELDOS
+   - GS FJ EXP
+   - TL
+   - IVA
+   - DEUDA
+   - GS EF
+   - AADI-CAPIF
+   - RETIROS
+   - GS VAR
+   - GS EL
+   - GS EL OTROS
+   - Reportes
+   - VALORACION
+   - VALORACION EJ
+   - INDEMNIZACIONES
+   - auxapp
+   - auxPV
+   - CalcPrecios
+   - costoprod
+   - DIAS
+
+──────────────────────────────────────────────────────────────────────
+🔍 ANÁLISIS DE HOJA 'stock':
+──────────────────────────────────────────────────────────────────────
+✅ Hoja 'stock' encontrada
+
+📋 Columnas detectadas (30):
+    1. 'id producto'
+    2. 'Código'
+    3. 'nombre'
+    4. 'precio'
+    5. 'precio negocio'
+    6. 'Descripción'
+    7. 'cantidad'
+    8. 'unidad'
+    9. 'ubicacion'
+   10. 'tipo de envase'
+   11. 'Activo'
+   12. 'Etiqueta Visual'
+   13. 'Destino Final'
+   14. 'Observaciones'
+   15. 'Codigo de barras'
+   16. 'CODIGO DE BARRA 1'
+   17. 'CODIGO DE BARRA 2'
+   18. 'CODIGO DE BARRA 3'
+   19. 'Imagen'
+   20. 'Barras'
+   21. 'Cant Minima'
+   22. 'Proveedor 1'
+   23. 'Costo 1'
+   24. 'Proveedor 2'
+   25. 'Costo 2'
+   26. 'Proveedor 3'
+   27. 'Costo 3'
+   28. 'Categoria'
+   29. 'Porcentaje Minorista'
+   30. 'Porcentaje Mayorista'
+
+🔍 MAPEO AUTOMÁTICO DE COLUMNAS:
+   ✅ Código/ID            → 'Código'
+   ✅ Stock                → 'cantidad'
+   ✅ Descripción          → 'nombre'
+   ✅ Precio Venta         → 'precio'
+   ⚠️  Precio Costo         → NO DETECTADA
+   ✅ Ubicación            → 'ubicacion'
+
+📊 MUESTRA DE DATOS (primeras 3 filas):
+
+   Fila 1:
+      id producto: 1
+      Código: 1780304c
+      nombre: Perfume 250ml
+      precio:  $ 30.000,00 
+      precio negocio:  $ 30.000,00 
+
+   Fila 2:
+      id producto: 2
+      Código: bd1d81d3
+      nombre: Shorts jeans caleta (doblete) Talle 38 40 42
+      precio:  $ 30.000,00 
+      precio negocio:  $ 30.000,00 
+
+   Fila 3:
+      id producto: 3
+      Código: 2f3a69e0
+      nombre: Shorts jeans tachas (luz clea) talle ,36,38,40,42,44,46
+      precio:  $ 30.000,00 
+      precio negocio:  $ 30.000,00 
+
+──────────────────────────────────────────────────────────────────────
+✅ RESULTADO: Configuración CORRECTA - Stock se puede sincronizar
+
+======================================================================
+🏢 EMPRESA: DISTRIBUIDORA EL NEGRO (ID: 33)
+======================================================================
+📋 Google Sheet ID: 1aWWvDZmoGRqPfSsXzrSzFdCmooVQvOcLjCfzzDg5YdA
+✅ Documento encontrado: 'IMA Dist El Negro v582'
+❌ Error inesperado: APIError: [429]: Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:21539055019'.
+
+
+######################################################################
+# RESUMEN GENERAL
+######################################################################
+
+📊 Total de empresas analizadas: 18
+   ✅ Configuradas correctamente: 12
+   ❌ Con problemas: 6
+
+⚠️  Empresas que requieren atención:
+   - Empresa 14 (ID: 14)
+   - Empresa 15 (ID: 15)
+   - Empresa 24 (ID: 24)
+   - MARKET VALLEJOS (ID: 29)
+   - DON BARRY - Comidas con gusto (ID: 31)
+   - DISTRIBUIDORA EL NEGRO (ID: 33)
+
+2026-02-12 10:02:17,209 INFO sqlalchemy.engine.Engine ROLLBACK

@@ -127,7 +127,10 @@ class Articulo(SQLModel, table=True):
     empresa: "Empresa" = Relationship()
     proveedores: List["ArticuloProveedor"] = Relationship(back_populates="articulo")
    
-    codigos: List["ArticuloCodigo"] = Relationship(back_populates="articulo")
+    codigos: List["ArticuloCodigo"] = Relationship(
+        back_populates="articulo",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
     movimientos_stock: List["StockMovimiento"] = Relationship(back_populates="articulo")
     
     # === LA CORRECCIÓN CLAVE ESTÁ AQUÍ ===

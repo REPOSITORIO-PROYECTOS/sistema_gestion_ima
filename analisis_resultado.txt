@@ -1,0 +1,313 @@
+--- Cargando config.py (Versión Explícita) ---
+DEBUG_CFG: Intentando cargar .env desde: '/home/sgi_user/proyectos/sistema_gestion_ima/.env'
+DEBUG_CFG: Configuración cargada. Usando GOOGLE_SERVICE_ACCOUNT_FILE='credencial_IA.json'
+
+################################################################################
+# ANÁLISIS DE LECTURA DE HOJAS DE GOOGLE SHEETS
+# Sistema de Gestión IMA
+################################################################################
+
+================================================================================
+📋 ANÁLISIS DE USO DE HOJAS DE GOOGLE SHEETS
+================================================================================
+
+🔍 HOJAS QUE USA EL SISTEMA ACTUALMENTE:
+
+📄 [94mclientes[0m
+   Método: cargar_clientes()
+   Definido en: back/utils/tablas_handler.py (línea 72)
+   Propósito: Sincronizar datos de clientes desde Sheets a la DB
+   Campo clave: id-cliente o codigo_interno
+   [91m⚠️  NOMBRE FIJO[0m - La hoja DEBE llamarse 'clientes'
+   Usado en 2 archivo(s):
+      - back/gestion/caja/cliente_publico.py
+      - back/gestion/actualizaciones/actualizaciones_masivas.py
+
+📄 [94mproveedores[0m
+   Método: cargar_proveedores()
+   Definido en: back/utils/tablas_handler.py (línea 90)
+   Propósito: Sincronizar datos de proveedores desde Sheets a la DB
+   Campo clave: id o codigo_interno
+   [91m⚠️  NOMBRE FIJO[0m - La hoja DEBE llamarse 'proveedores'
+   Usado en 1 archivo(s):
+      - back/gestion/actualizaciones/actualizaciones_masivas.py
+
+📄 [94mMOVIMIENTOS[0m
+   Método: registrar_movimiento()
+   Definido en: back/utils/tablas_handler.py (línea 111)
+   Propósito: Registrar cada venta/movimiento de caja en Sheets
+   Campo clave: id_movimiento (generado automáticamente)
+   [91m⚠️  NOMBRE FIJO[0m - La hoja DEBE llamarse 'MOVIMIENTOS'
+   Usado en 1 archivo(s):
+      - back/gestion/caja/registro_caja.py (3 veces)
+
+📄 [94mstock[0m
+   Método: restar_stock() y cargar_articulos()
+   Definido en: back/utils/tablas_handler.py (líneas 154, 394)
+   Propósito: Actualizar stock en ventas y sincronizar artículos
+   Campo clave: Código o codigo_interno
+   [92m✓ FLEXIBLE[0m - Puede tener estos nombres: stock, articulos, productos, inventory, inventario, items
+   Usado en 3 archivo(s):
+      - back/gestion/caja/registro_caja.py
+      - back/gestion/sincronizacion_manager.py
+      - back/gestion/actualizaciones/actualizaciones_masivas.py
+
+
+================================================================================
+🏢 VERIFICACIÓN DE HOJAS EN EMPRESAS CONFIGURADAS
+================================================================================
+
+2026-02-12 10:06:43,838 INFO sqlalchemy.engine.Engine SELECT DATABASE()
+2026-02-12 10:06:43,838 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-12 10:06:43,839 INFO sqlalchemy.engine.Engine SELECT @@sql_mode
+2026-02-12 10:06:43,840 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-12 10:06:43,841 INFO sqlalchemy.engine.Engine SELECT @@lower_case_table_names
+2026-02-12 10:06:43,841 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-12 10:06:43,841 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-02-12 10:06:43,932 INFO sqlalchemy.engine.Engine SELECT configuracion_empresa.cuit, configuracion_empresa.id_empresa, configuracion_empresa.link_google_sheets, configuracion_empresa.link_visual_1, configuracion_empresa.link_visual_2, configuracion_empresa.link_visual_3, configuracion_empresa.nombre_negocio, configuracion_empresa.color_principal, configuracion_empresa.ruta_logo, configuracion_empresa.ruta_icono, configuracion_empresa.recargo_transferencia, configuracion_empresa.concepto_recargo_transferencia, configuracion_empresa.recargo_banco, configuracion_empresa.concepto_recargo_banco, configuracion_empresa.formato_comprobante_predeterminado, configuracion_empresa.afip_condicion_iva, configuracion_empresa.afip_punto_venta_predeterminado, configuracion_empresa.limite_consumidor_final, configuracion_empresa.aclaraciones_legales, configuracion_empresa.direccion_negocio, configuracion_empresa.telefono_negocio, configuracion_empresa.mail_negocio, configuracion_empresa.afip_certificado_encrypted, configuracion_empresa.afip_clave_privada_encrypted, configuracion_empresa.catalogo_version 
+FROM configuracion_empresa 
+WHERE configuracion_empresa.link_google_sheets IS NOT NULL AND configuracion_empresa.link_google_sheets != %(link_google_sheets_1)s
+2026-02-12 10:06:43,937 INFO sqlalchemy.engine.Engine [generated in 0.00456s] {'link_google_sheets_1': ''}
+Analizando 18 empresa(s)...
+
+────────────────────────────────────────────────────────────────────────────────
+🏢 Jugos Swing (ID: 1)
+   Sheet ID: 1yNrBzxXga0TpFOpMcAQw6xvQ2dSa0TC9P7F88eO...
+   Total de hojas: 127
+   [92m✓[0m 'clientes' encontrada
+   [92m✓[0m 'proveedores' encontrada
+   [92m✓[0m 'MOVIMIENTOS' encontrada
+   [92m✓[0m 'stock' encontrada
+────────────────────────────────────────────────────────────────────────────────
+🏢 Ferretería Bruzzone Suc 2 (ID: 9)
+   Sheet ID: 1qTKPeK2AkcibeeUY1-dPlcKXiVsX4Ke2lBMhS9f...
+   Total de hojas: 101
+   [92m✓[0m 'clientes' encontrada
+   [91m✗[0m 'proveedores' NO encontrada
+   [92m✓[0m 'MOVIMIENTOS' encontrada
+   [92m✓[0m 'stock' encontrada
+────────────────────────────────────────────────────────────────────────────────
+🏢 AUTOSERVICIO LOURDES (ID: 13)
+   Sheet ID: 1aWWvDZmoGRqPfSsXzrSzFdCmooVQvOcLjCfzzDg...
+   Total de hojas: 103
+   [92m✓[0m 'clientes' encontrada
+   [91m✗[0m 'proveedores' NO encontrada
+   [92m✓[0m 'MOVIMIENTOS' encontrada
+   [92m✓[0m 'stock' encontrada
+────────────────────────────────────────────────────────────────────────────────
+🏢 Empresa 14 (ID: 14)
+   Sheet ID: asdasdasdasd...
+   [91m❌ Documento no encontrado[0m
+────────────────────────────────────────────────────────────────────────────────
+🏢 Empresa 15 (ID: 15)
+   Sheet ID: assd...
+   [91m❌ Documento no encontrado[0m
+────────────────────────────────────────────────────────────────────────────────
+🏢 Empresa 16 (ID: 16)
+   Sheet ID: 1C6CkFCiQvmu-NpBnqV01L73aYzE9D8JEsf7WM4G...
+   Total de hojas: 102
+   [92m✓[0m 'clientes' encontrada
+   [91m✗[0m 'proveedores' NO encontrada
+   [92m✓[0m 'MOVIMIENTOS' encontrada
+   [92m✓[0m 'stock' encontrada
+────────────────────────────────────────────────────────────────────────────────
+🏢 Empresa 21 (ID: 21)
+   Sheet ID: 13nJbSTZA9wjxaOajKndjEwM9ceZjs5BXWiNrMtE...
+   Total de hojas: 101
+   [92m✓[0m 'clientes' encontrada
+   [91m✗[0m 'proveedores' NO encontrada
+   [92m✓[0m 'MOVIMIENTOS' encontrada
+   [92m✓[0m 'stock' encontrada
+────────────────────────────────────────────────────────────────────────────────
+🏢 Empresa 23 (ID: 23)
+   Sheet ID: 1yNrBzxXga0TpFOpMcAQw6xvQ2dSa0TC9P7F88eO...
+   Total de hojas: 127
+   [92m✓[0m 'clientes' encontrada
+   [92m✓[0m 'proveedores' encontrada
+   [92m✓[0m 'MOVIMIENTOS' encontrada
+   [92m✓[0m 'stock' encontrada
+────────────────────────────────────────────────────────────────────────────────
+🏢 Empresa 24 (ID: 24)
+   Sheet ID: 1jDd784ApjPGyI7jsFF_bwPhupsBid-yGSJ9K4hO...
+   [91m❌ Error: [0m
+────────────────────────────────────────────────────────────────────────────────
+🏢 Odonto Desing  (ID: 25)
+   Sheet ID: 1WCJqOoeVR4HZI7-UeXai_zW10s9jrrHWvBVa8ud...
+   Total de hojas: 109
+   [92m✓[0m 'clientes' encontrada
+   [91m✗[0m 'proveedores' NO encontrada
+   [92m✓[0m 'MOVIMIENTOS' encontrada
+   [92m✓[0m 'stock' encontrada
+────────────────────────────────────────────────────────────────────────────────
+🏢 epsilon tattoo (ID: 26)
+   Sheet ID: 1lSeM21AxUJyrfrE7a7-Ym3sLJqWkQVQglzMhGVD...
+   Total de hojas: 102
+   [92m✓[0m 'clientes' encontrada
+   [91m✗[0m 'proveedores' NO encontrada
+   [92m✓[0m 'MOVIMIENTOS' encontrada
+   [92m✓[0m 'stock' encontrada
+────────────────────────────────────────────────────────────────────────────────
+🏢 Empresa 27 (ID: 27)
+   Sheet ID: 1UTPvjsz4gdF1E953X3qkmdmnj03opg8IFmU1I2n...
+   Total de hojas: 109
+   [92m✓[0m 'clientes' encontrada
+   [91m✗[0m 'proveedores' NO encontrada
+   [92m✓[0m 'MOVIMIENTOS' encontrada
+   [92m✓[0m 'stock' encontrada
+────────────────────────────────────────────────────────────────────────────────
+🏢 MAZLA GREEN S.A.S. (ID: 28)
+   Sheet ID: 11G8Lf9QoKDWQaXyswg4lXdTTx7kDDKrRLJ6yj_s...
+   Total de hojas: 102
+   [92m✓[0m 'clientes' encontrada
+   [91m✗[0m 'proveedores' NO encontrada
+   [92m✓[0m 'MOVIMIENTOS' encontrada
+   [92m✓[0m 'stock' encontrada
+────────────────────────────────────────────────────────────────────────────────
+🏢 MARKET VALLEJOS (ID: 29)
+   Sheet ID: 1O6zNdwahQZKGecBPvwAH3GjlvG7QMNiJCZnHoPL...
+   Total de hojas: 102
+   [92m✓[0m 'clientes' encontrada
+   [91m✗[0m 'proveedores' NO encontrada
+   [92m✓[0m 'MOVIMIENTOS' encontrada
+   [92m✓[0m 'stock' encontrada
+────────────────────────────────────────────────────────────────────────────────
+🏢 DEMO IMA POS (ID: 30)
+   Sheet ID: 1lYi2BEg2IxSLA420cIfKkyqW_pdDbetg5RGjKgx...
+   Total de hojas: 103
+   [92m✓[0m 'clientes' encontrada
+   [91m✗[0m 'proveedores' NO encontrada
+   [92m✓[0m 'MOVIMIENTOS' encontrada
+   [92m✓[0m 'stock' encontrada
+────────────────────────────────────────────────────────────────────────────────
+🏢 DON BARRY - Comidas con gusto (ID: 31)
+   Sheet ID: 1pqccdKi9rU1ZRNI72V0se90vCm9wW5mvpnkkIon...
+   Total de hojas: 110
+   [92m✓[0m 'clientes' encontrada
+   [91m✗[0m 'proveedores' NO encontrada
+   [92m✓[0m 'MOVIMIENTOS' encontrada
+   [92m✓[0m 'stock' encontrada
+────────────────────────────────────────────────────────────────────────────────
+🏢 Fressia (ID: 32)
+   Sheet ID: 1lSeM21AxUJyrfrE7a7-Ym3sLJqWkQVQglzMhGVD...
+   Total de hojas: 102
+   [92m✓[0m 'clientes' encontrada
+   [91m✗[0m 'proveedores' NO encontrada
+   [92m✓[0m 'MOVIMIENTOS' encontrada
+   [92m✓[0m 'stock' encontrada
+────────────────────────────────────────────────────────────────────────────────
+🏢 DISTRIBUIDORA EL NEGRO (ID: 33)
+   Sheet ID: 1aWWvDZmoGRqPfSsXzrSzFdCmooVQvOcLjCfzzDg...
+   Total de hojas: 103
+   [92m✓[0m 'clientes' encontrada
+   [91m✗[0m 'proveedores' NO encontrada
+   [92m✓[0m 'MOVIMIENTOS' encontrada
+   [92m✓[0m 'stock' encontrada
+
+
+================================================================================
+📊 RESUMEN DE ANÁLISIS
+================================================================================
+
+Total de empresas analizadas: 18
+[92m✓ Configuradas correctamente: 2[0m
+[93m⚠ Con hojas faltantes: 13[0m
+[91m✗ Con errores de conexión: 3[0m
+
+[93m⚠️  EMPRESAS QUE REQUIEREN ATENCIÓN:[0m
+
+[93m⚠ Ferretería Bruzzone Suc 2 (ID: 9)[0m
+  Hojas faltantes:
+    - proveedores
+
+[93m⚠ AUTOSERVICIO LOURDES (ID: 13)[0m
+  Hojas faltantes:
+    - proveedores
+
+[91m✗ Empresa 14 (ID: 14)[0m
+  Error: Documento no encontrado
+
+[91m✗ Empresa 15 (ID: 15)[0m
+  Error: Documento no encontrado
+
+[93m⚠ Empresa 16 (ID: 16)[0m
+  Hojas faltantes:
+    - proveedores
+
+[93m⚠ Empresa 21 (ID: 21)[0m
+  Hojas faltantes:
+    - proveedores
+
+[91m✗ Empresa 24 (ID: 24)[0m
+  Error: 
+
+[93m⚠ Odonto Desing  (ID: 25)[0m
+  Hojas faltantes:
+    - proveedores
+
+[93m⚠ epsilon tattoo (ID: 26)[0m
+  Hojas faltantes:
+    - proveedores
+
+[93m⚠ Empresa 27 (ID: 27)[0m
+  Hojas faltantes:
+    - proveedores
+
+[93m⚠ MAZLA GREEN S.A.S. (ID: 28)[0m
+  Hojas faltantes:
+    - proveedores
+
+[93m⚠ MARKET VALLEJOS (ID: 29)[0m
+  Hojas faltantes:
+    - proveedores
+
+[93m⚠ DEMO IMA POS (ID: 30)[0m
+  Hojas faltantes:
+    - proveedores
+
+[93m⚠ DON BARRY - Comidas con gusto (ID: 31)[0m
+  Hojas faltantes:
+    - proveedores
+
+[93m⚠ Fressia (ID: 32)[0m
+  Hojas faltantes:
+    - proveedores
+
+[93m⚠ DISTRIBUIDORA EL NEGRO (ID: 33)[0m
+  Hojas faltantes:
+    - proveedores
+
+
+================================================================================
+💡 RECOMENDACIONES
+================================================================================
+
+1. HOJAS CON NOMBRE FIJO (deben llamarse exactamente así):
+   - 'clientes' [91m← OBLIGATORIO[0m
+   - 'proveedores' [91m← OBLIGATORIO[0m
+   - 'MOVIMIENTOS' [91m← OBLIGATORIO (en MAYÚSCULAS)[0m
+
+2. HOJA DE STOCK (acepta variantes):
+   - 'stock' [92m← RECOMENDADO[0m
+   - Alternativas: 'articulos', 'productos', 'inventory', etc.
+
+3. COLUMNAS REQUERIDAS:
+   En 'clientes':
+     - id-cliente o codigo_interno
+     - nombre-usuario
+     - CUIT-CUIL, whatsapp, mail, direccion, etc.
+
+   En 'proveedores':
+     - id o codigo_interno
+     - nombre
+     - cuit, telefono, etc.
+
+   En 'MOVIMIENTOS':
+     - Se generan automáticamente al registrar ventas
+     - No requiere columnas previas
+
+   En 'stock':
+     - Código/codigo_interno/code (ID del producto)
+     - cantidad/stock/stock_actual (cantidad en stock)
+     - nombre/descripcion (descripción del producto)
+     - precio (precio de venta)
+2026-02-12 10:06:59,235 INFO sqlalchemy.engine.Engine ROLLBACK

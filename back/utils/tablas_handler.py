@@ -153,12 +153,36 @@ class TablasHandler:
             sheet = self.client.open_by_key(self.google_sheet_id)
             worksheet = sheet.worksheet("stock")
             datos_stock = worksheet.get_all_records()
-            columna_id = "Código"
-            columna_stock = "cantidad"
-   
-            if not datos_stock or columna_id not in datos_stock[0] or columna_stock not in datos_stock[0]:
-                print(f"❌ ERROR [STOCK]: La hoja 'stock' no tiene las columnas requeridas '{columna_id}' y '{columna_stock}'.")
+            
+            if not datos_stock:
+                print("❌ ERROR [STOCK]: La hoja 'stock' está vacía.")
                 return False
+            
+            # Obtener encabezados y detectar columnas flexiblemente
+            encabezados = list(datos_stock[0].keys()) if datos_stock else []
+            print(f"📋 [STOCK] Columnas detectadas en hoja: {encabezados}")
+            
+            # Buscar columna de código (ID del producto)
+            columna_id = self._encontrar_columna(
+                encabezados, 
+                ['codigo_interno', 'codigo', 'código', 'code', 'Código']
+            )
+            
+            # Buscar columna de stock
+            columna_stock = self._encontrar_columna(
+                encabezados,
+                ['stock_actual', 'stock', 'cantidad', 'existencia', 'cantidad_disponible']
+            )
+            
+            if not columna_id:
+                print(f"❌ ERROR [STOCK]: No se encontró columna de código en la hoja. Columnas disponibles: {encabezados}")
+                return False
+                
+            if not columna_stock:
+                print(f"❌ ERROR [STOCK]: No se encontró columna de stock en la hoja. Columnas disponibles: {encabezados}")
+                return False
+            
+            print(f"✅ [STOCK] Usando columnas: ID='{columna_id}', Stock='{columna_stock}'")
 
             for item_a_restar in lista_items:
                 id_producto = db.get(Articulo, item_a_restar.id_articulo).codigo_interno
@@ -170,19 +194,25 @@ class TablasHandler:
 
                 print(f"  -> Procesando ID: {id_producto}, Cantidad a restar: {cantidad_a_restar}")
                 encontrado = False
-                for i, fila in enumerate(datos_stock): #fija
+                for i, fila in enumerate(datos_stock):
                     if str(fila.get(columna_id)) == str(id_producto):
                         encontrado = True
                         numero_fila_gspread = i + 2  # +2 por encabezado y base 1
-                        stock_actual = float(fila.get(columna_stock, 0))
+                        
+                        # Limpiar valor de stock (puede tener formato de moneda o texto)
+                        valor_stock = fila.get(columna_stock, 0)
+                        try:
+                            stock_actual = float(str(valor_stock).replace(',', '.').replace('$', '').strip())
+                        except (ValueError, AttributeError):
+                            stock_actual = 0.0
 
                         if stock_actual < cantidad_a_restar:
                             print(f"❌ ERROR [STOCK]: Stock insuficiente para ID {id_producto}. Stock actual: {stock_actual}, se necesita: {cantidad_a_restar}. Abortando.")
                             return False
 
                         nuevo_stock = stock_actual - cantidad_a_restar
-                        encabezados = worksheet.row_values(1)
-                        letra_columna_stock = gspread.utils.rowcol_to_a1(1, encabezados.index(columna_stock) + 1)[0]
+                        encabezados_raw = worksheet.row_values(1)
+                        letra_columna_stock = gspread.utils.rowcol_to_a1(1, encabezados_raw.index(columna_stock) + 1)[0]
                         celda_a_actualizar = f"{letra_columna_stock}{numero_fila_gspread}"
 
                         print(f"     Stock actual: {stock_actual}. Actualizando celda {celda_a_actualizar} a {nuevo_stock}")
@@ -203,6 +233,8 @@ class TablasHandler:
             return False
         except Exception as e:
             print(f"❌ ERROR [STOCK]: Error inesperado al actualizar stock: {e}")
+            import traceback
+            traceback.print_exc()
             return False
         
 

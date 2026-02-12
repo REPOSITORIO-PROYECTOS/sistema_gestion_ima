@@ -206,7 +206,8 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int, nombr
     
     # --- Lógica de Eliminación (Delete) ---
     # Eliminar artículos que están en la DB pero NO en el Sheet
-    # Esto cumple con el requerimiento: "si no esta en el drive se tiene que borrar"
+    # IMPORTANTE: Solo eliminamos artículos SIN movimientos (ventas/compras)
+    # Los artículos con historial se mantienen para preservar integridad
     
     # 1. Obtenemos todos los artículos de esta empresa
     articulos_en_db = db.exec(
@@ -214,6 +215,7 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int, nombr
     ).all()
     
     eliminados = 0
+    no_eliminados_con_movimientos = 0
     print(f"Verificando eliminaciones... Total en DB: {len(articulos_en_db)}. Total en Sheet (únicos): {len(codigos_en_sheet)}")
     print(f"Muestra de códigos en Sheet: {list(codigos_en_sheet)[:10]}")
     
@@ -222,9 +224,17 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int, nombr
         codigo_db_normalizado = str(articulo.codigo_interno).strip()
         
         if codigo_db_normalizado not in codigos_en_sheet:
-            print(f"Eliminando artículo obsoleto (no encontrado en Sheet): DB='{codigo_db_normalizado}' Desc='{articulo.descripcion}'")
-            db.delete(articulo)
-            eliminados += 1
+            # Verificar si el artículo tiene movimientos
+            tiene_ventas = len(articulo.items_venta) > 0
+            tiene_compras = len(articulo.items_compra) > 0
+            
+            if tiene_ventas or tiene_compras:
+                print(f"  ⚠️ No se puede eliminar '{codigo_db_normalizado}' - Tiene movimientos históricos (Ventas: {len(articulo.items_venta)}, Compras: {len(articulo.items_compra)})")
+                no_eliminados_con_movimientos += 1
+            else:
+                print(f"  🗑️ Eliminando artículo sin movimientos: '{codigo_db_normalizado}' - {articulo.descripcion}")
+                db.delete(articulo)
+                eliminados += 1
     
     # Actualizar versión de catálogo
     if config_empresa:
@@ -238,6 +248,8 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int, nombr
     try:
         db.commit()
         print("✅ Sincronización completada exitosamente.")
+        if no_eliminados_con_movimientos > 0:
+            print(f"ℹ️ {no_eliminados_con_movimientos} artículo(s) no se eliminaron porque tienen movimientos históricos.")
     except Exception as e:
         print(f"⚠️ Error no crítico durante commit de eliminaciones (ignorado): {type(e).__name__}")
         # No hacer rollback para preservar los cambios de artículos que ya fueron guardados
@@ -255,5 +267,6 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int, nombr
         "creados_en_db": creados,
         "actualizados_en_db": actualizados,
         "eliminados_en_db": eliminados,
+        "no_eliminados_con_movimientos": no_eliminados_con_movimientos,
         "filas_con_error": filas_con_error
     }
