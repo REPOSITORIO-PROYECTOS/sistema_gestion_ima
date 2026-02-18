@@ -44,7 +44,18 @@ def api_sincronizar_articulos(db: Session = Depends(get_db),current_user: Usuari
         resultado = mod_sync.sincronizar_articulos_desde_sheets(db,id_empresa)
         if "error" in resultado:
             raise HTTPException(status_code=500, detail=resultado["error"])
-        return {"status": "success", "message": "Sincronización de artículos completada.", "data": resultado}
+
+        total_leidos = resultado.get("leidos", 0)
+        total_actualizados = resultado.get("actualizados", 0)
+        total_creados = resultado.get("creados", 0)
+        mensaje_resumen = (
+            "Sincronización de artículos completada. "
+            f"Leídos: {total_leidos}. "
+            f"Actualizados: {total_actualizados}. "
+            f"Creados: {total_creados}."
+        )
+
+        return {"status": "success", "message": mensaje_resumen, "data": resultado}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ocurrió un error inesperado: {e}")
     

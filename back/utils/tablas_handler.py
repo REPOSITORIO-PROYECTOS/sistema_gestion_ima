@@ -253,34 +253,19 @@ class TablasHandler:
         return None
     
     def _limpiar_precio(self, valor: Any) -> float:
-        """Limpia y convierte un valor a precio (float)."""
-        if valor is None or valor == '':
+        """Convierte valores como '$ 2.900,00' o '1200.00' a float."""
+        if valor is None:
             return 0.0
-        
-        # Convertir a string si no lo es
-        valor_str = str(valor).strip()
-        
-        if not valor_str or valor_str.lower() in ['nan', 'none', 'null']:
+
+        valor_str = str(valor).replace('$', '').strip()
+        if not valor_str:
             return 0.0
-        
-        # Remover símbolos de moneda y espacios
-        valor_str = valor_str.replace('$', '').replace('€', '').replace('ARS', '').strip()
-        
-        # Manejar separadores de miles y decimales
-        # Formato: 20.000,00 (punto para miles, coma para decimales)
-        if ',' in valor_str and '.' in valor_str:
-            # Tiene ambos: asumir formato 20.000,00 (punto=miles, coma=decimal)
-            valor_str = valor_str.replace('.', '').replace(',', '.')
-        elif ',' in valor_str:
-            # Solo coma: puede ser 20,00 (coma como decimal)
-            if valor_str.count(',') == 1 and len(valor_str.split(',')[1]) <= 2:
-                # Es un decimal, reemplazar coma por punto
-                valor_str = valor_str.replace(',', '.')
-            else:
-                # Es un separador de miles
-                valor_str = valor_str.replace(',', '')
-        
+
         try:
+            if '.' in valor_str and ',' in valor_str:
+                valor_str = valor_str.replace('.', '').replace(',', '.')
+            elif ',' in valor_str:
+                valor_str = valor_str.replace(',', '.')
             return float(valor_str)
         except ValueError:
             return 0.0
@@ -292,95 +277,62 @@ class TablasHandler:
         """
         mapeada = {}
         
-        # Mapeo de código - IMPORTANTE: Mantener la clave 'Código' original
-        col_codigo = self._encontrar_columna(encabezados, ['codigo_interno', 'codigo', 'código', 'code'])
-        if col_codigo:
-            codigo_valor = fila.get(col_codigo)
-            mapeada['codigo_interno'] = codigo_valor
-            mapeada['Código'] = codigo_valor  # ← Mantener para compatibilidad con sincronización
-        
-        # Mapeo de descripción con fallback a 'nombre' si está vacía
-        # Primero intenta columna 'Descripción' explícitamente
-        col_desc = self._encontrar_columna(encabezados, ['descripcion', 'descripción', 'descripción_corta'])
-        valor_desc = fila.get(col_desc, '').strip() if col_desc else ''
-        
-        # Si 'Descripción' está vacía, usa 'nombre' como fallback
-        if not valor_desc:
-            col_nombre = self._encontrar_columna(encabezados, ['nombre', 'name'])
-            if col_nombre:
-                valor_desc = fila.get(col_nombre, '').strip()
-        
-        mapeada['descripcion'] = valor_desc if valor_desc else ''
-        
-        # Mapeo de precio de venta - intenta múltiples fuentes
-        col_precio_venta = None
-        # Primero intenta "Costo 1" (que tiene el valor real)
-        col_precio_venta = self._encontrar_columna(encabezados, ['costo 1', 'costo_1', 'precio negocio', 'precio_negocio', 'precio_venta', 'precio', 'precio_cliente', 'pvp', 'valor_venta'])
-        
-        if col_precio_venta:
-            mapeada['precio_venta'] = self._limpiar_precio(fila.get(col_precio_venta, 0))
-        else:
-            mapeada['precio_venta'] = 0.0
-        
-        # Mapeo de precio de costo
-        col_precio_costo = self._encontrar_columna(encabezados, ['precio_costo', 'costo', 'precio_compra', 'costo_unitario', 'costo_1'])
-        if col_precio_costo:
-            mapeada['precio_costo'] = self._limpiar_precio(fila.get(col_precio_costo, 0))
-        else:
-            mapeada['precio_costo'] = 0.0
-        
-        # Mapeo de precio negocio (precio de cliente especial/mayorista)
-        col_venta_negocio = self._encontrar_columna(encabezados, ['venta_negocio', 'precio_negocio', 'precio_mayorista', 'precio_cliente', 'precio_especial', 'precio_wholesale'])
-        if col_venta_negocio:
-            mapeada['venta_negocio'] = self._limpiar_precio(fila.get(col_venta_negocio, 0))
-        else:
-            mapeada['venta_negocio'] = 0.0
-        
-        # Mapeo de stock
-        col_stock = self._encontrar_columna(encabezados, ['stock_actual', 'stock', 'cantidad', 'stock_disponible', 'existencia'])
+        col_codigo = self._encontrar_columna(encabezados, ['Código', 'codigo', 'codigo_interno'])
+        col_id = self._encontrar_columna(encabezados, ['id producto', 'id_producto'])
+
+        codigo_valor = str(fila.get(col_codigo, '')).strip() if col_codigo else ''
+        if not codigo_valor:
+            codigo_valor = str(fila.get(col_id, '')).strip() if col_id else ''
+        if not codigo_valor:
+            return {}
+
+        mapeada['codigo_interno'] = codigo_valor
+        mapeada['Código'] = codigo_valor
+
+        col_nombre = self._encontrar_columna(encabezados, ['nombre'])
+        col_desc = self._encontrar_columna(encabezados, ['Descripción', 'descripcion'])
+        valor_nombre = str(fila.get(col_nombre, '')).strip() if col_nombre else ''
+        valor_desc = str(fila.get(col_desc, '')).strip() if col_desc else ''
+        mapeada['descripcion'] = valor_nombre or valor_desc or 'Sin Descripción'
+
+        col_precio = self._encontrar_columna(encabezados, ['precio', 'precio venta'])
+        mapeada['precio_venta'] = self._limpiar_precio(fila.get(col_precio)) if col_precio else 0.0
+
+        col_negocio = self._encontrar_columna(encabezados, ['precio negocio'])
+        mapeada['venta_negocio'] = self._limpiar_precio(fila.get(col_negocio)) if col_negocio else 0.0
+
+        col_costo = self._encontrar_columna(encabezados, ['Costo 1', 'costo'])
+        mapeada['precio_costo'] = self._limpiar_precio(fila.get(col_costo)) if col_costo else 0.0
+
+        col_stock = self._encontrar_columna(encabezados, ['cantidad', 'stock'])
         if col_stock:
             try:
-                mapeada['stock_actual'] = float(fila.get(col_stock, 0) or 0)
-            except:
+                val_stock = str(fila.get(col_stock, 0)).replace('.', '').replace(',', '.')
+                mapeada['stock_actual'] = float(val_stock or 0)
+            except Exception:
                 mapeada['stock_actual'] = 0.0
-        
-        # Mapeo de IVA
-        col_iva = self._encontrar_columna(encabezados, ['tasa_iva', 'iva', 'alicuota_iva', 'impuesto'])
-        if col_iva:
-            try:
-                mapeada['tasa_iva'] = float(fila.get(col_iva, 0.21) or 0.21)
-            except:
-                mapeada['tasa_iva'] = 0.21
-        
-        # Mapeo de categoría
-        col_categoria = self._encontrar_columna(encabezados, ['categoria', 'categoría', 'category', 'tipo'])
-        if col_categoria:
-            mapeada['categoria'] = fila.get(col_categoria)
-        
-        # Mapeo de marca
-        col_marca = self._encontrar_columna(encabezados, ['marca', 'brand', 'fabricante'])
-        if col_marca:
-            mapeada['marca'] = fila.get(col_marca)
-        
-        # Mapeo de ubicación
-        col_ubicacion = self._encontrar_columna(encabezados, ['ubicacion', 'ubicación', 'location', 'estante', 'pasillo'])
-        if col_ubicacion:
-            ubicacion_valor = fila.get(col_ubicacion)
-            mapeada['ubicacion'] = ubicacion_valor if ubicacion_valor else "Sin definir"
         else:
-            mapeada['ubicacion'] = "Sin definir"
-        
-        # Mapeo de unidad
-        col_unidad = self._encontrar_columna(encabezados, ['unidad', 'unidad_venta', 'unit'])
-        if col_unidad:
-            mapeada['unidad_venta'] = fila.get(col_unidad, 'Unidad') or 'Unidad'
-        else:
-            mapeada['unidad_venta'] = 'Unidad'
-        
-        # Copiar campos adicionales del original
+            mapeada['stock_actual'] = 0.0
+
+        col_activo = self._encontrar_columna(encabezados, ['Activo'])
+        activo_val = str(fila.get(col_activo, 'TRUE')).strip().upper() if col_activo else 'TRUE'
+        mapeada['Activo'] = activo_val
+
+        col_barras = self._encontrar_columna(encabezados, ['Codigo de barras', 'Barras'])
+        mapeada['Codigo de barras'] = str(fila.get(col_barras, '')).strip() if col_barras else ''
+
+        col_ubicacion = self._encontrar_columna(encabezados, ['ubicacion'])
+        mapeada['ubicacion'] = str(fila.get(col_ubicacion, '')).strip() if col_ubicacion else 'Sin definir'
+
+        col_unidad = self._encontrar_columna(encabezados, ['unidad'])
+        mapeada['unidad_venta'] = str(fila.get(col_unidad, 'Unidad')).strip() if col_unidad else 'Unidad'
+
+        col_categoria = self._encontrar_columna(encabezados, ['Categoria', 'categoria'])
+        mapeada['categoria'] = str(fila.get(col_categoria, '')).strip() if col_categoria else ''
+
         mapeada['_fila_original'] = fila
-        
-        return mapeada
+
+        return mapeada if mapeada.get('codigo_interno') else {}
 
     def cargar_articulos(self, nombre_hoja: Optional[str] = None):
         """
