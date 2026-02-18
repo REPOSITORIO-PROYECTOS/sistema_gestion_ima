@@ -416,6 +416,41 @@ def registrar_venta_y_movimientos_caja_multiples(
         print(f"  -> Movimiento registrado: {pago.metodo_pago} - ${pago.monto:.2f}")
     
     db.flush()
+    
+    # --- 4. REGISTRAR EN GOOGLE SHEETS: Una fila por cada método de pago ---
+    try:
+        print("[SHEETS] Registrando desglose de pagos múltiples...")
+        cliente = db.get(Tercero, id_cliente) if id_cliente else None
+        cliente_sheets_data = obtener_cliente_por_id(db, id_empresa=usuario_actual.id_empresa, id_cliente=cliente.codigo_interno) if cliente else None
+        
+        nombre_cliente = cliente_sheets_data.get("nombre-usuario", "Cliente sin nombre") if cliente_sheets_data else "Público General"
+        cuit_cliente = cliente_sheets_data.get("CUIT-CUIL", "N/A") if cliente_sheets_data else "N/A"
+        razon_social = cliente_sheets_data.get("Nombre de Contacto", "N/A") if cliente_sheets_data else "N/A"
+        
+        caller = TablasHandler(id_empresa=usuario_actual.id_empresa, db=db)
+        
+        # Registrar en sheets por cada pago
+        for pago in pagos_multiples:
+            datos_para_sheets = {
+                "id_cliente": id_cliente,
+                "cliente": nombre_cliente,
+                "cuit": cuit_cliente,
+                "razon_social": razon_social,
+                "Tipo_movimiento": f"[{tipo_comprobante_solicitado}] Venta en {pago.metodo_pago.upper()}",
+                "descripcion": f"Venta de {', '.join(f'(articulo id = {db.get(Articulo, item.id_articulo).codigo_interno}, cantidad = {item.cantidad})' for item in articulos_vendidos)}",
+                "monto": pago.monto,  # El monto específico de este método de pago
+                "Repartidor": usuario_actual.nombre_usuario
+            }
+            if not caller.registrar_movimiento(datos_para_sheets):
+                print(f"⚠️ [SHEETS] Error al registrar pago {pago.metodo_pago} por ${pago.monto:.2f}")
+        
+        # Registrar descuento de stock una sola vez (sincronizado con el primer pago)
+        if articulos_vendidos and not caller.restar_stock(db, articulos_vendidos):
+            print("⚠️ [SHEETS] Error al actualizar el stock en Google Sheets.")
+            
+    except Exception as e_sheets:
+        print(f"❌ [SHEETS] Ocurrió un error al registrar en Google Sheets: {e_sheets}")
+    
     print(f"--- [FIN REGISTRO VENTA CON MÚLTIPLES PAGOS] ---\n")
     
     return nueva_venta, movimientos

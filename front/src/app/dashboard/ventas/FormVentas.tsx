@@ -278,6 +278,8 @@ function FormVentas({
     setInputEfectivo("");
     setOpen(false);
     setCodigoEscaneado("");
+    setUsarPagosMultiples(false);
+    setPagosMultiples([]);
     // Solo reseteamos el producto si no está activa la persistencia
     if (!persistirProducto) {
       setProductoSeleccionado(null);
@@ -700,9 +702,27 @@ function FormVentas({
       return;
     }
 
-    if (metodoPago === "efectivo" && montoPagado < totalVentaFinal) {
-      toast.error("❌ El monto abonado no puede ser menor al valor final del pedido.");
-      return;
+    // Validación de método de pago
+    if (!usarPagosMultiples) {
+      if (!metodoPago) {
+        toast.error("❌ Debe seleccionar un método de pago.");
+        return;
+      }
+      if (metodoPago === "efectivo" && montoPagado < totalVentaFinal) {
+        toast.error("❌ El monto abonado no puede ser menor al valor final del pedido.");
+        return;
+      }
+    } else {
+      // Validación de pagos múltiples
+      const sumaPagos = pagosMultiples.reduce((sum, p) => sum + p.monto, 0);
+      if (Math.abs(sumaPagos - totalVentaFinal) > 0.01) {
+        toast.error(`❌ La suma de pagos ($${sumaPagos.toFixed(2)}) debe ser igual al total ($${totalVentaFinal.toFixed(2)})`);;
+        return;
+      }
+      if (pagosMultiples.length === 0) {
+        toast.error("❌ Debe agregar al menos un método de pago.");
+        return;
+      }
     }
 
     if (tipoClienteSeleccionado.id === "1" && !clienteSeleccionado) {
@@ -752,9 +772,8 @@ function FormVentas({
     // 3. El descuento total es la diferencia
     const descuentoTotalCalculado = Math.max(0, totalLista - totalConDescuento);
 
-    const ventaPayload = {
+    const ventaPayload: any = {
       id_cliente: tipoClienteSeleccionado.id === "0" ? 0 : clienteSeleccionado?.id ?? 0,
-      metodo_pago: metodoPago.toUpperCase(),
       total_venta: totalConDescuento, // Enviamos el total NETO para cálculo correcto de recargos
       descuento_total: descuentoTotalCalculado, // Nuevo campo para historial
       paga_con: montoPagado,
@@ -774,6 +793,17 @@ function FormVentas({
         };
       })
     };
+
+    // Agregar información de pago (simple o múltiple)
+    if (usarPagosMultiples) {
+      ventaPayload.pagos_multiples = pagosMultiples.map((p) => ({
+        metodo_pago: p.metodo_pago,
+        monto: p.monto,
+      }));
+    } else {
+      ventaPayload.metodo_pago = metodoPago.toUpperCase();
+      ventaPayload.paga_con = montoPagado;
+    }
 
     try {
       if (!empresa || !empresa.id_empresa) {
