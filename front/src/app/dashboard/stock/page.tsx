@@ -8,7 +8,7 @@ import { useAuthStore } from "@/lib/authStore";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
 export default function StockPage() {
-    
+
   const [productos, setProductos] = useState<ProductoAPI[]>([]);
   const [loading, setLoading] = useState(true);
   const token = useAuthStore((state) => state.token);

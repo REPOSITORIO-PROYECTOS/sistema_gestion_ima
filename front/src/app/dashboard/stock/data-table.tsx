@@ -7,23 +7,23 @@ import { Input } from "@/components/ui/input"
 import { fetchAllArticulos } from "./api"
 import { ProductoAPI } from "./columns"
 import {
-  ColumnDef,
-  ColumnFiltersState,
-  SortingState,
-  flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-  useReactTable,
+    ColumnDef,
+    ColumnFiltersState,
+    SortingState,
+    flexRender,
+    getCoreRowModel,
+    getFilteredRowModel,
+    getPaginationRowModel,
+    getSortedRowModel,
+    useReactTable,
 } from "@tanstack/react-table"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
 } from "@/components/ui/table"
 import {
     Select,
@@ -162,48 +162,48 @@ export function DataTable<TData extends ProductoAPI, TValue>({
             <div className="rounded-md border">
                 <Table>
                     <TableHeader>
-                    {table.getHeaderGroups().map((headerGroup) => (
-                        <TableRow key={headerGroup.id}>
-                        {headerGroup.headers.map((header) => {
-                            return (
-                            <TableHead key={header.id}>
-                                {header.isPlaceholder
-                                ? null
-                                : flexRender(
-                                    header.column.columnDef.header,
-                                    header.getContext()
-                                    )}
-                            </TableHead>
-                            )
-                        })}
-                        </TableRow>
-                    ))}
+                        {table.getHeaderGroups().map((headerGroup) => (
+                            <TableRow key={headerGroup.id}>
+                                {headerGroup.headers.map((header) => {
+                                    return (
+                                        <TableHead key={header.id}>
+                                            {header.isPlaceholder
+                                                ? null
+                                                : flexRender(
+                                                    header.column.columnDef.header,
+                                                    header.getContext()
+                                                )}
+                                        </TableHead>
+                                    )
+                                })}
+                            </TableRow>
+                        ))}
                     </TableHeader>
                     <TableBody>
-                    {table.getRowModel().rows?.length ? (
-                        table.getRowModel().rows.map((row) => (
-                        <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
-                            {/* Filas Tabla */}
-                            {row.getVisibleCells().map((cell) => (
-                            <TableCell key={cell.id} className="px-6">
-                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                            </TableCell>
-                            ))}
-                        </TableRow>
-                        ))
-                    ) : (
-                        <TableRow>
-                        <TableCell colSpan={columns.length} className="h-24 text-center">
-                            No hay resultados que coincidan con la búsqueda.
-                        </TableCell>
-                        </TableRow>
-                    )}
+                        {table.getRowModel().rows?.length ? (
+                            table.getRowModel().rows.map((row) => (
+                                <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
+                                    {/* Filas Tabla */}
+                                    {row.getVisibleCells().map((cell) => (
+                                        <TableCell key={cell.id} className="px-6">
+                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                        </TableCell>
+                                    ))}
+                                </TableRow>
+                            ))
+                        ) : (
+                            <TableRow>
+                                <TableCell colSpan={columns.length} className="h-24 text-center">
+                                    No hay resultados que coincidan con la búsqueda.
+                                </TableCell>
+                            </TableRow>
+                        )}
                     </TableBody>
                 </Table>
                 {/* Footer Tabla */}
                 <div className="flex flex-col sm:flex-row justify-between items-center m-2">
                     {/* Control de Filas por Página */}
-                    <Select onValueChange={(value) => {  table.setPageSize(+value) }}>
+                    <Select onValueChange={(value) => { table.setPageSize(+value) }}>
                         <SelectTrigger className="w-[100px] m-2 cursor-pointer">
                             <SelectValue placeholder="10 filas" />
                         </SelectTrigger>
@@ -226,7 +226,7 @@ export function DataTable<TData extends ProductoAPI, TValue>({
                             onClick={() => table.previousPage()}
                             disabled={!table.getCanPreviousPage()}
                         >
-                        Anterior
+                            Anterior
                         </Button>
                         <Button
                             variant="outline"
@@ -234,7 +234,7 @@ export function DataTable<TData extends ProductoAPI, TValue>({
                             onClick={() => table.nextPage()}
                             disabled={!table.getCanNextPage()}
                         >
-                        Siguiente
+                            Siguiente
                         </Button>
                     </div>
                 </div>
