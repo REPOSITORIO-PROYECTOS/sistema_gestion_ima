@@ -17,7 +17,10 @@ export default function StockPage() {
   useEffect(() => {
     const fetchProductos = async () => {
       try {
-        const data = await fetchAllArticulos(token);
+        if (!token) {
+          return;
+        }
+        const data = await fetchAllArticulos(token as string);
         setProductos(data);
       } catch (err) {
         console.error("❌ Error al obtener productos:", err);

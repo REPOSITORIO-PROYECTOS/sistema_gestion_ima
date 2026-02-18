@@ -77,9 +77,14 @@ export function SeccionProducto(props: SeccionProductoProps) {
     const q = (codigo || "").trim().toLowerCase()
     window.clearTimeout(debounceRef.current)
     debounceRef.current = window.setTimeout(async () => {
+      if (!q) {
+        setMatches([])
+        setPopoverOpen(false)
+        return
+      }
+
       setLoading(true)
-      const limit = q ? 20 : 100
-      const resp = await api.articulos.buscar(q, limit)
+      const resp = await api.articulos.buscar(q, 20)
       const data = (resp.success ? (resp.data as MinimalArticulo[]) : []) || []
       const mapped: Producto[] = data.map((a) => ({
         id: String(a.id),
@@ -90,6 +95,7 @@ export function SeccionProducto(props: SeccionProductoProps) {
         unidad_venta: a.unidad_venta ?? "unidad",
       }))
       setMatches(mapped)
+      setPopoverOpen(mapped.length > 0)
       setLoading(false)
     }, 250)
 
@@ -133,22 +139,7 @@ export function SeccionProducto(props: SeccionProductoProps) {
                 value={codigo}
                 onChange={(e) => setCodigoEscaneado(e.target.value)}
                 onKeyDown={onKeyDown}
-                onFocus={() => {
-                  setLoading(true)
-                  api.articulos.buscar("", 100).then((resp) => {
-                    const data = (resp.success ? (resp.data as MinimalArticulo[]) : []) || []
-                    const mapped: Producto[] = data.map((a) => ({
-                      id: String(a.id),
-                      nombre: a.descripcion,
-                      precio_venta: a.precio_venta,
-                      venta_negocio: a.venta_negocio ?? a.precio_venta,
-                      stock_actual: a.stock_actual ?? 0,
-                      unidad_venta: a.unidad_venta ?? "unidad",
-                    }))
-                    setMatches(mapped)
-                    setPopoverOpen(true)
-                  }).finally(() => setLoading(false))
-                }}
+                onFocus={() => setPopoverOpen(false)}
                 className="border w-full"
                 autoFocus
                 placeholder="Escanee o escriba nombre y presione Enter"
