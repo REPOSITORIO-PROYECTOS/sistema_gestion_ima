@@ -862,8 +862,8 @@ function FormVentas({
   ]);
 
   const handleF5 = useCallback(() => {
-    setTipoFacturacion('comprobante');
-    procesarVenta('comprobante');
+    setTipoFacturacion('recibo');
+    procesarVenta('recibo');
   }, [procesarVenta]);
 
   const handleF6 = useCallback(() => {
@@ -876,7 +876,7 @@ function FormVentas({
     setMontoPagado(totalVentaFinal);
     setInputEfectivo(formatearMoneda(totalVentaFinal.toString()));
     setCheckoutVisible(true);
-    setTipoFacturacion('comprobante');
+    setTipoFacturacion('recibo');
     setAutoSubmitFlag(true);
     toast.info("Procesando pago en EFECTIVO (F8)...");
   }, [totalVentaFinal, setMetodoPago, setMontoPagado, formatearMoneda]);
@@ -885,7 +885,7 @@ function FormVentas({
     setMetodoPago('transferencia');
     setMontoPagado(totalVentaFinal);
     setCheckoutVisible(true);
-    setTipoFacturacion('comprobante');
+    setTipoFacturacion('recibo');
     setAutoSubmitFlag(true);
     toast.info("Procesando pago con TRANSFERENCIA (F9)...");
   }, [totalVentaFinal, setMetodoPago, setMontoPagado]);
@@ -894,7 +894,7 @@ function FormVentas({
     setMetodoPago('bancario');
     setMontoPagado(totalVentaFinal);
     setCheckoutVisible(true);
-    setTipoFacturacion('comprobante');
+    setTipoFacturacion('recibo');
     setAutoSubmitFlag(true);
     toast.info("Procesando pago con POS (F10)...");
   }, [totalVentaFinal, setMetodoPago, setMontoPagado]);

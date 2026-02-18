@@ -159,22 +159,22 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
         if (accionActual === 'agrupar' || accionActual === 'facturar') {
             const ids_para_procesar = selectedRows.map(row => row.original.id);
             const id_cliente_final = selectedRows[0]?.original.venta?.cliente?.id ?? null;
-            const payloadItems: ItemPayload[] = itemsResumen.map(item => ({
-                id_articulo: Number(productos.find(p => p.nombre === item.descripcion)?.id) || 0,
-                cantidad: item.cantidad,
-                precio_unitario: item.precio_unitario_nuevo,
-                subtotal: item.subtotal_nuevo,
-                nombre: item.descripcion
-            }));
-            
+
             if (accionActual === 'agrupar') {
+                const payloadItems: ItemPayload[] = itemsResumen.map(item => ({
+                    id_articulo: Number(productos.find(p => p.nombre === item.descripcion)?.id) || 0,
+                    cantidad: item.cantidad,
+                    precio_unitario: item.precio_unitario_nuevo,
+                    subtotal: item.subtotal_nuevo,
+                    nombre: item.descripcion
+                }));
+
                 url = 'https://sistema-ima.sistemataup.online/api/comprobantes/agrupar';
                 body = { ids_comprobantes: ids_para_procesar, id_cliente_final, items: payloadItems, total_final: totalResumen, nuevo_tipo_comprobante: tipoComprobanteAgrupado };
                 successMessage = `Se creó el nuevo Comprobante a partir de ${ids_para_procesar.length} movimientos.`;
             } else {
+                // Facturación en lote, enviando UNO POR UNO
                 url = "https://sistema-ima.sistemataup.online/api/comprobantes/facturar-lote";
-                body = { ids_movimientos: ids_para_procesar, id_cliente_final, items: payloadItems, total_final: totalResumen };
-                successMessage = `Se facturaron con éxito ${ids_para_procesar.length} movimientos.`;
             }
         } else if (accionActual === 'anular') {
             url = 'https://sistema-ima.sistemataup.online/api/comprobantes/anular-factura';
@@ -184,19 +184,73 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
 
         try {
             if (!url) throw new Error("Acción no reconocida.");
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify(body)
-            });
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || `Error en la operación: ${accionActual}`);
+
+            if (accionActual === 'facturar') {
+                let exitos = 0;
+                let fallos: string[] = [];
+
+                for (const row of selectedRows) {
+                    const venta = row.original.venta;
+                    const idCliente = venta?.cliente?.id ?? null;
+                    const itemsParaVenta: ItemPayload[] = (venta?.articulos_vendidos || []).map(itemV => {
+                        const productoActual = productos.find(p => String(p.id) === String(itemV.id_articulo));
+                        const precio = productoActual?.precio_venta ?? itemV.precio_unitario;
+                        return {
+                            id_articulo: Number(itemV.id_articulo),
+                            cantidad: itemV.cantidad,
+                            precio_unitario: precio,
+                            subtotal: precio * itemV.cantidad,
+                            nombre: itemV.nombre,
+                        };
+                    });
+                    const totalFila = itemsParaVenta.reduce((acc, it) => acc + it.subtotal, 0);
+
+                    const bodyPorFila: BodyType = {
+                        ids_movimientos: [row.original.id],
+                        id_cliente_final: idCliente,
+                        items: itemsParaVenta,
+                        total_final: totalFila,
+                    };
+
+                    try {
+                        const response = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                            body: JSON.stringify(bodyPorFila)
+                        });
+                        if (!response.ok) {
+                            const errorData = await response.json();
+                            throw new Error(errorData.detail || `Error en facturación de movimiento ${row.original.id}`);
+                        }
+                        await response.json();
+                        exitos += 1;
+                    } catch (err) {
+                        const msg = err instanceof Error ? err.message : String(err);
+                        fallos.push(`ID ${row.original.id}: ${msg}`);
+                    }
+                }
+
+                if (exitos > 0) {
+                    toast.success(`Facturación completada`, { description: `Se facturaron ${exitos} movimiento(s).` });
+                }
+                if (fallos.length > 0) {
+                    toast.error("Algunos movimientos no se facturaron", { description: fallos.join(" | ") });
+                }
+
+            } else {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify(body)
+                });
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `Error en la operación: ${accionActual}`);
+                }
+                await response.json();
+                toast.success("¡Operación Exitosa!", { description: successMessage });
             }
-            
-            const responseData = await response.json();
-            toast.success("¡Operación Exitosa!", { description: successMessage });
-            
+
             // --- NUEVO: Descargar PDF si es Anulación ---
             if (accionActual === 'anular' && selectedRows.length === 1) {
                  const idVenta = selectedRows[0].original.venta?.id;
