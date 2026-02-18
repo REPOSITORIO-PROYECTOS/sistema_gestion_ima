@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { DataTable } from "./data-table";
 import { columns, ProductoAPI } from "./columns";
+import { fetchAllArticulos } from "./api";
 import { useAuthStore } from "@/lib/authStore";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
@@ -16,16 +17,8 @@ export default function StockPage() {
   useEffect(() => {
     const fetchProductos = async () => {
       try {
-        const res = await fetch("https://sistema-ima.sistemataup.online/api/articulos/obtener_todos", {
-          headers: {
-            "Authorization": `Bearer ${token}`,
-          },
-        });
-
-        const data: ProductoAPI[] = await res.json();
+        const data = await fetchAllArticulos(token);
         setProductos(data);
-        console.log(data)
-
       } catch (err) {
         console.error("❌ Error al obtener productos:", err);
 
@@ -34,7 +27,11 @@ export default function StockPage() {
       }
     };
 
-    fetchProductos();
+    if (token) {
+      fetchProductos();
+    } else {
+      setLoading(false);
+    }
   }, [token]);
 
   if (loading) return <p className="text-center py-10">Cargando productos...</p>;

@@ -4,6 +4,8 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { fetchAllArticulos } from "./api"
+import { ProductoAPI } from "./columns"
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -35,14 +37,14 @@ import {
 import { toast } from "sonner";
 import { useAuthStore } from "@/lib/authStore"
 
-interface DataTableProps<TData, TValue> {
+interface DataTableProps<TData extends ProductoAPI, TValue> {
     columns: ColumnDef<TData, TValue>[]
     data: TData[]
     onProductosActualizados?: (productos: TData[]) => void
     loading?: boolean
 }
 
-export function DataTable<TData, TValue>({
+export function DataTable<TData extends ProductoAPI, TValue>({
     columns,
     data,
     onProductosActualizados,
@@ -72,6 +74,11 @@ export function DataTable<TData, TValue>({
 
     const [syncLoading, setSyncLoading] = useState(false);
     const handleSyncArticulos = async () => {
+        if (!token) {
+            toast.error("Sesión no disponible. Vuelve a iniciar sesión.");
+            return;
+        }
+
         setSyncLoading(true);
         toast("Sincronizando artículos... Por favor espera");
         try {
@@ -83,24 +90,29 @@ export function DataTable<TData, TValue>({
                 },
                 body: JSON.stringify({}),
             });
-            if (!response.ok) throw new Error("Fallo en la respuesta del servidor");
+            if (!response.ok) {
+                const detalle = await response.json().catch(() => ({} as Record<string, string>));
+                const mensajeError = detalle?.detail || "Fallo en la respuesta del servidor";
+                throw new Error(mensajeError);
+            }
 
-            // Obtener la lista actualizada de productos
-            const productosResponse = await fetch("https://sistema-ima.sistemataup.online/api/articulos/obtener_todos", {
-                method: "GET",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                },
-            });
-            if (!productosResponse.ok) throw new Error("No se pudo obtener la lista actualizada de productos");
-            const productos = await productosResponse.json();
+            const payload = await response.json();
+            const resumen = payload?.data || {};
+
+            const productos = await fetchAllArticulos(token) as unknown as TData[];
             if (onProductosActualizados) onProductosActualizados(productos);
 
-            toast.success("Artículos sincronizados ✅");
+            const leidos = resumen.leidos ?? 0;
+            const actualizados = resumen.actualizados ?? 0;
+            const creados = resumen.creados ?? 0;
+            const eliminados = resumen.eliminados ?? 0;
+            const omitidos = resumen.no_eliminados_con_movimientos ?? 0;
+            const mensaje = `Artículos sincronizados ✅ | Leídos: ${leidos}, Actualizados: ${actualizados}, Creados: ${creados}, Eliminados: ${eliminados}, Protegidos: ${omitidos}`;
+            toast.success(mensaje);
         } catch (error) {
             console.error("Error al sincronizar artículos:", error);
-            toast.error("Error al sincronizar artículos ❌");
+            const mensaje = error instanceof Error ? error.message : "Error al sincronizar artículos ❌";
+            toast.error(mensaje);
         } finally {
             setSyncLoading(false);
         }
