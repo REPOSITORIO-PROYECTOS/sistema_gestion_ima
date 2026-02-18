@@ -3,32 +3,32 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
-  ColumnDef,
-  ColumnFiltersState,
-  SortingState,
-  flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-  useReactTable,
+    ColumnDef,
+    ColumnFiltersState,
+    SortingState,
+    flexRender,
+    getCoreRowModel,
+    getFilteredRowModel,
+    getPaginationRowModel,
+    getSortedRowModel,
+    useReactTable,
 } from "@tanstack/react-table"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
 } from "@/components/ui/table"
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectLabel,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select"
 
 import { MovimientoAPI } from "./columns";
@@ -41,19 +41,19 @@ import { ResumenItemsModal, ItemParaResumen } from "./ResumenItemsModal";
 import { useProductoStore } from "@/lib/productoStore";
 
 interface DataTableProps<TData, TValue> {
-  columns: ColumnDef<TData, TValue>[]
-  data: TData[]
-  token: string | null;
-  onActionComplete: () => void;
+    columns: ColumnDef<TData, TValue>[]
+    data: TData[]
+    token: string | null;
+    onActionComplete: () => void;
 }
 
 export function DataTable<TData extends MovimientoAPI, TValue>({
-  columns,
-  data,
-  token,
-  onActionComplete
+    columns,
+    data,
+    token,
+    onActionComplete
 }: DataTableProps<TData, TValue>) {
-    
+
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
     const [facturadoFilter, setFacturadoFilter] = useState("all");
@@ -70,7 +70,7 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
 
     const prepararYAbrirModal = (accion: 'agrupar' | 'facturar') => {
         const selectedRows = table.getSelectedRowModel().flatRows;
-        
+
         // 1. Validación: Selección Mínima
         if (selectedRows.length === 0) {
             toast.info("Por favor, seleccione uno o más movimientos para continuar.");
@@ -80,7 +80,7 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
         // 2. Validación: Consistencia de la Selección
         const primerItem = selectedRows[0].original;
         const idClienteBase = primerItem.venta?.cliente?.id;
-        
+
         for (const row of selectedRows) {
             if (row.original.venta?.cliente?.id !== idClienteBase) {
                 toast.error("Selección inválida", { description: "Todos los movimientos deben pertenecer al mismo cliente." });
@@ -100,7 +100,7 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
                 return;
             }
         }
-        
+
         // 3. Si todas las validaciones pasan, proceder a preparar los datos
         const itemsConsolidados: ItemParaResumen[] = [];
         let totalFinal = 0;
@@ -119,36 +119,36 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
                 totalFinal += subtotalActualizado;
             });
         });
-        
+
         setItemsResumen(itemsConsolidados);
         setTotalResumen(totalFinal);
         setAccionActual(accion);
     };
-    
+
     const handleAnularClick = () => {
         const selectedRows = table.getSelectedRowModel().flatRows;
-        
+
         if (selectedRows.length !== 1) {
             toast.error("Selección inválida", { description: "Para anular, debe seleccionar una única factura." });
             return;
         }
 
         const rowToAnul = selectedRows[0].original;
-        
+
         if (!rowToAnul.venta || !rowToAnul.venta.facturada) {
             toast.error("Acción no permitida", { description: "Solo se pueden anular movimientos que ya han sido facturados fiscalmente." });
             return;
         }
-        
+
         setAccionActual('anular');
     };
-    
+
     const handleConfirmarAccion = async () => {
         if (!accionActual) return;
-        
+
         setIsLoading(true);
         const selectedRows = table.getSelectedRowModel().flatRows;
-        
+
         let url = '';
         let successMessage = "";
 
@@ -253,31 +253,31 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
 
             // --- NUEVO: Descargar PDF si es Anulación ---
             if (accionActual === 'anular' && selectedRows.length === 1) {
-                 const idVenta = selectedRows[0].original.venta?.id;
-                 if (idVenta) {
-                     toast.info("Generando PDF de Nota de Crédito...");
-                     try {
-                         const pdfRes = await fetch(`https://sistema-ima.sistemataup.online/api/comprobantes/venta/${idVenta}/nota-credito/pdf`, {
-                             headers: { Authorization: `Bearer ${token}` }
-                         });
-                         if (pdfRes.ok) {
-                             const blob = await pdfRes.blob();
-                             const url = window.URL.createObjectURL(blob);
-                             const a = document.createElement('a');
-                             a.href = url;
-                             a.download = `NC_Venta_${idVenta}.pdf`;
-                             document.body.appendChild(a);
-                             a.click();
-                             window.URL.revokeObjectURL(url);
-                             document.body.removeChild(a);
-                         } else {
-                             toast.error("No se pudo descargar el PDF de la Nota de Crédito");
-                         }
-                     } catch (e) {
-                         console.error(e);
-                         toast.error("Error al descargar PDF");
-                     }
-                 }
+                const idVenta = selectedRows[0].original.venta?.id;
+                if (idVenta) {
+                    toast.info("Generando PDF de Nota de Crédito...");
+                    try {
+                        const pdfRes = await fetch(`https://sistema-ima.sistemataup.online/api/comprobantes/venta/${idVenta}/nota-credito/pdf`, {
+                            headers: { Authorization: `Bearer ${token}` }
+                        });
+                        if (pdfRes.ok) {
+                            const blob = await pdfRes.blob();
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `NC_Venta_${idVenta}.pdf`;
+                            document.body.appendChild(a);
+                            a.click();
+                            window.URL.revokeObjectURL(url);
+                            document.body.removeChild(a);
+                        } else {
+                            toast.error("No se pudo descargar el PDF de la Nota de Crédito");
+                        }
+                    } catch (e) {
+                        console.error(e);
+                        toast.error("Error al descargar PDF");
+                    }
+                }
             }
 
             table.resetRowSelection();
@@ -309,7 +309,7 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
         <div>
             {/* Contenedor de controles */}
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4">
-                
+
                 {/* Grupo de Filtros */}
                 <div className="flex flex-col sm:flex-row gap-2 w-full md:flex-grow">
                     <Input
@@ -333,27 +333,27 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
                         <SelectContent><SelectGroup><SelectLabel>Facturación</SelectLabel><SelectItem value="all">Todos</SelectItem><SelectItem value="true">Facturados</SelectItem><SelectItem value="false">No Facturados</SelectItem></SelectGroup></SelectContent>
                     </Select>
                 </div>
-        
+
                 {/* Grupo de Botones de Acción - Siempre Visibles */}
                 <div className="flex w-full md:w-auto md:flex-shrink-0 gap-2">
-                    <Button 
-                        className="flex-1 md:flex-initial" 
-                        variant="outline" 
+                    <Button
+                        className="flex-1 md:flex-initial"
+                        variant="outline"
                         onClick={() => prepararYAbrirModal('facturar')}
                         disabled={isLoading}
                     >
                         {isLoading ? <Loader2 className="animate-spin h-4 w-4" /> : `Facturar Lote`}
                     </Button>
-                    <Button 
-                        className="flex-1 md:flex-initial" 
+                    <Button
+                        className="flex-1 md:flex-initial"
                         variant="outline"
                         onClick={() => prepararYAbrirModal('agrupar')}
                         disabled={isLoading}
                     >
-                         {isLoading ? <Loader2 className="animate-spin h-4 w-4" /> : `Agrupar`}
+                        {isLoading ? <Loader2 className="animate-spin h-4 w-4" /> : `Agrupar`}
                     </Button>
-                    <Button 
-                        className="flex-1 md:flex-initial" 
+                    <Button
+                        className="flex-1 md:flex-initial"
                         variant="destructive"
                         onClick={handleAnularClick}
                         disabled={isLoading}
@@ -366,36 +366,36 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
             {/* Tabla Principal */}
             <div className="rounded-md border">
                 <Table>
-                  <TableHeader>
-                    {table.getHeaderGroups().map((headerGroup) => (
-                      <TableRow key={headerGroup.id}>
-                        {headerGroup.headers.map((header) => (
-                          <TableHead key={header.id}>
-                            {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                          </TableHead>
+                    <TableHeader>
+                        {table.getHeaderGroups().map((headerGroup) => (
+                            <TableRow key={headerGroup.id}>
+                                {headerGroup.headers.map((header) => (
+                                    <TableHead key={header.id}>
+                                        {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                                    </TableHead>
+                                ))}
+                            </TableRow>
                         ))}
-                      </TableRow>
-                    ))}
-                  </TableHeader>
-                  <TableBody>
-                    {table.getRowModel().rows?.length ? (
-                      table.getRowModel().rows.map((row) => (
-                        <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
-                          {row.getVisibleCells().map((cell) => (
-                            <TableCell key={cell.id} className="px-4">
-                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                            </TableCell>
-                          ))}
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={columns.length} className="h-24 text-center">
-                          No hay resultados.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
+                    </TableHeader>
+                    <TableBody>
+                        {table.getRowModel().rows?.length ? (
+                            table.getRowModel().rows.map((row) => (
+                                <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
+                                    {row.getVisibleCells().map((cell) => (
+                                        <TableCell key={cell.id} className="px-4">
+                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                        </TableCell>
+                                    ))}
+                                </TableRow>
+                            ))
+                        ) : (
+                            <TableRow>
+                                <TableCell colSpan={columns.length} className="h-24 text-center">
+                                    No hay resultados.
+                                </TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
                 </Table>
             </div>
 
@@ -418,12 +418,12 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
                 isLoading={isLoading}
                 titulo={
                     accionActual === 'agrupar' ? "Agrupar a Comprobante" :
-                    accionActual === 'facturar' ? "Facturar Lote" : "Anular Factura"
+                        accionActual === 'facturar' ? "Facturar Lote" : "Anular Factura"
                 }
                 descripcion={
-                    accionActual === 'anular' 
-                    ? `Estás a punto de emitir una Nota de Crédito para anular la factura seleccionada. Esta acción es irreversible. ¿Deseas continuar?`
-                    : `Revisa los detalles antes de confirmar. Los precios han sido actualizados a la fecha.`
+                    accionActual === 'anular'
+                        ? `Estás a punto de emitir una Nota de Crédito para anular la factura seleccionada. Esta acción es irreversible. ¿Deseas continuar?`
+                        : `Revisa los detalles antes de confirmar. Los precios han sido actualizados a la fecha.`
                 }
                 textoBotonConfirmar={
                     accionActual === 'anular' ? "Sí, Anular Factura" : "Confirmar"
