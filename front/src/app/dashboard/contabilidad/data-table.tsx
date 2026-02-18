@@ -135,8 +135,8 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
 
         const rowToAnul = selectedRows[0].original;
 
-        if (!rowToAnul.venta || !rowToAnul.venta.facturada) {
-            toast.error("Acción no permitida", { description: "Solo se pueden anular movimientos que ya han sido facturados fiscalmente." });
+        if (!rowToAnul.venta) {
+            toast.error("Acción no permitida", { description: "El movimiento no tiene venta asociada." });
             return;
         }
 
@@ -177,9 +177,15 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
                 url = "https://sistema-ima.sistemataup.online/api/comprobantes/facturar-lote";
             }
         } else if (accionActual === 'anular') {
-            url = 'https://sistema-ima.sistemataup.online/api/comprobantes/anular-factura';
+            const venta = selectedRows[0].original.venta;
+            const esFiscal = !!venta?.facturada;
+            url = esFiscal
+                ? 'https://sistema-ima.sistemataup.online/api/comprobantes/anular-factura'
+                : 'https://sistema-ima.sistemataup.online/api/comprobantes/anular-comprobante';
             body = { id_movimiento: selectedRows[0].original.id, };
-            successMessage = "La factura ha sido anulada con éxito.";
+            successMessage = esFiscal
+                ? "La factura ha sido anulada con éxito."
+                : "El comprobante no fiscal ha sido anulado.";
         }
 
         try {
@@ -251,10 +257,12 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
                 toast.success("¡Operación Exitosa!", { description: successMessage });
             }
 
-            // --- NUEVO: Descargar PDF si es Anulación ---
+            // --- Descargar PDF solo si era fiscal (nota de crédito) ---
             if (accionActual === 'anular' && selectedRows.length === 1) {
-                const idVenta = selectedRows[0].original.venta?.id;
-                if (idVenta) {
+                const venta = selectedRows[0].original.venta;
+                const idVenta = venta?.id;
+                const esFiscal = !!venta?.facturada;
+                if (esFiscal && idVenta) {
                     toast.info("Generando PDF de Nota de Crédito...");
                     try {
                         const pdfRes = await fetch(`https://sistema-ima.sistemataup.online/api/comprobantes/venta/${idVenta}/nota-credito/pdf`, {

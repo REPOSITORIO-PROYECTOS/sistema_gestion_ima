@@ -36,6 +36,10 @@ class AnularFacturaRequest(BaseModel):
     id_movimiento: int
     motivo: Optional[str]
 
+class AnularComprobanteRequest(BaseModel):
+    id_movimiento: int
+    motivo: Optional[str] = None
+
 router = APIRouter(
     prefix="/comprobantes",
     tags=["Generación de Comprobantes"],
@@ -272,3 +276,26 @@ def api_anular_factura_con_nc(
             status_code=500, # 500 Internal Server Error
             detail="Ocurrió un error interno inesperado al intentar anular la factura."
         )
+
+
+@router.post("/anular-comprobante", summary="Anula un comprobante no fiscal y revierte stock")
+def api_anular_comprobante(
+    req: AnularComprobanteRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(obtener_usuario_actual)
+):
+    try:
+        resultado = facturacion_lotes_manager.anular_comprobante_no_fiscal(
+            db=db,
+            usuario_actual=current_user,
+            id_movimiento_a_anular=req.id_movimiento
+        )
+        db.commit()
+        return resultado
+    except (ValueError, RuntimeError) as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        db.rollback()
+        print(f"ERROR INESPERADO al anular comprobante: {e}")
+        raise HTTPException(status_code=500, detail="Ocurrió un error interno al anular el comprobante.")

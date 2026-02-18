@@ -2,6 +2,7 @@
 # VERSIÓN FINAL COMPLETA
 
 import requests
+from datetime import datetime
 from sqlmodel import Session, select
 from sqlalchemy.orm import selectinload
 from typing import List, Dict, Any
@@ -254,3 +255,78 @@ def crear_nota_credito_para_anular(
 
     # El commit se hará en el router que llama a esta función.
     return resultado_afip_nc
+
+
+def anular_comprobante_no_fiscal(
+    db: Session,
+    usuario_actual: Usuario,
+    id_movimiento_a_anular: int
+) -> Dict[str, Any]:
+    """
+    Anula un comprobante no fiscal (ej. recibo/remito/presupuesto), revierte stock
+    y registra un movimiento de caja negativo. No invoca AFIP.
+    """
+
+    movimiento_original = db.get(CajaMovimiento, id_movimiento_a_anular)
+
+    if not (movimiento_original and movimiento_original.venta and movimiento_original.venta.id_empresa == usuario_actual.id_empresa):
+        raise ValueError("El movimiento a anular es inválido o no pertenece a su empresa.")
+
+    venta_original = movimiento_original.venta
+
+    if venta_original.facturada:
+        raise ValueError("La venta es fiscal. Use la anulación con Nota de Crédito.")
+
+    if venta_original.estado == "ANULADA":
+        raise ValueError("Esta venta ya fue anulada previamente.")
+
+    # Movimiento de caja negativo para reflejar la devolución
+    mov_nc = CajaMovimiento(
+        id_caja_sesion=movimiento_original.id_caja_sesion,
+        id_usuario=usuario_actual.id,
+        tipo="ANULACION_COMPROBANTE",
+        concepto=f"Anulación comprobante no fiscal ID mov {movimiento_original.id}",
+        monto=-venta_original.total,
+        metodo_pago=movimiento_original.metodo_pago,
+        id_venta=venta_original.id
+    )
+    db.add(mov_nc)
+
+    # Marcar venta como anulada y guardar rastro
+    venta_original.estado = "ANULADA"
+    datos_factura = venta_original.datos_factura or {}
+    datos_factura["anulado_no_fiscal"] = {
+        "motivo": "anulacion_comprobante",
+        "timestamp": datetime.utcnow().isoformat()
+    }
+    venta_original.datos_factura = datos_factura
+    db.add(venta_original)
+
+    # Devolver stock
+    if venta_original.items:
+        for item in venta_original.items:
+            articulo = item.articulo
+            if articulo and articulo.activo:
+                stock_anterior = articulo.stock_actual
+                articulo.stock_actual += item.cantidad
+                stock_nuevo = articulo.stock_actual
+
+                mov_stock = StockMovimiento(
+                    tipo="ANULACION_COMPROBANTE",
+                    cantidad=item.cantidad,
+                    stock_anterior=stock_anterior,
+                    stock_nuevo=stock_nuevo,
+                    id_articulo=articulo.id,
+                    id_usuario=usuario_actual.id,
+                    id_venta_detalle=item.id,
+                    id_empresa=usuario_actual.id_empresa
+                )
+                db.add(mov_stock)
+                db.add(articulo)
+
+    return {
+        "status": "success",
+        "mensaje": "Comprobante no fiscal anulado y stock revertido.",
+        "venta_id": venta_original.id,
+        "movimiento_anulacion_id": mov_nc.id
+    }
