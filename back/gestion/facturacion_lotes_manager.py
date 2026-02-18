@@ -6,6 +6,7 @@ from datetime import datetime
 from sqlmodel import Session, select
 from sqlalchemy.orm import selectinload
 from typing import List, Dict, Any
+from jinja2 import Environment, FileSystemLoader
 
 # --- Módulos del Proyecto ---
 from back.modelos import ConfiguracionEmpresa, Usuario, Tercero, Venta, CajaMovimiento, VentaDetalle, Articulo, StockMovimiento
@@ -15,6 +16,7 @@ from back.gestion.facturacion_afip import generar_factura_para_venta, generar_no
 from back.schemas.comprobante_schemas import EmisorData, ReceptorData, TransaccionData, ItemData
 # Importamos la configuración para obtener las URLs y API Keys
 from back.config import URL_BOVEDA, API_KEY_INTERNA
+from back.gestion.reportes.generador_comprobantes import TEMPLATE_DIR, format_datetime
 
 # Límite para Consumidor Final
 LIMITE_CONSUMIDOR_FINAL = 200000.00
@@ -324,9 +326,122 @@ def anular_comprobante_no_fiscal(
                 db.add(mov_stock)
                 db.add(articulo)
 
-    return {
-        "status": "success",
-        "mensaje": "Comprobante no fiscal anulado y stock revertido.",
-        "venta_id": venta_original.id,
-        "movimiento_anulacion_id": mov_nc.id
+        ticket_html = _render_ticket_anulacion_no_fiscal(
+            db=db,
+            empresa=usuario_actual.empresa,
+            venta=venta_original,
+            movimiento=mov_nc
+        )
+
+        return {
+                "status": "success",
+                "mensaje": "Comprobante no fiscal anulado y stock revertido.",
+                "venta_id": venta_original.id,
+                "movimiento_anulacion_id": mov_nc.id,
+                "ticket_html": ticket_html
+        }
+
+
+def _render_ticket_anulacion_no_fiscal(
+    db: Session,
+    empresa: Usuario.empresa.__class__,
+    venta: Venta,
+    movimiento: CajaMovimiento
+) -> str:
+    """Renderiza la anulación usando la plantilla de ticket existente (recibo/remito/presupuesto)."""
+
+    def _resolver_template(tipo_comprobante: str) -> str:
+        tipo = (tipo_comprobante or "").lower()
+        if tipo in {"remito", "presupuesto", "recibo"}:
+            return tipo
+        if tipo == "factura" or tipo == "ticket":
+            return "comprobante"
+        return "recibo"
+
+    # Buscar configuración de la empresa para completar datos visuales
+    config_empresa = getattr(empresa, "configuracion", None)
+    if not config_empresa and getattr(empresa, "id", None):
+        config_empresa = db.query(ConfiguracionEmpresa).filter(ConfiguracionEmpresa.id_empresa == empresa.id).first()
+
+    emisor_ctx = {
+        "razon_social": getattr(config_empresa, "nombre_negocio", None) or getattr(empresa, "nombre_legal", None) or getattr(empresa, "nombre_fantasia", None) or "Empresa",
+        "cuit": getattr(empresa, "cuit", "") or "",
+        "domicilio": getattr(config_empresa, "direccion_negocio", None) or "",
+        "condicion_iva": getattr(config_empresa, "afip_condicion_iva", None) or "",
+        "punto_venta": getattr(config_empresa, "afip_punto_venta_predeterminado", None) or 0,
+        "ingresos_brutos": getattr(config_empresa, "ingresos_brutos", None) or "",
+        "inicio_actividades": getattr(config_empresa, "inicio_actividades", None) or "",
+        "logo_url": None,
     }
+
+    cliente = getattr(venta, "cliente", None)
+    receptor_ctx = {
+        "nombre_razon_social": getattr(cliente, "nombre_razon_social", None) or getattr(cliente, "nombre", None) or "Consumidor Final",
+        "cuit_o_dni": getattr(cliente, "cuit", None) or getattr(cliente, "dni", None) or "0",
+        "domicilio": getattr(cliente, "domicilio", None) or "",
+        "condicion_iva": getattr(cliente, "condicion_iva", None) or "Consumidor Final",
+    }
+
+    items = []
+    for item in venta.items or []:
+        descripcion = getattr(getattr(item, "articulo", None), "descripcion", None) or "Item"
+        items.append({
+            "cantidad": item.cantidad,
+            "descripcion": descripcion,
+            "precio_unitario": item.precio_unitario,
+            "subtotal": item.cantidad * item.precio_unitario,
+            "descuento_especifico": getattr(item, "descuento_aplicado", 0.0) or 0.0,
+            "descuento_especifico_por": 0.0,
+        })
+
+    fecha_emision = movimiento.timestamp or datetime.utcnow()
+
+    transaccion_ctx = {
+        "items": items,
+        "total": venta.total,
+        "subtotal": None,
+        "descuento_general": getattr(venta, "descuento_total", 0.0) or 0.0,
+        "descuento_general_por": 0.0,
+        "observaciones": f"ANULACIÓN de comprobante - Mov {movimiento.id} - {fecha_emision.strftime('%d/%m/%Y %H:%M')}"
+    }
+
+    afip_ctx = {
+        "tipo_comprobante_nombre": "ANULACION",
+        "tipo_comprobante_letra": "X",
+        "numero_comprobante": (venta.datos_factura or {}).get("numero_comprobante", 0) if venta.datos_factura else 0,
+        "tipo_afip": None,
+        "qr_base64": None,
+    }
+
+    contexto = {
+        "emisor": emisor_ctx,
+        "receptor": receptor_ctx,
+        "transaccion": transaccion_ctx,
+        "fecha_emision": fecha_emision,
+        "afip": afip_ctx,
+    }
+
+    template_name = _resolver_template(getattr(venta, "tipo_comprobante_solicitado", None))
+
+    try:
+        env = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
+        env.filters["date"] = format_datetime
+        template = env.get_template(f"ticket/{template_name}.html")
+        return template.render(contexto)
+    except Exception:
+        # Fallback liviano para no bloquear la anulación en caso de error de template
+        fecha_str = format_datetime(fecha_emision)
+        line_items = "".join([
+            f"<tr><td>{it['descripcion']}</td><td style='text-align:right'>{it['cantidad']}</td><td style='text-align:right'>{it['precio_unitario']:.2f}</td><td style='text-align:right'>{it['subtotal']:.2f}</td></tr>"
+            for it in items
+        ])
+        return f"""
+        <html><body>
+        <h3>{emisor_ctx['razon_social']}</h3>
+        <div>ANULACIÓN DE COMPROBANTE</div>
+        <div>Fecha: {fecha_str}</div>
+        <table>{line_items}</table>
+        <div>Total: ${venta.total:.2f}</div>
+        <div>Movimiento: {movimiento.id}</div>
+        </body></html>
+        """

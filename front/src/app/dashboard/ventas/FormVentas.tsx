@@ -31,6 +31,7 @@ import { attachAutoScaleBridge } from "@/lib/scaleSerial";
 import { SeccionCliente } from "./SeccionCliente";
 import { SeccionProducto } from "./SeccionProducto";
 import { SeccionCantidad } from "./SeccionCantidad";
+import { PagoMultiple, type Pago } from "./PagoMultiple";
 import { Accordion, AccordionItem } from "@/components/ui/accordion"
 import { AccordionContent, AccordionTrigger } from "@/components/ui/accordion"
 
@@ -159,6 +160,9 @@ function FormVentas({
   const [autoSubmitFlag, setAutoSubmitFlag] = useState(false);
   const [balanzaRetry, setBalanzaRetry] = useState(0);
 
+  // Estados para Pagos Múltiples
+  const [usarPagosMultiples, setUsarPagosMultiples] = useState(false);
+  const [pagosMultiples, setPagosMultiples] = useState<Pago[]>([]);
 
   // Estados para Venta a Granel
   const [modoVenta, setModoVenta] = useState<'unidad' | 'granel'>('unidad');
@@ -1086,19 +1090,46 @@ function FormVentas({
             <div className="flex flex-col gap-4 mt-4">
               <div className="flex flex-col gap-4 items-start justify-between md:flex-row">
                 <Label className="text-2xl font-semibold text-green-900">Método de Pago</Label>
-                <Select value={metodoPago} onValueChange={setMetodoPago}>
-                  <SelectTrigger className="w-full md:max-w-1/2 cursor-pointer text-black">
-                    <SelectValue placeholder="Seleccionar método" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="efectivo">Efectivo</SelectItem>
-                    <SelectItem value="transferencia">Transferencia</SelectItem>
-                    <SelectItem value="bancario">POS</SelectItem>
-                  </SelectContent>
-                </Select>
+                {!usarPagosMultiples ? (
+                  <div className="flex gap-2 w-full md:max-w-1/2">
+                    <Select value={metodoPago} onValueChange={setMetodoPago}>
+                      <SelectTrigger className="w-full cursor-pointer text-black flex-1">
+                        <SelectValue placeholder="Seleccionar método" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="efectivo">Efectivo</SelectItem>
+                        <SelectItem value="transferencia">Transferencia</SelectItem>
+                        <SelectItem value="bancario">POS</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setUsarPagosMultiples(true)
+                        setPagosMultiples([])
+                      }}
+                      className="border-green-700 text-green-700"
+                    >
+                      ↓ Múltiples
+                    </Button>
+                  </div>
+                ) : null}
               </div>
 
-              {metodoPago === 'efectivo' && (
+              {usarPagosMultiples && (
+                <PagoMultiple
+                  pagos={pagosMultiples}
+                  totalVenta={totalVentaFinal}
+                  onPagosChange={setPagosMultiples}
+                  onToggleMode={() => {
+                    setUsarPagosMultiples(false)
+                    setPagosMultiples([])
+                  }}
+                />
+              )}
+
+              {!usarPagosMultiples && metodoPago === 'efectivo' && (
                 <div className="flex flex-col gap-4 p-4 bg-green-800 rounded-lg mt-2">
                   <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
                     <Label className="text-2xl font-semibold text-white">Costo del Pedido:</Label>

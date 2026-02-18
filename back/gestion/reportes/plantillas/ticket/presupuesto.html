@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,45 +14,132 @@
             padding: 0;
             color: #000;
         }
+
         .ticket {
-            width: 56mm; /* Ajustable a 78mm para rollos de 80mm */
+            width: 56mm;
+            /* Ajustable a 78mm para rollos de 80mm */
             padding: 1mm;
         }
-        .header, .footer {
+
+        .header,
+        .footer {
             text-align: center;
         }
-        .header h1 { margin: 0; font-size: 13px; word-wrap: break-word; }
-        .header h2 { margin: 4px 0; font-size: 12px; }
-        p { margin: 2px 0; }
-        hr { border: none; border-top: 1px dashed black; margin: 5px 0; }
-        
-        .cliente-info { margin-top: 5px; }
-        .cliente-info p { margin-bottom: 3px; }
 
-        .item-list { margin-top: 8px; }
-        .item { display: flex; justify-content: space-between; margin: 3px 0; }
-        .item .cantidad { width: 15%; text-align: left; }
-        .item .descripcion { flex-grow: 1; text-align: left; word-wrap: break-word; padding: 0 4px; }
-        .item .unitario { width: 25%; text-align: right; }
-        .item .subtotal { width: 25%; text-align: right; }
+        .header h1 {
+            margin: 0;
+            font-size: 13px;
+            word-wrap: break-word;
+        }
 
-        .item-header { font-weight: bold; border-bottom: 1px solid black; padding-bottom: 2px; }
-        
+        .header h2 {
+            margin: 4px 0;
+            font-size: 12px;
+        }
+
+        p {
+            margin: 2px 0;
+        }
+
+        hr {
+            border: none;
+            border-top: 1px dashed black;
+            margin: 5px 0;
+        }
+
+        .cliente-info {
+            margin-top: 5px;
+        }
+
+        .cliente-info p {
+            margin-bottom: 3px;
+        }
+
+        .item-list {
+            margin-top: 8px;
+        }
+
+        .item {
+            display: flex;
+            justify-content: space-between;
+            margin: 3px 0;
+        }
+
+        .item .cantidad {
+            width: 15%;
+            text-align: left;
+        }
+
+        .item .descripcion {
+            flex-grow: 1;
+            text-align: left;
+            word-wrap: break-word;
+            padding: 0 4px;
+        }
+
+        .item .unitario {
+            width: 25%;
+            text-align: right;
+        }
+
+        .item .subtotal {
+            width: 25%;
+            text-align: right;
+        }
+
+        .item-header {
+            font-weight: bold;
+            border-bottom: 1px solid black;
+            padding-bottom: 2px;
+        }
+
         /* === ESTILOS NUEVOS PARA DESCUENTOS === */
         .item-discount {
             font-size: 9px;
-            color: #d9534f; /* Rojo suave para descuentos */
-            padding-left: 8px; /* Indentación */
+            color: #d9534f;
+            /* Rojo suave para descuentos */
+            padding-left: 8px;
+            /* Indentación */
             margin-top: -2px;
         }
-        .totals-section { margin-top: 8px; border-top: 1px dashed black; padding-top: 5px; }
-        .totals-section .item { font-weight: bold; }
-        .totals-section .discount { color: #d9534f; }
-        .total-final { font-weight: bold; font-size: 13px; }
 
-        .footer { font-size: 9px; margin-top: 10px; text-align: left; }
+        .totals-section {
+            margin-top: 8px;
+            border-top: 1px dashed black;
+            padding-top: 5px;
+        }
+
+        .totals-section .item {
+            font-weight: bold;
+        }
+
+        .totals-section .discount {
+            color: #d9534f;
+        }
+
+        .total-final {
+            font-weight: bold;
+            font-size: 13px;
+        }
+
+        .footer {
+            font-size: 9px;
+            margin-top: 10px;
+            text-align: left;
+        }
+
+        .badge-anulado {
+            display: inline-block;
+            padding: 2px 6px;
+            margin-top: 6px;
+            border: 1px solid #d9534f;
+            color: #d9534f;
+            font-weight: bold;
+            font-size: 11px;
+        }
     </style>
 </head>
+
 <body>
     <div class="ticket">
         <div class="header">
@@ -60,6 +148,9 @@
             <p>{{ emisor.domicilio }}</p>
             <hr>
             <h2>PRESUPUESTO</h2>
+            {% if afip and afip.tipo_comprobante_nombre and afip.tipo_comprobante_nombre|upper == 'ANULACION' %}
+            <div class="badge-anulado">ANULADO</div>
+            {% endif %}
             <p>Fecha: {{ fecha_emision | date }}</p>
             <p>Validez: 15 días</p>
             <hr>
@@ -87,15 +178,15 @@
                 <!-- Subtotal ANTES del descuento específico -->
                 <span class="subtotal">${{ "%.2f"|format(item.cantidad * item.precio_unitario) }}</span>
             </div>
-            
+
             <!-- LÓGICA PARA MOSTRAR DESCUENTO ESPECÍFICO DEL ÍTEM -->
             {% if item.descuento_especifico and item.descuento_especifico > 0 %}
             <div class="item item-discount">
                 <span class="cantidad"></span> <!-- Espacio vacío para alinear -->
                 <span class="descripcion">
-                    Desc. 
+                    Desc.
                     {% if item.descuento_especifico_por and item.descuento_especifico_por > 0 %}
-                        ({{ "%.0f"|format(item.descuento_especifico_por) }}%)
+                    ({{ "%.0f"|format(item.descuento_especifico_por) }}%)
                     {% endif %}
                 </span>
                 <span class="unitario"></span> <!-- Espacio vacío -->
@@ -116,15 +207,15 @@
 
             <!-- LÓGICA PARA MOSTRAR DESCUENTO GENERAL -->
             {% if transaccion.descuento_general and transaccion.descuento_general > 0 %}
-                <div class="item discount">
-                    <span>
-                        DESCUENTO GRAL. 
-                        {% if transaccion.descuento_general_por and transaccion.descuento_general_por > 0 %}
-                            ({{ "%.0f"|format(transaccion.descuento_general_por) }}%)
-                        {% endif %}
-                    </span>
-                    <span>-${{ "%.2f"|format(transaccion.descuento_general) }}</span>
-                </div>
+            <div class="item discount">
+                <span>
+                    DESCUENTO GRAL.
+                    {% if transaccion.descuento_general_por and transaccion.descuento_general_por > 0 %}
+                    ({{ "%.0f"|format(transaccion.descuento_general_por) }}%)
+                    {% endif %}
+                </span>
+                <span>-${{ "%.2f"|format(transaccion.descuento_general) }}</span>
+            </div>
             {% endif %}
 
             <div class="item total-final">
@@ -140,4 +231,5 @@
         </div>
     </div>
 </body>
+
 </html>

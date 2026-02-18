@@ -8,7 +8,7 @@ from datetime import datetime
 from back.gestion.caja.cliente_publico import obtener_cliente_por_id
 # Importa todos tus modelos. Asegúrate de que las rutas sean correctas.
 from back.modelos import Usuario, Venta, VentaDetalle, Articulo, CajaMovimiento, Tercero, CajaSesion, ConfiguracionEmpresa
-from back.schemas.caja_schemas import ArticuloVendido, RegistrarVentaRequest, TipoMovimiento
+from back.schemas.caja_schemas import ArticuloVendido, RegistrarVentaRequest, TipoMovimiento, PagoMultiple
 from back.utils.tablas_handler import TablasHandler
 
 from back.gestion.contabilidad.clientes_contabilidad import manager as clientes_manager
@@ -347,4 +347,76 @@ def registrar_ingreso_egreso(
         db.rollback()
         # Relanzamos la excepción para que el router la capture
         raise RuntimeError(f"Error de base de datos al registrar el movimiento: {e}")
+
+
+def registrar_venta_y_movimientos_caja_multiples(
+    db: Session,
+    usuario_actual: Usuario,
+    id_sesion_caja: int,
+    total_venta: float,
+    pagos_multiples: List[PagoMultiple],
+    articulos_vendidos: List[ArticuloVendido],
+    id_cliente: int = None,
+    pago_separado: bool = None,
+    detalles_pago_separado: str = None,
+    tipo_comprobante_solicitado: str = None,
+    omitir_stock: bool = False,
+    propina: float = 0.0,
+    descuento_total: float = 0.0
+) -> Tuple[Venta, List[CajaMovimiento]]:
+    """
+    Registra una Venta con MÚLTIPLES MEDIOS DE PAGO.
+    Crea un CajaMovimiento para cada medio de pago con su monto correspondiente.
+    
+    Valida que la suma de pagos_multiples sea igual a total_venta.
+    """
+    print(f"\n--- [REGISTRO VENTA CON MÚLTIPLES PAGOS] ---")
+    print(f"Total esperado: ${total_venta:.2f}")
+    print(f"Pagos: {[(p.metodo_pago, p.monto) for p in pagos_multiples]}")
+    
+    # --- 1. VALIDAR SUMA DE PAGOS ---
+    suma_pagos = sum(p.monto for p in pagos_multiples)
+    if abs(suma_pagos - total_venta) > 0.01:  # Tolerancia por redondeo
+        raise ValueError(f"La suma de pagos (${suma_pagos:.2f}) no coincide con el total (${total_venta:.2f})")
+    
+    # --- 2. REUTILIZAR LÓGICA DE VALIDACIÓN Y CREACIÓN DE VENTA ---
+    # (Usar metodo_pago como "MÚLTIPLE" para registro)
+    nueva_venta, _ = registrar_venta_y_movimiento_caja(
+        db=db,
+        usuario_actual=usuario_actual,
+        id_sesion_caja=id_sesion_caja,
+        total_venta=total_venta,
+        metodo_pago="MÚLTIPLE",  # Marcamos como múltiple
+        articulos_vendidos=articulos_vendidos,
+        id_cliente=id_cliente,
+        pago_separado=pago_separado,
+        detalles_pago_separado=detalles_pago_separado,
+        tipo_comprobante_solicitado=tipo_comprobante_solicitado,
+        omitir_stock=omitir_stock,
+        propina=propina,
+        descuento_total=descuento_total
+    )
+    
+    # --- 3. CREAR UN MOVIMIENTO DE CAJA POR CADA MEDIO DE PAGO ---
+    movimientos = []
+    for pago in pagos_multiples:
+        concepto = f"Venta ({tipo_comprobante_solicitado}) ID: {nueva_venta.id} - Pago por {pago.metodo_pago}"
+        
+        movimiento = CajaMovimiento(
+            tipo=TipoMovimiento.VENTA.value,
+            concepto=concepto,
+            monto=pago.monto,
+            metodo_pago=pago.metodo_pago.upper(),
+            id_caja_sesion=id_sesion_caja,
+            id_usuario=usuario_actual.id,
+            id_venta=nueva_venta.id,
+        )
+        db.add(movimiento)
+        movimientos.append(movimiento)
+        print(f"  -> Movimiento registrado: {pago.metodo_pago} - ${pago.monto:.2f}")
+    
+    db.flush()
+    print(f"--- [FIN REGISTRO VENTA CON MÚLTIPLES PAGOS] ---\n")
+    
+    return nueva_venta, movimientos
 

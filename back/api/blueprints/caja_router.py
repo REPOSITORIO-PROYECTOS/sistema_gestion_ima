@@ -88,21 +88,41 @@ def api_registrar_venta(
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
     
-    # --- PASO 1: TRANSACCIÓN CRÍTICA CON LA BASE DE DATOS (sin cambios) ---
+    # --- PASO 1: TRANSACCIÓN CRÍTICA CON LA BASE DE DATOS ---
     try:
-        venta_creada, _ = registro_caja.registrar_venta_y_movimiento_caja(
-            db=db,
-            usuario_actual=current_user,
-            id_sesion_caja=sesion_activa.id,
-            total_venta=req.total_venta,
-            metodo_pago=req.metodo_pago.upper(),
-            articulos_vendidos=req.articulos_vendidos,
-            id_cliente=req.id_cliente,
-            pago_separado=req.pago_separado,
-            detalles_pago_separado=req.detalles_pago_separado,
-            tipo_comprobante_solicitado = req.tipo_comprobante_solicitado,
-            descuento_total=req.descuento_total
-        )
+        # Detectar si viene pagos_multiples o metodo_pago único
+        if req.pagos_multiples and len(req.pagos_multiples) > 0:
+            print(f"[PAGO MÚLTIPLE] Registrando venta con {len(req.pagos_multiples)} medios de pago...")
+            venta_creada, movimientos = registro_caja.registrar_venta_y_movimientos_caja_multiples(
+                db=db,
+                usuario_actual=current_user,
+                id_sesion_caja=sesion_activa.id,
+                total_venta=req.total_venta,
+                pagos_multiples=req.pagos_multiples,
+                articulos_vendidos=req.articulos_vendidos,
+                id_cliente=req.id_cliente,
+                pago_separado=req.pago_separado,
+                detalles_pago_separado=req.detalles_pago_separado,
+                tipo_comprobante_solicitado=req.tipo_comprobante_solicitado,
+                descuento_total=req.descuento_total
+            )
+        else:
+            # Fallback a método único
+            metodo_pago_str = req.metodo_pago if req.metodo_pago else "EFECTIVO"
+            print(f"[PAGO ÚNICO] Registrando venta con método: {metodo_pago_str}")
+            venta_creada, _ = registro_caja.registrar_venta_y_movimiento_caja(
+                db=db,
+                usuario_actual=current_user,
+                id_sesion_caja=sesion_activa.id,
+                total_venta=req.total_venta,
+                metodo_pago=metodo_pago_str.upper(),
+                articulos_vendidos=req.articulos_vendidos,
+                id_cliente=req.id_cliente,
+                pago_separado=req.pago_separado,
+                detalles_pago_separado=req.detalles_pago_separado,
+                tipo_comprobante_solicitado=req.tipo_comprobante_solicitado,
+                descuento_total=req.descuento_total
+            )
         db.commit()
         db.refresh(venta_creada)
     except ValueError as e:

@@ -35,9 +35,15 @@ class ArticuloVendido(BaseModel):
     descuento_especifico: Optional[float] = 0.0
     descuento_especifico_por: Optional[float] = 0.0
 
+class PagoMultiple(BaseModel):
+    """Representa un pago individual en una transacción con múltiples medios de pago."""
+    metodo_pago: str = Field(..., description="Efectivo, Transferencia, POS, etc.")
+    monto: float = Field(..., gt=0, description="Monto en este método de pago")
+
 class RegistrarVentaRequest(BaseModel):
     id_cliente: Optional[int] = None
-    metodo_pago: str
+    metodo_pago: Optional[str] = None  # Para retrocompatibilidad (si viene un solo método)
+    pagos_multiples: Optional[List[PagoMultiple]] = None  # Nueva forma: múltiples pagos
     total_venta: float
     descuento_total: Optional[float] = 0.0
     paga_con: float
