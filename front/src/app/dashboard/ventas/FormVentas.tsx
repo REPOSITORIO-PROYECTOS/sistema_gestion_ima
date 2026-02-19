@@ -159,6 +159,7 @@ function FormVentas({
   const checkoutSectionRef = useRef<HTMLDivElement>(null);
   const [autoSubmitFlag, setAutoSubmitFlag] = useState(false);
   const [balanzaRetry, setBalanzaRetry] = useState(0);
+  const [catalogoResetTick, setCatalogoResetTick] = useState(0);
 
   // Estados para Pagos Múltiples
   const [usarPagosMultiples, setUsarPagosMultiples] = useState(false);
@@ -332,9 +333,6 @@ function FormVentas({
     };
   }, [empresa, token, balanzaRetry]);
 
-
-
-
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
@@ -416,6 +414,8 @@ function FormVentas({
   // Se posiciona después de la definición de handleSubmit para evitar uso antes de declaración
 
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Esta función solo se ejecuta cuando viene del escáner automático (código de barras)
+    // No se ejecuta cuando el usuario está escribiendo manualmente gracias al control en SeccionProducto
     if (e.key === 'Enter') {
       e.preventDefault();
       if (!codigo) return;
@@ -573,6 +573,13 @@ function FormVentas({
   }, [token, setProductos]);
 
   useEffect(() => {
+    const interval = setInterval(() => {
+      refrescarProductos();
+    }, 10000); // Refrescar cada 10 segundos
+    return () => clearInterval(interval);
+  }, [refrescarProductos]);
+
+  useEffect(() => {
     let lastVersion = parseInt(localStorage.getItem("catalogo_version") || "0", 10);
     const interval = setInterval(async () => {
       try {
@@ -591,7 +598,23 @@ function FormVentas({
       } catch { }
     }, 5000);
     return () => clearInterval(interval);
-  }, [token, refrescarProductos]);
+  }, [token, refrescarProductos, catalogoResetTick]);
+
+  useEffect(() => {
+    const intervalMs = 300000;
+    const interval = setInterval(async () => {
+      try {
+        localStorage.removeItem("producto-storage");
+        localStorage.removeItem("productos");
+        localStorage.setItem("catalogo_version", "0");
+        setCatalogoResetTick((tick) => tick + 1);
+        await refrescarProductos();
+      } catch (err) {
+        console.error("Error limpiando cache de productos:", err);
+      }
+    }, intervalMs);
+    return () => clearInterval(interval);
+  }, [refrescarProductos]);
 
   const imprimirComprobante = useCallback(async (
     tipo: string,
@@ -728,10 +751,12 @@ function FormVentas({
     if (tipoClienteSeleccionado.id === "0" && totalVenta > 200000) {
       if (cuitManual.trim() === "") {
         toast.error("❌ Para montos mayores a $200.000, debe ingresar un CUIT.");
+        setIsLoading(false);
         return;
       }
       if (!/^\d{11}$/.test(cuitManual.trim())) {
         toast.error("❌ El CUIT ingresado no es válido. Debe tener 11 dígitos.");
+        setIsLoading(false);
         return;
       }
     }
@@ -752,8 +777,26 @@ function FormVentas({
       }
     }
 
-    // --- CÁLCULO DE DESCUENTOS PARA EL BACKEND ---
-    // 1. Calcular el precio de lista total (sin ningún descuento)
+    // --- VALIDACIÓN MEJORADA DE PRODUCTOS EN CARRITO ---
+    // Buscar productos no encontrados y dar diagnóstico
+    const productosNoEncontrados = productosVendidos.filter(p => {
+      const encontrado = productos.find(prod => prod.nombre === p.tipo);
+      return !encontrado;
+    });
+
+    if (productosNoEncontrados.length > 0) {
+      const nombresNoEncontrados = productosNoEncontrados.map(p => `"${p.tipo}"`).join(", ");
+      const sugerencia = productosNoEncontrados.length === 1 
+        ? `El producto ${nombresNoEncontrados} no está en el catálogo cargado. Intente refrescar el catálogo o verificar el nombre exacto.`
+        : `Los productos ${nombresNoEncontrados} no están en el catálogo cargado. Haga clic en 🔄 para refrescar.`;
+      
+      toast.error(`❌ ${sugerencia}`);
+      setIsLoading(false);
+      return;
+    }
+
+    // --- VALIDACIÓN ORIGINAL DE IDs ---
+    // Calcular el precio de lista total (sin ningún descuento)
     const totalLista = productosVendidos.reduce((acc, p) => {
       const productoReal = productos.find(prod => prod.nombre === p.tipo);
       const precioUnitario = productoReal ? getPrecioProducto(productoReal) : 0;
@@ -780,6 +823,7 @@ function FormVentas({
     if (articulosSinId.length > 0) {
       const nombres = articulosSinId.map((item) => item.nombre).join(", ");
       toast.error(`❌ Hay artículos sin ID válido: ${nombres}. Revise el producto seleccionado.`);
+      setIsLoading(false);
       return;
     }
 

@@ -100,6 +100,59 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
   }, [token, loadFromBackend]);
 
   useEffect(() => {
+    if (!token) return;
+
+    const hydrateFromEmpresaLinks = async () => {
+      try {
+        const [res1, res2, res3] = await Promise.all([
+          fetch(`${API_CONFIG.BASE_URL}/configuracion/mi-empresa/link/1`, {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: "no-store",
+          }),
+          fetch(`${API_CONFIG.BASE_URL}/configuracion/mi-empresa/link/2`, {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: "no-store",
+          }),
+          fetch(`${API_CONFIG.BASE_URL}/configuracion/mi-empresa/link/3`, {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: "no-store",
+          }),
+        ]);
+
+        const data1 = res1.ok ? await res1.json() : { link: "" };
+        const data2 = res2.ok ? await res2.json() : { link: "" };
+        const data3 = res3.ok ? await res3.json() : { link: "" };
+
+        const byId = new Map(customLinks.map((link) => [link.id, link]));
+        const nextLinks = ([1, 2, 3] as const).map((id, idx) => {
+          const existing = byId.get(id);
+          const url =
+            id === 1
+              ? data1.link || existing?.url || ""
+              : id === 2
+                ? data2.link || existing?.url || ""
+                : data3.link || existing?.url || "";
+
+          return {
+            id,
+            name: existing?.name || `Enlace ${id}`,
+            url,
+            visible: existing?.visible ?? Boolean(url),
+          };
+        });
+
+        loadFromBackend({ custom_links: nextLinks });
+      } catch (error) {
+        console.error("Error hidratando links de empresa:", error);
+      }
+    };
+
+    hydrateFromEmpresaLinks();
+    const interval = setInterval(hydrateFromEmpresaLinks, 60000);
+    return () => clearInterval(interval);
+  }, [token, customLinks, loadFromBackend]);
+
+  useEffect(() => {
     const obtenerEmpresa = async () => {
       try {
         const res = await fetch(`${API_CONFIG.BASE_URL}/configuracion/mi-empresa`, {
