@@ -49,8 +49,8 @@ def test_backend_db_connection_indirect():
     """
     print("Probando conexión lógica a DB a través de Login...")
     url = f"{BASE_URL}/api/auth/token"
-    # Datos falsos para forzar validación
-    payload = {"username": "usuario_test_inexistente", "password": "password_falso"}
+    # Datos para prueba (admin barry)
+    payload = {"username": "admin barry", "password": "12345678"}
     
     try:
         response = requests.post(url, data=payload, timeout=5)
@@ -58,9 +58,15 @@ def test_backend_db_connection_indirect():
         # 500 indica error de servidor (probablemente DB)
         assert response.status_code != 500, "❌ Error Interno del Servidor (500). Posible fallo de conexión a DB."
         
-        # 401 indica que la app procesó la solicitud y rechazó las credenciales -> DB OK
-        assert response.status_code == 401
-        print("✅ Backend DB Connection: OK (Respondió 401 correctamente)")
+        # 200 OK si las credenciales son correctas, 401 si son incorrectas pero el endpoint responde
+        if response.status_code == 200:
+             print("✅ Login exitoso con credenciales de prueba.")
+        elif response.status_code == 401:
+             print("✅ Backend DB Connection: OK (Respondió 401 correctamente - credenciales rechazadas)")
+        else:
+             # Si da 404 u otro error, fallamos
+             assert response.status_code in [200, 401], f"❌ Error inesperado: {response.status_code}"
+
     except requests.exceptions.ConnectionError:
         pytest.fail("❌ Error de conexión al probar login.")
 

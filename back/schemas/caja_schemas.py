@@ -29,7 +29,7 @@ class CerrarCajaRequest(BaseModel):
     saldo_final_efectivo: float
 
 class ArticuloVendido(BaseModel):
-    id_articulo: int
+    id_articulo: int = Field(..., gt=0, description="ID del artículo debe ser mayor a 0")
     cantidad: float = Field(..., gt=0)
     precio_unitario: float = Field(..., ge=0)
     descuento_especifico: Optional[float] = 0.0
@@ -47,7 +47,7 @@ class RegistrarVentaRequest(BaseModel):
     total_venta: float
     descuento_total: Optional[float] = 0.0
     paga_con: float
-    articulos_vendidos: List[ArticuloVendido]
+    articulos_vendidos: List[ArticuloVendido] = Field(..., min_items=1, description="Debe tener al menos 1 artículo")
     quiere_factura: bool = False
     tipo_comprobante_solicitado: Optional[str] = None
     pago_separado: Optional[bool] = None

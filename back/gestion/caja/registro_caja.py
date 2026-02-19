@@ -32,7 +32,8 @@ def registrar_venta_y_movimiento_caja(
     tipo_comprobante_solicitado: str = None,
     omitir_stock: bool = False,
     propina: float = 0.0,
-    descuento_total: float = 0.0
+    descuento_total: float = 0.0,
+    crear_movimiento_caja: bool = True  # <-- NUEVO: Controla si se crea o no el movimiento
 ) -> Tuple[Venta, CajaMovimiento]:
     """
     Registra una Venta, aplica recargos dinámicos según la configuración
@@ -40,15 +41,21 @@ def registrar_venta_y_movimiento_caja(
     """
     # --- 1. VALIDACIÓN DE ARTÍCULOS Y STOCK (Sin Cambios) ---
     for item in articulos_vendidos:
+        # Validar que el ID sea válido (no ser 0 o negativo)
+        if not item.id_articulo or item.id_articulo <= 0:
+            raise ValueError(f"ID de artículo inválido: {item.id_articulo}. Debe ser un número positivo.")
+        
         articulo_db = db.get(Articulo, item.id_articulo)
         if not articulo_db:
-            raise ValueError(f"El artículo con ID {item.id_articulo} no existe.")
+            raise ValueError(f"El artículo con ID {item.id_articulo} no existe en la base de datos.")
         if articulo_db.id_empresa != usuario_actual.id_empresa:
             raise ValueError(f"El artículo '{articulo_db.descripcion}' no pertenece a la empresa.")
         # Si omitir_stock es True, no validamos cantidad vs stock aquí, 
         # asumimos que ya se validó/descontó previamente (ej: en mesas)
         if not omitir_stock and articulo_db.stock_actual < item.cantidad:
             raise ValueError(f"Stock insuficiente para '{articulo_db.descripcion}'.")
+
+    id_cliente_normalizado = id_cliente if id_cliente and id_cliente > 0 else None
 
     # --- 2. LÓGICA DE RECARGO DINÁMICO ---
     total_final_con_recargo = total_venta
@@ -83,7 +90,7 @@ def registrar_venta_y_movimiento_caja(
     nueva_venta = Venta(
         total=total_final_con_recargo, # El total de la Venta SÍ incluye el recargo
         descuento_total=descuento_total,
-        id_cliente=id_cliente,
+        id_cliente=id_cliente_normalizado,
         id_usuario=usuario_actual.id,
         id_caja_sesion=id_sesion_caja,
         id_empresa=usuario_actual.id_empresa,
@@ -178,7 +185,8 @@ def registrar_venta_y_movimiento_caja(
 
     movimiento_principal = None # Inicializamos como None
     
-    if afectar_caja:
+    # Solo crear movimiento si afectar_caja es True Y crear_movimiento_caja es True
+    if afectar_caja and crear_movimiento_caja:
         print("   -> Registrando movimiento en caja...")
         monto_total_caja = total_final_con_recargo + propina
         concepto_movimiento = f"Venta ({tipo_comprobante_solicitado}) ID: {nueva_venta.id}"
@@ -196,20 +204,28 @@ def registrar_venta_y_movimiento_caja(
         )
         db.add(movimiento_principal)
     else:
-        print("   -> OMITIDO: No se registra movimiento en caja según configuración.")
+        if not crear_movimiento_caja:
+            print("   -> OMITIDO: No se crea movimiento de caja (se gestionará externamente).")
+        else:
+            print("   -> OMITIDO: No se registra movimiento en caja según configuración.")
         
     db.flush()
 
     # --- 4. SINCRONIZACIÓN CON GOOGLE SHEETS (TU LÓGICA ORIGINAL) ---
     # Esta parte ahora se ejecuta DENTRO de la misma función, antes del commit.
     # El router la convertirá en una tarea en segundo plano.
-    if afectar_stock or afectar_caja:
+    # NOTA: Solo sincronizamos si se está creando el movimiento (no para pagos múltiples)
+    if (afectar_stock or afectar_caja) and crear_movimiento_caja:
         try:
                 print("[DRIVE] Intentando registrar movimiento en Google Sheets...")
-                if id_cliente!= 0:
-                    cliente = clientes_manager.obtener_cliente_por_id(usuario_actual.id_empresa,db, id_cliente)
-                    cliente_sheets_data = obtener_cliente_por_id(db,id_empresa=usuario_actual.id_empresa,id_cliente=cliente.codigo_interno) # Asumo que esta función devuelve un dict
-                else : 
+                if id_cliente_normalizado is not None:
+                    cliente = clientes_manager.obtener_cliente_por_id(usuario_actual.id_empresa, db, id_cliente_normalizado)
+                    cliente_sheets_data = obtener_cliente_por_id(
+                        db,
+                        id_empresa=usuario_actual.id_empresa,
+                        id_cliente=cliente.codigo_interno
+                    ) if cliente else None
+                else:
                     cliente_sheets_data = None
                 print("LA DATA DE CLIENTE_SHEETS_DATA ES   :  ")
                 print(cliente_sheets_data)
@@ -218,20 +234,25 @@ def registrar_venta_y_movimiento_caja(
                 razon_social_para_sheets = "N/A"
 
                 # Si cliente_sheets_data NO es None (es decir, encontramos un diccionario)
-                if id_cliente!= 0 and cliente_sheets_data:
+                if id_cliente_normalizado is not None and cliente_sheets_data:
                     nombre_cliente_para_sheets = cliente_sheets_data.get("nombre-usuario", "Cliente sin nombre")
                     cuit_cliente_para_sheets = cliente_sheets_data.get("CUIT-CUIL", "N/A")
                     razon_social_para_sheets = cliente_sheets_data.get("Nombre de Contacto", "N/A")
 
                     datos_para_sheets = {
-                        "id_cliente": id_cliente,
+                        "id_cliente": id_cliente_normalizado,
+                        "id_ingresos": str(nueva_venta.id),
+                        "id_repartidor": "",
+                        "Repartidor": usuario_actual.nombre_usuario,
                         "cliente": nombre_cliente_para_sheets,
                         "cuit": cuit_cliente_para_sheets,
                         "razon_social": razon_social_para_sheets,
                         "Tipo_movimiento": f"[{tipo_comprobante_solicitado}] Venta en {metodo_pago}",
+                        "nro_comprobante": "",
                         "descripcion": f"Venta de {', '.join(f'(articulo id = {db.get(Articulo, item.id_articulo).codigo_interno}, cantidad = {item.cantidad})' for item in articulos_vendidos)}",
                         "monto": total_final_con_recargo,
-                        "Repartidor": usuario_actual.nombre_usuario
+                        "foto_comprobante": "",
+                        "observaciones": ""
                     }
                 
                     caller = TablasHandler(id_empresa=usuario_actual.id_empresa, db=db)
@@ -244,13 +265,18 @@ def registrar_venta_y_movimiento_caja(
                 else:
                     datos_para_sheets = {
                         "id_cliente": "0",
+                        "id_ingresos": str(nueva_venta.id),
+                        "id_repartidor": "",
+                        "Repartidor": usuario_actual.nombre_usuario,
                         "cliente": "cliente final",
                         "cuit": "-",
                         "razon_social": "-",
-                         "Tipo_movimiento": f"[{tipo_comprobante_solicitado}] Venta en {metodo_pago}",
+                        "Tipo_movimiento": f"[{tipo_comprobante_solicitado}] Venta en {metodo_pago}",
+                        "nro_comprobante": "",
                         "descripcion": f"Venta de {', '.join(f'(articulo id = {db.get(Articulo, item.id_articulo).codigo_interno}, cantidad = {item.cantidad})' for item in articulos_vendidos)}",
                         "monto": total_final_con_recargo,
-                        "Repartidor": usuario_actual.nombre_usuario
+                        "foto_comprobante": "",
+                        "observaciones": ""
                     }
                     caller = TablasHandler(id_empresa=usuario_actual.id_empresa, db=db)
                     if not caller.registrar_movimiento(datos_para_sheets):
@@ -374,27 +400,30 @@ def registrar_venta_y_movimientos_caja_multiples(
     print(f"Total esperado: ${total_venta:.2f}")
     print(f"Pagos: {[(p.metodo_pago, p.monto) for p in pagos_multiples]}")
     
+    id_cliente_normalizado = id_cliente if id_cliente and id_cliente > 0 else None
+
     # --- 1. VALIDAR SUMA DE PAGOS ---
     suma_pagos = sum(p.monto for p in pagos_multiples)
     if abs(suma_pagos - total_venta) > 0.01:  # Tolerancia por redondeo
         raise ValueError(f"La suma de pagos (${suma_pagos:.2f}) no coincide con el total (${total_venta:.2f})")
     
     # --- 2. REUTILIZAR LÓGICA DE VALIDACIÓN Y CREACIÓN DE VENTA ---
-    # (Usar metodo_pago como "MÚLTIPLE" para registro)
+    # NO creamos movimiento de caja aquí, solo la venta y descuento de stock
     nueva_venta, _ = registrar_venta_y_movimiento_caja(
         db=db,
         usuario_actual=usuario_actual,
         id_sesion_caja=id_sesion_caja,
         total_venta=total_venta,
-        metodo_pago="MÚLTIPLE",  # Marcamos como múltiple
+        metodo_pago="MÚLTIPLE",  # Marcamos como múltiple (pero no se usará para crear movimiento)
         articulos_vendidos=articulos_vendidos,
-        id_cliente=id_cliente,
+        id_cliente=id_cliente_normalizado,
         pago_separado=pago_separado,
         detalles_pago_separado=detalles_pago_separado,
         tipo_comprobante_solicitado=tipo_comprobante_solicitado,
         omitir_stock=omitir_stock,
         propina=propina,
-        descuento_total=descuento_total
+        descuento_total=descuento_total,
+        crear_movimiento_caja=False  # <-- CLAVE: No crear movimiento aquí
     )
     
     # --- 3. CREAR UN MOVIMIENTO DE CAJA POR CADA MEDIO DE PAGO ---
@@ -420,26 +449,38 @@ def registrar_venta_y_movimientos_caja_multiples(
     # --- 4. REGISTRAR EN GOOGLE SHEETS: Una fila por cada método de pago ---
     try:
         print("[SHEETS] Registrando desglose de pagos múltiples...")
-        cliente = db.get(Tercero, id_cliente) if id_cliente else None
-        cliente_sheets_data = obtener_cliente_por_id(db, id_empresa=usuario_actual.id_empresa, id_cliente=cliente.codigo_interno) if cliente else None
         
-        nombre_cliente = cliente_sheets_data.get("nombre-usuario", "Cliente sin nombre") if cliente_sheets_data else "Público General"
-        cuit_cliente = cliente_sheets_data.get("CUIT-CUIL", "N/A") if cliente_sheets_data else "N/A"
-        razon_social = cliente_sheets_data.get("Nombre de Contacto", "N/A") if cliente_sheets_data else "N/A"
+        # Manejar correctamente cliente final (id_cliente = 0 o None)
+        if id_cliente_normalizado is not None:
+            cliente = db.get(Tercero, id_cliente_normalizado)
+            cliente_sheets_data = obtener_cliente_por_id(db, id_empresa=usuario_actual.id_empresa, id_cliente=cliente.codigo_interno) if cliente else None
+            nombre_cliente = cliente_sheets_data.get("nombre-usuario", "Cliente sin nombre") if cliente_sheets_data else "Público General"
+            cuit_cliente = cliente_sheets_data.get("CUIT-CUIL", "N/A") if cliente_sheets_data else "N/A"
+            razon_social = cliente_sheets_data.get("Nombre de Contacto", "N/A") if cliente_sheets_data else "N/A"
+        else:
+            # Cliente final
+            nombre_cliente = "cliente final"
+            cuit_cliente = "-"
+            razon_social = "-"
         
         caller = TablasHandler(id_empresa=usuario_actual.id_empresa, db=db)
         
         # Registrar en sheets por cada pago
         for pago in pagos_multiples:
             datos_para_sheets = {
-                "id_cliente": id_cliente,
+                "id_cliente": id_cliente_normalizado if id_cliente_normalizado is not None else "0",
+                "id_ingresos": str(nueva_venta.id),
+                "id_repartidor": "",
+                "Repartidor": usuario_actual.nombre_usuario,
                 "cliente": nombre_cliente,
                 "cuit": cuit_cliente,
                 "razon_social": razon_social,
                 "Tipo_movimiento": f"[{tipo_comprobante_solicitado}] Venta en {pago.metodo_pago.upper()}",
+                "nro_comprobante": "",
                 "descripcion": f"Venta de {', '.join(f'(articulo id = {db.get(Articulo, item.id_articulo).codigo_interno}, cantidad = {item.cantidad})' for item in articulos_vendidos)}",
-                "monto": pago.monto,  # El monto específico de este método de pago
-                "Repartidor": usuario_actual.nombre_usuario
+                "monto": pago.monto,
+                "foto_comprobante": "",
+                "observaciones": ""
             }
             if not caller.registrar_movimiento(datos_para_sheets):
                 print(f"⚠️ [SHEETS] Error al registrar pago {pago.metodo_pago} por ${pago.monto:.2f}")

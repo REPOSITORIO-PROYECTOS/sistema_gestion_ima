@@ -658,15 +658,9 @@ function FormVentas({
       iframe.onload = () => {
         iframe.contentWindow?.print();
         setTimeout(() => {
-          try {
-            if (document.body.contains(iframe)) {
-              document.body.removeChild(iframe);
-            }
-            URL.revokeObjectURL(url);
-          } catch (cleanupError) {
-            console.warn("Limpieza de iframe completada (error menor):", cleanupError);
-          }
-        }, 500); // Reducido a 500ms - basta para enviar a la cola de impresión
+          document.body.removeChild(iframe);
+          URL.revokeObjectURL(url);
+        }, 10000); // Dar tiempo para que se envíe a la cola de impresión
       };
 
       toast.success("✅ Comprobante enviado a impresión.");
@@ -772,6 +766,22 @@ function FormVentas({
 
     // 3. El descuento total es la diferencia
     const descuentoTotalCalculado = Math.max(0, totalLista - totalConDescuento);
+
+    const articulosSinId = productosVendidos
+      .map((p) => {
+        const productoReal = productos.find(prod => prod.nombre === p.tipo);
+        return {
+          nombre: p.tipo,
+          id: productoReal?.id,
+        };
+      })
+      .filter((item) => !item.id || Number(item.id) <= 0);
+
+    if (articulosSinId.length > 0) {
+      const nombres = articulosSinId.map((item) => item.nombre).join(", ");
+      toast.error(`❌ Hay artículos sin ID válido: ${nombres}. Revise el producto seleccionado.`);
+      return;
+    }
 
     const ventaPayload: any = {
       id_cliente: tipoClienteSeleccionado.id === "0" ? 0 : clienteSeleccionado?.id ?? 0,

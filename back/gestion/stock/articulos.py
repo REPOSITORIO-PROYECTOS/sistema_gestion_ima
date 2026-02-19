@@ -79,12 +79,15 @@ def buscar_articulo_por_codigo(db: Session, id_empresa_actual: int, codigo: str)
 def obtener_todos_los_articulos(db: Session, id_empresa_actual: int, skip: int = 0, limit: int = 100) -> List[Articulo]:
     """
     Obtiene una lista paginada de artículos, pre-cargando eficientemente sus códigos de barras.
+    Usa DISTINCT para evitar duplicados cuando hay múltiples códigos de barras.
     """
     statement = (
         select(Articulo)
         .where(Articulo.id_empresa == id_empresa_actual)
         .order_by(Articulo.descripcion)
         .offset(skip)
+        .limit(limit)
+        .distinct()
         .options(selectinload(Articulo.codigos))
     )
     return db.exec(statement).all()
