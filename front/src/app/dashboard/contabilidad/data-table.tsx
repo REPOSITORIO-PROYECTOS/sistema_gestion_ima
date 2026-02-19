@@ -198,24 +198,11 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
                 for (const row of selectedRows) {
                     const venta = row.original.venta;
                     const idCliente = venta?.cliente?.id ?? null;
-                    const itemsParaVenta: ItemPayload[] = (venta?.articulos_vendidos || []).map(itemV => {
-                        const productoActual = productos.find(p => String(p.id) === String(itemV.id_articulo));
-                        const precio = productoActual?.precio_venta ?? itemV.precio_unitario;
-                        return {
-                            id_articulo: Number(itemV.id_articulo),
-                            cantidad: itemV.cantidad,
-                            precio_unitario: precio,
-                            subtotal: precio * itemV.cantidad,
-                            nombre: itemV.nombre,
-                        };
-                    });
-                    const totalFila = itemsParaVenta.reduce((acc, it) => acc + it.subtotal, 0);
 
+                    // Simplified body with only required fields per FacturarLoteRequest schema
                     const bodyPorFila: BodyType = {
                         ids_movimientos: [row.original.id],
                         id_cliente_final: idCliente,
-                        items: itemsParaVenta,
-                        total_final: totalFila,
                     };
 
                     try {

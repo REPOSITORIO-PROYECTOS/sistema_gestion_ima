@@ -161,6 +161,10 @@ function FormVentas({
   const [balanzaRetry, setBalanzaRetry] = useState(0);
   const [catalogoResetTick, setCatalogoResetTick] = useState(0);
 
+  // Estados para Auto-Sincronización de Catálogo
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+
   // Estados para Pagos Múltiples
   const [usarPagosMultiples, setUsarPagosMultiples] = useState(false);
   const [pagosMultiples, setPagosMultiples] = useState<Pago[]>([]);
@@ -519,7 +523,8 @@ function FormVentas({
     fetchClientes();
   }, [token]);
 
-  // Funcion que refresca el stock en el store despues de cada venta
+
+  // Función que refresca el stock en el store después de cada venta
   const refrescarProductos = useCallback(async () => {
     // Usamos el token que ya tienes disponible en el componente
     if (!token) {
@@ -528,6 +533,7 @@ function FormVentas({
     }
 
     try {
+      setIsSyncing(true);
       console.log("🔄 Refrescando catálogo de productos...");
       const res = await fetch("https://sistema-ima.sistemataup.online/api/articulos/obtener_todos", {
         headers: { Authorization: `Bearer ${token}` },
@@ -563,12 +569,17 @@ function FormVentas({
       // Opcional: También puedes actualizar el localStorage si lo necesitas síncrono
       localStorage.setItem("productos", JSON.stringify(adaptados));
 
+      // Registrar el timestamp de última sincronización
+      setLastSyncTime(new Date());
+
       console.log("✅ Catálogo de productos actualizado.");
 
     } catch (err) {
       // Usamos un toast para notificar el error de forma no invasiva
       toast.error("No se pudo actualizar el stock de productos en tiempo real.");
       console.error("Error actualizando productos post-venta:", err);
+    } finally {
+      setIsSyncing(false);
     }
   }, [token, setProductos]);
 
@@ -614,6 +625,15 @@ function FormVentas({
       }
     }, intervalMs);
     return () => clearInterval(interval);
+  }, [refrescarProductos]);
+
+  // Auto-sincronización cada 20 segundos para mantener catálogo actualizado
+  useEffect(() => {
+    const autoSyncInterval = setInterval(async () => {
+      await refrescarProductos();
+    }, 20000); // 20 segundos
+
+    return () => clearInterval(autoSyncInterval);
   }, [refrescarProductos]);
 
   const imprimirComprobante = useCallback(async (
@@ -786,10 +806,10 @@ function FormVentas({
 
     if (productosNoEncontrados.length > 0) {
       const nombresNoEncontrados = productosNoEncontrados.map(p => `"${p.tipo}"`).join(", ");
-      const sugerencia = productosNoEncontrados.length === 1 
+      const sugerencia = productosNoEncontrados.length === 1
         ? `El producto ${nombresNoEncontrados} no está en el catálogo cargado. Intente refrescar el catálogo o verificar el nombre exacto.`
         : `Los productos ${nombresNoEncontrados} no están en el catálogo cargado. Haga clic en 🔄 para refrescar.`;
-      
+
       toast.error(`❌ ${sugerencia}`);
       setIsLoading(false);
       return;
@@ -1034,6 +1054,27 @@ function FormVentas({
       <div className="w-full flex flex-row justify-between items-center px-6 py-4 bg-green-700 rounded-t-xl">
         <div className="flex items-center gap-3">
           <h4 className="text-xl font-semibold text-white">Cajero</h4>
+
+          {/* Indicador de Sincronización Automática */}
+          <div className="text-xs text-green-100 flex items-center gap-2">
+            {isSyncing ? (
+              <>
+                <span className="inline-block animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full"></span>
+                <span>Sincronizando...</span>
+              </>
+            ) : lastSyncTime ? (
+              <>
+                <span className="text-green-200">✓</span>
+                <span>Última sync: {lastSyncTime.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+              </>
+            ) : (
+              <>
+                <span className="text-yellow-200">⏱</span>
+                <span>Preparando sincronización...</span>
+              </>
+            )}
+          </div>
+
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
