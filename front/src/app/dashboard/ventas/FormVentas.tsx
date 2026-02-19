@@ -386,11 +386,7 @@ function FormVentas({
                 descuentoNominal: 0
               });
               toast.success(`Se agregó '${p.nombre}' desde balanza`);
-              if (autoFacturar) {
-                setMetodoPago('efectivo');
-                setMontoPagado(totalVentaFinal);
-                setAutoSubmitFlag(true);
-              }
+              // Auto-facturación desactivada - usuario debe hacer click en Registrar
               return;
             }
           }
@@ -408,11 +404,7 @@ function FormVentas({
               descuentoNominal: 0
             });
             toast.success(`Se agregó '${nombre}' desde escáner`);
-            if (autoFacturar) {
-              setMetodoPago('efectivo');
-              setMontoPagado(totalVentaFinal);
-              setAutoSubmitFlag(true);
-            }
+            // Auto-facturación desactivada - usuario debe hacer click en Registrar
           }
         }
       } catch { }
@@ -666,9 +658,15 @@ function FormVentas({
       iframe.onload = () => {
         iframe.contentWindow?.print();
         setTimeout(() => {
-          document.body.removeChild(iframe);
-          URL.revokeObjectURL(url);
-        }, 10000); // Dar tiempo para que se envíe a la cola de impresión
+          try {
+            if (document.body.contains(iframe)) {
+              document.body.removeChild(iframe);
+            }
+            URL.revokeObjectURL(url);
+          } catch (cleanupError) {
+            console.warn("Limpieza de iframe completada (error menor):", cleanupError);
+          }
+        }, 500); // Reducido a 500ms - basta para enviar a la cola de impresión
       };
 
       toast.success("✅ Comprobante enviado a impresión.");
@@ -714,13 +712,16 @@ function FormVentas({
       }
     } else {
       // Validación de pagos múltiples
-      const sumaPagos = pagosMultiples.reduce((sum, p) => sum + p.monto, 0);
-      if (Math.abs(sumaPagos - totalVentaFinal) > 0.01) {
-        toast.error(`❌ La suma de pagos ($${sumaPagos.toFixed(2)}) debe ser igual al total ($${totalVentaFinal.toFixed(2)})`);;
-        return;
-      }
       if (pagosMultiples.length === 0) {
         toast.error("❌ Debe agregar al menos un método de pago.");
+        return;
+      }
+
+      const sumaPagos = pagosMultiples.reduce((sum, p) => sum + p.monto, 0);
+
+      // Permite un margen de +/- 1 peso por redondeos
+      if (Math.abs(sumaPagos - totalVentaFinal) > 1) {
+        toast.error(`❌ Diferencia: La suma de pagos ($${sumaPagos.toFixed(2)}) no coincide con el total ($${totalVentaFinal.toFixed(2)}). Diferencia: $${Math.abs(sumaPagos - totalVentaFinal).toFixed(2)}`);
         return;
       }
     }
@@ -892,7 +893,9 @@ function FormVentas({
     descuentoSobreTotal,
     observaciones,
     imprimirComprobante,
-    resetFormularioVenta
+    resetFormularioVenta,
+    pagosMultiples,
+    usarPagosMultiples
   ]);
 
   const handleF5 = useCallback(() => {
@@ -911,8 +914,7 @@ function FormVentas({
     setInputEfectivo(formatearMoneda(totalVentaFinal.toString()));
     setCheckoutVisible(true);
     setTipoFacturacion('recibo');
-    setAutoSubmitFlag(true);
-    toast.info("Procesando pago en EFECTIVO (F8)...");
+    toast.info("✅ Pago EFECTIVO listo - Click en 'Registrar Venta'");
   }, [totalVentaFinal, setMetodoPago, setMontoPagado, formatearMoneda]);
 
   const handleF9 = useCallback(() => {
@@ -920,8 +922,7 @@ function FormVentas({
     setMontoPagado(totalVentaFinal);
     setCheckoutVisible(true);
     setTipoFacturacion('recibo');
-    setAutoSubmitFlag(true);
-    toast.info("Procesando pago con TRANSFERENCIA (F9)...");
+    toast.info("✅ Pago TRANSFERENCIA listo - Click en 'Registrar Venta'");
   }, [totalVentaFinal, setMetodoPago, setMontoPagado]);
 
   const handleF10 = useCallback(() => {
@@ -929,8 +930,7 @@ function FormVentas({
     setMontoPagado(totalVentaFinal);
     setCheckoutVisible(true);
     setTipoFacturacion('recibo');
-    setAutoSubmitFlag(true);
-    toast.info("Procesando pago con POS (F10)...");
+    toast.info("✅ Pago POS listo - Click en 'Registrar Venta'");
   }, [totalVentaFinal, setMetodoPago, setMontoPagado]);
 
   useEffect(() => {
@@ -1186,17 +1186,28 @@ function FormVentas({
               )}
             </div>
 
-            <div className="flex items-center">
+            <div className="flex items-center justify-between">
               <Label htmlFor="pagoDividido" className="flex items-center gap-2 text-green-950 text-md font-medium cursor-pointer">
                 <Input
                   id="pagoDividido"
                   type="checkbox"
                   checked={pagoDividido}
-                  onChange={(e) => setPagoDividido(e.target.checked)}
+                  onChange={(e) => {
+                    setPagoDividido(e.target.checked)
+                    setUsarPagosMultiples(e.target.checked)
+                    if (e.target.checked) {
+                      setPagosMultiples([])
+                    }
+                  }}
                   className="h-5 w-5 text-green-700 border-gray-300 rounded focus:ring-green-600 cursor-pointer"
                 />
                 <span>¿Paga de dos o mas formas?</span>
               </Label>
+              {usarPagosMultiples && (
+                <span className="text-xs bg-green-300 text-green-900 px-3 py-1 rounded-full font-semibold">
+                  🟢 MODO MÚLTIPLE ACTIVO
+                </span>
+              )}
             </div>
             <span className="block w-full h-0.5 bg-green-900"></span>
 

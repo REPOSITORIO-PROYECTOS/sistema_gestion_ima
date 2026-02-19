@@ -71,6 +71,8 @@ export function SeccionProducto(props: SeccionProductoProps) {
 
   const [matches, setMatches] = useState<Producto[]>([])
   const [loading, setLoading] = useState(false)
+  const [selectedIndex, setSelectedIndex] = useState(0)
+  const [productoJustSeleccionado, setProductoJustSeleccionado] = useState(false)
   const debounceRef = useRef<number | undefined>(undefined)
 
   useEffect(() => {
@@ -79,6 +81,7 @@ export function SeccionProducto(props: SeccionProductoProps) {
     debounceRef.current = window.setTimeout(async () => {
       if (!q) {
         setMatches([])
+        setSelectedIndex(0)
         setPopoverOpen(false)
         return
       }
@@ -95,6 +98,7 @@ export function SeccionProducto(props: SeccionProductoProps) {
         unidad_venta: a.unidad_venta ?? "unidad",
       }))
       setMatches(mapped)
+      setSelectedIndex(0)
       setPopoverOpen(mapped.length > 0)
       setLoading(false)
     }, 250)
@@ -103,19 +107,58 @@ export function SeccionProducto(props: SeccionProductoProps) {
   }, [codigo, setPopoverOpen])
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && matches.length > 0) {
-      e.preventDefault()
-      setProductoSeleccionado(matches[0])
-      setCodigoEscaneado(matches[0].nombre)
-      setPopoverOpen(false)
-      return
-    }
-    if (e.key === "ArrowDown") {
-      e.preventDefault()
-      const all = productos.slice(0, 200)
-      setMatches(all)
-      setPopoverOpen(true)
-      return
+    // Si el popover está abierto, gestionar navegación con flechas
+    if (popoverOpen && matches.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault()
+        setSelectedIndex((prev) => (prev + 1) % matches.length)
+        return
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault()
+        setSelectedIndex((prev) => (prev - 1 + matches.length) % matches.length)
+        return
+      }
+      if (e.key === "Enter") {
+        e.preventDefault()
+        const selected = matches[selectedIndex]
+        if (selected) {
+          setProductoSeleccionado(selected)
+          setCodigoEscaneado(selected.nombre)
+          setPopoverOpen(false)
+          setSelectedIndex(0)
+        }
+        return
+      }
+      if (e.key === "Escape") {
+        e.preventDefault()
+        setPopoverOpen(false)
+        return
+      }
+    } else {
+      // Si el popover está cerrado
+      if (e.key === "Enter" && matches.length > 0) {
+        e.preventDefault()
+        const selected = matches[0]
+        setProductoSeleccionado(selected)
+        setCodigoEscaneado(selected.nombre)
+        setPopoverOpen(false)
+        return
+      }
+      if (e.key === "ArrowDown") {
+        e.preventDefault()
+        if (codigo.trim()) {
+          // Si hay texto, abrir popover con resultados
+          setPopoverOpen(true)
+          return
+        }
+        // Si no hay texto, mostrar todos los productos
+        const all = productos.slice(0, 200)
+        setMatches(all)
+        setSelectedIndex(0)
+        setPopoverOpen(true)
+        return
+      }
     }
     handleKeyDown(e)
   }
@@ -139,10 +182,9 @@ export function SeccionProducto(props: SeccionProductoProps) {
                 value={codigo}
                 onChange={(e) => setCodigoEscaneado(e.target.value)}
                 onKeyDown={onKeyDown}
-                onFocus={() => setPopoverOpen(false)}
-                className="border w-full"
+                className="border w-full font-semibold"
                 autoFocus
-                placeholder="Escanee o escriba nombre y presione Enter"
+                placeholder="Escanee o escriba nombre y presione Enter (↓ para ver todos)"
               />
             </PopoverTrigger>
             <Button
@@ -161,6 +203,7 @@ export function SeccionProducto(props: SeccionProductoProps) {
                     unidad_venta: a.unidad_venta ?? "unidad",
                   }))
                   setMatches(mapped)
+                  setSelectedIndex(0)
                   setPopoverOpen(true)
                 }).finally(() => setLoading(false))
               }}
@@ -185,6 +228,7 @@ export function SeccionProducto(props: SeccionProductoProps) {
                     unidad_venta: a.unidad_venta ?? "unidad",
                   }))
                   setMatches(mapped)
+                  setSelectedIndex(0)
                   setPopoverOpen(true)
                 }).finally(() => setLoading(false))
               }}
@@ -202,35 +246,60 @@ export function SeccionProducto(props: SeccionProductoProps) {
             </Button>
           </div>
           <PopoverContent className="p-0 w-[min(520px,85vw)] max-h-[50vh] overflow-auto" align="start">
-            <Command>
+            <Command shouldFilter={false}>
               {productoSeleccionado && (
-                <div className="px-3 py-2 text-sm flex items-center justify-between border-b">
-                  <span className="truncate">{productoSeleccionado.nombre}</span>
-                  <span className="text-muted-foreground">${productoSeleccionado.precio_venta.toFixed(2)}</span>
+                <div className="px-3 py-2 text-sm flex items-center justify-between border-b bg-green-50">
+                  <span className="truncate font-semibold text-green-900">✅ Seleccionado: {productoSeleccionado.nombre}</span>
+                  <span className="text-green-700 font-bold">${productoSeleccionado.precio_venta.toFixed(2)}</span>
                 </div>
               )}
               <CommandInput
                 value={codigo}
                 onValueChange={(v) => setCodigoEscaneado(v)}
-                placeholder="Buscar producto..."
+                placeholder="Escribe el nombre del producto..."
               />
-              <CommandEmpty>{loading ? "Buscando..." : "No hay resultados"}</CommandEmpty>
+              <CommandEmpty>
+                <div className="py-4 text-center">
+                  {loading ? (
+                    <span className="text-gray-500">🔍 Buscando...</span>
+                  ) : codigo ? (
+                    <span className="text-red-500">❌ No encontramos "{codigo}"</span>
+                  ) : (
+                    <span className="text-gray-400">Escribe para buscar o usa ↓</span>
+                  )}
+                </div>
+              </CommandEmpty>
               <CommandGroup heading="Productos">
-                {matches.map((prod) => (
+                {matches.map((prod, index) => (
                   <CommandItem
                     key={prod.id}
                     value={prod.nombre}
                     onSelect={() => {
                       setProductoSeleccionado(prod)
                       setCodigoEscaneado(prod.nombre)
-                      setPopoverOpen(false)
+                      setSelectedIndex(0)
+                      setTimeout(() => setPopoverOpen(false), 100)
                     }}
+                    onClick={() => {
+                      setProductoSeleccionado(prod)
+                      setCodigoEscaneado(prod.nombre)
+                      setSelectedIndex(0)
+                      setTimeout(() => setPopoverOpen(false), 100)
+                    }}
+                    className={`cursor-pointer transition-colors ${index === selectedIndex
+                      ? "bg-green-200 dark:bg-green-900"
+                      : "hover:bg-gray-100 dark:hover:bg-gray-800"
+                      }`}
                   >
                     <div className="flex items-center justify-between w-full">
-                      <span className="truncate">{prod.nombre}</span>
-                      <span className="text-muted-foreground flex items-center gap-1">
-                        <ChevronsUpDown className="h-4 w-4" />
-                        ${prod.precio_venta.toFixed(2)}
+                      <span className="truncate font-medium">{prod.nombre}</span>
+                      <span className="text-muted-foreground flex items-center gap-2 ml-2 flex-shrink-0">
+                        <span className="text-xs">${prod.precio_venta.toFixed(2)}</span>
+                        {prod.stock_actual > 0 && (
+                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                            Stock: {prod.stock_actual}
+                          </span>
+                        )}
                       </span>
                     </div>
                   </CommandItem>
