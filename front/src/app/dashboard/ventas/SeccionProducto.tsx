@@ -98,26 +98,17 @@ export function SeccionProducto(props: SeccionProductoProps) {
   useEffect(() => {
     const q = (codigo || "").trim().toLowerCase()
 
-    // Detectar escritura manual (más de 2 caracteres o cambios frecuentes)
-    if (q.length > 0) {
-      setIsTyping(true)
-      window.clearTimeout(typingTimeoutRef.current)
-      typingTimeoutRef.current = window.setTimeout(() => {
-        setIsTyping(false)
-      }, 1500) // Se considera "escribiendo" por 1.5 segundos después del último cambio
-    }
-
     window.clearTimeout(debounceRef.current)
     debounceRef.current = window.setTimeout(async () => {
       if (!q) {
         setMatches([])
         setPopoverOpen(false)
-        setJustSelected(false) // Resetear flag cuando se borra el input
         return
       }
 
       setLoading(true)
-      const resp = await api.articulos.buscar(q, 20)
+      // ✅ Buscar solo 4 coincidencias máximo
+      const resp = await api.articulos.buscar(q, 4)
       const data = (resp.success ? (resp.data as MinimalArticulo[]) : []) || []
       const mapped: Producto[] = data.map((a) => ({
         id: String(a.id),
@@ -129,20 +120,19 @@ export function SeccionProducto(props: SeccionProductoProps) {
       }))
       setMatches(mapped)
 
-      // Solo abrir automáticamente si NO se acaba de seleccionar un producto
-      // Y solo si el usuario NO está escribiendo activamente
-      if (!justSelected && !isTyping && mapped.length > 0) {
+      // ✅ Abrir el dropdown si hay coincidencias (simple y directo)
+      if (mapped.length > 0) {
         setPopoverOpen(true)
+        setJustSelected(false) // Resetear flag para permitir más búsquedas
       }
 
       setLoading(false)
-    }, 500)
+    }, 300) // ✅ Debounce rápido para respuesta inmediata
 
     return () => {
       window.clearTimeout(debounceRef.current)
-      window.clearTimeout(typingTimeoutRef.current)
     }
-  }, [codigo, setPopoverOpen, justSelected])
+  }, [codigo, setPopoverOpen])
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     // ESCAPE: Cerrar el popover
@@ -196,94 +186,87 @@ export function SeccionProducto(props: SeccionProductoProps) {
                   setCodigoEscaneado(newValue)
                   setIsTyping(true)
 
-                  // Si el usuario modifica manualmente el texto, resetear flag de selección
+                  // Si el usuario modifica el texto después de seleccionar, resetear para nueva búsqueda
                   if (productoSeleccionado && newValue !== productoSeleccionado.nombre) {
-                    setJustSelected(false)
+                    setJustSelected(false) // ✅ Permite que se reabre la búsqueda si escribe diferente
+                    setProductoSeleccionado(null) // Limpiar selección anterior
                   }
                 }}
                 onKeyDown={onKeyDown}
                 onFocus={() => {
-                  // Cuando el input recibe foco, si hay texto, mostrar resultados
+                  // Al recibir foco: si hay texto y está escribiendo (no acaba de seleccionar), abrir dropdown
                   if (codigo.trim() && matches.length > 0 && !justSelected) {
                     setPopoverOpen(true)
                   }
                 }}
                 className="border w-full font-semibold"
                 autoFocus
-                placeholder="Escanee código o escriba el nombre del producto"
+                placeholder="Escribe código o nombre (máximo 3-4 coincidencias)"
               />
               {popoverOpen && (
                 <div
                   ref={dropdownRef}
-                  className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-[50vh] overflow-auto"
+                  className="absolute z-50 w-full mt-1 bg-white border border-green-300 rounded-md shadow-lg max-h-80 overflow-y-auto"
                 >
                   <Command shouldFilter={false}>
                     {productoSeleccionado && (
                       <div className="px-3 py-2 text-sm flex items-center justify-between border-b bg-green-50">
-                        <span className="truncate font-semibold text-green-900">
-                          ✅ {productoSeleccionado.nombre} 
-                          {productoSeleccionado.id ? ` (ID: ${productoSeleccionado.id})` : ' ⚠️ SIN ID'}
+                        <span className="font-semibold text-green-900 text-xs">
+                          ✅ Seleccionado: {productoSeleccionado.nombre} (ID: {productoSeleccionado.id})
                         </span>
-                        <span className="text-green-700 font-bold">${productoSeleccionado.precio_venta.toFixed(2)}</span>
+                        <span className="text-green-700 font-bold text-xs">${productoSeleccionado.precio_venta.toFixed(2)}</span>
                       </div>
                     )}
                     <CommandEmpty>
-                      <div className="py-4 text-center">
+                      <div className="py-3 text-center text-sm">
                         {loading ? (
                           <span className="text-gray-500">🔍 Buscando...</span>
                         ) : codigo ? (
-                          <span className="text-red-500">❌ No encontramos "{codigo}"</span>
+                          <span className="text-red-500">❌ No encontrado: "{codigo}"</span>
                         ) : (
-                          <span className="text-gray-400">Escribe arriba para buscar</span>
+                          <span className="text-gray-400">Escribe para buscar...</span>
                         )}
                       </div>
                     </CommandEmpty>
-                    <CommandGroup heading="Productos">
-                      {matches.map((prod, index) => (
+                    <CommandGroup heading="Coincidencias" className="text-xs">
+                      {matches.map((prod) => (
                         <CommandItem
                           key={prod.id}
                           value={prod.nombre}
                           onSelect={() => {
                             setProductoSeleccionado(prod)
-                            setCodigoEscaneado(prod.nombre)
+                            setCodigoEscaneado(prod.nombre) // ✅ Mostrar nombre del producto seleccionado
                             setIsTyping(false)
-                            setJustSelected(true) // Marcar que se acaba de seleccionar
+                            setJustSelected(true)
                             setPopoverOpen(false)
                           }}
                           onMouseDown={(e) => {
-                            // Prevenir que el click quite el foco del input
                             e.preventDefault()
                           }}
                           onClick={() => {
                             setProductoSeleccionado(prod)
                             setCodigoEscaneado(prod.nombre)
                             setIsTyping(false)
-                            setJustSelected(true) // Marcar que se acaba de seleccionar
+                            setJustSelected(true)
                             setPopoverOpen(false)
-                            // Restaurar foco al input después de seleccionar
                             setTimeout(() => {
                               if (inputRef && 'current' in inputRef && inputRef.current) {
                                 inputRef.current.focus()
                               }
                             }, 50)
                           }}
-                          className="cursor-pointer transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                          className="cursor-pointer text-xs py-1.5 hover:bg-green-50"
                         >
-                          <div className="flex items-center justify-between w-full">
-                            <div className="flex items-center gap-2 flex-1">
-                              <span className="truncate font-medium">{prod.nombre}</span>
-                              <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded flex-shrink-0">
-                                ID: {prod.id}
-                              </span>
-                            </div>
-                            <span className="text-muted-foreground flex items-center gap-2 ml-2 flex-shrink-0">
-                              <span className="text-xs">${prod.precio_venta.toFixed(2)}</span>
+                          <div className="flex items-center justify-between w-full gap-2">
+                            <span className="font-medium flex-1">{prod.nombre}</span>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <span className="text-xs text-gray-600">${prod.precio_venta.toFixed(0)}</span>
                               {prod.stock_actual > 0 && (
-                                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
-                                  Stock: {prod.stock_actual}
+                                <span className="text-xs bg-blue-100 text-blue-700 px-1 py-0.5 rounded">
+                                  {prod.stock_actual}
                                 </span>
                               )}
-                            </span>
+                            </div>
                           </div>
                         </CommandItem>
                       ))}

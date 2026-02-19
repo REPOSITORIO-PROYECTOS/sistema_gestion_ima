@@ -189,7 +189,56 @@ function FormVentas({
   // Hook para cambiar el modo de venta según el producto seleccionado
   useEffect(() => {
     if (productoSeleccionado) {
-      const esVentaPorUnidad = !productoSeleccionado.unidad_venta || productoSeleccionado.unidad_venta.toLowerCase() === 'unidad';
+      // ✅ Normalizar unidad_venta: limpiar spaces, lowercase
+      const unidadRaw = productoSeleccionado.unidad_venta || '';
+      const unidad = unidadRaw.toLowerCase().trim().replace(/\s+/g, '');
+
+      console.log(`[DEBUG] Producto: ${productoSeleccionado.nombre}, unidad_venta RAW: "${unidadRaw}", normalizada: "${unidad}"`);
+
+      // 🔹 Detección PRECISA:
+      // Primero: detectar GRANEL (tiene prioridad, palabras explícitas)
+      const esGranel = (
+        unidad.includes('gramo') || 
+        unidad.includes('kg') || 
+        unidad.includes('litro') || 
+        unidad.includes('litros') ||
+        (unidad.includes('gm') && !unidad.includes('u')) ||
+        (unidad === 'g') ||
+        (unidad === 'ml') ||
+        (unidad === 'l')
+      );
+
+      // Segundo: detectar si es UNIDAD explícita
+      const esUnitadExplicita = (
+        unidad === 'unidad' ||
+        unidad === 'unidades' ||
+        unidad.startsWith('un') ||
+        unidad === 'unit' ||
+        unidad === 'units' ||
+        unidad === 'und' ||
+        unidad === 'pza' ||
+        unidad === 'pzas' ||
+        unidad === 'pieza' ||
+        unidad === 'piezas'
+      );
+
+      // Tercero: detectar si es vacío o "sin información" (asumir UNIDAD por defecto)
+      const esVacio = (
+        unidad === '' ||
+        unidad.includes('sininformacion') ||
+        unidad.includes('sin') ||
+        unidad.includes('info')
+      );
+
+      // Lógica final: 
+      // - Si es claramente GRANEL → GRANEL
+      // - Si es UNIDAD explícita → UNIDAD
+      // - Si es vacío/sin info → UNIDAD (default seguro)
+      // - Cualquier otro caso → UNIDAD (default)
+      const esVentaPorUnidad = !esGranel;
+
+      console.log(`[DEBUG] esGranel: ${esGranel}, esUnitadExplicita: ${esUnitadExplicita}, esVacio: ${esVacio}, modo: ${esVentaPorUnidad ? 'UNIDAD' : 'GRANEL'}`);
+
       if (!esVentaPorUnidad) {
         setModoVenta('granel');
         const precioUnitario = getPrecioProducto(productoSeleccionado);
