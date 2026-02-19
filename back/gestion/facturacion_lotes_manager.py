@@ -204,6 +204,10 @@ def crear_nota_credito_para_anular(
     # --- INICIO DE LA CORRECCIÓN CLAVE ---
 
     # 4. Actualización de la Base de Datos
+    # 🔴 CAMBIO: Marcar el movimiento original como "venta_anulada"
+    movimiento_original.tipo = "venta_anulada"
+    db.add(movimiento_original)
+
     # Creamos un movimiento de caja negativo para reflejar la devolución
     movimiento_caja_nc = CajaMovimiento(
         id_caja_sesion=movimiento_original.id_caja_sesion,
@@ -282,7 +286,11 @@ def anular_comprobante_no_fiscal(
     if venta_original.estado == "ANULADA":
         raise ValueError("Esta venta ya fue anulada previamente.")
 
-    # Movimiento de caja negativo para reflejar la devolución
+    # 🔴 CAMBIO: Marcar el movimiento original como "venta_anulada"
+    movimiento_original.tipo = "venta_anulada"
+    db.add(movimiento_original)
+
+    # Movimiento de caja negativo para reflejar la devolución de dinero
     mov_nc = CajaMovimiento(
         id_caja_sesion=movimiento_original.id_caja_sesion,
         id_usuario=usuario_actual.id,

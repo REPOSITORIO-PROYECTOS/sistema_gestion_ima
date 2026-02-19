@@ -103,28 +103,44 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
     if (!token) return;
 
     const hydrateFromEmpresaLinks = async () => {
+      // 🔹 Solo hacer fetch si hay token disponible
+      if (!token) {
+        console.warn("⚠️ No hay token para hidratar links de empresa");
+        return;
+      }
+
       try {
-        const [res1, res2, res3] = await Promise.all([
-          fetch(`${API_CONFIG.BASE_URL}/configuracion/mi-empresa/link/1`, {
-            headers: { Authorization: `Bearer ${token}` },
-            cache: "no-store",
-          }),
-          fetch(`${API_CONFIG.BASE_URL}/configuracion/mi-empresa/link/2`, {
-            headers: { Authorization: `Bearer ${token}` },
-            cache: "no-store",
-          }),
-          fetch(`${API_CONFIG.BASE_URL}/configuracion/mi-empresa/link/3`, {
-            headers: { Authorization: `Bearer ${token}` },
-            cache: "no-store",
-          }),
+        // 🔹 Hacer 3 requests con timeout individual y manejo de error por cada uno
+        const fetchWithTimeout = (url: string, timeout = 5000) => {
+          return Promise.race([
+            fetch(url, {
+              headers: { Authorization: `Bearer ${token}` },
+              cache: "no-store",
+            }),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error("Fetch timeout")), timeout)
+            ),
+          ]);
+        };
+
+        const results = await Promise.allSettled([
+          fetchWithTimeout(`${API_CONFIG.BASE_URL}/configuracion/mi-empresa/link/1`),
+          fetchWithTimeout(`${API_CONFIG.BASE_URL}/configuracion/mi-empresa/link/2`),
+          fetchWithTimeout(`${API_CONFIG.BASE_URL}/configuracion/mi-empresa/link/3`),
         ]);
 
-        const data1 = res1.ok ? await res1.json() : { link: "" };
-        const data2 = res2.ok ? await res2.json() : { link: "" };
-        const data3 = res3.ok ? await res3.json() : { link: "" };
+        const data1 = results[0].status === "fulfilled" && (results[0].value as Response).ok
+          ? await (results[0].value as Response).json()
+          : { link: "" };
+        const data2 = results[1].status === "fulfilled" && (results[1].value as Response).ok
+          ? await (results[1].value as Response).json()
+          : { link: "" };
+        const data3 = results[2].status === "fulfilled" && (results[2].value as Response).ok
+          ? await (results[2].value as Response).json()
+          : { link: "" };
 
         const byId = new Map(customLinks.map((link) => [link.id, link]));
-        const nextLinks = ([1, 2, 3] as const).map((id, idx) => {
+        const nextLinks = ([1, 2, 3] as const).map((id) => {
           const existing = byId.get(id);
           const url =
             id === 1
@@ -142,12 +158,18 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
         });
 
         loadFromBackend({ custom_links: nextLinks });
+        console.log("✅ Links de empresa actualizados correctamente");
       } catch (error) {
-        console.error("Error hidratando links de empresa:", error);
+        console.error("❌ Error hidratando links de empresa:", error);
+        // No lanzar error, solo log. Usar valores por defecto.
       }
     };
 
-    hydrateFromEmpresaLinks();
+    // 🔹 Solo ejecutar cuando el token esté disponible
+    if (token) {
+      hydrateFromEmpresaLinks();
+    }
+
     const interval = setInterval(hydrateFromEmpresaLinks, 60000);
     return () => clearInterval(interval);
   }, [token, customLinks, loadFromBackend]);
