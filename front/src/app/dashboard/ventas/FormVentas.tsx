@@ -198,9 +198,9 @@ function FormVentas({
       // 🔹 Detección PRECISA:
       // Primero: detectar GRANEL (tiene prioridad, palabras explícitas)
       const esGranel = (
-        unidad.includes('gramo') || 
-        unidad.includes('kg') || 
-        unidad.includes('litro') || 
+        unidad.includes('gramo') ||
+        unidad.includes('kg') ||
+        unidad.includes('litro') ||
         unidad.includes('litros') ||
         (unidad.includes('gm') && !unidad.includes('u')) ||
         (unidad === 'g') ||
