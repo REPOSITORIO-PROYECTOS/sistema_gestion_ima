@@ -75,6 +75,7 @@ const tipoCliente = [
 // --- Props del Componente ---
 interface FormVentasProps {
   onAgregarProducto: (prod: {
+    id?: string;
     tipo: string;
     cantidad: number;
     precioTotal: number;
@@ -86,9 +87,11 @@ interface FormVentasProps {
   }) => void;
   totalVenta: number;
   productosVendidos: {
+    id?: string;
     tipo: string;
     cantidad: number;
     precioTotal: number;
+    precioBase: number;
     descuentoAplicado?: boolean;
     porcentajeDescuento?: number;
     descuentoNominal?: number;
@@ -285,6 +288,7 @@ function FormVentas({
       return;
     };
     onAgregarProducto({
+      id: productoSeleccionado.id,
       tipo: productoSeleccionado.nombre,
       cantidad,
       precioTotal: productoConDescuento,
@@ -699,6 +703,11 @@ function FormVentas({
       ? { items, total: totalFinal, observaciones: obs }
       : { items, total: totalFinal, descuento_general: descGeneral, descuento_general_por: descGeneralPor, observaciones: obs };
 
+    const aclaraciones: any = empresa?.aclaraciones_legales || {};
+    const incluirTicketCambio = (aclaraciones.ticket_cambio_habilitado === "true" || aclaraciones.ticket_cambio_habilitado === true)
+      && formatoComprobante.toLowerCase() !== "pdf";
+    const plazoCambio = aclaraciones.ticket_cambio_plazo || aclaraciones.plazo_cambio || "30 dias";
+
     const reqPayload = {
       formato: formatoComprobante.toLowerCase(),
       tipo: tipo.toLowerCase(),
@@ -715,7 +724,9 @@ function FormVentas({
         domicilio: "Sin especificar",
         condicion_iva: tipoClienteSeleccionado.id === "0" ? "Consumidor Final" : clienteSeleccionado?.condicion_iva ?? "Consumidor Final"
       },
-      transaccion
+      transaccion,
+      incluir_ticket_cambio: incluirTicketCambio,
+      plazo_cambio: plazoCambio
     };
 
     try {
@@ -848,8 +859,9 @@ function FormVentas({
 
     // --- VALIDACIÓN MEJORADA DE PRODUCTOS EN CARRITO ---
     // Buscar productos no encontrados y dar diagnóstico
-    const productosNoEncontrados = productosVendidos.filter(p => {
-      const encontrado = productos.find(prod => prod.nombre === p.tipo);
+    const productosNoEncontrados = productosVendidos.filter((p) => {
+      if (p.id) return false;
+      const encontrado = productos.find((prod) => prod.nombre === p.tipo);
       return !encontrado;
     });
 
@@ -867,9 +879,7 @@ function FormVentas({
     // --- VALIDACIÓN ORIGINAL DE IDs ---
     // Calcular el precio de lista total (sin ningún descuento)
     const totalLista = productosVendidos.reduce((acc, p) => {
-      const productoReal = productos.find(prod => prod.nombre === p.tipo);
-      const precioUnitario = productoReal ? getPrecioProducto(productoReal) : 0;
-      return acc + (precioUnitario * p.cantidad);
+      return acc + (p.precioBase || 0);
     }, 0);
 
     // 2. Calcular el total neto (lo que paga el cliente antes de recargos)
@@ -881,10 +891,12 @@ function FormVentas({
 
     const articulosSinId = productosVendidos
       .map((p) => {
-        const productoReal = productos.find(prod => prod.nombre === p.tipo);
+        const productoReal = p.id
+          ? productos.find((prod) => prod.id === p.id)
+          : productos.find((prod) => prod.nombre === p.tipo);
         return {
           nombre: p.tipo,
-          id: productoReal?.id,
+          id: p.id ?? productoReal?.id,
         };
       })
       .filter((item) => !item.id || Number(item.id) <= 0);
@@ -906,12 +918,17 @@ function FormVentas({
       tipo_comprobante_solicitado: tipoSolicitadoPayload,
       quiere_factura: tipo === "factura",
       articulos_vendidos: productosVendidos.map((p) => {
-        const productoReal = productos.find(prod => prod.nombre === p.tipo);
+        const productoReal = p.id
+          ? productos.find((prod) => prod.id === p.id)
+          : productos.find((prod) => prod.nombre === p.tipo);
+        const precioUnitario = productoReal
+          ? getPrecioProducto(productoReal)
+          : (p.cantidad ? p.precioBase / p.cantidad : 0);
         return {
-          id_articulo: productoReal?.id ?? "0",
+          id_articulo: p.id ?? productoReal?.id ?? "0",
           nombre: productoReal?.nombre ?? p.tipo,
           cantidad: p.cantidad,
-          precio_unitario: productoReal ? getPrecioProducto(productoReal) : 0,
+          precio_unitario: precioUnitario,
           subtotal: p.precioTotal,
           tasa_iva: 21.0
         };
@@ -960,11 +977,16 @@ function FormVentas({
 
       // Preparar datos para impresión
       const itemsBase = productosVendidos.map((p): ItemComprobante => {
-        const productoReal = productos.find((prod) => prod.nombre === p.tipo);
+        const productoReal = p.id
+          ? productos.find((prod) => prod.id === p.id)
+          : productos.find((prod) => prod.nombre === p.tipo);
+        const precioUnitario = productoReal
+          ? getPrecioProducto(productoReal)
+          : (p.cantidad ? p.precioBase / p.cantidad : 0);
         const item: ItemComprobante = {
           descripcion: productoReal?.nombre || p.tipo,
           cantidad: p.cantidad,
-          precio_unitario: productoReal ? getPrecioProducto(productoReal) : 0,
+          precio_unitario: precioUnitario,
           subtotal: p.precioTotal,
           tasa_iva: 21
         };

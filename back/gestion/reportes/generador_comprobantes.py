@@ -231,7 +231,11 @@ def generar_comprobante_stateless(data: GenerarComprobanteRequest) -> bytes:
                 }
 
             contexto_cambio = {
+                "emisor": data.emisor,
+                "receptor": data.receptor,
                 "transaccion": transaccion_para_renderizar,
+                "fecha_emision": datetime.now(),
+                "numero": data.numero_comprobante if hasattr(data, 'numero_comprobante') else "",
                 "fecha_limite_cambio": fecha_limite,
                 "estilos": estilos
             }

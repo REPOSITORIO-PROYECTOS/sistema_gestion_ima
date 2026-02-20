@@ -38,13 +38,13 @@ export default function GestionNegocio() {
     toggleRecargoBancario,
     recargoBancario,
     setRecargoBancario,
-    formatoComprobante, 
+    formatoComprobante,
     setFormatoComprobante
   } = useFacturacionStore();
   const [navbarColor, setNavbarColor] = useState("bg-sky-600");
 
   // Formatos de impresión de ticket - escalable a mas opciones 
-  const formatosDisponibles = ["PDF", "Ticket"];  
+  const formatosDisponibles = ["PDF", "Ticket"];
 
   /* Edición y manejo de empresas - obtenemos la empresa a partir del user para una cosa*/
   const usuario = useAuthStore((state) => state.usuario);
@@ -58,7 +58,7 @@ export default function GestionNegocio() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   /* const logoUrl = empresa?.ruta_logo || '/default-logo.png'; */
-  
+
 
   /* Manejo de Negocio y Ventas */
 
@@ -93,6 +93,8 @@ export default function GestionNegocio() {
 
   // GET Configuración General (para ancho ticket cambio)
   const [ticketCambioAncho, setTicketCambioAncho] = useState("80mm");
+  const [ticketCambioHabilitado, setTicketCambioHabilitado] = useState(false);
+  const [ticketCambioDias, setTicketCambioDias] = useState(30);
 
   useEffect(() => {
     if (!token) return;
@@ -107,6 +109,16 @@ export default function GestionNegocio() {
           if (aclaraciones.ticket_cambio_ancho) {
             setTicketCambioAncho(aclaraciones.ticket_cambio_ancho);
           }
+          if (aclaraciones.ticket_cambio_habilitado !== undefined) {
+            const isEnabled = aclaraciones.ticket_cambio_habilitado === "true" || aclaraciones.ticket_cambio_habilitado === true;
+            setTicketCambioHabilitado(isEnabled);
+          }
+          if (aclaraciones.ticket_cambio_plazo) {
+            const dias = parseInt(String(aclaraciones.ticket_cambio_plazo), 10);
+            if (!Number.isNaN(dias) && dias > 0) {
+              setTicketCambioDias(dias);
+            }
+          }
         }
       } catch (e) {
         console.error(e);
@@ -120,38 +132,112 @@ export default function GestionNegocio() {
     setTicketCambioAncho(valor);
     if (!token || !empresaId) return;
     try {
-        // 1. Obtener config actual para no sobrescribir otros campos de aclaraciones_legales
-        const resGet = await fetch(`${API_CONFIG.BASE_URL}/empresas/admin/${empresaId}/configuracion`, {
-            headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!resGet.ok) throw new Error("No se pudo leer la configuración actual");
-        
-        const data = await resGet.json();
-        const aclaraciones = data.aclaraciones_legales || {};
-        
-        // 2. Patch con el nuevo valor
-        const res = await fetch(`${API_CONFIG.BASE_URL}/empresas/admin/${empresaId}/configuracion`, {
-            method: "PATCH",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-                aclaraciones_legales: {
-                    ...aclaraciones,
-                    ticket_cambio_ancho: valor
-                }
-            })
-        });
+      // 1. Obtener config actual para no sobrescribir otros campos de aclaraciones_legales
+      const resGet = await fetch(`${API_CONFIG.BASE_URL}/empresas/admin/${empresaId}/configuracion`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!resGet.ok) throw new Error("No se pudo leer la configuración actual");
 
-        if (res.ok) {
-            toast.success("Ancho de ticket actualizado");
-        } else {
-            toast.error("Error al guardar configuración");
-        }
-    } catch (e) {
-        console.error(e);
+      const data = await resGet.json();
+      const aclaraciones = data.aclaraciones_legales || {};
+
+      // 2. Patch con el nuevo valor
+      const res = await fetch(`${API_CONFIG.BASE_URL}/empresas/admin/${empresaId}/configuracion`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          aclaraciones_legales: {
+            ...aclaraciones,
+            ticket_cambio_ancho: valor
+          }
+        })
+      });
+
+      if (res.ok) {
+        toast.success("Ancho de ticket actualizado");
+      } else {
         toast.error("Error al guardar configuración");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Error al guardar configuración");
+    }
+  };
+
+  const guardarTicketCambioHabilitado = async (valor: boolean) => {
+    setTicketCambioHabilitado(valor);
+    if (!token || !empresaId) return;
+    try {
+      const resGet = await fetch(`${API_CONFIG.BASE_URL}/empresas/admin/${empresaId}/configuracion`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!resGet.ok) throw new Error("Error al leer config");
+
+      const data = await resGet.json();
+      const aclaraciones = data.aclaraciones_legales || {};
+
+      const res = await fetch(`${API_CONFIG.BASE_URL}/empresas/admin/${empresaId}/configuracion`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          aclaraciones_legales: {
+            ...aclaraciones,
+            ticket_cambio_habilitado: valor ? "true" : "false"
+          }
+        })
+      });
+
+      if (res.ok) {
+        toast.success(valor ? "✅ Ticket de cambio habilitado" : "❌ Ticket de cambio deshabilitado");
+      } else {
+        toast.error("Error al guardar configuración");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Error al guardar configuración");
+    }
+  };
+
+  const guardarTicketCambioDias = async (valor: number) => {
+    setTicketCambioDias(valor);
+    if (!token || !empresaId) return;
+    try {
+      const resGet = await fetch(`${API_CONFIG.BASE_URL}/empresas/admin/${empresaId}/configuracion`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!resGet.ok) throw new Error("Error al leer config");
+
+      const data = await resGet.json();
+      const aclaraciones = data.aclaraciones_legales || {};
+
+      const res = await fetch(`${API_CONFIG.BASE_URL}/empresas/admin/${empresaId}/configuracion`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          aclaraciones_legales: {
+            ...aclaraciones,
+            ticket_cambio_plazo: String(valor)
+          }
+        })
+      });
+
+      if (res.ok) {
+        toast.success("Plazo de ticket de cambio actualizado");
+      } else {
+        toast.error("Error al guardar configuración");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Error al guardar configuración");
     }
   };
 
@@ -168,7 +254,7 @@ export default function GestionNegocio() {
           },
           body: JSON.stringify({
             porcentaje: recargoTransferencia,
-            concepto: "Actualización recargo transferencia" 
+            concepto: "Actualización recargo transferencia"
           }),
         }
       );
@@ -203,7 +289,7 @@ export default function GestionNegocio() {
       if (!res.ok) throw new Error("Error en el PATCH");
 
       toast.success("Recargo por banco actualizado correctamente");
-      
+
     } catch (error) {
       console.error(error);
       toast.error("Error al actualizar el recargo por banco");
@@ -256,17 +342,17 @@ export default function GestionNegocio() {
 
       // Refrescar datos actualizados desde el backend
       const res = await fetch(`${API_CONFIG.BASE_URL}/configuracion/mi-empresa`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
       );
       const data = await res.json();
       useEmpresaStore.getState().setEmpresa(data);
 
       if (fileInputRef.current) {
-        fileInputRef.current.value = ""; 
+        fileInputRef.current.value = "";
       }
 
       toast.success("Logo subido correctamente.");
@@ -381,7 +467,7 @@ export default function GestionNegocio() {
         const data = await res.json();
         const val = (data.aclaraciones_legales?.mesas_enabled ?? "false") === "true";
         setMesasEnabled(val);
-      } catch {}
+      } catch { }
     };
     cargarIntegraciones();
   }, [token, empresaId, setMesasEnabled]);
@@ -617,11 +703,61 @@ export default function GestionNegocio() {
                 <label className="text-lg font-semibold text-green-950">🎨 Cambiar logo de empresa:</label>
                 <Input type="file" accept=".png,.jpg,.jpeg,.webp" ref={fileInputRef} onChange={handleFileChange} className="max-w-sm" />
               </div>
-              
+
+              <div className="flex flex-col gap-2 w-full md:w-1/2 mb-6">
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  <Switch.Root
+                    checked={ticketCambioHabilitado}
+                    onCheckedChange={guardarTicketCambioHabilitado}
+                    className={`relative w-16 h-8 rounded-full ${ticketCambioHabilitado ? "bg-green-900" : "bg-gray-300"} cursor-pointer transition-colors`}
+                  >
+                    <Switch.Thumb
+                      className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-300 ${ticketCambioHabilitado ? "translate-x-8" : "translate-x-0"}`}
+                    />
+                  </Switch.Root>
+                  <h3 className="text-lg font-semibold text-green-950">🎟️ Emitir Ticket de Cambio en cada venta</h3>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Cuando está habilitado, cada venta generará automáticamente <strong>dos comprobantes</strong>: el comprobante normal + un ticket de cambio con la fecha y monto del cambio.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2 w-full md:w-1/2 mb-6">
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  <label className="text-lg font-semibold text-green-950 whitespace-nowrap">📅 Vigencia Ticket de Cambio (días):</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={ticketCambioDias}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      const val = parseInt(raw, 10);
+                      if (Number.isNaN(val)) return;
+                      setTicketCambioDias(val);
+                    }}
+                    onBlur={(e) => {
+                      const raw = e.target.value;
+                      const val = parseInt(raw, 10);
+                      if (Number.isNaN(val) || val <= 0) {
+                        setTicketCambioDias(30);
+                        guardarTicketCambioDias(30);
+                        return;
+                      }
+                      guardarTicketCambioDias(val);
+                    }}
+                    disabled={!ticketCambioHabilitado}
+                    className="w-full md:max-w-[180px]"
+                  />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Se guarda en la base de datos y aplica al cálculo de fecha límite del ticket.
+                </p>
+              </div>
+
               <div className="flex flex-col gap-2 w-full md:w-1/2 mb-6">
                 <div className="flex flex-col sm:flex-row items-center gap-4">
                   <label className="text-lg font-semibold text-green-950 whitespace-nowrap">🖨️ Ancho Ticket de Cambio:</label>
-                  <Select value={ticketCambioAncho} onValueChange={guardarAnchoTicket}>
+                  <Select value={ticketCambioAncho} onValueChange={guardarAnchoTicket} disabled={!ticketCambioHabilitado}>
                     <SelectTrigger className="w-full cursor-pointer">
                       <SelectValue placeholder="Seleccionar ancho" />
                     </SelectTrigger>

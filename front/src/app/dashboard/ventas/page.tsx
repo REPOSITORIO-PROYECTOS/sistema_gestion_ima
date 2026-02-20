@@ -20,6 +20,7 @@ import { useFacturacionStore } from "@/lib/facturacionStore"; // Importar
 import EgresoForm from "./EgresoForm";
 
 interface ProductoVendido {
+  id?: string;
   tipo: string;
   cantidad: number;
   precioTotal: number;
@@ -134,6 +135,7 @@ function DashboardVenta() {
 
   const handleAgregarProducto = useCallback((
     producto: {
+      id?: string;
       tipo: string;
       cantidad: number;
       precioTotal: number;
