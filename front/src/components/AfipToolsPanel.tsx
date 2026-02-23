@@ -29,9 +29,10 @@ interface Empresa {
 // Definimos las props que este componente puede recibir
 interface AfipToolsPanelProps {
   empresaId?: number; // Es opcional, para pre-seleccionar una empresa
+  onSuccess?: (message: string) => void;
 }
 
-export function AfipToolsPanel({ empresaId }: AfipToolsPanelProps) {
+export function AfipToolsPanel({ empresaId, onSuccess }: AfipToolsPanelProps) {
   const token = useAuthStore((state) => state.token);
   const [empresas, setEmpresas] = React.useState<Empresa[]>([]);
   const [selectedEmpresa, setSelectedEmpresa] = React.useState<Empresa | null>(null);
@@ -47,7 +48,7 @@ export function AfipToolsPanel({ empresaId }: AfipToolsPanelProps) {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) throw new Error("No se pudo cargar la lista de empresas.");
-        
+
         // Aserción de tipo: Le decimos a TypeScript que confiamos en que la respuesta es un array de Empresas
         const data = await res.json() as Empresa[];
         setEmpresas(data);
@@ -90,10 +91,11 @@ export function AfipToolsPanel({ empresaId }: AfipToolsPanelProps) {
         const errorData = await res.json() as { detail: string };
         throw new Error(errorData.detail || "Error del servidor al generar la solicitud (CSR).");
       }
-      
+
       const csrContent = await res.text();
       downloadFile(csrContent, `${selectedEmpresa.cuit}.csr`, "application/x-pem-file");
       toast.success("¡Solicitud generada con éxito!", { description: "El archivo .csr se ha descargado." });
+      onSuccess?.("CSR generada");
 
     } catch (err) {
       if (err instanceof Error) toast.error("Error en la generación", { description: err.message });
@@ -109,7 +111,7 @@ export function AfipToolsPanel({ empresaId }: AfipToolsPanelProps) {
     }
     setIsLoading(true);
     toast.info("Subiendo y guardando certificado...");
-    
+
     const reader = new FileReader();
     reader.readAsText(certificateFile);
     reader.onload = async () => {
@@ -124,12 +126,13 @@ export function AfipToolsPanel({ empresaId }: AfipToolsPanelProps) {
           }),
         });
         if (!res.ok) {
-            const errorData = await res.json() as { detail: string };
-            throw new Error(errorData.detail || "Error al subir el certificado.");
+          const errorData = await res.json() as { detail: string };
+          throw new Error(errorData.detail || "Error al subir el certificado.");
         }
         toast.success("¡Certificado guardado con éxito en la bóveda!");
         if (fileInputRef.current) fileInputRef.current.value = "";
         setCertificateFile(null);
+        onSuccess?.("Certificado subido");
       } catch (err) {
         if (err instanceof Error) toast.error("Error al subir certificado", { description: err.message });
       } finally {
@@ -146,7 +149,7 @@ export function AfipToolsPanel({ empresaId }: AfipToolsPanelProps) {
     <div className="border rounded-lg p-6 space-y-6 bg-slate-50 w-full lg:w-2/3">
 
       <h2 className="text-xl font-bold">Herramientas de Credenciales AFIP</h2>
-      
+
       {/* 1er Input */}
       <div className="flex flex-col gap-4">
         <label className="font-medium">1. Selecciona la Empresa</label>
@@ -169,11 +172,11 @@ export function AfipToolsPanel({ empresaId }: AfipToolsPanelProps) {
 
         </Select>
       </div>
-      <hr className="p-0.25 bg-slate-900 my-8"/> {/* --------------------------------------- */}
+      <hr className="p-0.25 bg-slate-900 my-8" /> {/* --------------------------------------- */}
 
       {/* 2o y 3o */}
       <div className={`transition-opacity duration-300 ${!selectedEmpresa ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
-        
+
         {/* 2o Input */}
         <div className="flex flex-col gap-4">
           <label className="font-medium">2. Generar Solicitud de Certificado</label>
@@ -184,8 +187,8 @@ export function AfipToolsPanel({ empresaId }: AfipToolsPanelProps) {
             {isLoading ? "Generando..." : "Generar y Descargar .csr"}
           </Button>
         </div>
-        <hr className="p-0.25 bg-slate-900 my-8"/> {/* --------------------------------------- */}
-        
+        <hr className="p-0.25 bg-slate-900 my-8" /> {/* --------------------------------------- */}
+
         {/* 3er Input */}
         <div className="flex flex-col gap-4">
           <label className="font-medium">3. Subir Certificado Firmado por AFIP</label>
@@ -193,10 +196,10 @@ export function AfipToolsPanel({ empresaId }: AfipToolsPanelProps) {
             Una vez que AFIP te devuelva el `.crt`, súbelo aquí para guardarlo en la bóveda segura.
           </p>
           <div className="flex flex-col items-center gap-4 w-full">
-            <Input 
+            <Input
               ref={fileInputRef}
-              type="file" 
-              accept=".crt" 
+              type="file"
+              accept=".crt"
               onChange={(e) => setCertificateFile(e.target.files ? e.target.files[0] : null)}
               className="flex-grow"
               disabled={isLoading || !selectedEmpresa}
@@ -206,7 +209,7 @@ export function AfipToolsPanel({ empresaId }: AfipToolsPanelProps) {
             </Button>
           </div>
         </div>
- 
+
       </div>
 
     </div>

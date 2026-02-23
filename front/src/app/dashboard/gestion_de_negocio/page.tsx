@@ -20,6 +20,7 @@ import eventBus from "@/utils/eventBus";
 import { Button } from '@/components/ui/button';
 import { useCustomLinksStore } from '@/lib/customLinksStore';
 import { API_CONFIG } from '@/lib/api-config';
+import { AfipToolsPanel } from '@/components/AfipToolsPanel';
 import { NavigationMenu, NavigationMenuList, NavigationMenuItem, NavigationMenuLink } from "@/components/ui/navigation-menu";
 import { useFeaturesStore } from "@/lib/featuresStore";
 import { useRouter as useNextRouter } from "next/navigation";
@@ -582,7 +583,15 @@ export default function GestionNegocio() {
 
         {activeTab === 'negocio' && (
           <>
-            {empresaId && <ConfiguracionForm empresaId={empresaId} sections={{ general: true, balanza: false, afip: true }} />}
+            {empresaId && (
+              <>
+                <ConfiguracionForm empresaId={empresaId} sections={{ general: true, balanza: false, afip: true }} />
+                <div className="mt-8">
+                  <h3 className="text-lg font-semibold text-green-900 mb-4">Herramientas AFIP</h3>
+                  <AfipToolsPanel empresaId={empresaId} />
+                </div>
+              </>
+            )}
             <hr className="h-0.25 my-4" />
             <div className="space-y-2">
               <h2 className="text-xl font-bold text-green-950">Configuración sobre métodos de pago</h2>

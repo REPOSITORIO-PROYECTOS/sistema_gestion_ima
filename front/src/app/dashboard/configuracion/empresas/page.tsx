@@ -18,6 +18,7 @@ import { EmpresasTable } from "./EmpresasTable";
 import { CreateEmpresaModal } from "./CreateEmpresaModal";
 import { ConfiguracionForm } from "@/components/ConfiguracionForm"; // Asumo que está en la misma carpeta
 import AdminGuard from "@/components/AdminGuard";
+import { AfipToolsPanel } from "@/components/AfipToolsPanel";
 
 // Definimos el tipo de dato para una Empresa, que será usado en todo el componente
 interface Empresa {
@@ -42,6 +43,8 @@ export default function GestionEmpresasPage() {
   // --- Estado Clave: Guarda el ID de la empresa seleccionada para configurar ---
   const [selectedEmpresaId, setSelectedEmpresaId] = React.useState<number | null>(null);
   const [isConfigModalOpen, setIsConfigModalOpen] = React.useState(false);
+  const [configSavedAt, setConfigSavedAt] = React.useState<string | null>(null);
+  const [afipToolsStatus, setAfipToolsStatus] = React.useState<string | null>(null);
 
   // --- Lógica de Obtención de Datos ---
   const fetchEmpresas = React.useCallback(async () => {
@@ -85,6 +88,11 @@ export default function GestionEmpresasPage() {
     [selectedEmpresaId, empresas]
   );
 
+  React.useEffect(() => {
+    setConfigSavedAt(null);
+    setAfipToolsStatus(null);
+  }, [selectedEmpresaId]);
+
   return (
     <AdminGuard>
       <div className="p-4 md:p-6 space-y-8">
@@ -116,17 +124,62 @@ export default function GestionEmpresasPage() {
           setIsConfigModalOpen(v);
           if (!v) setSelectedEmpresaId(null);
         }}>
-          <DialogContent className="sm:max-w-2xl">
+          <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-hidden">
             <DialogHeader>
               <DialogTitle>Configuración de Empresa</DialogTitle>
             </DialogHeader>
             {selectedEmpresaId && (
-              <div className="py-2">
-                <div className="mb-4">
-                  <span className="text-sm text-muted-foreground">Empresa:</span>
-                  <div className="font-semibold">{empresaSeleccionada?.nombre_legal || `ID ${selectedEmpresaId}`}</div>
+              <div className="py-2 space-y-6">
+                <div className="space-y-2">
+                  <span className="text-sm text-muted-foreground">Empresa</span>
+                  <div className="text-2xl font-semibold text-slate-900">{empresaSeleccionada?.nombre_legal || `ID ${selectedEmpresaId}`}</div>
+                  <p className="text-sm text-slate-600">Aquí podés ajustar los datos fiscales y los certificados que se usan para emitir la FIP.</p>
                 </div>
-                <ConfiguracionForm empresaId={selectedEmpresaId} />
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <p className="text-xs uppercase tracking-wider text-slate-500">CUIT</p>
+                    <p className="text-lg font-semibold text-slate-900">{empresaSeleccionada?.cuit || "-"}</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <p className="text-xs uppercase tracking-wider text-slate-500">Estado</p>
+                    <p className={`text-sm font-semibold ${empresaSeleccionada?.activa ? "text-emerald-700" : "text-rose-600"}`}>
+                      {empresaSeleccionada?.activa ? "Activa" : "Inactiva"}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <p className="text-xs uppercase tracking-wider text-slate-500">Admin</p>
+                    <p className="text-sm font-semibold text-slate-900">{empresaSeleccionada?.admin_username || "Sin admin"}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-slate-900">Configuración General & AFIP</h3>
+                      <span className={`text-xs font-semibold ${configSavedAt ? "text-emerald-600" : "text-slate-500"}`}>
+                        {configSavedAt ? `Guardado ${configSavedAt}` : "Sin guardar"}
+                      </span>
+                    </div>
+                    <ConfiguracionForm
+                      empresaId={selectedEmpresaId}
+                      sections={{ general: true, afip: true, balanza: false }}
+                      onSave={() => setConfigSavedAt(new Date().toLocaleTimeString())}
+                    />
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-slate-900">Herramientas AFIP</h3>
+                      <span className={`text-xs font-semibold ${afipToolsStatus ? "text-emerald-600" : "text-slate-500"}`}>
+                        {afipToolsStatus || "Sin acciones"}
+                      </span>
+                    </div>
+                    <AfipToolsPanel
+                      empresaId={selectedEmpresaId}
+                      onSuccess={(message) => setAfipToolsStatus(`${message} ${new Date().toLocaleTimeString()}`)}
+                    />
+                  </div>
+                </div>
               </div>
             )}
             <DialogFooter>

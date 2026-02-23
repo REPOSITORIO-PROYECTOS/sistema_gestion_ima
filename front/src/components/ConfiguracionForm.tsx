@@ -85,11 +85,18 @@ interface Props {
     balanza?: boolean;
     afip?: boolean;
   };
+  onSave?: () => void;
 }
 
 export const ConfiguracionForm = (props: Props) => {
   const { empresaId } = props;
   const token = useAuthStore((state) => state.token);
+  const sections = {
+    general: true,
+    afip: true,
+    balanza: true,
+    ...props.sections,
+  };
   const [articulos, setArticulos] = React.useState<Articulo[]>([]);
   const [testBalanzaData, setTestBalanzaData] = React.useState<string | null>(null);
   const [probandoBalanza, setProbandoBalanza] = React.useState(false);
@@ -283,6 +290,7 @@ export const ConfiguracionForm = (props: Props) => {
 
       toast.success("Configuración guardada correctamente.");
       form.reset(values); // Resetear el formulario con los valores guardados
+      props.onSave?.();
     } catch (err) {
       if (err instanceof Error) toast.error("Error al guardar", { description: err.message });
     } finally {
@@ -293,7 +301,7 @@ export const ConfiguracionForm = (props: Props) => {
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 p-4">
         {/* Sección General */}
-        {props.sections?.general && (
+        {sections.general && (
           <div className="space-y-4">
             <h2 className="text-xl font-bold text-green-950">Configuración General</h2>
             <FormField
@@ -367,7 +375,7 @@ export const ConfiguracionForm = (props: Props) => {
         )}
 
         {/* Sección AFIP */}
-        {props.sections?.afip && (
+        {sections.afip && (
           <div className="space-y-4">
             <h2 className="text-xl font-bold text-green-950">Configuración AFIP</h2>
             <FormField
@@ -424,7 +432,7 @@ export const ConfiguracionForm = (props: Props) => {
         )}
 
         {/* Sección Balanza */}
-        {props.sections?.balanza && (
+        {sections.balanza && (
           <div className="space-y-4">
             <h2 className="text-xl font-bold text-green-950">Configuración Balanza</h2>
 
