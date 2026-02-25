@@ -10,8 +10,8 @@ from back.database import engine
 from back.gestion.sincronizacion_manager import sincronizar_articulos_desde_sheet
 from sqlalchemy import text
 
-# ID de empresa para admin_ropa
-ID_EMPRESA = 32
+# ID de empresa para Distribuidora El Negro
+ID_EMPRESA = 33
 
 print(f"\n{'='*60}")
 print(f"PRUEBA DE SINCRONIZACIÓN MANUAL - Empresa ID: {ID_EMPRESA}")

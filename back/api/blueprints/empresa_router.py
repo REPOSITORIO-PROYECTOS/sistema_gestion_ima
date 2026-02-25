@@ -6,7 +6,7 @@ from typing import List
 
 # --- Dependencias, Modelos y Managers ---
 from back.database import get_db
-from back.security import es_admin
+from back.security import es_admin, obtener_usuario_actual
 from back.modelos import Usuario, Empresa # Importamos los modelos necesarios
 
 # Importamos ambos managers porque este router orquesta acciones en ambos
@@ -14,7 +14,7 @@ import back.gestion.empresa_manager as empresa_manager
 import back.gestion.configuracion_manager as configuracion_manager 
 
 # --- Schemas ---
-from back.schemas.empresa_schemas import EmpresaCreate, EmpresaResponse
+from back.schemas.empresa_schemas import EmpresaCreate, EmpresaResponse, EmpresaListaResponse
 # Renombramos la importación para que el código sea más claro y evitar conflictos
 from back.schemas.configuracion_schemas import ConfiguracionResponse as SchemaConfigResponse, ConfiguracionUpdate
 
@@ -50,33 +50,24 @@ def api_crear_empresa(req: EmpresaCreate, db: Session = Depends(get_db)):
         else:
             raise HTTPException(status_code=500, detail=f"Error interno del servidor: {e}")
 
-@router.get("/admin/lista", response_model=List[EmpresaResponse])
-def api_obtener_empresas(db: Session = Depends(get_db)):
-    """Obtiene la lista de todas las empresas registradas."""
+@router.get("/admin/lista", response_model=List[EmpresaListaResponse])
+def api_obtener_empresas(current_user: Usuario = Depends(obtener_usuario_actual), db: Session = Depends(get_db)):
+    """
+    Obtiene la lista de todas las empresas registradas (INFORMACIÓN PÚBLICA ÚNICAMENTE).
+    
+    ⚠️ SEGURIDAD: 
+    - Solo usuarios Admin pueden acceder
+    - Se devuelven SOLO campos públicos: id, nombre_legal, nombre_fantasia, cuit, activa
+    - NO se exponen: nombres de usuario, IDs de usuario, URLs de Google Sheets, configuración privada
+    """
+    # Verificar que el usuario sea realmente admin
+    if not current_user.rol or current_user.rol.nombre != "Admin":
+        raise HTTPException(status_code=403, detail="Solo administradores pueden acceder a la lista de empresas")
+    
     empresas_db = empresa_manager.obtener_todas_las_empresas(db)
     
-    respuesta = []
-    for emp in empresas_db:
-        # Buscamos el primer usuario admin preferentemente con rol "Admin", si no existe usamos "Gerente"
-        primer_admin = db.exec(
-            select(Usuario).where(Usuario.id_empresa == emp.id, Usuario.rol.has(nombre="Admin"))
-        ).first()
-        if not primer_admin:
-            primer_admin = db.exec(
-                select(Usuario).where(Usuario.id_empresa == emp.id, Usuario.rol.has(nombre="Gerente"))
-            ).first()
-
-        respuesta.append(EmpresaResponse(
-            id=emp.id,
-            nombre_legal=emp.nombre_legal,
-            nombre_fantasia=emp.nombre_fantasia,
-            cuit=emp.cuit,
-            activa=emp.activa,
-            link_google_sheets=emp.configuracion.link_google_sheets if emp.configuracion else None,
-            admin_username=primer_admin.nombre_usuario if primer_admin else "N/A",
-            admin_user_id=primer_admin.id if primer_admin else None
-        ))
-    return respuesta
+    # Convertir directamente a lista de objetos seguros - Pydantic valida automáticamente
+    return [EmpresaListaResponse.model_validate(emp) for emp in empresas_db]
 
 # =================================================================================
 # === ENDPOINTS CORREGIDOS Y AÑADIDOS PARA EL FORMULARIO DE CONFIGURACIÓN ===
@@ -120,3 +111,54 @@ def api_actualizar_configuracion_de_empresa(
         return config_actualizada
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+@router.patch("/admin/{id_empresa}/nombre-legal", response_model=dict)
+def api_actualizar_nombre_legal(
+    id_empresa: int,
+    data: dict,
+    current_user: Usuario = Depends(obtener_usuario_actual),
+    db: Session = Depends(get_db)
+):
+    """
+    Actualiza el nombre legal de una empresa.
+    ⚠️ REQUIERE SER ADMIN
+    
+    Body JSON:
+    {
+      "nombre_legal": "NUEVO NOMBRE"
+    }
+    """
+    try:
+        # Verificar autenticación
+        if not current_user.rol or current_user.rol.nombre != "Admin":
+            raise HTTPException(status_code=403, detail="Solo administradores pueden actualizar empresas")
+        
+        # Obtener la empresa
+        empresa = db.exec(select(Empresa).where(Empresa.id == id_empresa)).first()
+        if not empresa:
+            raise HTTPException(status_code=404, detail=f"Empresa con ID {id_empresa} no encontrada")
+        
+        # Validar que se envió el campo
+        if "nombre_legal" not in data or not data["nombre_legal"]:
+            raise HTTPException(status_code=400, detail="Falta el campo 'nombre_legal'")
+        
+        # Actualizar
+        nombre_anterior = empresa.nombre_legal
+        empresa.nombre_legal = data["nombre_legal"].strip()
+        db.add(empresa)
+        db.commit()
+        db.refresh(empresa)
+        
+        return {
+            "status": "success",
+            "message": f"Nombre legal actualizado correctamente",
+            "anterior": nombre_anterior,
+            "nuevo": empresa.nombre_legal,
+            "id_empresa": empresa.id
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al actualizar empresa: {str(e)}")
+

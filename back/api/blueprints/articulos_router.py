@@ -51,7 +51,30 @@ def api_buscar_articulos(
         skip=skip,
         limit=limit
     )
-    return [ArticuloRead.model_validate(a) for a in resultados]
+    
+    # Construir dicts manualmente antes de validar con Pydantic
+    articuloread_list = []
+    for articulo in resultados:
+        try:
+            articulo_dict = {
+                'id': articulo.id,
+                'codigo_interno': articulo.codigo_interno,
+                'descripcion': articulo.descripcion,
+                'precio_venta': articulo.precio_venta,
+                'venta_negocio': articulo.venta_negocio,
+                'stock_actual': articulo.stock_actual,
+                'activo': articulo.activo,
+                'unidad_venta': articulo.unidad_venta,
+                'costo_ultimo': articulo.costo_ultimo,
+                'categoria': articulo.categoria
+            }
+            articuloread_list.append(ArticuloRead.model_validate(articulo_dict))
+        except Exception as e:
+            # Log error pero continúa con otros artículos
+            print(f"Error procesando artículo {articulo.id}: {e}")
+            continue
+    
+    return articuloread_list
 
 @router.get("/obtener_todos", response_model=List[ArticuloReadConCodigos])
 def api_get_all_articulos(
@@ -69,31 +92,47 @@ def api_get_all_articulos(
         limit=limite
     )
 
-    # --- INICIO DEL BLOQUE DE DEPURACIÓN ---
-    # Este bloque intentará validar los datos antes de que FastAPI lo haga,
-    # para que podamos capturar y registrar cualquier error de Pydantic.
-    try:
-        # Validamos manualmente cada artículo contra el schema de respuesta.
-        # Esto simula lo que FastAPI hace internamente.
-        for articulo in lista_articulos:
-            ArticuloReadConCodigos.model_validate(articulo)
-        
-        # Si todos los artículos son válidos, los retornamos normalmente.
-        return lista_articulos
-
-    except ValidationError as e:
-        # ¡AQUÍ ATRAPAMOS AL CULPABLE!
-        print("!!!!!!!!!!!!!! ERROR DE VALIDACIÓN DE PYDANTIC DETECTADO !!!!!!!!!!!!!!")
-        # Imprimimos el error en un formato JSON muy detallado en los logs del servidor.
-        print(e.json(indent=2))
-        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-        
-        # Lanzamos una excepción HTTP 500 para que el proceso no se cierre.
-        # Esto estabilizará la aplicación y evitará el bucle de reinicios.
-        raise HTTPException(
-            status_code=500, 
-            detail="Error de validación en el servidor al procesar la lista de artículos. Revisar logs."
-        )
+    # Convertir manualmente cada artículo al schema de respuesta
+    # para evitar problemas de relaciones no cargadas
+    resultado = []
+    for articulo in lista_articulos:
+        try:
+            # Construir el diccionario del artículo + sus códigos
+            articulo_dict = {
+                'id': articulo.id,
+                'codigo_interno': articulo.codigo_interno,
+                'descripcion': articulo.descripcion,
+                'precio_venta': articulo.precio_venta,
+                'venta_negocio': articulo.venta_negocio,
+                'costo_ultimo': getattr(articulo, 'costo_ultimo', 0.0),
+                'categoria': articulo.categoria.nombre if articulo.categoria else None,
+                'ubicacion': articulo.ubicacion,
+                'stock_actual': articulo.stock_actual,
+                'activo': articulo.activo,
+                'unidad_venta': articulo.unidad_venta,
+                'codigos': [{'codigo': c.codigo} for c in (articulo.codigos or [])]
+            }
+            resultado.append(ArticuloReadConCodigos.model_validate(articulo_dict))
+        except Exception as e:
+            print(f"⚠️ Error al procesar artículo {articulo.id}: {e}")
+            # Retornar el artículo con codigos vacía si hay error
+            articulo_dict = {
+                'id': articulo.id,
+                'codigo_interno': articulo.codigo_interno,
+                'descripcion': articulo.descripcion,
+                'precio_venta': articulo.precio_venta,
+                'venta_negocio': articulo.venta_negocio,
+                'costo_ultimo': 0.0,
+                'categoria': None,
+                'ubicacion': articulo.ubicacion,
+                'stock_actual': articulo.stock_actual,
+                'activo': articulo.activo,
+                'unidad_venta': articulo.unidad_venta,
+                'codigos': []
+            }
+            resultado.append(ArticuloReadConCodigos.model_validate(articulo_dict))
+    
+    return resultado
 
 @router.get("/obtener/{id_articulo}", response_model=ArticuloReadConCodigos)
 def api_get_articulo(

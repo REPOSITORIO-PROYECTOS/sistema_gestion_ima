@@ -32,3 +32,17 @@ class EmpresaResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+class EmpresaListaResponse(BaseModel):
+    """
+    Schema SEGURO para devolver lista de empresas.
+    Solo devuelve información pública, SIN datos sensibles de usuarios o configuración.
+    """
+    id: int
+    nombre_legal: str
+    nombre_fantasia: Optional[str] = None
+    cuit: str
+    activa: bool
+    
+    class Config:
+        from_attributes = True

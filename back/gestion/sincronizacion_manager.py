@@ -12,7 +12,7 @@ from sqlmodel import Session, select
 from typing import List, Dict, Any, Type, Optional
 
 # Importamos los modelos de nuestra base de datos con los que vamos a trabajar
-from back.modelos import Articulo, Categoria, Marca, ConfiguracionEmpresa
+from back.modelos import Articulo, Categoria, Marca, ConfiguracionEmpresa, ArticuloCodigo
 
 # Importamos nuestro "operario" para leer Google Sheets
 from back.utils.tablas_handler import TablasHandler
@@ -40,6 +40,41 @@ def _obtener_o_crear_relacion(db: Session, id_empresa: int, modelo: Type[Any], n
         db.add(nueva_instancia)
         # No hacemos commit aquí, esperamos al final de la transacción principal.
         return nueva_instancia
+
+
+def _procesar_codigos_barra(codigo_barra_string: str) -> List[str]:
+    """
+    Procesa códigos de barra que pueden venir con separadores ';' o ','
+    Retorna una lista de códigos de barra
+    
+    Ejemplos:
+    - '7798316700808;;' → ['7798316700808;;']
+    - '7798316700808; 7790895643743' → ['7798316700808', '7790895643743']
+    """
+    if not codigo_barra_string or not str(codigo_barra_string).strip():
+        return []
+    
+    # Convertir a string y limpiar espacios iniciales/finales
+    codigo_str = str(codigo_barra_string).strip()
+    
+    # Si está vacío o solo tiene separadores, retornar lista vacía
+    if not codigo_str or codigo_str.replace(';', '').replace(',', '').replace('|', '').replace(' ', '').strip() == '':
+        return []
+    
+    # El código tal como viene es válido
+    # Solo dividir si hay separadores de múltiples códigos
+    if codigo_str.count(';') > 1 or (';' in codigo_str and len(codigo_str.split(';')) > 2):
+        # Hay múltiples códigos separados
+        codigos = codigo_str.split(';')
+        codigos_limpios = []
+        for codigo in codigos:
+            codigo = codigo.strip()
+            if codigo:
+                codigos_limpios.append(codigo)
+        return codigos_limpios if codigos_limpios else [codigo_str]
+    
+    # Si viene un solo código (incluso con ;; al final), mantenerlo tal como es
+    return [codigo_str]
 
 
 def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int, nombre_hoja: Optional[str] = None) -> Dict[str, Any]:
@@ -86,6 +121,7 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int, nombr
     
     # Set para rastrear los códigos que SÍ existen en el sheet
     codigos_en_sheet = set()
+
 
     # 3. PROCESAR CADA FILA Y SINCRONIZAR
     for i, fila_sheet in enumerate(articulos_del_sheet):
@@ -163,6 +199,34 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int, nombr
                     articulo_existente.marca = marca_obj
                 
                 db.add(articulo_existente)
+                
+                # --- PROCESAR CÓDIGOS DE BARRA ---
+                codigos_barra = _procesar_codigos_barra(fila_sheet.get('Codigo de barras', ''))
+                if codigos_barra:
+                    # Limpiar códigos de barra antiguos
+                    codigos_antiguos = db.exec(
+                        select(ArticuloCodigo).where(ArticuloCodigo.id_articulo == articulo_existente.id)
+                    ).all()
+                    for cod_antiguo in codigos_antiguos:
+                        db.delete(cod_antiguo)
+                    
+                    # Hacer flush para aplicar los deletes antes de insertar nuevos
+                    try:
+                        db.flush()
+                    except Exception as flush_err:
+                        print(f"  ⚠️ Error en flush de códigos antiguos para {codigo_interno}: {flush_err}")
+                    
+                    # Agregar nuevos códigos de barra
+                    for codigo_barra in codigos_barra:
+                        try:
+                            nuevo_codigo = ArticuloCodigo(
+                                codigo=codigo_barra,
+                                id_articulo=articulo_existente.id
+                            )
+                            db.add(nuevo_codigo)
+                        except Exception as cod_err:
+                            print(f"  ⚠️ Error al agregar código {codigo_barra} para {codigo_interno}: {cod_err}")
+                
                 actualizados += 1
             else:
                 # --- CREAR NUEVO ARTÍCULO ---
@@ -182,10 +246,27 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int, nombr
                     id_marca=marca_obj.id if marca_obj else None
                 )
                 db.add(nuevo_articulo)
+                
+                # Flush para obtener el ID del nuevo artículo
+                db.flush()
+                
+                # --- PROCESAR CÓDIGOS DE BARRA ---
+                codigos_barra = _procesar_codigos_barra(fila_sheet.get('Codigo de barras', ''))
+                if codigos_barra:
+                    for codigo_barra in codigos_barra:
+                        nuevo_codigo = ArticuloCodigo(
+                            codigo=codigo_barra,
+                            id_articulo=nuevo_articulo.id
+                        )
+                        db.add(nuevo_codigo)
+                
                 creados += 1
         
         except Exception as e:
-            print(f"Error fatal procesando la fila {i+2} ({fila_sheet.get('codigo_interno')}): {e}")
+            # Cuando hay un error, hacer rollback para limpiar la sesión
+            # y poder continuar con el siguiente artículo
+            db.rollback()
+            print(f"Error procesando la fila {i+2} ({fila_sheet.get('codigo_interno')}): {e}")
             filas_con_error += 1    
     
     # --- COMMIT 1: Guardar artículos nuevos/actualizados PRIMERO ---
