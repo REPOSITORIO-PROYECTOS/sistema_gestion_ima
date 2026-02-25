@@ -170,8 +170,7 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
       hydrateFromEmpresaLinks();
     }
 
-    const interval = setInterval(hydrateFromEmpresaLinks, 60000);
-    return () => clearInterval(interval);
+    // ✅ Se carga una sola vez al iniciar, sin recarga automática
   }, [token, customLinks, loadFromBackend]);
 
   useEffect(() => {

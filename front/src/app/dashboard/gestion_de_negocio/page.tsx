@@ -454,7 +454,7 @@ export default function GestionNegocio() {
     };
 
     fetchLinks();
-  }, [token, customLinks]);
+  }, [token]);
 
   useEffect(() => {
     if (!token || !empresaId) return;
