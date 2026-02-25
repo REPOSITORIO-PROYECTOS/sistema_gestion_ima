@@ -91,10 +91,30 @@ def guardar_links_empresa(db: Session, id_empresa: int, link1: str | None = None
     return config_db
 
 def actualizar_configuracion_parcial(db: Session, id_empresa: int, data: ConfiguracionUpdate) -> ConfiguracionEmpresa:
+    """
+    Actualiza solo los campos de la configuración que vienen en la petición.
+    También puede actualizar nombre_legal y nombre_fantasia en la tabla Empresa.
+    """
     config_db = obtener_configuracion_por_id_empresa(db, id_empresa)
-    update_data = data.model_dump(exclude_unset=True) # Solo los campos que envía el frontend
-    for key, value in update_data.items():
-        setattr(config_db, key, value) # Actualiza el campo dinámicamente
+    
+    # Separar los campos que pertenecen a Empresa vs ConfiguracionEmpresa
+    campos_empresa = {'nombre_legal', 'nombre_fantasia'}
+    update_data = data.model_dump(exclude_unset=True)
+    
+    # Actualizar campos de Empresa
+    campos_a_actualizar_empresa = {k: v for k, v in update_data.items() if k in campos_empresa}
+    if campos_a_actualizar_empresa:
+        empresa = db.get(Empresa, id_empresa)
+        if empresa:
+            for key, value in campos_a_actualizar_empresa.items():
+                setattr(empresa, key, value)
+            db.add(empresa)
+    
+    # Actualizar campos de ConfiguracionEmpresa
+    campos_config = {k: v for k, v in update_data.items() if k not in campos_empresa}
+    for key, value in campos_config.items():
+        setattr(config_db, key, value)
+    
     db.add(config_db)
     db.commit()
     db.refresh(config_db)

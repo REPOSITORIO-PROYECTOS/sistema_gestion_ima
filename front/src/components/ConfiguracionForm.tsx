@@ -59,6 +59,8 @@ const opcionesCondicionIVA = [
 ] as const;
 
 const formSchema = z.object({
+  nombre_legal: z.string().optional().nullable(),
+  nombre_fantasia: z.string().optional().nullable(),
   nombre_negocio: z.string().min(1, "Requerido").nullable(),
   direccion_negocio: z.string().optional().nullable(),
   telefono_negocio: z.string().optional().nullable(),
@@ -304,6 +306,41 @@ export const ConfiguracionForm = (props: Props) => {
         {sections.general && (
           <div className="space-y-4">
             <h2 className="text-xl font-bold text-green-950">Configuración General</h2>
+
+            <FormField
+              control={form.control}
+              name="nombre_legal"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nombre Legal</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Nombre legal de la empresa" {...field} value={field.value || ""} />
+                  </FormControl>
+                  <FormDescription>
+                    El nombre legal registrado ante AFIP
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="nombre_fantasia"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nombre de Fantasía</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Nombre de fantasía (cómo se conoce la empresa)" {...field} value={field.value || ""} />
+                  </FormControl>
+                  <FormDescription>
+                    El nombre comercial con el que se conoce la empresa
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <FormField
               control={form.control}
               name="nombre_negocio"

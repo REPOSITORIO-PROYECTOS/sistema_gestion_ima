@@ -20,6 +20,10 @@ class ConfiguracionUpdate(BaseModel):
     Schema para actualizar la configuración. Todos los campos son opcionales
     para permitir actualizaciones parciales.
     """
+    # Campos de Empresa
+    nombre_legal: Optional[str] = None
+    nombre_fantasia: Optional[str] = None
+    # Campos de Configuración
     nombre_negocio: Optional[str] = None
     color_principal: Optional[str] = None # Valida que sea un color hex
     afip_condicion_iva: Optional[CondicionIVAEnum] = None
@@ -39,6 +43,10 @@ class ConfiguracionUpdate(BaseModel):
 class ConfiguracionResponse(BaseModel):
     """Schema completo para devolver la configuración de una empresa."""
     id_empresa: int
+    # Campos de Empresa
+    nombre_legal: Optional[str] = None
+    nombre_fantasia: Optional[str] = None
+    # Campos de Configuración
     nombre_negocio: Optional[str]
     color_principal: str
     ruta_logo: Optional[str]

@@ -80,16 +80,38 @@ def api_obtener_configuracion_de_empresa(
 ):
     """
     Obtiene la configuración completa de una empresa específica por su ID.
-    Este endpoint es el que soluciona el problema de los campos vacíos en el formulario.
+    Incluye datos de ConfiguracionEmpresa y Empresa (nombre_legal, nombre_fantasia).
     """
     try:
-        # La lógica de negocio ya está en el manager, solo la llamamos.
-        # El manager es lo suficientemente inteligente para crear una config si no existe.
+        # Obtener la configuración
         config = configuracion_manager.obtener_configuracion_empresa(db, id_empresa)
         
-        # FastAPI se encarga de convertir el objeto 'config' en un JSON que coincide
-        # con el 'response_model=SchemaConfigResponse', ya que los nombres de campo coinciden.
-        return config
+        # Obtener datos de Empresa para nombre_legal y nombre_fantasia
+        empresa = db.exec(select(Empresa).where(Empresa.id == id_empresa)).first()
+        
+        # Construir dict con todos los campos
+        config_dict = {
+            'id_empresa': config.id_empresa,
+            'nombre_legal': empresa.nombre_legal if empresa else None,
+            'nombre_fantasia': empresa.nombre_fantasia if empresa else None,
+            'nombre_negocio': config.nombre_negocio,
+            'color_principal': config.color_principal,
+            'ruta_logo': config.ruta_logo,
+            'ruta_icono': config.ruta_icono,
+            'afip_condicion_iva': config.afip_condicion_iva,
+            'afip_punto_venta_predeterminado': config.afip_punto_venta_predeterminado,
+            'direccion_negocio': config.direccion_negocio,
+            'telefono_negocio': config.telefono_negocio,
+            'mail_negocio': config.mail_negocio,
+            'link_google_sheets': config.link_google_sheets,
+            'link_visual_1': config.link_visual_1,
+            'link_visual_2': config.link_visual_2,
+            'link_visual_3': config.link_visual_3,
+            'cuit': config.cuit,
+            'aclaraciones_legales': config.aclaraciones_legales
+        }
+        
+        return SchemaConfigResponse.model_validate(config_dict)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -101,6 +123,7 @@ def api_actualizar_configuracion_de_empresa(
 ):
     """
     Actualiza parcialmente la configuración de una empresa específica.
+    Puede actualizar campos de ConfiguracionEmpresa y también nombre_legal/nombre_fantasia de Empresa.
     """
     try:
         config_actualizada = configuracion_manager.actualizar_configuracion_parcial(
@@ -108,7 +131,33 @@ def api_actualizar_configuracion_de_empresa(
             id_empresa=id_empresa,
             data=data
         )
-        return config_actualizada
+        
+        # Obtener datos actualizados de Empresa
+        empresa = db.exec(select(Empresa).where(Empresa.id == id_empresa)).first()
+        
+        # Construir dict con todos los campos actualizados
+        config_dict = {
+            'id_empresa': config_actualizada.id_empresa,
+            'nombre_legal': empresa.nombre_legal if empresa else None,
+            'nombre_fantasia': empresa.nombre_fantasia if empresa else None,
+            'nombre_negocio': config_actualizada.nombre_negocio,
+            'color_principal': config_actualizada.color_principal,
+            'ruta_logo': config_actualizada.ruta_logo,
+            'ruta_icono': config_actualizada.ruta_icono,
+            'afip_condicion_iva': config_actualizada.afip_condicion_iva,
+            'afip_punto_venta_predeterminado': config_actualizada.afip_punto_venta_predeterminado,
+            'direccion_negocio': config_actualizada.direccion_negocio,
+            'telefono_negocio': config_actualizada.telefono_negocio,
+            'mail_negocio': config_actualizada.mail_negocio,
+            'link_google_sheets': config_actualizada.link_google_sheets,
+            'link_visual_1': config_actualizada.link_visual_1,
+            'link_visual_2': config_actualizada.link_visual_2,
+            'link_visual_3': config_actualizada.link_visual_3,
+            'cuit': config_actualizada.cuit,
+            'aclaraciones_legales': config_actualizada.aclaraciones_legales
+        }
+        
+        return SchemaConfigResponse.model_validate(config_dict)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 

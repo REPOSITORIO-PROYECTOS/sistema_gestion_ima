@@ -171,7 +171,10 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
   }, [token, loadFromBackend]);
 
   useEffect(() => {
+    // Solo ejecutar UNA SOLA VEZ al montar el componente
     const obtenerEmpresa = async () => {
+      if (empresaCargada) return; // 🔴 GUARD: No hacer fetch si ya está cargado
+
       try {
         const res = await fetch(`${API_CONFIG.BASE_URL}/configuracion/mi-empresa`, {
           headers: {
@@ -211,18 +214,50 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
       }
     };
 
-    if (token) {
+    if (token && !empresaCargada) {
       obtenerEmpresa();
     }
 
+  }, [token, empresaCargada]); // Añadido empresaCargada para evitar loops infinitos
+
+  // Efecto SEPARADO para escuchar eventos de actualización
+  useEffect(() => {
+    const handleEmpresaActualizada = async () => {
+      try {
+        const res = await fetch(`${API_CONFIG.BASE_URL}/configuracion/mi-empresa`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) throw new Error('Error al obtener datos de empresa');
+
+        const data = await res.json();
+        setNavbarColor(data.color_principal || 'bg-green-800');
+        const apiBase = API_CONFIG.BASE_URL;
+        const staticBase = apiBase.endsWith('/api') ? apiBase.slice(0, -4) : apiBase;
+        setLogoUrl(`${staticBase}${data.ruta_logo}`);
+
+        if (data.aclaraciones_legales) {
+          const mesasValue = data.aclaraciones_legales.mesas_enabled;
+          const mesasHabilitadas = String(mesasValue) === "true";
+          setMesasEnabled(mesasHabilitadas);
+        }
+
+        useEmpresaStore.getState().setEmpresa(data);
+      } catch (error) {
+        console.error('Error al cargar datos de empresa:', error);
+      }
+    };
+
     // Escuchar evento y refrescar los datos de empresa al recibirlo
-    eventBus.on("empresa_actualizada", obtenerEmpresa);
+    eventBus.on("empresa_actualizada", handleEmpresaActualizada);
 
     // Limpiar al desmontar
     return () => {
-      eventBus.off("empresa_actualizada", obtenerEmpresa);
+      eventBus.off("empresa_actualizada", handleEmpresaActualizada);
     };
-  }, [token]);
+  }, [token]); // Solo reregistrar listener cuando token cambia
 
 
 
