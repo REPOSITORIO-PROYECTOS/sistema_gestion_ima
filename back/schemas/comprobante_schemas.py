@@ -34,6 +34,9 @@ class EmisorData(BaseModel):
     punto_venta: int
     condicion_iva: Optional[str] = None
     aclaraciones_legales: Optional[Dict[str, str]] = None
+    # Permitir inyectar credenciales cuando ya fueron obtenidas (ej. facturación por lotes)
+    afip_certificado: Optional[str] = None
+    afip_clave_privada: Optional[str] = None
 
 
 class ReceptorData(BaseModel):

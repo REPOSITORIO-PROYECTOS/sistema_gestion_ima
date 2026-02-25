@@ -2,8 +2,8 @@
 # VERSIÓN FINAL, LIMPIA Y COMPLETA
 
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel, ValidationError
 from starlette.responses import Response
 from sqlmodel import Session # <-- 1. IMPORTACIÓN AÑADIDA
 
@@ -170,8 +170,8 @@ def api_generar_comprobante(
 
 @router.post("/facturar-lote", summary="Factura un lote de ventas no facturadas a un único cliente",
 response_model=FacturarLoteResponse)
-def api_facturar_lote_de_ventas(
-    req: FacturarLoteRequest,
+async def api_facturar_lote_de_ventas(
+    request: Request,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(obtener_usuario_actual)
 ):
@@ -181,6 +181,21 @@ def api_facturar_lote_de_ventas(
     Devuelve un JSON con el resultado, no un PDF.
     """
     try:
+        # Defensive parse: aceptamos dict o lista con un único objeto.
+        raw_payload = await request.json()
+        if isinstance(raw_payload, list):
+            if not raw_payload:
+                raise HTTPException(status_code=400, detail="El payload no puede ser una lista vacía.")
+            raw_payload = raw_payload[0]
+        if not isinstance(raw_payload, dict):
+            raise HTTPException(status_code=400, detail="El payload debe ser un objeto JSON con ids_movimientos e id_cliente_final.")
+
+        try:
+            req = FacturarLoteRequest.model_validate(raw_payload)
+        except ValidationError as e:
+            # Mostramos el primer error para el cliente
+            raise HTTPException(status_code=422, detail=e.errors())
+
         # Llamamos a la función a través de su módulo, manteniendo el código limpio
         resultado_factura = facturacion_lotes_manager.facturar_lote_de_ventas(
             db=db,

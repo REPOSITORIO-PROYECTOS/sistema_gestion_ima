@@ -202,6 +202,19 @@ def generar_factura_para_venta(
         
     print(f"Emisor: {condicion_emisor.name}, Receptor: {condicion_receptor.name}, Total: {total}")
 
+    # Obtener credenciales si no vienen en el emisor_data
+    cert = getattr(emisor_data, "afip_certificado", None)
+    clave = getattr(emisor_data, "afip_clave_privada", None)
+    if not cert or not clave:
+        try:
+            secreto_emisor = cliente_boveda.obtener_secreto(emisor_data.cuit)
+            if not secreto_emisor:
+                raise ValueError(f"No se encontraron credenciales en la bóveda para el CUIT {emisor_data.cuit}.")
+            cert = secreto_emisor.certificado
+            clave = secreto_emisor.clave_privada
+        except Exception as e:
+            raise RuntimeError(f"El servicio de bóveda no está disponible: {e}")
+
     # Decide si el receptor está identificado con CUIT (longitud 11 en documento)
     receptor_tiene_cuit = False
     try:
@@ -223,31 +236,26 @@ def generar_factura_para_venta(
     )
     print(f"Lógica determinada: {logica_factura}")
 
-    # Construcción del payload para el endpoint /facturar-por-cantidad (List[InvoiceItemPayload])
-    invoice_payload = {
-        "total": total,
-        "cliente_data": {
-            "cuit_o_dni": documento,
-            "nombre_razon_social": nombre_receptor,
-            "domicilio": domicilio_receptor,
-            "condicion_iva": condicion_iva_receptor_str
-        },
-        "emisor_cuit": str(emisor_data.cuit),
+    # Estructuramos datos_factura según guía del microservicio (objeto, no lista)
+    datos_factura = {
+        "tipo_afip": logica_factura["tipo_afip"],
         "punto_venta": emisor_data.punto_venta,
-        "tipo_forzado": logica_factura["tipo_afip"],
-        "conceptos": [
-             {
-                 "descripcion": "Venta de productos/servicios",
-                 "cantidad": 1,
-                 "precio_unitario": total,
-                 "subtotal": total,
-                 "tasa_iva": TASA_IVA_21 # Por defecto 21%, idealmente debería venir de la venta
-             }
-        ]
+        "tipo_documento": tipo_documento_receptor.value,
+        "documento": str(documento),
+        "total": total,
+        "neto": logica_factura.get("neto", total),
+        "iva": logica_factura.get("iva", 0.0),
+        "id_condicion_iva": getattr(condicion_receptor, "value", None)
     }
 
-    # Enviar como lista
-    payload = [invoice_payload]
+    payload = {
+        "credenciales": {
+            "cuit": str(emisor_data.cuit),
+                "certificado": cert,
+                "clave_privada": clave
+        },
+        "datos_factura": datos_factura,
+    }
     
     print(f"Enviando petición al microservicio de facturación en: {FACTURACION_API_URL}")
     
@@ -276,12 +284,17 @@ def generar_factura_para_venta(
         
             response.raise_for_status() 
             
-            # La respuesta es una LISTA de resultados
-            resultados_lista = response.json()
-            if not resultados_lista or len(resultados_lista) == 0:
-                raise ValueError("Respuesta vacía del servicio de facturación")
-                
-            resultado_afip = resultados_lista[0]
+            # La respuesta puede ser dict o lista; normalizamos a dict
+            resultados = response.json()
+            if isinstance(resultados, list):
+                if not resultados:
+                    raise ValueError("Respuesta vacía del servicio de facturación")
+                resultado_afip = resultados[0]
+            elif isinstance(resultados, dict):
+                resultado_afip = resultados
+            else:
+                raise ValueError("Formato de respuesta de facturación no reconocido")
+
             print(f"SERVICIO EXTERNO - Respuesta exitosa del microservicio de facturación: {resultado_afip}")
             print(f"SERVICIO EXTERNO - Campos recibidos: {list(resultado_afip.keys())}")
             

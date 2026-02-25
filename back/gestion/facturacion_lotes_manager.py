@@ -50,6 +50,7 @@ def facturar_lote_de_ventas(
     total_a_facturar = 0.0
     ventas_a_procesar: List[Venta] = []
     items_consolidados: List[ItemData] = []
+    clientes_en_movimientos = set()
     
     # --- LA NUEVA LÓGICA DE VALIDACIÓN ---
     # Ya no nos importa el tipo de comprobante, solo que sea una venta válida y no esté facturada.
@@ -59,6 +60,8 @@ def facturar_lote_de_ventas(
         
         total_a_facturar += mov.venta.total
         ventas_a_procesar.append(mov.venta)
+        if mov.venta.id_cliente:
+            clientes_en_movimientos.add(mov.venta.id_cliente)
         for detalle in mov.venta.items:
             # Consolidamos los ítems de todos los comprobantes, sin importar su origen
             items_consolidados.append(ItemData(
@@ -68,14 +71,28 @@ def facturar_lote_de_ventas(
                 subtotal=detalle.cantidad * detalle.precio_unitario
             ))
             
-    # --- FASE 2: VALIDACIÓN DE CLIENTE (sin cambios) ---
+    # --- FASE 2: VALIDACIÓN DE CLIENTE ---
     cliente_db = None
     if id_cliente_final:
+        # Si se indicó cliente explícito, todos los movimientos deben pertenecer a ese cliente (si tienen cliente asignado)
+        if clientes_en_movimientos and clientes_en_movimientos != {id_cliente_final}:
+            raise ValueError("Todos los movimientos deben pertenecer al mismo cliente seleccionado para facturar en lote.")
         cliente_db = db.get(Tercero, id_cliente_final)
         if not cliente_db or cliente_db.id_empresa != usuario_actual.id_empresa:
             raise ValueError("El cliente final especificado es inválido.")
-    elif total_a_facturar > LIMITE_CONSUMIDOR_FINAL:
-        raise ValueError(f"El monto total (${total_a_facturar:,.2f}) supera el límite para Consumidor Final.")
+    else:
+        # Si no se indicó cliente, pero los movimientos tienen más de un cliente distinto, no se permite
+        if len(clientes_en_movimientos) > 1:
+            raise ValueError("Los movimientos seleccionados deben pertenecer al mismo cliente para facturar en lote.")
+        # Si hay exactamente un cliente, lo usamos
+        if len(clientes_en_movimientos) == 1:
+            unico_cliente = next(iter(clientes_en_movimientos))
+            cliente_db = db.get(Tercero, unico_cliente)
+            if not cliente_db or cliente_db.id_empresa != usuario_actual.id_empresa:
+                raise ValueError("El cliente asociado a los movimientos es inválido.")
+        elif total_a_facturar > LIMITE_CONSUMIDOR_FINAL:
+            # Sin cliente y excede límite CF
+            raise ValueError(f"El monto total (${total_a_facturar:,.2f}) supera el límite para Consumidor Final.")
 
     # --- FASE 3: PREPARACIÓN Y LLAMADA A AFIP (sin cambios) ---
     # (Tu lógica existente para obtener credenciales y datos del emisor/receptor es correcta)
