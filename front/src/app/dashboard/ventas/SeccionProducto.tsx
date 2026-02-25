@@ -70,10 +70,8 @@ export function SeccionProducto(props: SeccionProductoProps) {
 
   const [matches, setMatches] = useState<Producto[]>([])
   const [loading, setLoading] = useState(false)
-  const [isTyping, setIsTyping] = useState(false) // Detectar si el usuario está escribiendo manualmente
   const [justSelected, setJustSelected] = useState(false) // Flag para evitar reabrir dropdown después de selección
   const debounceRef = useRef<number | undefined>(undefined)
-  const typingTimeoutRef = useRef<number | undefined>(undefined)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Cerrar dropdown al hacer click fuera
@@ -99,6 +97,12 @@ export function SeccionProducto(props: SeccionProductoProps) {
     const q = (codigo || "").trim().toLowerCase()
 
     window.clearTimeout(debounceRef.current)
+
+    // ✅ Para scanner: debounce ultra-rápido (50ms), para búsqueda manual: 300ms
+    // Si empieza con dígitos (típico de código de barras), es más probable que sea scanner
+    const isLikelyBarcode = q && /^\d/.test(q)
+    const debounceDelay = isLikelyBarcode ? 50 : 300
+
     debounceRef.current = window.setTimeout(async () => {
       if (!q) {
         setMatches([])
@@ -127,7 +131,7 @@ export function SeccionProducto(props: SeccionProductoProps) {
       }
 
       setLoading(false)
-    }, 300) // ✅ Debounce rápido para respuesta inmediata
+    }, debounceDelay)
 
     return () => {
       window.clearTimeout(debounceRef.current)
@@ -139,7 +143,6 @@ export function SeccionProducto(props: SeccionProductoProps) {
     if (e.key === "Escape") {
       e.preventDefault()
       setPopoverOpen(false)
-      setIsTyping(false)
       return
     }
 
@@ -157,8 +160,10 @@ export function SeccionProducto(props: SeccionProductoProps) {
       return
     }
 
-    // ENTER: Solo para código de barras cuando NO está escribiendo
-    if (e.key === "Enter" && !isTyping && codigo.trim()) {
+    // ENTER: Ejecutar scanner (búsqueda por código de barras)
+    // ✅ Permitir ENTER SIEMPRE que haya código, sin condición de isTyping
+    if (e.key === "Enter" && codigo.trim()) {
+      e.preventDefault()
       handleKeyDown(e)
       return
     }
@@ -184,7 +189,6 @@ export function SeccionProducto(props: SeccionProductoProps) {
                 onChange={(e) => {
                   const newValue = e.target.value
                   setCodigoEscaneado(newValue)
-                  setIsTyping(true)
 
                   // Si el usuario modifica el texto después de seleccionar, resetear para nueva búsqueda
                   if (productoSeleccionado && newValue !== productoSeleccionado.nombre) {
@@ -236,7 +240,6 @@ export function SeccionProducto(props: SeccionProductoProps) {
                           onSelect={() => {
                             setProductoSeleccionado(prod)
                             setCodigoEscaneado(prod.nombre) // ✅ Mostrar nombre del producto seleccionado
-                            setIsTyping(false)
                             setJustSelected(true)
                             setPopoverOpen(false)
                           }}
@@ -246,7 +249,6 @@ export function SeccionProducto(props: SeccionProductoProps) {
                           onClick={() => {
                             setProductoSeleccionado(prod)
                             setCodigoEscaneado(prod.nombre)
-                            setIsTyping(false)
                             setJustSelected(true)
                             setPopoverOpen(false)
                             setTimeout(() => {
