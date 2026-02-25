@@ -580,23 +580,16 @@ function FormVentas({
   // Función que refresca el stock en el store después de cada venta
   const refrescarProductos = useCallback(async () => {
     // Usamos el token que ya tienes disponible en el componente
-    if (!token) {
-      console.error("No hay token para refrescar productos.");
-      return;
-    }
+    if (!token) return;
 
     try {
       setIsSyncing(true);
-      console.log("🔄 Refrescando catálogo de productos...");
       const res = await fetch("https://sistema-ima.sistemataup.online/api/articulos/obtener_todos", {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!res.ok) {
-        throw new Error("Error al refrescar productos desde el servidor");
-      }
+      if (!res.ok) throw new Error("Error al refrescar productos desde el servidor");
 
-      // Reutilizamos el tipado que definiste en el login
       type ProductoAPI = {
         id: number | string;
         nombre?: string;
@@ -617,77 +610,45 @@ function FormVentas({
         unidad_venta: p.unidad_venta || 'Unidad',
       }));
 
-      // Usamos la acción del store para actualizar el estado global
+      // Actualizar store global y localStorage
       setProductos(adaptados);
-      // Opcional: También puedes actualizar el localStorage si lo necesitas síncrono
       localStorage.setItem("productos", JSON.stringify(adaptados));
-
-      // Registrar el timestamp de última sincronización
       setLastSyncTime(new Date());
 
-      console.log("✅ Catálogo de productos actualizado.");
-
     } catch (err) {
-      // Usamos un toast para notificar el error de forma no invasiva
       toast.error("No se pudo actualizar el stock de productos en tiempo real.");
-      console.error("Error actualizando productos post-venta:", err);
     } finally {
       setIsSyncing(false);
     }
   }, [token, setProductos]);
 
+  // ✅ Refresco inteligente: solo si hay cambios de versión en el servidor
   useEffect(() => {
-    const interval = setInterval(() => {
-      refrescarProductos();
-    }, 10000); // Refrescar cada 10 segundos
-    return () => clearInterval(interval);
-  }, [refrescarProductos]);
+    if (!token) return;
 
-  useEffect(() => {
     let lastVersion = parseInt(localStorage.getItem("catalogo_version") || "0", 10);
+
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`${API_CONFIG.BASE_URL}/articulos/version`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (!res.ok) return;
+
         const data = await res.json() as { version?: number };
         const v = typeof data.version === "number" ? data.version : 0;
+
+        // Solo refrescar si hay cambios
         if (v > lastVersion) {
           await refrescarProductos();
           lastVersion = v;
           localStorage.setItem("catalogo_version", String(v));
-          toast.success("Catálogo actualizado");
         }
       } catch { }
-    }, 5000);
+    }, 30000); // Revisar cada 30 segundos (no 5 segundos)
+
     return () => clearInterval(interval);
-  }, [token, refrescarProductos, catalogoResetTick]);
-
-  useEffect(() => {
-    const intervalMs = 300000;
-    const interval = setInterval(async () => {
-      try {
-        localStorage.removeItem("producto-storage");
-        localStorage.removeItem("productos");
-        localStorage.setItem("catalogo_version", "0");
-        setCatalogoResetTick((tick) => tick + 1);
-        await refrescarProductos();
-      } catch (err) {
-        console.error("Error limpiando cache de productos:", err);
-      }
-    }, intervalMs);
-    return () => clearInterval(interval);
-  }, [refrescarProductos]);
-
-  // Auto-sincronización cada 20 segundos para mantener catálogo actualizado
-  useEffect(() => {
-    const autoSyncInterval = setInterval(async () => {
-      await refrescarProductos();
-    }, 20000); // 20 segundos
-
-    return () => clearInterval(autoSyncInterval);
-  }, [refrescarProductos]);
+  }, [token, refrescarProductos]);
 
   const imprimirComprobante = useCallback(async (
     tipo: string,

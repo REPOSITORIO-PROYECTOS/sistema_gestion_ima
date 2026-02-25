@@ -80,10 +80,8 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
 
         if (res.ok) {
           const configuracion = await res.json();
-          console.log("👤 Configuración del usuario cargada:", configuracion);
 
           if (configuracion && typeof configuracion === 'object') {
-            console.log("⚙️ Aplicando configuración al store:", configuracion);
             loadFromBackend(configuracion);
           } else {
             console.warn("⚠️ Configuración vacía o inválida");
@@ -158,7 +156,6 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
         });
 
         loadFromBackend({ custom_links: nextLinks });
-        console.log("✅ Links de empresa actualizados correctamente");
       } catch (error) {
         console.error("❌ Error hidratando links de empresa:", error);
         // No lanzar error, solo log. Usar valores por defecto.
@@ -171,7 +168,7 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
     }
 
     // ✅ Se carga una sola vez al iniciar, sin recarga automática
-  }, [token, customLinks, loadFromBackend]);
+  }, [token, loadFromBackend]);
 
   useEffect(() => {
     const obtenerEmpresa = async () => {
@@ -196,7 +193,6 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
         if (data.aclaraciones_legales) {
           const mesasValue = data.aclaraciones_legales.mesas_enabled;
           const mesasHabilitadas = String(mesasValue) === "true";
-          console.log("📊 Valor mesas_enabled del backend:", mesasValue, "→ Resultado boolean:", mesasHabilitadas);
           setMesasEnabled(mesasHabilitadas);
         } else {
           console.warn("⚠️ No hay aclaraciones_legales en los datos de empresa");
