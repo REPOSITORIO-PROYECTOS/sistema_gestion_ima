@@ -207,6 +207,8 @@ export const ConfiguracionForm = (props: Props) => {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      nombre_legal: "",
+      nombre_fantasia: "",
       nombre_negocio: "",
       direccion_negocio: "",
       telefono_negocio: "",
@@ -235,8 +237,11 @@ export const ConfiguracionForm = (props: Props) => {
       const data = await res.json();
       const transformedData = {
         ...data,
+        nombre_legal: data.nombre_legal ?? "",
+        nombre_fantasia: data.nombre_fantasia ?? "",
         cuit: data.cuit ? String(data.cuit) : "",
         afip_punto_venta_predeterminado: data.afip_punto_venta_predeterminado ? String(data.afip_punto_venta_predeterminado) : "",
+        afip_condicion_iva: data.afip_condicion_iva ?? null,
         aclaraciones_legales: data.aclaraciones_legales ?? {},
         balanza_articulo_id: data.aclaraciones_legales?.balanza_articulo_id ?? "",
         balanza_auto_agregar: (data.aclaraciones_legales?.balanza_auto_agregar ?? "false") === "true",
@@ -267,6 +272,7 @@ export const ConfiguracionForm = (props: Props) => {
         ...values,
         cuit: values.cuit === "" ? null : values.cuit,
         afip_punto_venta_predeterminado: values.afip_punto_venta_predeterminado === "" ? null : Number(values.afip_punto_venta_predeterminado),
+        afip_condicion_iva: !values.afip_condicion_iva ? null : values.afip_condicion_iva,
         aclaraciones_legales: {
           ...values.aclaraciones_legales,
           balanza_articulo_id: values.balanza_articulo_id || null,
@@ -434,7 +440,7 @@ export const ConfiguracionForm = (props: Props) => {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Condición IVA</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecciona condición de IVA" />
@@ -653,7 +659,7 @@ export const ConfiguracionForm = (props: Props) => {
           </div>
         )}
 
-        <Button type="submit" disabled={form.formState.isSubmitting || !form.formState.isDirty}>
+        <Button type="submit" disabled={form.formState.isSubmitting}>
           {form.formState.isSubmitting ? "Guardando..." : "Guardar Cambios"}
         </Button>
       </form>

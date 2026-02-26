@@ -58,19 +58,18 @@ def api_buscar_articulos(
         try:
             articulo_dict = {
                 'id': articulo.id,
-                'codigo_interno': articulo.codigo_interno,
+                'codigo_interno': getattr(articulo, 'codigo_interno', None),
                 'descripcion': articulo.descripcion,
                 'precio_venta': articulo.precio_venta,
-                'venta_negocio': articulo.venta_negocio,
-                'stock_actual': articulo.stock_actual,
-                'activo': articulo.activo,
-                'unidad_venta': articulo.unidad_venta,
-                'costo_ultimo': articulo.costo_ultimo,
-                'categoria': articulo.categoria
+                'venta_negocio': getattr(articulo, 'venta_negocio', articulo.precio_venta),
+                'stock_actual': getattr(articulo, 'stock_actual', 0),
+                'activo': getattr(articulo, 'activo', True),
+                'unidad_venta': getattr(articulo, 'unidad_venta', 'unidad'),
+                'costo_ultimo': getattr(articulo, 'costo_ultimo', 0.0),
+                'categoria': getattr(articulo, 'categoria', None),
             }
             articuloread_list.append(ArticuloRead.model_validate(articulo_dict))
         except Exception as e:
-            # Log error pero continúa con otros artículos
             print(f"Error procesando artículo {articulo.id}: {e}")
             continue
     

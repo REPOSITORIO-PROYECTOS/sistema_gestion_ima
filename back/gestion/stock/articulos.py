@@ -102,32 +102,61 @@ def buscar_articulos_por_termino(
     """
     NUEVA FUNCIÓN: Busca artículos de una empresa que coincidan con un término de búsqueda.
     Filtra por descripción, código interno y códigos de barras asociados.
+    Refactorizado para evitar problemas con NULL en JOINs.
     """
     
+    # Si no hay término, retornar todos los artículos de la empresa sin filtro
+    if not termino.strip():
+        statement_todos = (
+            select(Articulo)
+            .where(Articulo.id_empresa == id_empresa_actual)
+            .order_by(Articulo.descripcion)
+            .offset(skip)
+            .limit(limit)
+            .options(selectinload(Articulo.codigos))
+        )
+        return db.exec(statement_todos).all()
+
     # Preparamos el término para una búsqueda de tipo "contiene"
     termino_like = f"%{termino}%"
 
-    # La consulta es casi idéntica a la que te propuse antes, pero ahora
-    # vive en su propia función.
-    statement = (
+    # Búsqueda por descripción y código interno (sin JOIN problemático)
+    statement_main = (
         select(Articulo)
-        .join(ArticuloCodigo, isouter=True) # isouter=True es un LEFT JOIN
         .where(
             Articulo.id_empresa == id_empresa_actual,
             or_(
                 Articulo.descripcion.ilike(termino_like),
-                Articulo.codigo_interno.ilike(termino_like),
-                ArticuloCodigo.codigo.ilike(termino_like)
+                Articulo.codigo_interno.ilike(termino_like)
             )
         )
-        .distinct()
         .order_by(Articulo.descripcion)
-        .offset(skip)
-        .limit(limit)
         .options(selectinload(Articulo.codigos))
     )
-    
-    return db.exec(statement).all()
+    articulos_por_descripcion = db.exec(statement_main).all()
+
+    # Búsqueda adicional por códigos de barras
+    statement_codigos = (
+        select(Articulo)
+        .join(ArticuloCodigo)
+        .where(
+            Articulo.id_empresa == id_empresa_actual,
+            ArticuloCodigo.codigo.ilike(termino_like)
+        )
+        .distinct()
+        .options(selectinload(Articulo.codigos))
+    )
+    articulos_por_codigo = db.exec(statement_codigos).all()
+
+    # Combinar resultados sin duplicados, manteniendo orden
+    articulos_set = {a.id: a for a in articulos_por_descripcion}
+    for a in articulos_por_codigo:
+        articulos_set[a.id] = a
+
+    resultados = sorted(articulos_set.values(), key=lambda a: a.descripcion)
+
+    # Aplicar paginación después de combinar
+    return resultados[skip:skip + limit]
 
 # ===================================================================
 # === OPERACIONES DE ESCRITURA (CREATE, UPDATE, DELETE)
