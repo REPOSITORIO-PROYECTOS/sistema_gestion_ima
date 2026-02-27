@@ -58,6 +58,8 @@ bot-whastapp*.json  # Or be more specific: bot-whastapp121-ed126e837c9c.json
 malware_cleanup.sh
 malware_forensics.py
 security_monitor.py
+fail2ban_monitor.sh
+firewall_secundario.sh
 
 # Logs y reportes de seguridad
 .malware_cleanup.log
@@ -65,6 +67,15 @@ security_monitor.py
 malware_alerts.json
 .forensics/
 security_monitor.log
+fail2ban_*.log
+
+# Fail2Ban específico - NUNCA subir configuración de seguridad
+/etc/fail2ban/
+fail2ban.conf
+jail.local
+jail.d/
+filter.d/
+action.d/
 
 # Reportes sensibles
 SECURITY_REPORT.md
