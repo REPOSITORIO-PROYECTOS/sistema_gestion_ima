@@ -48,6 +48,27 @@ bot-whastapp*.json  # Or be more specific: bot-whastapp121-ed126e837c9c.json
 *.sublime-workspace
 *.suo
 *.user
+
+# ═══════════════════════════════════════════════════════════
+# 🛡️ SEGURIDAD: Herramientas de protección contra malware
+#    NO SUBIR A GIT - Mantener privadas en el servidor
+# ═══════════════════════════════════════════════════════════
+
+# Scripts de seguridad y monitoreo
+malware_cleanup.sh
+malware_forensics.py
+security_monitor.py
+
+# Logs y reportes de seguridad
+.malware_cleanup.log
+.security_cleanup.log
+malware_alerts.json
+.forensics/
+security_monitor.log
+
+# Reportes sensibles
+SECURITY_REPORT.md
+SECRET_SECURITY_TOOLS.txt
 *.userosscache
 *.sln
 *.tmp
