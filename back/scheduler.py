@@ -1,16 +1,18 @@
 """
-Background scheduler para sincronización automática cada 5 minutos
+Background scheduler para sincronización automática cada 10 segundos
 Integrado en el API FastAPI
+Sincroniza TODAS las empresas configuradas
 """
 import logging
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
-from sqlmodel import Session
+from sqlmodel import Session, select
 import sys
 
 sys.path.insert(0, '/home/sgi_user/proyectos/sistema_gestion_ima')
 
 from back.database import engine
+from back.modelos import Empresa
 from back.gestion.actualizaciones.actualizaciones_masivas import (
     sincronizar_articulos_desde_sheets,
     sincronizar_clientes_desde_sheets,
@@ -18,10 +20,17 @@ from back.gestion.actualizaciones.actualizaciones_masivas import (
 
 logger = logging.getLogger(__name__)
 
-# IDs de empresas a sincronizar
-EMPRESAS_A_SINCRONIZAR = [32]  # admin_ropa
-
 scheduler = None
+
+def obtener_todas_las_empresas():
+    """Obtiene todas las empresas activas de la base de datos"""
+    try:
+        with Session(engine) as db:
+            empresas = db.exec(select(Empresa).where(Empresa.activa == True)).all()
+            return [emp.id_empresa for emp in empresas]
+    except Exception as e:
+        print(f"⚠️ Error al obtener empresas: {e}")
+        return []
 
 def sincronizar_empresa_background(id_empresa: int):
     """Función que se ejecuta en background cada 5 minutos"""
@@ -45,18 +54,27 @@ def sincronizar_empresa_background(id_empresa: int):
         logger.error(f"Error en sincronización automática: {e}", exc_info=True)
 
 def init_scheduler():
-    """Inicializar el scheduler"""
+    """Inicializar el scheduler con TODAS las empresas activas"""
     global scheduler
     
     if scheduler is None:
         scheduler = BackgroundScheduler()
         
+        # Obtener todas las empresas activas
+        empresas_a_sincronizar = obtener_todas_las_empresas()
+        
+        if not empresas_a_sincronizar:
+            print("⚠️ No hay empresas activas para sincronizar")
+            return
+        
+        print(f"📋 Empresas a sincronizar: {empresas_a_sincronizar}")
+        
         # Agregar jobs para cada empresa
-        for id_empresa in EMPRESAS_A_SINCRONIZAR:
+        for id_empresa in empresas_a_sincronizar:
             scheduler.add_job(
                 sincronizar_empresa_background,
                 'interval',
-                minutes=5,
+                seconds=10,  # Sincronizar cada 10 segundos
                 args=[id_empresa],
                 id=f'sync_empresa_{id_empresa}',
                 name=f'Sincronización Empresa {id_empresa}',
@@ -64,7 +82,7 @@ def init_scheduler():
             )
         
         scheduler.start()
-        print("✅ Background scheduler iniciado - Sincronización cada 5 minutos")
+        print(f"✅ Background scheduler iniciado - {len(empresas_a_sincronizar)} empresa(s) - Sincronización cada 10 segundos")
         
         # Imprimir próximas ejecuciones
         for job in scheduler.get_jobs():

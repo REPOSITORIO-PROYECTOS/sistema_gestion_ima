@@ -66,6 +66,14 @@ def startup_event():
         create_db_and_tables()
     except Exception as e:
         print(f"⚠️ No se pudieron crear tablas automáticamente: {e}")
+    
+    # Iniciar scheduler de sincronización automática
+    try:
+        from back.scheduler import init_scheduler
+        init_scheduler()
+        print("✅ Background scheduler de sincronización iniciado")
+    except Exception as e:
+        print(f"⚠️ No se pudo iniciar el scheduler: {e}")
 
 
 @app.on_event("shutdown")
