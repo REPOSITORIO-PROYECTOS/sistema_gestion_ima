@@ -12,7 +12,7 @@ from back.modelos import Usuario as UsuarioCierre
 from back.schemas.caja_schemas import TipoMovimiento
 
 
-def obtener_arqueos_de_caja(id_empresa,db: Session, usuario_actual: Usuario) -> Dict[str, List[Dict[str, Any]]]:
+def obtener_arqueos_de_caja(db: Session, usuario_actual: Usuario) -> Dict[str, List[Dict[str, Any]]]:
     """
     Obtiene un informe de cajas abiertas y cerradas, filtrando por la empresa
     del usuario actual y usando JOINs seguros.
@@ -91,7 +91,7 @@ def obtener_arqueos_de_caja(id_empresa,db: Session, usuario_actual: Usuario) -> 
         # Relanzamos la excepción para que el router devuelva un 500, pero con el log ya escrito.
         raise e
     
-def obtener_todos_los_movimientos_de_caja(db: Session, usuario_actual: Usuario) -> List[CajaMovimiento]:
+wdef obtener_todos_los_movimientos_de_caja(db: Session, usuario_actual: Usuario) -> List[CajaMovimiento]:
     """
     Función maestra actualizada. Obtiene TODOS los movimientos de caja de la empresa
     del usuario actual (ingresos, egresos, ventas) y carga eficientemente

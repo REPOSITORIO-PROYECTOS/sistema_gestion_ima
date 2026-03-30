@@ -257,11 +257,9 @@ def registrar_venta_y_movimiento_caja(
                 
                     caller = TablasHandler(id_empresa=usuario_actual.id_empresa, db=db)
                     if not caller.registrar_movimiento(datos_para_sheets):
-                        print("⚠️ [DRIVE] La función registrar_movimiento devolvió False.")
-                    if afectar_stock and not caller.restar_stock(db,articulos_vendidos): # Solo resta stock si afectar_stock es True
-                        print("⚠️ [DRIVE] Ocurrió un error al intentar actualizar el stock en Google Sheets.")
-                    # --- FIN DE LA LÓGICA CORREGIDA ---
-                    print("ESTAMOS SALIENDO DE LA FUNCION REGISTRAR_VENTA_Y _MOVIMIENTO")
+                        raise RuntimeError("[DRIVE] Error: No se pudo registrar el movimiento en Google Sheets para cliente actual.")
+                    if afectar_stock and not caller.restar_stock(db, articulos_vendidos):
+                        raise RuntimeError("[DRIVE] Error crítico: No se pudo actualizar el stock en Google Sheets. La venta fue registrada pero el stock NO está sincronizado.")
                 else:
                     datos_para_sheets = {
                         "id_cliente": "0",
@@ -280,12 +278,13 @@ def registrar_venta_y_movimiento_caja(
                     }
                     caller = TablasHandler(id_empresa=usuario_actual.id_empresa, db=db)
                     if not caller.registrar_movimiento(datos_para_sheets):
-                        print("⚠️ [DRIVE] La función registrar_movimiento devolvió False.")
-                    if afectar_stock and not caller.restar_stock(db,articulos_vendidos): # Solo resta stock si afectar_stock es True
-                        print("⚠️ [DRIVE] Ocurrió un error al intentar actualizar el stock en Google Sheets.")
+                        raise RuntimeError("[DRIVE] Error: No se pudo registrar el movimiento en Google Sheets para cliente final.")
+                    if afectar_stock and not caller.restar_stock(db, articulos_vendidos):
+                        raise RuntimeError("[DRIVE] Error crítico: No se pudo actualizar el stock en Google Sheets. La venta fue registrada pero el stock NO está sincronizado.")
 
         except Exception as e_sheets:
-            print(f"❌ [DRIVE] Ocurrió un error al intentar registrar en Google Sheets: {e_sheets}")
+            print(f"❌ [DRIVE] Error durante sincronización en Google Sheets: {e_sheets}")
+            raise RuntimeError(f"[GOOGLE SHEETS] Fallo crítico de sincronización: {str(e_sheets)}")
     return nueva_venta, movimiento_principal
 
 
@@ -483,14 +482,15 @@ def registrar_venta_y_movimientos_caja_multiples(
                 "observaciones": ""
             }
             if not caller.registrar_movimiento(datos_para_sheets):
-                print(f"⚠️ [SHEETS] Error al registrar pago {pago.metodo_pago} por ${pago.monto:.2f}")
+                raise RuntimeError(f"[SHEETS] Error crítico: No se pudo registrar el pago {pago.metodo_pago} por ${pago.monto:.2f} en Google Sheets.")
         
         # Registrar descuento de stock una sola vez (sincronizado con el primer pago)
         if articulos_vendidos and not caller.restar_stock(db, articulos_vendidos):
-            print("⚠️ [SHEETS] Error al actualizar el stock en Google Sheets.")
+            raise RuntimeError("[SHEETS] Error crítico: No se pudo actualizar el stock en Google Sheets. Los pagos fueron registrados pero el stock NO está sincronizado.")
             
     except Exception as e_sheets:
-        print(f"❌ [SHEETS] Ocurrió un error al registrar en Google Sheets: {e_sheets}")
+        print(f"❌ [SHEETS] Error durante sincronización en Google Sheets: {e_sheets}")
+        raise RuntimeError(f"[GOOGLE SHEETS] Fallo crítico en pagos múltiples: {str(e_sheets)}")
     
     print(f"--- [FIN REGISTRO VENTA CON MÚLTIPLES PAGOS] ---\n")
     

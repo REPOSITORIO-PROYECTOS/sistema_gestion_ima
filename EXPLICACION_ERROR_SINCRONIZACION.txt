@@ -1,0 +1,270 @@
+================================================================================
+❌ CÓDIGO ORIGINAL (CON ERROR) - Estaba en registro_caja.py línea ~260
+================================================================================
+
+    # --- 4. SINCRONIZACIÓN CON GOOGLE SHEETS ---
+    if (afectar_stock or afectar_caja) and crear_movimiento_caja:
+        try:
+            print("[DRIVE] Intentando registrar movimiento en Google Sheets...")
+            
+            # ... código de preparación de datos ...
+            
+            caller = TablasHandler(id_empresa=usuario_actual.id_empresa, db=db)
+            
+            if not caller.registrar_movimiento(datos_para_sheets):
+                ❌ print("⚠️ [DRIVE] La función registrar_movimiento devolvió False.")
+                ❌ # No hace nada más, CONTINÚA normalmente
+            
+            if afectar_stock and not caller.restar_stock(db, articulos_vendidos):
+                ❌ print("⚠️ [DRIVE] Ocurrió un error al intentar actualizar el stock...")
+                ❌ # NO RELANZA EXCEPCIÓN, solo imprime una advertencia
+                ❌ # El flujo CONTINÚA como si nada hubiera pasado
+
+        except Exception as e_sheets:
+            ❌ print(f"❌ [DRIVE] Ocurrió un error: {e_sheets}")
+            ❌ # Solo imprime, NO relanza la excepción al router
+
+    ✅ return nueva_venta, movimiento_principal  # ← REGRESA COMO SI TODO ESTUVO OK
+
+
+================================================================================
+✅ CÓDIGO CORREGIDO (NUEVO) - Ahora en registro_caja.py
+================================================================================
+
+    # --- 4. SINCRONIZACIÓN CON GOOGLE SHEETS ---
+    if (afectar_stock or afectar_caja) and crear_movimiento_caja:
+        try:
+            print("[DRIVE] Intentando registrar movimiento en Google Sheets...")
+            
+            # ... código de preparación de datos ...
+            
+            caller = TablasHandler(id_empresa=usuario_actual.id_empresa, db=db)
+            
+            if not caller.registrar_movimiento(datos_para_sheets):
+                ✅ raise RuntimeError("[DRIVE] Error: No se pudo registrar el movimiento...")
+                ✅ # LANZA EXCEPCIÓN INMEDIATAMENTE
+            
+            if afectar_stock and not caller.restar_stock(db, articulos_vendidos):
+                ✅ raise RuntimeError("[DRIVE] Error crítico: Stock NO sincronizado...")
+                ✅ # LANZA EXCEPCIÓN INMEDIATAMENTE
+                ✅ # El router capturará esto y reportará al cliente
+
+        except Exception as e_sheets:
+            ✅ print(f"❌ [DRIVE] Error: {e_sheets}")
+            ✅ raise RuntimeError(f"[GOOGLE SHEETS] Fallo: {str(e_sheets)}")
+            ✅ # RELANZA la excepción al router
+
+    ✅ return nueva_venta, movimiento_principal
+
+
+================================================================================
+QUÉ PASABA EN CADA ESCENARIO
+================================================================================
+
+ESCENARIO 1: Google Sheets NO Disponible (o sin conexión)
+──────────────────────────────────────────────────────────
+
+ANTES (Código Original):
+┌─────────────────────────────────────────────────────────┐
+│ 1. Usuario registra venta de 10 botellas de jugo        │
+│ 2. Stock se descuenta en BD Local: 96425 - 10 = 96415 ✅│
+│ 3. Sistema intenta sincronizar con Google Sheets       │
+│    └─ FALLA: "No se puede conectar a Google Sheets"   ❌│
+│ 4. El código imprime: "⚠️ Error al sincronizar..."     │
+│ 5. CONTINÚA NORMALMENTE (como si todo estuvo bien)    ⚠️│
+│ 6. Retorna SUCCESS al frontend                         │
+└─────────────────────────────────────────────────────────┘
+
+RESULTADO VISIBLE AL USUARIO:
+✅ La venta fue registrada (en la BD)
+✅ El stock en la aplicación local se actualizó
+❌ PERO: El Google Sheets NO se actualizó
+⚠️  Stock desincronizado (BD ≠ Google Sheets)
+
+
+DESPUÉS (Código Corregido):
+┌─────────────────────────────────────────────────────────┐
+│ 1. Usuario registra venta de 10 botellas de jugo        │
+│ 2. Stock se descuenta en BD Local: 96425 - 10 = 96415 ✅│
+│ 3. Sistema intenta sincronizar con Google Sheets       │
+│    └─ FALLA: "No se puede conectar a Google Sheets"   ❌│
+│ 4. El código LANZA EXCEPCIÓN INMEDIATAMENTE            │
+│ 5. La transacción se REVIERTE (rollback automático)    │
+│    └─ BD vuelve a: stock = 96425 (como estaba)        │
+│ 6. Retorna ERROR al frontend                           │
+└─────────────────────────────────────────────────────────┘
+
+RESULTADO VISIBLE AL USUARIO:
+❌ La venta fue RECHAZADA
+❌ El stock NO cambió (BD = Original)
+✅ Mensaje claro: "No se pudo sincronizar con Google Sheets"
+✅ Stock siempre sincronizado (BD = Google Sheets = ORIGINAL)
+
+
+================================================================================
+ESCENARIO 2: Google Sheets Tiene Columnas Diferentes
+──────────────────────────────────────────────────────────
+
+ANTES (Código Original):
+┌──────────────────────────────────────────────────────────┐
+│ 1. Usuario registra venta                                │
+│ 2. BD se actualiza correctamente                        ✅│
+│ 3. Sistema intenta escribir en Google Sheets            │
+│    └─ FALLA: "No se encontró columna 'stock_actual'"  ❌│
+│ 4. Imprime advertencia silenciosa                       │
+│ 5. CONTINÚA NORMALMENTE - Frontend recibe SUCCESS      ⚠️│
+│ 6. Usuario piensa que TODO está bien                   ⚠️│
+└──────────────────────────────────────────────────────────┘
+
+RESULTADO:
+❌ Usuario no tiene idea de que Google Sheets está INCONSISTENTE
+⚠️  El "chip" no refleja la realidad de la BD
+
+
+DESPUÉS (Código Corregido):
+┌──────────────────────────────────────────────────────────┐
+│ 1. Usuario registra venta                                │
+│ 2. BD se actualiza correctamente                        ✅│
+│ 3. Sistema intenta escribir en Google Sheets            │
+│    └─ FALLA: "No se encontró columna..."               ❌│
+│ 4. LANZA EXCEPCIÓN INMEDIATAMENTE                       │
+│ 5. Transacción se REVIERTE                             │
+│ 6. Frontend recibe ERROR CLARO                         ✅│
+└──────────────────────────────────────────────────────────┘
+
+RESULTADO:
+✅ Usuario sabe que hay un problema
+✅ BD y Google Sheets siempre están en SINCRONÍA
+
+
+================================================================================
+COMPARACIÓN VISUAL DEL FLUJO
+================================================================================
+
+ANTES (Código con Error):
+──────────────────────
+
+    ┌─ Venta ─┐
+    │         │
+    ▼         ▼
+ BD Local   Google Sheets
+  (OK)        (FALLA)
+   ✅           ❌
+   
+   ⚠️  Inconsistencia:
+       BD = 96415 unidades
+       GSheets = 96425 unidades (sin actualizar)
+
+
+DESPUÉS (Código Corregido):
+───────────────────────────
+
+    ┌─ Venta ─┐
+    │         │
+    ▼         ▼
+ BD Local   Google Sheets
+  (OK)      (FALLA)
+   ✅        ❌
+   
+   ⚠️  Transacción se REVIERTE:
+   
+    ┌─ Rollback ─┐
+    │            │
+    ▼            ▼
+ BD Local   Google Sheets
+  (ORIG)      (ORIG)
+   ✅           ✅
+   
+   ✅ Consistencia garantizada
+
+
+================================================================================
+EL PROBLEMA CLAVE
+================================================================================
+
+La función `restar_stock()` devuelve:
+  - TRUE  → Stock se actualizó correctamente en Google Sheets
+  - FALSE → Falló al actualizar (columna no encontrada, no hay conexión, etc.)
+
+ANTES:
+──────
+if not caller.restar_stock(...):
+    print("⚠️ Error")  ← Solo imprime, NO actúa
+    # El flujo continúa normalmente
+    # La venta se considera EXITOSA aunque falló la sincronización
+
+DESPUÉS:
+────────
+if not caller.restar_stock(...):
+    raise RuntimeError(...)  ← LANZA EXCEPCIÓN
+    # El router la captura
+    # Hace rollback automático
+    # Reporta error al cliente
+
+
+================================================================================
+DÓNDE SUCEDE LA SINCRONIZACIÓN: La clase TablasHandler
+================================================================================
+
+Archivo: back/utils/tablas_handler.py
+
+┌─────────────────────────────────────────────────────────────┐
+│ class TablasHandler:                                         │
+│                                                              │
+│  def restar_stock(self, db, lista_items) -> bool:           │
+│      """                                                     │
+│      Intenta actualizar stock en Google Sheets              │
+│      Devuelve: True si OK, False si FALLA                  │
+│      """                                                    │
+│                                                              │
+│      ├─ Se conecta a Google Sheets                         │
+│      ├─ Abre la pestaña "stock"                            │
+│      ├─ Busca cada artículo por código (codigo_interno)    │
+│      ├─ Descuenta la cantidad de cada uno                  │
+│      └─ Actualiza las celdas                               │
+│                                                              │
+│  def registrar_movimiento(self, datos) -> bool:             │
+│      """                                                    │
+│      Registra el movimiento en la pestaña MOVIMIENTOS      │
+│      """                                                    │
+│      └─ Agrega una fila con los datos de la venta         │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+
+Razones por las que puede fallar restar_stock():
+──────────────────────────────────────────────
+
+1. ❌ No hay conexión a Internet
+2. ❌ Google Sheets cambió su estructura (columnas diferentes)
+3. ❌ El producto no existe en la pestaña "stock"
+4. ❌ No hay permisos para escribir en el archivo
+5. ❌ La sesión de Google Sheets expiró
+6. ❌ El servidor de Google está caído
+
+
+================================================================================
+RESUMEN
+================================================================================
+
+¿QUÉ FALLABA?
+─────────────
+La sincronización de stock en Google Sheets fallaba SILENCIOSAMENTE.
+El código no lanzaba excepciones, solo imprimía advertencias.
+Resultado: Stock desincronizado y usuario sin saberlo.
+
+¿QUÉ SE ARREGLÓ?
+────────────────
+Ahora el código LANZA EXCEPCIONES cuando falla la sincronización.
+El router captura estas excepciones y reporta al cliente.
+La transacción se revierte automáticamente (rollback).
+Resultado: Consistencia garantizada entre BD y Google Sheets.
+
+¿DÓNDE ESTABA EL ERROR?
+───────────────────────
+En: back/gestion/caja/registro_caja.py (líneasoriginalmente ~260-280)
+En la función: registrar_venta_y_movimiento_caja()
+
+Cambios aplicados:
+├─ registrar_venta_y_movimiento_caja()
+├─ registrar_venta_y_movimientos_caja_multiples()
+└─ configuracion_manager.py (se corrigió typo)

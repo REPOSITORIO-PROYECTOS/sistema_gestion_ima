@@ -76,7 +76,7 @@ def guardar_links_empresa(db: Session, id_empresa: int, link1: str | None = None
     Devuelve:
         La instancia actualizada de `ConfiguracionEmpresa`.
     """
-    config_db = obtener_configuracion_empresa(db, id_empresa)
+    config_db = obtener_configuracion_por_id_empresa(db, id_empresa)
 
     if link1 is not None:
         config_db.link_visual_1 = link1
