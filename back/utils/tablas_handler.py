@@ -114,26 +114,58 @@ class TablasHandler:
             fecha_actual = datetime.now().strftime("%d-%m-%Y")
             fecha_hora = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
 
+            monto_formateado = f"${datos_venta.get('monto', 0):,.2f}".replace(",", "@").replace(".", ",").replace("@", ".")
+
+            # Mapeo por clave normalizada: soporta encabezados técnicos y
+            # encabezados descriptivos usados en planillas existentes.
+            fila_por_campo_norm = {
+                "id_movimiento": id_movimiento,
+                "id_cliente": datos_venta.get("id_cliente", ""),
+                "id_ingresos": datos_venta.get("id_ingresos", ""),
+                "id_repartidor": datos_venta.get("id_repartidor", ""),
+                "repartidor": datos_venta.get("Repartidor", ""),
+                "fecha_hora": fecha_hora,
+                "fecha_y_hora_entrega": fecha_hora,
+                "fecha_actual": fecha_actual,
+                "fecha": fecha_actual,
+                "cliente": datos_venta.get("cliente", ""),
+                "cuit": datos_venta.get("cuit", ""),
+                "razon_social": datos_venta.get("razon_social", ""),
+                "tipo_movimiento": datos_venta.get("Tipo_movimiento", ""),
+                "tipo_de_movimiento": datos_venta.get("Tipo_movimiento", ""),
+                "nro_comprobante": datos_venta.get("nro_comprobante", ""),
+                "descripcion": datos_venta.get("descripcion", ""),
+                "monto": monto_formateado,
+                "foto_comprobante": datos_venta.get("foto_comprobante", ""),
+                "observaciones": datos_venta.get("observaciones", ""),
+            }
+
+            # Alinea por encabezado real para evitar corrimientos de columnas.
+            encabezados = hoja.get("1:1")
+            encabezados = encabezados[0] if encabezados else []
+
+            # Si no hay encabezado utilizable, usamos el layout estándar A:P.
+            if not encabezados:
+                encabezados = [
+                    "id_movimiento", "id_cliente", "id_ingresos", "id_repartidor", "Repartidor",
+                    "fecha_hora", "fecha_actual", "cliente", "cuit", "razon_social",
+                    "Tipo_movimiento", "nro_comprobante", "descripcion", "monto",
+                    "foto_comprobante", "observaciones"
+                ]
+
             fila = [
-                id_movimiento,
-                datos_venta.get("id_cliente", ""),
-                datos_venta.get("id_ingresos", ""),
-                datos_venta.get("id_repartidor", ""),
-                datos_venta.get("Repartidor", ""),
-                fecha_hora,
-                fecha_actual,
-                datos_venta.get("cliente", ""),
-                datos_venta.get("cuit", ""),
-                datos_venta.get("razon_social", ""),
-                datos_venta.get("Tipo_movimiento", ""),
-                datos_venta.get("nro_comprobante", ""),
-                datos_venta.get("descripcion", ""),
-                f"${datos_venta.get('monto', 0):,.2f}".replace(",", "@").replace(".", ",").replace("@", "."),
-                datos_venta.get("foto_comprobante", ""),
-                datos_venta.get("observaciones", "")
+                fila_por_campo_norm.get(self._normalizar_nombre_columna(col), "")
+                for col in encabezados
             ]
 
-            hoja.append_row(fila, value_input_option="USER_ENTERED")
+            # Evita inserciones fuera de tabla: escribir en última fila real + 1.
+            ultima_fila_con_datos = len(hoja.get_all_values())
+            fila_destino = max(ultima_fila_con_datos + 1, 2)
+
+            columna_final = gspread.utils.rowcol_to_a1(1, len(fila)).rstrip("1")
+            rango_destino = f"A{fila_destino}:{columna_final}{fila_destino}"
+
+            hoja.update(rango_destino, [fila], value_input_option="USER_ENTERED")
             print(f"✅ Movimiento registrado correctamente en hoja 'MOVIMIENTOS' con ID: {id_movimiento}")
             return True
 
