@@ -91,7 +91,7 @@ def obtener_arqueos_de_caja(db: Session, usuario_actual: Usuario) -> Dict[str, L
         # Relanzamos la excepción para que el router devuelva un 500, pero con el log ya escrito.
         raise e
     
-wdef obtener_todos_los_movimientos_de_caja(db: Session, usuario_actual: Usuario) -> List[CajaMovimiento]:
+def obtener_todos_los_movimientos_de_caja(db: Session, usuario_actual: Usuario) -> List[CajaMovimiento]:
     """
     Función maestra actualizada. Obtiene TODOS los movimientos de caja de la empresa
     del usuario actual (ingresos, egresos, ventas) y carga eficientemente
