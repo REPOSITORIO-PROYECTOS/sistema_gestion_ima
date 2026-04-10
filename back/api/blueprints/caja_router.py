@@ -1,6 +1,7 @@
 # back/api/blueprints/caja_router.py
 
 from sqlite3.dbapi2 import Timestamp
+import logging
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlmodel import Session, select
 from typing import List, Dict, Any, Optional
@@ -29,6 +30,8 @@ router = APIRouter(
     prefix="/caja",
     tags=["Caja"],
 )
+
+logger = logging.getLogger(__name__)
 
 # =================================================================
 # === ENDPOINTS DE GESTIÓN DE SESIÓN DE CAJA (SIN CAMBIOS) ===
@@ -80,6 +83,9 @@ def api_registrar_venta(
     if not sesion_activa:
         raise HTTPException(status_code=400, detail="Operación denegada: El usuario no tiene una caja abierta.")
 
+    # Limpiar residuos por seguridad y permitir reporte por-request.
+    db.info.pop("protocolo_sync_nube", None)
+
     # --- Lógica de Vuelto (sin cambios) ---
     vuelto = None
     if req.paga_con:
@@ -130,6 +136,7 @@ def api_registrar_venta(
         raise HTTPException(status_code=409, detail=f"Conflicto de negocio: {e}")
     except Exception as e:
         db.rollback()
+        logger.exception("Error inesperado registrando venta", exc_info=e)
         raise HTTPException(status_code=500, detail="Error interno al registrar la venta.")
 
     # --- PASO 2: INTEGRACIÓN CON AFIP Y ACTUALIZACIÓN DE LA VENTA ---
@@ -206,15 +213,26 @@ def api_registrar_venta(
             print(e)
             print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             resultado_afip = {"estado": "FALLIDO", "error": str(e)}
+        except Exception as e:
+            # Nunca derribamos la venta por una falla inesperada de integración AFIP.
+            logger.exception("Error inesperado durante facturación AFIP", exc_info=e)
+            resultado_afip = {"estado": "FALLIDO", "error": f"Error inesperado AFIP: {str(e)}"}
 
     # --- RESPUESTA FINAL (sin cambios) ---
+    protocolo_sync = db.info.get("protocolo_sync_nube", [])
+    sync_pendiente = any(ev.get("estado") in {"fallido", "pendiente"} for ev in protocolo_sync)
+
     return RespuestaGenerica(
         status="success",
         message="Venta registrada.",
         data={
             "id_venta": venta_creada.id,
             "vuelto": vuelto,
-            "facturacion_afip": resultado_afip
+            "facturacion_afip": resultado_afip,
+            "sync_nube": {
+                "estado": "pendiente" if sync_pendiente else "ok",
+                "protocolo": protocolo_sync,
+            },
         }
     )
 

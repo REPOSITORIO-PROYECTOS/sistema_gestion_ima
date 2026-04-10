@@ -478,7 +478,7 @@ function FormVentas({
       if (!codigo) return;
 
       try {
-        const res = await fetch(`https://sistema-ima.sistemataup.online/api/articulos/codigos/buscar/${codigo}`, {
+        const res = await fetch(`${API_CONFIG.BASE_URL}/articulos/codigos/buscar/${codigo}`, {
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         });
 
@@ -562,7 +562,7 @@ function FormVentas({
   useEffect(() => {
     const fetchClientes = async () => {
       try {
-        const res = await fetch("https://sistema-ima.sistemataup.online/api/clientes/obtener-todos", {
+        const res = await fetch(`${API_CONFIG.BASE_URL}/clientes/obtener-todos`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) return;
@@ -584,7 +584,7 @@ function FormVentas({
 
     try {
       setIsSyncing(true);
-      const res = await fetch("https://sistema-ima.sistemataup.online/api/articulos/obtener_todos", {
+      const res = await fetch(`${API_CONFIG.BASE_URL}/articulos/obtener_todos`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -691,7 +691,7 @@ function FormVentas({
     };
 
     try {
-      const respComp = await fetch("https://sistema-ima.sistemataup.online/api/comprobantes/generar", {
+      const respComp = await fetch(`${API_CONFIG.BASE_URL}/comprobantes/generar`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(reqPayload)
@@ -914,7 +914,7 @@ function FormVentas({
         return;
       }
 
-      const response = await fetch("https://sistema-ima.sistemataup.online/api/caja/ventas/registrar", {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/caja/ventas/registrar`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

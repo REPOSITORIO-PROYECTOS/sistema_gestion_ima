@@ -30,6 +30,8 @@ def api_sincronizar_clientes(db: Session = Depends(get_db),current_user: Usuario
             incluir_proveedores=False,
             detener_en_error=True,
         )
+        if resultado.get("status") == "busy":
+            raise HTTPException(status_code=409, detail=resultado.get("message", "Sincronización en curso"))
         if resultado.get("status") == "error":
             detalle = resultado.get("pasos", {}).get("clientes", {}).get("error", "Error inesperado")
             raise HTTPException(status_code=500, detail=detalle)
@@ -39,6 +41,8 @@ def api_sincronizar_clientes(db: Session = Depends(get_db),current_user: Usuario
             "message": "Sincronización de clientes completada.",
             "data": resultado,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ocurrió un error inesperado: {e}")
 
@@ -59,6 +63,8 @@ def api_sincronizar_articulos(db: Session = Depends(get_db),current_user: Usuari
             incluir_proveedores=False,
             detener_en_error=True,
         )
+        if resultado.get("status") == "busy":
+            raise HTTPException(status_code=409, detail=resultado.get("message", "Sincronización en curso"))
         if resultado.get("status") == "error":
             detalle = resultado.get("pasos", {}).get("articulos", {}).get("error", "Error inesperado")
             raise HTTPException(status_code=500, detail=detalle)
@@ -81,6 +87,8 @@ def api_sincronizar_articulos(db: Session = Depends(get_db),current_user: Usuari
             "message": mensaje_resumen,
             "data": resultado
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en sincronización: {str(e)}")
 
@@ -100,6 +108,8 @@ def api_sincronizar_proveedores(db: Session = Depends(get_db),current_user: Usua
             incluir_proveedores=True,
             detener_en_error=True,
         )
+        if resultado.get("status") == "busy":
+            raise HTTPException(status_code=409, detail=resultado.get("message", "Sincronización en curso"))
         if resultado.get("status") == "error":
             detalle = resultado.get("pasos", {}).get("proveedores", {}).get("error", "Error inesperado")
             raise HTTPException(status_code=500, detail=detalle)
@@ -109,6 +119,8 @@ def api_sincronizar_proveedores(db: Session = Depends(get_db),current_user: Usua
             "message": "Sincronización de proveedores completada.",
             "data": resultado,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ocurrió un error inesperado: {e}")
 
@@ -129,6 +141,9 @@ def api_sincronizar_todo(db: Session = Depends(get_db), current_user: Usuario = 
             incluir_proveedores=True,
             detener_en_error=False,
         )
+
+        if resultado.get("status") == "busy":
+            raise HTTPException(status_code=409, detail=resultado.get("message", "Sincronización en curso"))
 
         if resultado.get("status") == "error":
             raise HTTPException(status_code=500, detail=resultado.get("message", "Error en sincronización"))

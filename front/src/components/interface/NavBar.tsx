@@ -52,6 +52,15 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
   const [empresaCargada, setEmpresaCargada] = useState(false);
   const loadFromBackend = useCustomLinksStore((s) => s.loadFromBackend);
 
+  const construirLogoUrl = (apiBase: string, rutaLogo?: string | null) => {
+    if (!rutaLogo) return '/default-logo.png';
+    if (rutaLogo.startsWith('http://') || rutaLogo.startsWith('https://')) return rutaLogo;
+
+    const staticBase = apiBase.endsWith('/api') ? apiBase.slice(0, -4) : apiBase;
+    const rutaNormalizada = rutaLogo.startsWith('/') ? rutaLogo : `/${rutaLogo}`;
+    return `${staticBase}${rutaNormalizada}`;
+  };
+
 
   // Oculta NavBar en scroll
   useEffect(() => {
@@ -189,8 +198,7 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
         // Actualizar visualmente logo y color
         setNavbarColor(data.color_principal || 'bg-green-800');
         const apiBase = API_CONFIG.BASE_URL;
-        const staticBase = apiBase.endsWith('/api') ? apiBase.slice(0, -4) : apiBase;
-        setLogoUrl(`${staticBase}${data.ruta_logo}`);
+        setLogoUrl(construirLogoUrl(apiBase, data.ruta_logo));
 
         // Cargar estado de mesas habilitadas (desde aclaraciones_legales)
         if (data.aclaraciones_legales) {
@@ -235,8 +243,7 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
         const data = await res.json();
         setNavbarColor(data.color_principal || 'bg-green-800');
         const apiBase = API_CONFIG.BASE_URL;
-        const staticBase = apiBase.endsWith('/api') ? apiBase.slice(0, -4) : apiBase;
-        setLogoUrl(`${staticBase}${data.ruta_logo}`);
+        setLogoUrl(construirLogoUrl(apiBase, data.ruta_logo));
 
         if (data.aclaraciones_legales) {
           const mesasValue = data.aclaraciones_legales.mesas_enabled;

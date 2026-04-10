@@ -119,6 +119,7 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int, nombr
     eliminados = 0
     filas_con_error = 0
     conflictos_codigos = 0
+    codigos_duplicados_en_sheet = 0
     
     # Set para rastrear los códigos que SÍ existen en el sheet
     codigos_en_sheet = set()
@@ -148,6 +149,8 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int, nombr
                     continue
 
                 # Agregamos el código al set de códigos válidos (normalizado)
+                if codigo_interno in codigos_en_sheet:
+                    codigos_duplicados_en_sheet += 1
                 codigos_en_sheet.add(codigo_interno)
 
                 # Obtener valores numéricos seguros
@@ -158,6 +161,8 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int, nombr
                 tasa_iva = fila_sheet.get('tasa_iva', 0.21) or 0.21
                 ubicacion = fila_sheet.get('ubicacion', 'Sin definir') or 'Sin definir'
                 unidad_venta = fila_sheet.get('unidad_venta', 'Unidad') or 'Unidad'
+                activo_raw = str(fila_sheet.get('Activo', 'TRUE')).strip().lower()
+                activo_en_sheet = activo_raw in {'true', '1', 'si', 'sí', 'yes', 'y', 'on'}
 
                 try:
                     precio_costo = float(precio_costo)
@@ -196,6 +201,7 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int, nombr
                     articulo_existente.tasa_iva = tasa_iva
                     articulo_existente.ubicacion = ubicacion
                     articulo_existente.unidad_venta = unidad_venta
+                    articulo_existente.activo = activo_en_sheet
                     if categoria_obj:
                         articulo_existente.categoria = categoria_obj
                     if marca_obj:
@@ -218,6 +224,7 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int, nombr
                         tasa_iva=tasa_iva,
                         ubicacion=ubicacion,
                         unidad_venta=unidad_venta,
+                        activo=activo_en_sheet,
                         id_categoria=categoria_obj.id if categoria_obj else None,
                         id_marca=marca_obj.id if marca_obj else None
                     )
@@ -293,10 +300,28 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int, nombr
     
     eliminados = 0
     no_eliminados_con_movimientos = 0
+    inactivados_con_movimientos = 0
+    eliminacion_omitida_por_seguridad = False
     print(f"Verificando eliminaciones... Total en DB: {len(articulos_en_db)}. Total en Sheet (únicos): {len(codigos_en_sheet)}")
     print(f"Muestra de códigos en Sheet: {list(codigos_en_sheet)[:10]}")
+
+    # Guardrail: si la lectura de sheet luce incompleta, no borrar/inactivar masivamente.
+    if len(codigos_en_sheet) == 0:
+        eliminacion_omitida_por_seguridad = True
+        print("⚠️ Eliminación omitida por seguridad: el Sheet devolvió 0 códigos válidos.")
+
+    if not eliminacion_omitida_por_seguridad and len(articulos_en_db) > 20:
+        cobertura = len(codigos_en_sheet) / max(1, len(articulos_en_db))
+        if cobertura < 0.2:
+            eliminacion_omitida_por_seguridad = True
+            print(
+                f"⚠️ Eliminación omitida por seguridad: cobertura de Sheet muy baja ({cobertura:.2%})."
+            )
     
     for articulo in articulos_en_db:
+        if eliminacion_omitida_por_seguridad:
+            break
+
         # Normalizamos también el código de la DB para comparar manzanas con manzanas
         codigo_db_normalizado = str(articulo.codigo_interno).strip()
         
@@ -308,6 +333,12 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int, nombr
             if tiene_ventas or tiene_compras:
                 print(f"  ⚠️ No se puede eliminar '{codigo_db_normalizado}' - Tiene movimientos históricos (Ventas: {len(articulo.items_venta)}, Compras: {len(articulo.items_compra)})")
                 no_eliminados_con_movimientos += 1
+                if getattr(articulo, "activo", True):
+                    articulo.activo = False
+                    articulo.stock_actual = 0
+                    db.add(articulo)
+                    inactivados_con_movimientos += 1
+                    print(f"  📌 Artículo histórico inactivado: '{codigo_db_normalizado}' - {articulo.descripcion}")
             else:
                 print(f"  🗑️ Eliminando artículo sin movimientos: '{codigo_db_normalizado}' - {articulo.descripcion}")
                 db.delete(articulo)
@@ -327,6 +358,8 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int, nombr
         print("✅ Sincronización completada exitosamente.")
         if no_eliminados_con_movimientos > 0:
             print(f"ℹ️ {no_eliminados_con_movimientos} artículo(s) no se eliminaron porque tienen movimientos históricos.")
+        if inactivados_con_movimientos > 0:
+            print(f"ℹ️ {inactivados_con_movimientos} artículo(s) históricos fueron inactivados para no mostrarse en catálogo activo.")
     except Exception as e:
         print(f"⚠️ Error no crítico durante commit de eliminaciones (ignorado): {type(e).__name__}")
         # No hacer rollback para preservar los cambios de artículos que ya fueron guardados
@@ -345,6 +378,9 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int, nombr
         "actualizados_en_db": actualizados,
         "eliminados_en_db": eliminados,
         "no_eliminados_con_movimientos": no_eliminados_con_movimientos,
+        "inactivados_con_movimientos": inactivados_con_movimientos,
         "filas_con_error": filas_con_error,
         "conflictos_codigos": conflictos_codigos,
+        "codigos_duplicados_en_sheet": codigos_duplicados_en_sheet,
+        "eliminacion_omitida_por_seguridad": eliminacion_omitida_por_seguridad,
     }

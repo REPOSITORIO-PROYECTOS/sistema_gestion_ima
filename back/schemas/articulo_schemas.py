@@ -1,6 +1,6 @@
 # back/schemas/articulo_schemas.py
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Any, List
 
 class ArticuloBase(BaseModel):
@@ -13,6 +13,18 @@ class ArticuloBase(BaseModel):
     ubicacion: Optional[str] = None
     # El ID de artículo del sistema viejo lo manejaremos en un campo específico si es necesario
     # id_articulo_legacy: Optional[str] = None
+
+    @field_validator("categoria", mode="before")
+    @classmethod
+    def _normalizar_categoria(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str):
+            return v
+        nombre = getattr(v, "nombre", None)
+        if isinstance(nombre, str):
+            return nombre
+        return str(v)
 
 class ArticuloCreate(ArticuloBase):
     """Schema para crear un nuevo artículo."""

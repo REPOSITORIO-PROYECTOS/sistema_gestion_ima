@@ -15,6 +15,26 @@ from back.gestion.contabilidad.clientes_contabilidad import manager as clientes_
 
 #ACA TENGO QUE REGISTRAR CUANDO ENTRA Y CUANDO SALE PLATA, MODIFICA LA TABLA MOVIMIENTOS
 
+
+def _agregar_evento_sync_nube(
+    db: Session,
+    operacion: str,
+    estado: str,
+    mensaje: str,
+    requiere_reintento: bool = False,
+) -> None:
+    """Registra eventos de sincronización externa para exponerlos en la respuesta API."""
+    eventos = db.info.setdefault("protocolo_sync_nube", [])
+    eventos.append(
+        {
+            "operacion": operacion,
+            "estado": estado,
+            "mensaje": mensaje,
+            "requiere_reintento": requiere_reintento,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+    )
+
 # =============================================================================
 # === ESPECIALISTA DE BASE DE DATOS ===
 # =============================================================================
@@ -257,9 +277,36 @@ def registrar_venta_y_movimiento_caja(
                 
                     caller = TablasHandler(id_empresa=usuario_actual.id_empresa, db=db)
                     if not caller.registrar_movimiento(datos_para_sheets):
+                        _agregar_evento_sync_nube(
+                            db,
+                            operacion="registrar_movimiento",
+                            estado="fallido",
+                            mensaje="No se pudo registrar el movimiento en Google Sheets para cliente actual.",
+                            requiere_reintento=True,
+                        )
                         raise RuntimeError("[DRIVE] Error: No se pudo registrar el movimiento en Google Sheets para cliente actual.")
+                    _agregar_evento_sync_nube(
+                        db,
+                        operacion="registrar_movimiento",
+                        estado="ok",
+                        mensaje="Movimiento registrado en Google Sheets.",
+                    )
                     if afectar_stock and not caller.restar_stock(db, articulos_vendidos):
+                        _agregar_evento_sync_nube(
+                            db,
+                            operacion="restar_stock",
+                            estado="fallido",
+                            mensaje="No se pudo actualizar stock en Google Sheets.",
+                            requiere_reintento=True,
+                        )
                         raise RuntimeError("[DRIVE] Error crítico: No se pudo actualizar el stock en Google Sheets. La venta fue registrada pero el stock NO está sincronizado.")
+                    if afectar_stock:
+                        _agregar_evento_sync_nube(
+                            db,
+                            operacion="restar_stock",
+                            estado="ok",
+                            mensaje="Stock actualizado en Google Sheets.",
+                        )
                 else:
                     datos_para_sheets = {
                         "id_cliente": "0",
@@ -278,13 +325,48 @@ def registrar_venta_y_movimiento_caja(
                     }
                     caller = TablasHandler(id_empresa=usuario_actual.id_empresa, db=db)
                     if not caller.registrar_movimiento(datos_para_sheets):
+                        _agregar_evento_sync_nube(
+                            db,
+                            operacion="registrar_movimiento",
+                            estado="fallido",
+                            mensaje="No se pudo registrar el movimiento en Google Sheets para cliente final.",
+                            requiere_reintento=True,
+                        )
                         raise RuntimeError("[DRIVE] Error: No se pudo registrar el movimiento en Google Sheets para cliente final.")
+                    _agregar_evento_sync_nube(
+                        db,
+                        operacion="registrar_movimiento",
+                        estado="ok",
+                        mensaje="Movimiento registrado en Google Sheets.",
+                    )
                     if afectar_stock and not caller.restar_stock(db, articulos_vendidos):
+                        _agregar_evento_sync_nube(
+                            db,
+                            operacion="restar_stock",
+                            estado="fallido",
+                            mensaje="No se pudo actualizar stock en Google Sheets.",
+                            requiere_reintento=True,
+                        )
                         raise RuntimeError("[DRIVE] Error crítico: No se pudo actualizar el stock en Google Sheets. La venta fue registrada pero el stock NO está sincronizado.")
+                    if afectar_stock:
+                        _agregar_evento_sync_nube(
+                            db,
+                            operacion="restar_stock",
+                            estado="ok",
+                            mensaje="Stock actualizado en Google Sheets.",
+                        )
 
         except Exception as e_sheets:
+            # No abortamos la venta por una falla externa de sincronización.
             print(f"❌ [DRIVE] Error durante sincronización en Google Sheets: {e_sheets}")
-            raise RuntimeError(f"[GOOGLE SHEETS] Fallo crítico de sincronización: {str(e_sheets)}")
+            print("⚠️ [DRIVE] La venta se registró en BD local, pero la sincronización con Sheets quedó pendiente.")
+            _agregar_evento_sync_nube(
+                db,
+                operacion="sync_nube_venta",
+                estado="pendiente",
+                mensaje=f"Sincronización pendiente por error externo: {str(e_sheets)}",
+                requiere_reintento=True,
+            )
     return nueva_venta, movimiento_principal
 
 
@@ -482,15 +564,50 @@ def registrar_venta_y_movimientos_caja_multiples(
                 "observaciones": ""
             }
             if not caller.registrar_movimiento(datos_para_sheets):
+                _agregar_evento_sync_nube(
+                    db,
+                    operacion="registrar_movimiento",
+                    estado="fallido",
+                    mensaje=f"No se pudo registrar el pago {pago.metodo_pago} en Google Sheets.",
+                    requiere_reintento=True,
+                )
                 raise RuntimeError(f"[SHEETS] Error crítico: No se pudo registrar el pago {pago.metodo_pago} por ${pago.monto:.2f} en Google Sheets.")
+            _agregar_evento_sync_nube(
+                db,
+                operacion="registrar_movimiento",
+                estado="ok",
+                mensaje=f"Pago {pago.metodo_pago} registrado en Google Sheets.",
+            )
         
         # Registrar descuento de stock una sola vez (sincronizado con el primer pago)
         if articulos_vendidos and not caller.restar_stock(db, articulos_vendidos):
+            _agregar_evento_sync_nube(
+                db,
+                operacion="restar_stock",
+                estado="fallido",
+                mensaje="No se pudo actualizar stock en Google Sheets para pago múltiple.",
+                requiere_reintento=True,
+            )
             raise RuntimeError("[SHEETS] Error crítico: No se pudo actualizar el stock en Google Sheets. Los pagos fueron registrados pero el stock NO está sincronizado.")
+        if articulos_vendidos:
+            _agregar_evento_sync_nube(
+                db,
+                operacion="restar_stock",
+                estado="ok",
+                mensaje="Stock actualizado en Google Sheets para pago múltiple.",
+            )
             
     except Exception as e_sheets:
+        # Mantener disponibilidad: no revertir una venta válida por caída de Sheets.
         print(f"❌ [SHEETS] Error durante sincronización en Google Sheets: {e_sheets}")
-        raise RuntimeError(f"[GOOGLE SHEETS] Fallo crítico en pagos múltiples: {str(e_sheets)}")
+        print("⚠️ [SHEETS] Venta registrada en BD local; sincronización externa pendiente.")
+        _agregar_evento_sync_nube(
+            db,
+            operacion="sync_nube_venta",
+            estado="pendiente",
+            mensaje=f"Sincronización pendiente por error externo: {str(e_sheets)}",
+            requiere_reintento=True,
+        )
     
     print(f"--- [FIN REGISTRO VENTA CON MÚLTIPLES PAGOS] ---\n")
     

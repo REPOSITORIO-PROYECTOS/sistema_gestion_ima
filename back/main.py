@@ -82,6 +82,11 @@ def shutdown_event():
     Código que se ejecuta al detener la API.
     """
     print("--- Evento de Cierre de la API ---")
+    try:
+        from back.scheduler import shutdown_scheduler
+        shutdown_scheduler()
+    except Exception as e:
+        print(f"⚠️ No se pudo detener el scheduler correctamente: {e}")
 
 
 # --- Inclusión de Routers ---

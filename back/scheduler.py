@@ -38,6 +38,7 @@ def _get_bool_env(name: str, default: bool) -> bool:
 SYNC_INTERVAL_SECONDS = _get_int_env("SYNC_INTERVAL_SECONDS", 60)
 SYNC_JOB_MISFIRE_GRACE_SECONDS = _get_int_env("SYNC_JOB_MISFIRE_GRACE_SECONDS", 30)
 SYNC_INCLUDE_PROVEEDORES = _get_bool_env("SYNC_INCLUDE_PROVEEDORES", False)
+SYNC_REFRESH_COMPANIES_SECONDS = _get_int_env("SYNC_REFRESH_COMPANIES_SECONDS", 120)
 
 # Requisito operativo: sincronización automática fija cada 10 segundos.
 SYNC_INTERVAL_SECONDS = 10
@@ -47,7 +48,7 @@ def obtener_todas_las_empresas():
     try:
         with Session(engine) as db:
             empresas = db.exec(select(Empresa).where(Empresa.activa == True)).all()
-            return [emp.id_empresa for emp in empresas]
+            return [emp.id for emp in empresas if emp.id is not None]
     except Exception as e:
         print(f"⚠️ Error al obtener empresas: {e}")
         return []
@@ -66,7 +67,11 @@ def sincronizar_empresa_background(id_empresa: int):
                 incluir_proveedores=SYNC_INCLUDE_PROVEEDORES,
                 detener_en_error=False,
             )
-            print(f"  ✓ Resultado sincronización: {resultado}")
+            status_sync = resultado.get("status", "unknown")
+            if status_sync == "busy":
+                print(f"  ℹ️ Sincronización omitida (empresa {id_empresa} ocupada): {resultado.get('message')}")
+            else:
+                print(f"  ✓ Resultado sincronización: {resultado}")
             
             print(f"[{timestamp}] ✅ Sincronización completada")
             
@@ -74,41 +79,72 @@ def sincronizar_empresa_background(id_empresa: int):
         print(f"❌ Error en sincronización: {e}")
         logger.error(f"Error en sincronización automática: {e}", exc_info=True)
 
-def init_scheduler():
-    """Inicializar el scheduler con TODAS las empresas activas"""
+
+def _reconciliar_jobs_empresas():
+    """Sincroniza jobs del scheduler con las empresas activas actuales."""
     global scheduler
-    
     if scheduler is None:
-        scheduler = BackgroundScheduler()
-        
-        # Obtener todas las empresas activas
-        empresas_a_sincronizar = obtener_todas_las_empresas()
-        
-        if not empresas_a_sincronizar:
-            print("⚠️ No hay empresas activas para sincronizar")
-            return
-        
-        print(f"📋 Empresas a sincronizar: {empresas_a_sincronizar}")
-        
-        # Agregar jobs para cada empresa
-        for id_empresa in empresas_a_sincronizar:
+        return
+
+    empresas_activas = set(obtener_todas_las_empresas())
+    jobs_actuales = {job.id: job for job in scheduler.get_jobs()}
+    jobs_empresas_ids = {
+        job_id for job_id in jobs_actuales.keys() if job_id.startswith("sync_empresa_")
+    }
+
+    # Crear faltantes
+    for id_empresa in empresas_activas:
+        job_id = f"sync_empresa_{id_empresa}"
+        if job_id not in jobs_actuales:
             scheduler.add_job(
                 sincronizar_empresa_background,
                 'interval',
                 seconds=SYNC_INTERVAL_SECONDS,
                 args=[id_empresa],
-                id=f'sync_empresa_{id_empresa}',
+                id=job_id,
                 name=f'Sincronización Empresa {id_empresa}',
                 replace_existing=True,
                 max_instances=1,
                 coalesce=True,
                 misfire_grace_time=SYNC_JOB_MISFIRE_GRACE_SECONDS,
             )
+            print(f"➕ Job agregado para empresa activa {id_empresa}")
+
+    # Eliminar jobs de empresas inactivas o inexistentes
+    for job_id in jobs_empresas_ids:
+        id_empresa_job = int(job_id.replace("sync_empresa_", ""))
+        if id_empresa_job not in empresas_activas:
+            scheduler.remove_job(job_id)
+            print(f"➖ Job removido para empresa inactiva {id_empresa_job}")
+
+def init_scheduler():
+    """Inicializar el scheduler con TODAS las empresas activas"""
+    global scheduler
+    
+    if scheduler is None:
+        scheduler = BackgroundScheduler()
+
+        # Carga inicial de jobs de empresas activas
+        _reconciliar_jobs_empresas()
+
+        # Job de mantenimiento: refresca altas/bajas de empresas sin reiniciar API
+        scheduler.add_job(
+            _reconciliar_jobs_empresas,
+            'interval',
+            seconds=SYNC_REFRESH_COMPANIES_SECONDS,
+            id='sync_refresh_empresas',
+            name='Reconciliación de empresas para sincronización',
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=max(SYNC_JOB_MISFIRE_GRACE_SECONDS, 30),
+        )
         
         scheduler.start()
         print(
-            f"✅ Background scheduler iniciado - {len(empresas_a_sincronizar)} empresa(s) - "
+            f"✅ Background scheduler iniciado - "
             f"Sincronización cada {SYNC_INTERVAL_SECONDS} segundos - "
+            f"Refresh de empresas cada {SYNC_REFRESH_COMPANIES_SECONDS} segundos - "
             f"Proveedores={'ON' if SYNC_INCLUDE_PROVEEDORES else 'OFF'}"
         )
         

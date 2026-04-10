@@ -83,7 +83,10 @@ def obtener_todos_los_articulos(db: Session, id_empresa_actual: int, skip: int =
     """
     statement = (
         select(Articulo)
-        .where(Articulo.id_empresa == id_empresa_actual)
+        .where(
+            Articulo.id_empresa == id_empresa_actual,
+            Articulo.activo == True
+        )
         .order_by(Articulo.descripcion)
         .offset(skip)
         .limit(limit)
@@ -109,7 +112,10 @@ def buscar_articulos_por_termino(
     if not termino.strip():
         statement_todos = (
             select(Articulo)
-            .where(Articulo.id_empresa == id_empresa_actual)
+            .where(
+                Articulo.id_empresa == id_empresa_actual,
+                Articulo.activo == True
+            )
             .order_by(Articulo.descripcion)
             .offset(skip)
             .limit(limit)
@@ -125,6 +131,7 @@ def buscar_articulos_por_termino(
         select(Articulo)
         .where(
             Articulo.id_empresa == id_empresa_actual,
+            Articulo.activo == True,
             or_(
                 Articulo.descripcion.ilike(termino_like),
                 Articulo.codigo_interno.ilike(termino_like)
@@ -141,6 +148,7 @@ def buscar_articulos_por_termino(
         .join(ArticuloCodigo)
         .where(
             Articulo.id_empresa == id_empresa_actual,
+            Articulo.activo == True,
             ArticuloCodigo.codigo.ilike(termino_like)
         )
         .distinct()
