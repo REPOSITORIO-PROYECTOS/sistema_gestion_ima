@@ -301,6 +301,32 @@ class TablasHandler:
             return float(valor_str)
         except ValueError:
             return 0.0
+
+    def _limpiar_numero(self, valor: Any) -> float:
+        """Convierte números con formato local/internacional a float sin perder decimales."""
+        if valor is None:
+            return 0.0
+
+        valor_str = str(valor).strip().replace('$', '')
+        if not valor_str:
+            return 0.0
+
+        # Mantener solo caracteres numéricos relevantes
+        valor_str = ''.join(ch for ch in valor_str if ch.isdigit() or ch in [',', '.', '-'])
+        if not valor_str:
+            return 0.0
+
+        try:
+            if '.' in valor_str and ',' in valor_str:
+                # Formato 1.234,56
+                valor_str = valor_str.replace('.', '').replace(',', '.')
+            elif ',' in valor_str:
+                # Formato 1234,56
+                valor_str = valor_str.replace(',', '.')
+            # Si solo hay '.', se asume decimal estándar y no se toca
+            return float(valor_str)
+        except ValueError:
+            return 0.0
     
     def _mapear_fila(self, fila: Dict[str, Any], encabezados: List[str]) -> Dict[str, Any]:
         """
@@ -339,8 +365,7 @@ class TablasHandler:
         col_stock = self._encontrar_columna(encabezados, ['cantidad', 'stock'])
         if col_stock:
             try:
-                val_stock = str(fila.get(col_stock, 0)).replace('.', '').replace(',', '.')
-                mapeada['stock_actual'] = float(val_stock or 0)
+                mapeada['stock_actual'] = self._limpiar_numero(fila.get(col_stock, 0))
             except Exception:
                 mapeada['stock_actual'] = 0.0
         else:

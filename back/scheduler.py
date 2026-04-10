@@ -1,9 +1,10 @@
 """
-Background scheduler para sincronización automática cada 10 segundos
+Background scheduler para sincronización automática configurable
 Integrado en el API FastAPI
 Sincroniza TODAS las empresas configuradas
 """
 import logging
+import os
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from sqlmodel import Session, select
@@ -13,14 +14,33 @@ sys.path.insert(0, '/home/sgi_user/proyectos/sistema_gestion_ima')
 
 from back.database import engine
 from back.modelos import Empresa
-from back.gestion.actualizaciones.actualizaciones_masivas import (
-    sincronizar_articulos_desde_sheets,
-    sincronizar_clientes_desde_sheets,
-)
+from back.gestion.sincronizacion_orquestador import sincronizar_empresa_unificada
 
 logger = logging.getLogger(__name__)
 
 scheduler = None
+
+def _get_int_env(name: str, default: int) -> int:
+    valor = os.getenv(name, str(default))
+    try:
+        return int(valor)
+    except (TypeError, ValueError):
+        logger.warning(f"Valor inválido para {name}={valor!r}. Usando default {default}.")
+        return default
+
+
+def _get_bool_env(name: str, default: bool) -> bool:
+    valor = os.getenv(name)
+    if valor is None:
+        return default
+    return str(valor).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+SYNC_INTERVAL_SECONDS = _get_int_env("SYNC_INTERVAL_SECONDS", 60)
+SYNC_JOB_MISFIRE_GRACE_SECONDS = _get_int_env("SYNC_JOB_MISFIRE_GRACE_SECONDS", 30)
+SYNC_INCLUDE_PROVEEDORES = _get_bool_env("SYNC_INCLUDE_PROVEEDORES", False)
+
+# Requisito operativo: sincronización automática fija cada 10 segundos.
+SYNC_INTERVAL_SECONDS = 10
 
 def obtener_todas_las_empresas():
     """Obtiene todas las empresas activas de la base de datos"""
@@ -38,14 +58,15 @@ def sincronizar_empresa_background(id_empresa: int):
         with Session(engine) as db:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print(f"[{timestamp}] Iniciando sincronización automática para empresa {id_empresa}...")
-            
-            # Sincronizar artículos
-            resultado_artículos = sincronizar_articulos_desde_sheets(db, id_empresa)
-            print(f"  ✓ Artículos: {resultado_artículos}")
-            
-            # Sincronizar clientes
-            resultado_clientes = sincronizar_clientes_desde_sheets(db, id_empresa)
-            print(f"  ✓ Clientes: {resultado_clientes}")
+            resultado = sincronizar_empresa_unificada(
+                db=db,
+                id_empresa=id_empresa,
+                incluir_articulos=True,
+                incluir_clientes=True,
+                incluir_proveedores=SYNC_INCLUDE_PROVEEDORES,
+                detener_en_error=False,
+            )
+            print(f"  ✓ Resultado sincronización: {resultado}")
             
             print(f"[{timestamp}] ✅ Sincronización completada")
             
@@ -74,15 +95,22 @@ def init_scheduler():
             scheduler.add_job(
                 sincronizar_empresa_background,
                 'interval',
-                seconds=10,  # Sincronizar cada 10 segundos
+                seconds=SYNC_INTERVAL_SECONDS,
                 args=[id_empresa],
                 id=f'sync_empresa_{id_empresa}',
                 name=f'Sincronización Empresa {id_empresa}',
-                replace_existing=True
+                replace_existing=True,
+                max_instances=1,
+                coalesce=True,
+                misfire_grace_time=SYNC_JOB_MISFIRE_GRACE_SECONDS,
             )
         
         scheduler.start()
-        print(f"✅ Background scheduler iniciado - {len(empresas_a_sincronizar)} empresa(s) - Sincronización cada 10 segundos")
+        print(
+            f"✅ Background scheduler iniciado - {len(empresas_a_sincronizar)} empresa(s) - "
+            f"Sincronización cada {SYNC_INTERVAL_SECONDS} segundos - "
+            f"Proveedores={'ON' if SYNC_INCLUDE_PROVEEDORES else 'OFF'}"
+        )
         
         # Imprimir próximas ejecuciones
         for job in scheduler.get_jobs():

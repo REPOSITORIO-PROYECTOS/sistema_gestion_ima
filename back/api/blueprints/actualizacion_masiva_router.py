@@ -5,9 +5,7 @@ from sqlmodel import Session
 from typing import Dict
 
 from back.database import get_db
-# Importamos la lógica mejorada de sincronización
-from back.gestion.sincronizacion_manager import sincronizar_articulos_desde_sheet
-from back.gestion.actualizaciones import actualizaciones_masivas as mod_sync
+from back.gestion.sincronizacion_orquestador import sincronizar_empresa_unificada
 from back.modelos import Usuario
 from back.security import obtener_usuario_actual
 
@@ -24,10 +22,23 @@ def api_sincronizar_clientes(db: Session = Depends(get_db),current_user: Usuario
     """
     try:
         id_empresa = current_user.id_empresa
-        resultado = mod_sync.sincronizar_clientes_desde_sheets(db,id_empresa)
-        if "error" in resultado:
-            raise HTTPException(status_code=500, detail=resultado["error"])
-        return {"status": "success", "message": "Sincronización de clientes completada.", "data": resultado}
+        resultado = sincronizar_empresa_unificada(
+            db=db,
+            id_empresa=id_empresa,
+            incluir_articulos=False,
+            incluir_clientes=True,
+            incluir_proveedores=False,
+            detener_en_error=True,
+        )
+        if resultado.get("status") == "error":
+            detalle = resultado.get("pasos", {}).get("clientes", {}).get("error", "Error inesperado")
+            raise HTTPException(status_code=500, detail=detalle)
+
+        return {
+            "status": "success",
+            "message": "Sincronización de clientes completada.",
+            "data": resultado,
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ocurrió un error inesperado: {e}")
 
@@ -40,14 +51,23 @@ def api_sincronizar_articulos(db: Session = Depends(get_db),current_user: Usuari
     """
     try:
         id_empresa = current_user.id_empresa
-        resultado = sincronizar_articulos_desde_sheet(db, id_empresa)
-        if resultado.get("error"):
-            raise HTTPException(status_code=500, detail=resultado.get("error"))
+        resultado = sincronizar_empresa_unificada(
+            db=db,
+            id_empresa=id_empresa,
+            incluir_articulos=True,
+            incluir_clientes=False,
+            incluir_proveedores=False,
+            detener_en_error=True,
+        )
+        if resultado.get("status") == "error":
+            detalle = resultado.get("pasos", {}).get("articulos", {}).get("error", "Error inesperado")
+            raise HTTPException(status_code=500, detail=detalle)
 
-        total_leidos = resultado.get("leidos_de_sheet", 0)
-        total_actualizados = resultado.get("actualizados_en_db", 0)
-        total_creados = resultado.get("creados_en_db", 0)
-        total_errores = resultado.get("filas_con_error", 0)
+        data_articulos = resultado.get("pasos", {}).get("articulos", {}).get("resultado", {})
+        total_leidos = data_articulos.get("leidos_de_sheet", 0)
+        total_actualizados = data_articulos.get("actualizados_en_db", 0)
+        total_creados = data_articulos.get("creados_en_db", 0)
+        total_errores = data_articulos.get("filas_con_error", 0)
         mensaje_resumen = (
             f"✅ Sincronización completada. "
             f"Leídos: {total_leidos}, "
@@ -72,15 +92,53 @@ def api_sincronizar_proveedores(db: Session = Depends(get_db),current_user: Usua
     """
     try:
         id_empresa = current_user.id_empresa
-        resultado = mod_sync.sincronizar_proveedores_desde_sheets(db,id_empresa)
-        if "error" in resultado:
-            raise HTTPException(status_code=500, detail=resultado["error"])
-        return {"status": "success", "message": "Sincronización de proveedores completada.", "data": resultado}
+        resultado = sincronizar_empresa_unificada(
+            db=db,
+            id_empresa=id_empresa,
+            incluir_articulos=False,
+            incluir_clientes=False,
+            incluir_proveedores=True,
+            detener_en_error=True,
+        )
+        if resultado.get("status") == "error":
+            detalle = resultado.get("pasos", {}).get("proveedores", {}).get("error", "Error inesperado")
+            raise HTTPException(status_code=500, detail=detalle)
+
+        return {
+            "status": "success",
+            "message": "Sincronización de proveedores completada.",
+            "data": resultado,
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ocurrió un error inesperado: {e}")
-        resultado = mod_sync.sincronizar_proveedores_desde_sheets(db,id_empresa)
-        if "error" in resultado:
-            raise HTTPException(status_code=500, detail=resultado["error"])
-        return {"status": "success", "message": "Sincronización de proveedores completada.", "data": resultado}
+
+
+@router.post("/todo", response_model=Dict)
+def api_sincronizar_todo(db: Session = Depends(get_db), current_user: Usuario = Depends(obtener_usuario_actual)):
+    """
+    Ejecuta sincronización completa de la empresa: artículos, clientes y proveedores.
+    Devuelve estado "partial" si al menos un paso falló pero otros pudieron completarse.
+    """
+    try:
+        id_empresa = current_user.id_empresa
+        resultado = sincronizar_empresa_unificada(
+            db=db,
+            id_empresa=id_empresa,
+            incluir_articulos=True,
+            incluir_clientes=True,
+            incluir_proveedores=True,
+            detener_en_error=False,
+        )
+
+        if resultado.get("status") == "error":
+            raise HTTPException(status_code=500, detail=resultado.get("message", "Error en sincronización"))
+
+        return {
+            "status": resultado.get("status", "success"),
+            "message": resultado.get("message", "Sincronización completada."),
+            "data": resultado,
+        }
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ocurrió un error inesperado: {e}")
+        raise HTTPException(status_code=500, detail=f"Error en sincronización completa: {str(e)}")

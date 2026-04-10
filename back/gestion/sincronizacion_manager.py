@@ -118,6 +118,7 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int, nombr
     actualizados = 0
     eliminados = 0
     filas_con_error = 0
+    conflictos_codigos = 0
     
     # Set para rastrear los códigos que SÍ existen en el sheet
     codigos_en_sheet = set()
@@ -130,142 +131,137 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int, nombr
             print(f"DEBUG: Campos mapeados disponibles: {[k for k in fila_sheet.keys() if k != '_fila_original']}")
 
         try:
-            # Ya tiene formato estándar gracias al mapeo
-            codigo_interno = fila_sheet.get('codigo_interno')
-            descripcion = fila_sheet.get('descripcion')
-            
-            # Normalización del código
-            if codigo_interno:
-                codigo_interno = str(codigo_interno).strip()
-            
-            # Validación básica
-            if not codigo_interno or not descripcion:
-                print(f"⚠️ Fila {i+2}: Código o descripción vacíos. Saltando.")
-                filas_con_error += 1
-                continue
+            # Savepoint por fila: evita perder todo lo procesado por errores puntuales.
+            with db.begin_nested():
+                # Ya tiene formato estándar gracias al mapeo
+                codigo_interno = fila_sheet.get('codigo_interno')
+                descripcion = fila_sheet.get('descripcion')
 
-            # Agregamos el código al set de códigos válidos (normalizado)
-            codigos_en_sheet.add(codigo_interno)
+                # Normalización del código
+                if codigo_interno:
+                    codigo_interno = str(codigo_interno).strip()
 
-            # Obtener valores numéricos seguros
-            precio_costo = fila_sheet.get('precio_costo', 0) or 0
-            precio_venta = fila_sheet.get('precio_venta', 0) or 0
-            venta_negocio = fila_sheet.get('venta_negocio', 0) or 0
-            stock_actual = fila_sheet.get('stock_actual', 0) or 0
-            tasa_iva = fila_sheet.get('tasa_iva', 0.21) or 0.21
-            ubicacion = fila_sheet.get('ubicacion', 'Sin definir') or 'Sin definir'
-            unidad_venta = fila_sheet.get('unidad_venta', 'Unidad') or 'Unidad'
-            
-            try:
-                precio_costo = float(precio_costo)
-                precio_venta = float(precio_venta)
-                venta_negocio = float(venta_negocio)
-                stock_actual = float(stock_actual)
-                tasa_iva = float(tasa_iva)
-            except (ValueError, TypeError):
-                print(f"⚠️ Fila {i+2}: Error en conversión de números. Usando valores por defecto.")
-                precio_costo = 0.0
-                precio_venta = 0.0
-                venta_negocio = 0.0
-                stock_actual = 0.0
-                tasa_iva = 0.21
+                # Validación básica
+                if not codigo_interno or not descripcion:
+                    print(f"⚠️ Fila {i+2}: Código o descripción vacíos. Saltando.")
+                    filas_con_error += 1
+                    continue
 
-            # --- Lógica de UPSERT (Update or Insert) ---
-            articulo_existente = db.exec(
-                select(Articulo).where(Articulo.codigo_interno == codigo_interno, Articulo.id_empresa == id_empresa_actual)
-            ).first()
+                # Agregamos el código al set de códigos válidos (normalizado)
+                codigos_en_sheet.add(codigo_interno)
 
-            # Manejo de relaciones (Categoría y Marca)
-            nombre_categoria = fila_sheet.get('categoria')
-            nombre_marca = fila_sheet.get('marca')
-            
-            categoria_obj = _obtener_o_crear_relacion(db, id_empresa_actual, Categoria, nombre_categoria)
-            marca_obj = _obtener_o_crear_relacion(db, id_empresa_actual, Marca, nombre_marca)
+                # Obtener valores numéricos seguros
+                precio_costo = fila_sheet.get('precio_costo', 0) or 0
+                precio_venta = fila_sheet.get('precio_venta', 0) or 0
+                venta_negocio = fila_sheet.get('venta_negocio', 0) or 0
+                stock_actual = fila_sheet.get('stock_actual', 0) or 0
+                tasa_iva = fila_sheet.get('tasa_iva', 0.21) or 0.21
+                ubicacion = fila_sheet.get('ubicacion', 'Sin definir') or 'Sin definir'
+                unidad_venta = fila_sheet.get('unidad_venta', 'Unidad') or 'Unidad'
 
-            if articulo_existente:
-                # --- ACTUALIZAR ARTÍCULO EXISTENTE ---
-                print(f"  ✏️ Actualizando: {codigo_interno} - {descripcion}")
-                articulo_existente.descripcion = descripcion
-                articulo_existente.precio_costo = precio_costo
-                articulo_existente.precio_venta = precio_venta
-                articulo_existente.venta_negocio = venta_negocio
-                articulo_existente.stock_actual = stock_actual
-                articulo_existente.tasa_iva = tasa_iva
-                articulo_existente.ubicacion = ubicacion
-                articulo_existente.unidad_venta = unidad_venta
-                if categoria_obj:
-                    articulo_existente.categoria = categoria_obj
-                if marca_obj:
-                    articulo_existente.marca = marca_obj
-                
-                db.add(articulo_existente)
-                
-                # --- PROCESAR CÓDIGOS DE BARRA ---
+                try:
+                    precio_costo = float(precio_costo)
+                    precio_venta = float(precio_venta)
+                    venta_negocio = float(venta_negocio)
+                    stock_actual = float(stock_actual)
+                    tasa_iva = float(tasa_iva)
+                except (ValueError, TypeError):
+                    print(f"⚠️ Fila {i+2}: Error en conversión de números. Usando valores por defecto.")
+                    precio_costo = 0.0
+                    precio_venta = 0.0
+                    venta_negocio = 0.0
+                    stock_actual = 0.0
+                    tasa_iva = 0.21
+
+                # --- Lógica de UPSERT (Update or Insert) ---
+                articulo_existente = db.exec(
+                    select(Articulo).where(Articulo.codigo_interno == codigo_interno, Articulo.id_empresa == id_empresa_actual)
+                ).first()
+
+                # Manejo de relaciones (Categoría y Marca)
+                nombre_categoria = fila_sheet.get('categoria')
+                nombre_marca = fila_sheet.get('marca')
+
+                categoria_obj = _obtener_o_crear_relacion(db, id_empresa_actual, Categoria, nombre_categoria)
+                marca_obj = _obtener_o_crear_relacion(db, id_empresa_actual, Marca, nombre_marca)
+
+                if articulo_existente:
+                    # --- ACTUALIZAR ARTÍCULO EXISTENTE ---
+                    print(f"  ✏️ Actualizando: {codigo_interno} - {descripcion}")
+                    articulo_existente.descripcion = descripcion
+                    articulo_existente.precio_costo = precio_costo
+                    articulo_existente.precio_venta = precio_venta
+                    articulo_existente.venta_negocio = venta_negocio
+                    articulo_existente.stock_actual = stock_actual
+                    articulo_existente.tasa_iva = tasa_iva
+                    articulo_existente.ubicacion = ubicacion
+                    articulo_existente.unidad_venta = unidad_venta
+                    if categoria_obj:
+                        articulo_existente.categoria = categoria_obj
+                    if marca_obj:
+                        articulo_existente.marca = marca_obj
+
+                    db.add(articulo_existente)
+                    articulo_actual = articulo_existente
+                    actualizados += 1
+                else:
+                    # --- CREAR NUEVO ARTÍCULO ---
+                    print(f"  ✨ Creando nuevo: {codigo_interno} - {descripcion}")
+                    nuevo_articulo = Articulo(
+                        id_empresa=id_empresa_actual,
+                        codigo_interno=codigo_interno,
+                        descripcion=descripcion,
+                        precio_costo=precio_costo,
+                        precio_venta=precio_venta,
+                        venta_negocio=venta_negocio,
+                        stock_actual=stock_actual,
+                        tasa_iva=tasa_iva,
+                        ubicacion=ubicacion,
+                        unidad_venta=unidad_venta,
+                        id_categoria=categoria_obj.id if categoria_obj else None,
+                        id_marca=marca_obj.id if marca_obj else None
+                    )
+                    db.add(nuevo_articulo)
+                    db.flush()  # obtener ID
+                    articulo_actual = nuevo_articulo
+                    creados += 1
+
+                # --- PROCESAR CÓDIGOS DE BARRA (sin romper la fila por duplicados) ---
                 codigos_barra = _procesar_codigos_barra(fila_sheet.get('Codigo de barras', ''))
                 if codigos_barra:
-                    # Limpiar códigos de barra antiguos
+                    # Eliminar códigos actuales del artículo y reconstruirlos desde hoja
                     codigos_antiguos = db.exec(
-                        select(ArticuloCodigo).where(ArticuloCodigo.id_articulo == articulo_existente.id)
+                        select(ArticuloCodigo).where(ArticuloCodigo.id_articulo == articulo_actual.id)
                     ).all()
                     for cod_antiguo in codigos_antiguos:
                         db.delete(cod_antiguo)
-                    
-                    # Hacer flush para aplicar los deletes antes de insertar nuevos
-                    try:
-                        db.flush()
-                    except Exception as flush_err:
-                        print(f"  ⚠️ Error en flush de códigos antiguos para {codigo_interno}: {flush_err}")
-                    
-                    # Agregar nuevos códigos de barra
-                    for codigo_barra in codigos_barra:
-                        try:
-                            nuevo_codigo = ArticuloCodigo(
-                                codigo=codigo_barra,
-                                id_articulo=articulo_existente.id
+                    db.flush()
+
+                    # Evitar repetir códigos dentro de la misma fila
+                    codigos_unicos_fila = []
+                    vistos_fila = set()
+                    for c in codigos_barra:
+                        c_norm = str(c).strip()
+                        if c_norm and c_norm not in vistos_fila:
+                            codigos_unicos_fila.append(c_norm)
+                            vistos_fila.add(c_norm)
+
+                    for codigo_barra in codigos_unicos_fila:
+                        existente_codigo = db.get(ArticuloCodigo, codigo_barra)
+
+                        # Si el código ya pertenece a otro artículo, no forzamos inserción.
+                        if existente_codigo and existente_codigo.id_articulo != articulo_actual.id:
+                            print(
+                                f"  ⚠️ Conflicto código '{codigo_barra}' para '{codigo_interno}' "
+                                f"(ya asignado a id_articulo={existente_codigo.id_articulo})."
                             )
-                            db.add(nuevo_codigo)
-                        except Exception as cod_err:
-                            print(f"  ⚠️ Error al agregar código {codigo_barra} para {codigo_interno}: {cod_err}")
-                
-                actualizados += 1
-            else:
-                # --- CREAR NUEVO ARTÍCULO ---
-                print(f"  ✨ Creando nuevo: {codigo_interno} - {descripcion}")
-                nuevo_articulo = Articulo(
-                    id_empresa=id_empresa_actual,
-                    codigo_interno=codigo_interno,
-                    descripcion=descripcion,
-                    precio_costo=precio_costo,
-                    precio_venta=precio_venta,
-                    venta_negocio=venta_negocio,
-                    stock_actual=stock_actual,
-                    tasa_iva=tasa_iva,
-                    ubicacion=ubicacion,
-                    unidad_venta=unidad_venta,
-                    id_categoria=categoria_obj.id if categoria_obj else None,
-                    id_marca=marca_obj.id if marca_obj else None
-                )
-                db.add(nuevo_articulo)
-                
-                # Flush para obtener el ID del nuevo artículo
-                db.flush()
-                
-                # --- PROCESAR CÓDIGOS DE BARRA ---
-                codigos_barra = _procesar_codigos_barra(fila_sheet.get('Codigo de barras', ''))
-                if codigos_barra:
-                    for codigo_barra in codigos_barra:
-                        nuevo_codigo = ArticuloCodigo(
-                            codigo=codigo_barra,
-                            id_articulo=nuevo_articulo.id
-                        )
-                        db.add(nuevo_codigo)
-                
-                creados += 1
+                            conflictos_codigos += 1
+                            continue
+
+                        if not existente_codigo:
+                            db.add(ArticuloCodigo(codigo=codigo_barra, id_articulo=articulo_actual.id))
         
         except Exception as e:
-            # Cuando hay un error, hacer rollback para limpiar la sesión
-            # y poder continuar con el siguiente artículo
-            db.rollback()
             print(f"Error procesando la fila {i+2} ({fila_sheet.get('codigo_interno')}): {e}")
             filas_con_error += 1    
     
@@ -349,5 +345,6 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int, nombr
         "actualizados_en_db": actualizados,
         "eliminados_en_db": eliminados,
         "no_eliminados_con_movimientos": no_eliminados_con_movimientos,
-        "filas_con_error": filas_con_error
+        "filas_con_error": filas_con_error,
+        "conflictos_codigos": conflictos_codigos,
     }
