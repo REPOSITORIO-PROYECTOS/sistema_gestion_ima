@@ -54,10 +54,35 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
 
   const construirLogoUrl = (apiBase: string, rutaLogo?: string | null) => {
     if (!rutaLogo) return '/default-logo.png';
-    if (rutaLogo.startsWith('http://') || rutaLogo.startsWith('https://')) return rutaLogo;
+
+    // Normaliza rutas heredadas del estilo "front/public/..." a "/..."
+    let raw = String(rutaLogo).trim().replace(/\\/g, '/');
+    raw = raw.replace(/^\.?\/?front\/public\//, '/');
+
+    // Corrige un caso observado en producción: dominio concatenado sin slash.
+    raw = raw.replace(/(sistemataup\.online)front\//i, '$1/front/');
+
+    // Si el backend terminó guardando una URL que apunta al default logo interno,
+    // usamos el asset local para evitar dependencias de rutas externas.
+    if (/default-logo\.png(?:$|[?#])/i.test(raw)) {
+      return '/default-logo.png';
+    }
+
+    if (raw.startsWith('http://') || raw.startsWith('https://')) {
+      try {
+        const parsed = new URL(raw);
+        // Si por error la URL apunta a un host inválido "...onlinefront", caemos al default.
+        if (/onlinefront$/i.test(parsed.hostname)) {
+          return '/default-logo.png';
+        }
+        return parsed.toString();
+      } catch {
+        return '/default-logo.png';
+      }
+    }
 
     const staticBase = apiBase.endsWith('/api') ? apiBase.slice(0, -4) : apiBase;
-    const rutaNormalizada = rutaLogo.startsWith('/') ? rutaLogo : `/${rutaLogo}`;
+    const rutaNormalizada = raw.startsWith('/') ? raw : `/${raw}`;
     return `${staticBase}${rutaNormalizada}`;
   };
 
