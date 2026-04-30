@@ -9,8 +9,11 @@ from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from sqlmodel import Session, select
 import sys
+from pathlib import Path
 
-sys.path.insert(0, '/home/sgi_user/proyectos/sistema_gestion_ima')
+_ROOT = Path(__file__).resolve().parents[1]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
 
 from back.database import engine
 from back.modelos import Empresa

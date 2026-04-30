@@ -3,7 +3,11 @@
 Script para probar la sincronización manual de artículos de admin_ropa
 """
 import sys
-sys.path.insert(0, '/home/sgi_user/proyectos/sistema_gestion_ima')
+from pathlib import Path
+
+_ROOT = Path(__file__).resolve().parents[1]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
 
 from sqlmodel import Session, select
 from back.database import engine

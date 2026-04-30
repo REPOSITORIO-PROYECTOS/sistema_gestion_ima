@@ -9,6 +9,7 @@ def get_db_connection():
         # Ahora los datos de conexión se leen desde config.py
         conn = mysql.connector.connect(
             host=config.DB_HOST,
+            port=int(config.DB_PORT),
             user=config.DB_USER,
             password=config.DB_PASSWORD,
             database=config.DB_NAME

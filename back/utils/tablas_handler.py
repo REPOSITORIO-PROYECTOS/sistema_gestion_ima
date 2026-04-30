@@ -387,6 +387,9 @@ class TablasHandler:
         col_categoria = self._encontrar_columna(encabezados, ['Categoria', 'categoria'])
         mapeada['categoria'] = str(fila.get(col_categoria, '')).strip() if col_categoria else ''
 
+        col_marca = self._encontrar_columna(encabezados, ['Marca', 'marca'])
+        mapeada['marca'] = str(fila.get(col_marca, '')).strip() if col_marca else ''
+
         mapeada['_fila_original'] = fila
 
         return mapeada if mapeada.get('codigo_interno') else {}
