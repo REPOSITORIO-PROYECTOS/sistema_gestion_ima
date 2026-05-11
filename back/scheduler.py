@@ -18,6 +18,7 @@ if str(_ROOT) not in sys.path:
 from back.database import engine
 from back.modelos import Empresa
 from back.gestion.sincronizacion_orquestador import sincronizar_empresa_unificada
+from back.gestion.sync_nube_queue_manager import procesar_cola_sync_nube
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,7 @@ SYNC_INTERVAL_SECONDS = _get_int_env("SYNC_INTERVAL_SECONDS", 60)
 SYNC_JOB_MISFIRE_GRACE_SECONDS = _get_int_env("SYNC_JOB_MISFIRE_GRACE_SECONDS", 30)
 SYNC_INCLUDE_PROVEEDORES = _get_bool_env("SYNC_INCLUDE_PROVEEDORES", False)
 SYNC_REFRESH_COMPANIES_SECONDS = _get_int_env("SYNC_REFRESH_COMPANIES_SECONDS", 120)
+SYNC_QUEUE_RETRY_SECONDS = _get_int_env("SYNC_QUEUE_RETRY_SECONDS", 20)
 
 # Requisito operativo: sincronización automática fija cada 10 segundos.
 SYNC_INTERVAL_SECONDS = 10
@@ -81,6 +83,17 @@ def sincronizar_empresa_background(id_empresa: int):
     except Exception as e:
         print(f"❌ Error en sincronización: {e}")
         logger.error(f"Error en sincronización automática: {e}", exc_info=True)
+
+def procesar_cola_sync_nube_background():
+    """Worker pasivo: reprocesa pendientes de sincronización Sheets."""
+    try:
+        with Session(engine) as db:
+            resumen = procesar_cola_sync_nube(db=db, max_items=100)
+            if resumen.get("procesados", 0) > 0:
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                print(f"[{timestamp}] 🔁 Cola sync_nube: {resumen}")
+    except Exception as e:
+        logger.error(f"Error procesando cola sync_nube: {e}", exc_info=True)
 
 
 def _reconciliar_jobs_empresas():
@@ -142,12 +155,25 @@ def init_scheduler():
             coalesce=True,
             misfire_grace_time=max(SYNC_JOB_MISFIRE_GRACE_SECONDS, 30),
         )
+
+        scheduler.add_job(
+            procesar_cola_sync_nube_background,
+            'interval',
+            seconds=SYNC_QUEUE_RETRY_SECONDS,
+            id='sync_nube_queue_retry',
+            name='Reintento pasivo de cola sync_nube',
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=max(SYNC_JOB_MISFIRE_GRACE_SECONDS, 15),
+        )
         
         scheduler.start()
         print(
             f"✅ Background scheduler iniciado - "
             f"Sincronización cada {SYNC_INTERVAL_SECONDS} segundos - "
             f"Refresh de empresas cada {SYNC_REFRESH_COMPANIES_SECONDS} segundos - "
+            f"Reintento cola sync cada {SYNC_QUEUE_RETRY_SECONDS} segundos - "
             f"Proveedores={'ON' if SYNC_INCLUDE_PROVEEDORES else 'OFF'}"
         )
         

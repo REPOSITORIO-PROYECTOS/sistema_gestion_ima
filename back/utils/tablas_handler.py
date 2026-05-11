@@ -1,4 +1,6 @@
 import os
+import re
+from datetime import datetime, timedelta
 
 from requests import Session
 from back.modelos import Articulo, ConfiguracionEmpresa
@@ -29,21 +31,25 @@ gspread_client: Optional[gspread.Client] = None
 datos_clientes: List[Dict] = []
 
 class TablasHandler:
+    _worksheet_title_cache: Dict[str, str] = {}
+    _headers_cache: Dict[str, Tuple[datetime, List[str]]] = {}
+
     def __init__(self, id_empresa: int, db: DBSession):
         self.db = db  
         self.id_empresa = id_empresa
         self.google_sheet_id = self.obtener_google_sheet_id()
         self.client = self._init_client()
+        self.ultimo_error_sync: Optional[str] = None
 
 
     
     def obtener_google_sheet_id(self) -> str:
         config = self.db.get(ConfiguracionEmpresa, self.id_empresa)
         if config and config.link_google_sheets:
-            return config.link_google_sheets.strip()
+            return self._normalizar_google_sheet_key(config.link_google_sheets)
         if GOOGLE_SHEET_ID:
             print(f"ADVERTENCIA: Usando GOOGLE_SHEET_ID global como fallback para empresa {self.id_empresa}")
-            return GOOGLE_SHEET_ID.strip()
+            return self._normalizar_google_sheet_key(GOOGLE_SHEET_ID)
         raise ValueError(f"No se encontró link_google_sheets para la empresa ID {self.id_empresa} y no hay GOOGLE_SHEET_ID global configurado.")
 
 
@@ -62,13 +68,95 @@ class TablasHandler:
                 gspread_client = None
         return gspread_client
 
+    def _normalizar_google_sheet_key(self, valor_crudo: Any) -> str:
+        """
+        Admite tanto key pura como URL de Google Sheets y devuelve SIEMPRE la key.
+        """
+        valor = str(valor_crudo or "").strip()
+        if not valor:
+            raise ValueError("El identificador de Google Sheets está vacío.")
+
+        if "docs.google.com/spreadsheets" not in valor:
+            return valor
+
+        match = re.search(r"/spreadsheets/d/([a-zA-Z0-9-_]+)", valor)
+        if match and match.group(1):
+            return match.group(1)
+
+        raise ValueError(
+            "No se pudo extraer el ID de la URL de Google Sheets. "
+            "Use la key (ID) o una URL válida."
+        )
+
+    def _abrir_planilla(self):
+        if not self.client:
+            raise RuntimeError("Cliente de Google Sheets no disponible.")
+        try:
+            return self.client.open_by_key(self.google_sheet_id)
+        except Exception as e:
+            raise RuntimeError(
+                f"No se pudo abrir la planilla (empresa={self.id_empresa}, sheet_id={self.google_sheet_id}): "
+                f"{type(e).__name__} - {e}"
+            ) from e
+
+    def _obtener_worksheet_flexible(self, sheet, nombres_posibles: List[str]):
+        """
+        Busca una pestaña por variantes de nombre, ignorando mayúsculas/minúsculas.
+        """
+        if not nombres_posibles:
+            raise ValueError("Debe indicarse al menos un nombre de hoja posible.")
+
+        cache_key = f"{self.google_sheet_id}:{'|'.join(sorted([self._normalizar_nombre_columna(n) for n in nombres_posibles]))}"
+        titulo_cacheado = self._worksheet_title_cache.get(cache_key)
+        if titulo_cacheado:
+            try:
+                return sheet.worksheet(titulo_cacheado)
+            except Exception:
+                # Si el título cacheado ya no existe, refrescar resolución.
+                self._worksheet_title_cache.pop(cache_key, None)
+
+        try:
+            worksheets = sheet.worksheets()
+            por_titulo_norm = {
+                self._normalizar_nombre_columna(ws.title): ws for ws in worksheets
+            }
+        except Exception as e:
+            raise RuntimeError(f"No se pudo listar hojas de la planilla: {type(e).__name__} - {e}") from e
+
+        for nombre in nombres_posibles:
+            ws = por_titulo_norm.get(self._normalizar_nombre_columna(nombre))
+            if ws:
+                self._worksheet_title_cache[cache_key] = ws.title
+                return ws
+
+        disponibles = [ws.title for ws in worksheets]
+        raise gspread.exceptions.WorksheetNotFound(
+            f"No se encontró hoja con variantes {nombres_posibles}. Hojas disponibles: {disponibles}"
+        )
+
+    def _obtener_encabezados_cacheados(self, hoja) -> List[str]:
+        """
+        Cachea encabezados para reducir lecturas y evitar 429 por exceso.
+        """
+        cache_key = f"{self.google_sheet_id}:{hoja.title}"
+        now = datetime.utcnow()
+        cache_entry = self._headers_cache.get(cache_key)
+
+        # TTL corto para acompañar cambios manuales de encabezados.
+        if cache_entry and (now - cache_entry[0]) < timedelta(minutes=5):
+            return cache_entry[1]
+
+        encabezados = hoja.row_values(1)
+        self._headers_cache[cache_key] = (now, encabezados)
+        return encabezados
+
     
 
     def cargar_clientes(self):
         print("Intentando cargar/recargar datos de Clientes...")
         if self.client:
             try:
-                sheet = self.client.open_by_key(self.google_sheet_id)
+                sheet = self._abrir_planilla()
                 worksheet = sheet.worksheet("clientes") 
                 datos_clientes = worksheet.get_all_records()
                 return datos_clientes
@@ -86,7 +174,7 @@ class TablasHandler:
         print("Intentando cargar/recargar datos de proveedores...")
         if self.client:
             try:
-                sheet = self.client.open_by_key(self.google_sheet_id)
+                sheet = self._abrir_planilla()
                 worksheet = sheet.worksheet("proveedores") 
                 datos_proveedores = worksheet.get_all_records()
                 return datos_proveedores
@@ -105,10 +193,15 @@ class TablasHandler:
     def registrar_movimiento(self, datos_venta: Dict[str, Any]) -> bool:
         if not self.client:
             print("ERROR: Cliente de Google Sheets no disponible.")
+            self.ultimo_error_sync = "Cliente de Google Sheets no disponible."
             return False
 
         try:
-            hoja = self.client.open_by_key(self.google_sheet_id).worksheet("MOVIMIENTOS")
+            sheet = self._abrir_planilla()
+            hoja = self._obtener_worksheet_flexible(
+                sheet,
+                ["MOVIMIENTOS", "Movimientos", "movimientos", "movimiento", "Movimiento"],
+            )
 
             id_movimiento = str(uuid.uuid4())[:8]
             fecha_actual = datetime.now().strftime("%d-%m-%Y")
@@ -141,8 +234,8 @@ class TablasHandler:
             }
 
             # Alinea por encabezado real para evitar corrimientos de columnas.
-            encabezados = hoja.get("1:1")
-            encabezados = encabezados[0] if encabezados else []
+            # Se cachea para reducir lecturas (mitiga errores 429 de cuota).
+            encabezados = self._obtener_encabezados_cacheados(hoja)
 
             # Si no hay encabezado utilizable, usamos el layout estándar A:P.
             if not encabezados:
@@ -158,19 +251,15 @@ class TablasHandler:
                 for col in encabezados
             ]
 
-            # Evita inserciones fuera de tabla: escribir en última fila real + 1.
-            ultima_fila_con_datos = len(hoja.get_all_values())
-            fila_destino = max(ultima_fila_con_datos + 1, 2)
-
-            columna_final = gspread.utils.rowcol_to_a1(1, len(fila)).rstrip("1")
-            rango_destino = f"A{fila_destino}:{columna_final}{fila_destino}"
-
-            hoja.update(rango_destino, [fila], value_input_option="USER_ENTERED")
+            # Escribe con append para evitar lectura de toda la hoja en cada venta.
+            hoja.append_row(fila, value_input_option="USER_ENTERED")
             print(f"✅ Movimiento registrado correctamente en hoja 'MOVIMIENTOS' con ID: {id_movimiento}")
+            self.ultimo_error_sync = None
             return True
 
         except Exception as e:
             print(f"❌ Error al registrar movimiento en Google Sheets: {e}")
+            self.ultimo_error_sync = f"{type(e).__name__}: {e}"
             return False
         
 
@@ -178,16 +267,18 @@ class TablasHandler:
     def restar_stock(self, db: DBSession, lista_items: List[ArticuloVendido]) -> bool:
         if not self.client:
             print("❌ ERROR [STOCK]: Cliente de Google Sheets no disponible.")
+            self.ultimo_error_sync = "Cliente de Google Sheets no disponible para stock."
             return False
 
         print("🔄 [STOCK] Iniciando proceso de actualización de stock en Google Sheets...")
         try:
-            sheet = self.client.open_by_key(self.google_sheet_id)
+            sheet = self._abrir_planilla()
             worksheet = sheet.worksheet("stock")
             datos_stock = worksheet.get_all_records()
             
             if not datos_stock:
                 print("❌ ERROR [STOCK]: La hoja 'stock' está vacía.")
+                self.ultimo_error_sync = "La hoja 'stock' está vacía."
                 return False
             
             # Obtener encabezados y detectar columnas flexiblemente
@@ -208,10 +299,12 @@ class TablasHandler:
             
             if not columna_id:
                 print(f"❌ ERROR [STOCK]: No se encontró columna de código en la hoja. Columnas disponibles: {encabezados}")
+                self.ultimo_error_sync = "No se encontró columna de código en hoja stock."
                 return False
                 
             if not columna_stock:
                 print(f"❌ ERROR [STOCK]: No se encontró columna de stock en la hoja. Columnas disponibles: {encabezados}")
+                self.ultimo_error_sync = "No se encontró columna de stock en hoja stock."
                 return False
             
             print(f"✅ [STOCK] Usando columnas: ID='{columna_id}', Stock='{columna_stock}'")
@@ -240,6 +333,7 @@ class TablasHandler:
 
                         if stock_actual < cantidad_a_restar:
                             print(f"❌ ERROR [STOCK]: Stock insuficiente para ID {id_producto}. Stock actual: {stock_actual}, se necesita: {cantidad_a_restar}. Abortando.")
+                            self.ultimo_error_sync = f"Stock insuficiente para ID {id_producto}."
                             return False
 
                         nuevo_stock = stock_actual - cantidad_a_restar
@@ -255,18 +349,22 @@ class TablasHandler:
 
                 if not encontrado:
                     print(f"❌ ERROR [STOCK]: Producto con ID {id_producto} no encontrado en hoja 'stock'. Abortando.")
+                    self.ultimo_error_sync = f"Producto {id_producto} no encontrado en hoja stock."
                     return False
 
             print("✅ [STOCK] Stock actualizado correctamente en Google Sheets.")
+            self.ultimo_error_sync = None
             return True
 
         except gspread.WorksheetNotFound:
             print("❌ ERROR [STOCK]: Hoja 'stock' no encontrada en el documento.")
+            self.ultimo_error_sync = "Hoja 'stock' no encontrada."
             return False
         except Exception as e:
             print(f"❌ ERROR [STOCK]: Error inesperado al actualizar stock: {e}")
             import traceback
             traceback.print_exc()
+            self.ultimo_error_sync = f"{type(e).__name__}: {e}"
             return False
         
 
@@ -408,7 +506,7 @@ class TablasHandler:
         hojas_posibles = nombre_hoja and [nombre_hoja] or ['stock', 'articulos', 'productos', 'inventory', 'inventario', 'items']
         
         try:
-            sheet = self.client.open_by_key(self.google_sheet_id)
+            sheet = self._abrir_planilla()
             
             for nombre_hoja_intento in hojas_posibles:
                 try:

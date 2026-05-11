@@ -531,6 +531,25 @@ class AuditLog(SQLModel, table=True):
     usuario: Usuario = Relationship()
     empresa: "Empresa" = Relationship()
 
+class SyncNubePendiente(SQLModel, table=True):
+    __tablename__ = "sync_nube_pendientes"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    creado_en: datetime = Field(default_factory=datetime.utcnow, index=True)
+    actualizado_en: datetime = Field(default_factory=datetime.utcnow)
+    id_empresa: int = Field(foreign_key="empresas.id", index=True)
+    id_venta: Optional[int] = Field(default=None, foreign_key="ventas.id", index=True)
+    operacion: str = Field(index=True)  # registrar_movimiento | restar_stock
+    payload: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    estado: str = Field(default="pendiente", index=True)  # pendiente | procesando | completado | fallido
+    intentos: int = Field(default=0)
+    max_intentos: int = Field(default=10)
+    ultimo_error: Optional[str] = Field(default=None)
+    proximo_reintento_en: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+    empresa: "Empresa" = Relationship()
+    venta: Optional["Venta"] = Relationship()
+
 class Orden(SQLModel, table=True):
     __tablename__ = "ordenes"
     id: Optional[int] = Field(default=None, primary_key=True)

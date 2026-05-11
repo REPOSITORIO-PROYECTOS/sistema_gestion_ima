@@ -12,6 +12,11 @@ from back.schemas.caja_schemas import ArticuloVendido, RegistrarVentaRequest, Ti
 from back.utils.tablas_handler import TablasHandler
 
 from back.gestion.contabilidad.clientes_contabilidad import manager as clientes_manager
+from back.gestion.sync_nube_queue_manager import (
+    encolar_sync_nube_pendiente,
+    OPERACION_REGISTRAR_MOVIMIENTO,
+    OPERACION_RESTAR_STOCK,
+)
 
 #ACA TENGO QUE REGISTRAR CUANDO ENTRA Y CUANDO SALE PLATA, MODIFICA LA TABLA MOVIMIENTOS
 
@@ -33,6 +38,44 @@ def _agregar_evento_sync_nube(
             "requiere_reintento": requiere_reintento,
             "timestamp": datetime.utcnow().isoformat(),
         }
+    )
+
+def _encolar_movimiento_pendiente(
+    db: Session,
+    id_empresa: int,
+    id_venta: int,
+    datos_para_sheets: Dict[str, Any],
+) -> None:
+    encolar_sync_nube_pendiente(
+        db=db,
+        id_empresa=id_empresa,
+        id_venta=id_venta,
+        operacion=OPERACION_REGISTRAR_MOVIMIENTO,
+        payload=datos_para_sheets,
+    )
+
+def _encolar_stock_pendiente(
+    db: Session,
+    id_empresa: int,
+    id_venta: int,
+    articulos_vendidos: List[ArticuloVendido],
+) -> None:
+    payload = {
+        "articulos_vendidos": [
+            {
+                "id_articulo": item.id_articulo,
+                "cantidad": item.cantidad,
+                "precio_unitario": item.precio_unitario,
+            }
+            for item in articulos_vendidos
+        ]
+    }
+    encolar_sync_nube_pendiente(
+        db=db,
+        id_empresa=id_empresa,
+        id_venta=id_venta,
+        operacion=OPERACION_RESTAR_STOCK,
+        payload=payload,
     )
 
 # =============================================================================
@@ -277,14 +320,21 @@ def registrar_venta_y_movimiento_caja(
                 
                     caller = TablasHandler(id_empresa=usuario_actual.id_empresa, db=db)
                     if not caller.registrar_movimiento(datos_para_sheets):
+                        detalle_sync = caller.ultimo_error_sync or "Causa no informada por integración Sheets."
+                        _encolar_movimiento_pendiente(
+                            db=db,
+                            id_empresa=usuario_actual.id_empresa,
+                            id_venta=nueva_venta.id,
+                            datos_para_sheets=datos_para_sheets,
+                        )
                         _agregar_evento_sync_nube(
                             db,
                             operacion="registrar_movimiento",
                             estado="fallido",
-                            mensaje="No se pudo registrar el movimiento en Google Sheets para cliente actual.",
+                            mensaje=f"No se pudo registrar movimiento en Google Sheets para cliente actual. Detalle: {detalle_sync}",
                             requiere_reintento=True,
                         )
-                        raise RuntimeError("[DRIVE] Error: No se pudo registrar el movimiento en Google Sheets para cliente actual.")
+                        raise RuntimeError(f"[DRIVE] Error registrando movimiento para cliente actual: {detalle_sync}")
                     _agregar_evento_sync_nube(
                         db,
                         operacion="registrar_movimiento",
@@ -292,14 +342,21 @@ def registrar_venta_y_movimiento_caja(
                         mensaje="Movimiento registrado en Google Sheets.",
                     )
                     if afectar_stock and not caller.restar_stock(db, articulos_vendidos):
+                        detalle_sync = caller.ultimo_error_sync or "Causa no informada por integración Sheets."
+                        _encolar_stock_pendiente(
+                            db=db,
+                            id_empresa=usuario_actual.id_empresa,
+                            id_venta=nueva_venta.id,
+                            articulos_vendidos=articulos_vendidos,
+                        )
                         _agregar_evento_sync_nube(
                             db,
                             operacion="restar_stock",
                             estado="fallido",
-                            mensaje="No se pudo actualizar stock en Google Sheets.",
+                            mensaje=f"No se pudo actualizar stock en Google Sheets. Detalle: {detalle_sync}",
                             requiere_reintento=True,
                         )
-                        raise RuntimeError("[DRIVE] Error crítico: No se pudo actualizar el stock en Google Sheets. La venta fue registrada pero el stock NO está sincronizado.")
+                        raise RuntimeError(f"[DRIVE] Error crítico al actualizar stock en Google Sheets: {detalle_sync}")
                     if afectar_stock:
                         _agregar_evento_sync_nube(
                             db,
@@ -325,14 +382,21 @@ def registrar_venta_y_movimiento_caja(
                     }
                     caller = TablasHandler(id_empresa=usuario_actual.id_empresa, db=db)
                     if not caller.registrar_movimiento(datos_para_sheets):
+                        detalle_sync = caller.ultimo_error_sync or "Causa no informada por integración Sheets."
+                        _encolar_movimiento_pendiente(
+                            db=db,
+                            id_empresa=usuario_actual.id_empresa,
+                            id_venta=nueva_venta.id,
+                            datos_para_sheets=datos_para_sheets,
+                        )
                         _agregar_evento_sync_nube(
                             db,
                             operacion="registrar_movimiento",
                             estado="fallido",
-                            mensaje="No se pudo registrar el movimiento en Google Sheets para cliente final.",
+                            mensaje=f"No se pudo registrar movimiento en Google Sheets para cliente final. Detalle: {detalle_sync}",
                             requiere_reintento=True,
                         )
-                        raise RuntimeError("[DRIVE] Error: No se pudo registrar el movimiento en Google Sheets para cliente final.")
+                        raise RuntimeError(f"[DRIVE] Error registrando movimiento para cliente final: {detalle_sync}")
                     _agregar_evento_sync_nube(
                         db,
                         operacion="registrar_movimiento",
@@ -340,14 +404,21 @@ def registrar_venta_y_movimiento_caja(
                         mensaje="Movimiento registrado en Google Sheets.",
                     )
                     if afectar_stock and not caller.restar_stock(db, articulos_vendidos):
+                        detalle_sync = caller.ultimo_error_sync or "Causa no informada por integración Sheets."
+                        _encolar_stock_pendiente(
+                            db=db,
+                            id_empresa=usuario_actual.id_empresa,
+                            id_venta=nueva_venta.id,
+                            articulos_vendidos=articulos_vendidos,
+                        )
                         _agregar_evento_sync_nube(
                             db,
                             operacion="restar_stock",
                             estado="fallido",
-                            mensaje="No se pudo actualizar stock en Google Sheets.",
+                            mensaje=f"No se pudo actualizar stock en Google Sheets. Detalle: {detalle_sync}",
                             requiere_reintento=True,
                         )
-                        raise RuntimeError("[DRIVE] Error crítico: No se pudo actualizar el stock en Google Sheets. La venta fue registrada pero el stock NO está sincronizado.")
+                        raise RuntimeError(f"[DRIVE] Error crítico al actualizar stock en Google Sheets: {detalle_sync}")
                     if afectar_stock:
                         _agregar_evento_sync_nube(
                             db,
@@ -564,14 +635,24 @@ def registrar_venta_y_movimientos_caja_multiples(
                 "observaciones": ""
             }
             if not caller.registrar_movimiento(datos_para_sheets):
+                detalle_sync = caller.ultimo_error_sync or "Causa no informada por integración Sheets."
+                _encolar_movimiento_pendiente(
+                    db=db,
+                    id_empresa=usuario_actual.id_empresa,
+                    id_venta=nueva_venta.id,
+                    datos_para_sheets=datos_para_sheets,
+                )
                 _agregar_evento_sync_nube(
                     db,
                     operacion="registrar_movimiento",
                     estado="fallido",
-                    mensaje=f"No se pudo registrar el pago {pago.metodo_pago} en Google Sheets.",
+                    mensaje=f"No se pudo registrar el pago {pago.metodo_pago} en Google Sheets. Detalle: {detalle_sync}",
                     requiere_reintento=True,
                 )
-                raise RuntimeError(f"[SHEETS] Error crítico: No se pudo registrar el pago {pago.metodo_pago} por ${pago.monto:.2f} en Google Sheets.")
+                raise RuntimeError(
+                    f"[SHEETS] Error crítico: no se pudo registrar el pago {pago.metodo_pago} "
+                    f"por ${pago.monto:.2f} en Google Sheets. Detalle: {detalle_sync}"
+                )
             _agregar_evento_sync_nube(
                 db,
                 operacion="registrar_movimiento",
@@ -581,14 +662,21 @@ def registrar_venta_y_movimientos_caja_multiples(
         
         # Registrar descuento de stock una sola vez (sincronizado con el primer pago)
         if articulos_vendidos and not caller.restar_stock(db, articulos_vendidos):
+            detalle_sync = caller.ultimo_error_sync or "Causa no informada por integración Sheets."
+            _encolar_stock_pendiente(
+                db=db,
+                id_empresa=usuario_actual.id_empresa,
+                id_venta=nueva_venta.id,
+                articulos_vendidos=articulos_vendidos,
+            )
             _agregar_evento_sync_nube(
                 db,
                 operacion="restar_stock",
                 estado="fallido",
-                mensaje="No se pudo actualizar stock en Google Sheets para pago múltiple.",
+                mensaje=f"No se pudo actualizar stock en Google Sheets para pago múltiple. Detalle: {detalle_sync}",
                 requiere_reintento=True,
             )
-            raise RuntimeError("[SHEETS] Error crítico: No se pudo actualizar el stock en Google Sheets. Los pagos fueron registrados pero el stock NO está sincronizado.")
+            raise RuntimeError(f"[SHEETS] Error crítico al actualizar stock para pago múltiple: {detalle_sync}")
         if articulos_vendidos:
             _agregar_evento_sync_nube(
                 db,
