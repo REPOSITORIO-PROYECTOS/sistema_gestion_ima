@@ -8,8 +8,11 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { ensureHttpsPublicOrigin } from "@/lib/publicUrl";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://sistema-ima.sistemataup.online";
+const API_URL = ensureHttpsPublicOrigin(
+  process.env.NEXT_PUBLIC_API_URL || "https://sistema-ima.sistemataup.online",
+).replace(/\/+$/, "");
 
 // Definimos los tipos de comprobantes que tendrán textos legales
 const TIPOS_COMPROBANTE = ["factura", "remito", "presupuesto", "recibo"];

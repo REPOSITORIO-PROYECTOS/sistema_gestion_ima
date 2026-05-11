@@ -11,6 +11,7 @@ import { ArrowLeft, Loader2, Upload } from "lucide-react";
 
 // Importamos el componente del formulario de configuración
 import { ConfiguradorPlantilla } from "./ConfiguradorPlantilla";
+import { ensureHttpsPublicOrigin } from "@/lib/publicUrl";
 
 // --- Definición de Tipos de Datos ---
 // La "forma" completa de los datos que esperamos de la API para esta página
@@ -33,7 +34,9 @@ interface ProveedorConPlantilla {
   plantilla_mapeo?: PlantillaMapeo | null;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://sistema-ima.sistemataup.online";
+const API_URL = ensureHttpsPublicOrigin(
+  process.env.NEXT_PUBLIC_API_URL || "https://sistema-ima.sistemataup.online",
+).replace(/\/+$/, "");
 
 // --- Componente Principal de la Página ---
 export default function ProveedorDetailPage() {

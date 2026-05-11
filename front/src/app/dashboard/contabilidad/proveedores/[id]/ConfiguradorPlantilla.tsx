@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Save } from "lucide-react";
+import { ensureHttpsPublicOrigin } from "@/lib/publicUrl";
 
 // --- Tipos de Datos ---
 // La "forma" de los datos de una plantilla existente
@@ -24,7 +25,9 @@ interface ConfiguradorPlantillaProps {
   onPlantillaGuardada: () => void; // Función para notificar al padre que se guardó
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://sistema-ima.sistemataup.online";
+const API_URL = ensureHttpsPublicOrigin(
+  process.env.NEXT_PUBLIC_API_URL || "https://sistema-ima.sistemataup.online",
+).replace(/\/+$/, "");
 
 export function ConfiguradorPlantilla({ proveedorId, token, plantillaActual, onPlantillaGuardada }: ConfiguradorPlantillaProps) {
   // --- Estados del Formulario ---

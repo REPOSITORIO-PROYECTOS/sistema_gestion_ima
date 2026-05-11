@@ -8,6 +8,7 @@ import { toast } from "sonner";
 // Importamos los componentes hijos que usaremos
 import { PlantillaGuia } from "./PlantillaGuia";
 import { UploaderConVistaPrevia } from "./UploaderVistaPrevia";
+import { ensureHttpsPublicOrigin } from "@/lib/publicUrl";
 
 // --- Definición de Tipos de Datos ---
 // Esto define cómo se ven los datos que esperamos de la API
@@ -37,7 +38,9 @@ export default function ActualizarPreciosPage() {
   const [proveedor, setProveedor] = useState<Proveedor | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://sistema-ima.sistemataup.online";
+  const API_URL = ensureHttpsPublicOrigin(
+    process.env.NEXT_PUBLIC_API_URL || "https://sistema-ima.sistemataup.online",
+  ).replace(/\/+$/, "");
 
   useEffect(() => {
     const fetchProveedorData = async () => {

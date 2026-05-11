@@ -1,10 +1,18 @@
+import { ensureHttpsPublicOrigin } from "@/lib/publicUrl";
+
+const productionApiOrigin = (): string =>
+  ensureHttpsPublicOrigin(
+    (process.env.NEXT_PUBLIC_API_URL || "https://sistema-ima.sistemataup.online").replace(
+      /\/+$/,
+      "",
+    ),
+  );
+
 // Configuración de la API
 export const API_CONFIG = {
   // URL base de la API - usar variable de entorno o fallback
   BASE_URL:
-    (process.env.NODE_ENV === 'production'
-      ? (process.env.NEXT_PUBLIC_API_URL || 'https://sistema-ima.sistemataup.online')
-      : '') + '/api',
+    (process.env.NODE_ENV === "production" ? productionApiOrigin() : "") + "/api",
 
   // Endpoints
   ENDPOINTS: {
