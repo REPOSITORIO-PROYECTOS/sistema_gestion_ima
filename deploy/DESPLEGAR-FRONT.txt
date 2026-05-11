@@ -1,0 +1,26 @@
+404 en /_next/static/chunks/*.js (Chrome muestra la app rota)
+============================================================
+
+Causa habitual: el servidor web sirve el HTML de Next pero los .js del build
+no están en la ruta que pide el navegador, o el HTML quedó cacheado de otro build.
+
+Checklist
+---------
+1) En el VPS, el front debe correr con el MISMO build que subiste:
+   cd front && npm ci && npm run build && pm2 restart gestion-ima-front
+
+2) Subí SIEMPRE la carpeta completa front/.next (no solo parte). Sin eso, 404.
+
+3) Nginx (u Hostinger) debe hacer proxy de TODO el host a Node, incluido /_next/:
+   - NO uses "try_files ... /index.html" como si fuera un SPA estático.
+   - Ver deploy/nginx-next.example.conf
+
+4) Si usás Cloudflare u otro CDN: después de deploy, purgá caché del dominio.
+   Un HTML viejo apunta a chunks con otros hashes → 404.
+
+5) Abrí siempre https://sistema-ima.sistemataup.online (no http://).
+
+API (backend)
+-------------
+GET https://TU_DOMINIO/api/health → {"status":"starting"} y luego "ready".
+Sirve para ver si el proceso responde sin esperar MySQL/scheduler.

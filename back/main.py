@@ -1,6 +1,8 @@
 # back/main.py
 
+import logging
 import os
+import threading
 from back.api.blueprints import admin_router, afip_tools_router, articulos_router, auth_router,actualizacion_masiva_router,clientes_router, configuracion_router, empresa_router, importaciones_router, proveedores_router, comprobantes_router, mesas_router, scanner_router, ordenes_router, impresion_router
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,6 +18,44 @@ from back.api.blueprints import usuarios_router
 from back import config # (y otros que necesites)
 from back.utils.mysql_handler import get_db_connection
 from back.database import create_db_and_tables
+
+logger = logging.getLogger(__name__)
+
+# La inicialización pesada corre en hilo: Uvicorn abre el puerto al instante (menos "servidor no responde").
+_startup_complete = threading.Event()
+
+
+def _startup_heavy() -> None:
+    try:
+        print("--- Evento de Inicio de la API (segundo plano) ---")
+        print(f"Verificando conexión a la base de datos '{config.DB_NAME}' en '{config.DB_HOST}'...")
+        conn = get_db_connection()
+        if conn:
+            print("✅ Conexión a la base de datos MySQL verificada exitosamente.")
+            conn.close()
+        else:
+            print("❌ ERROR CRÍTICO: No se pudo conectar a la base de datos MySQL.")
+
+        if config.GOOGLE_SHEET_ID:
+            print(f"ℹ️  Google Sheets configurado para reportes (ID: {config.GOOGLE_SHEET_ID[:10]}...).")
+        try:
+            print("⛏️ Creando tablas nuevas si faltan...")
+            create_db_and_tables()
+        except Exception as e:
+            print(f"⚠️ No se pudieron crear tablas automáticamente: {e}")
+
+        try:
+            from back.scheduler import init_scheduler
+
+            init_scheduler()
+            print("✅ Background scheduler de sincronización iniciado")
+        except Exception as e:
+            print(f"⚠️ No se pudo iniciar el scheduler: {e}")
+    except Exception as e:
+        logger.exception("Fallo en inicialización en segundo plano: %s", e)
+    finally:
+        _startup_complete.set()
+
 
 # --- Inicialización de FastAPI ---
 app = FastAPI(
@@ -42,38 +82,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- Verificación Inicial ---
+# --- Verificación inicial en segundo plano (no bloquea el bind de Uvicorn) ---
 @app.on_event("startup")
 def startup_event():
-    """
-    Código que se ejecuta una sola vez al iniciar la API.
-    Ideal para verificar conexiones a bases de datos.
-    """
-    print("--- Evento de Inicio de la API ---")
-    print(f"Verificando conexión a la base de datos '{config.DB_NAME}' en '{config.DB_HOST}'...")
-    conn = get_db_connection()
-    if conn:
-        print("✅ Conexión a la base de datos MySQL verificada exitosamente.")
-        conn.close()
-    else:
-        print("❌ ERROR CRÍTICO: No se pudo conectar a la base de datos MySQL.")
-        # En un entorno real, podrías decidir si la app debe detenerse aquí.
-    
-    if config.GOOGLE_SHEET_ID:
-        print(f"ℹ️  Google Sheets configurado para reportes (ID: {config.GOOGLE_SHEET_ID[:10]}...).")
-    try:
-        print("⛏️ Creando tablas nuevas si faltan...")
-        create_db_and_tables()
-    except Exception as e:
-        print(f"⚠️ No se pudieron crear tablas automáticamente: {e}")
-    
-    # Iniciar scheduler de sincronización automática
-    try:
-        from back.scheduler import init_scheduler
-        init_scheduler()
-        print("✅ Background scheduler de sincronización iniciado")
-    except Exception as e:
-        print(f"⚠️ No se pudo iniciar el scheduler: {e}")
+    print("--- API escuchando; inicialización pesada en segundo plano ---")
+    threading.Thread(target=_startup_heavy, daemon=True, name="ima-api-startup").start()
 
 
 @app.on_event("shutdown")
@@ -108,6 +121,18 @@ app.include_router(mesas_router.router)
 app.include_router(scanner_router.router)
 app.include_router(ordenes_router.router)
 app.include_router(impresion_router.router)
+
+
+@app.get("/api/health", tags=["General"])
+def api_health():
+    """
+    Ligero: responde enseguida. `startup_complete` indica si ya corrió DB + tablas + scheduler.
+    Útil para Nginx/Hostinger y para ver si el proceso está arriba sin esperar el arranque pesado.
+    """
+    return {
+        "status": "ready" if _startup_complete.is_set() else "starting",
+        "startup_complete": _startup_complete.is_set(),
+    }
 
 
 # --- Endpoint Raíz ---
