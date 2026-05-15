@@ -134,14 +134,14 @@ def registrar_venta_y_movimiento_caja(
         print(f"ADVERTENCIA: No se encontró configuración para la empresa ID {usuario_actual.id_empresa}.")
         porcentaje_recargo = 0.0
     else:
-        # PASO B: Decidimos qué recargo leer de la base de datos basándonos en el método de pago.
+        # PASO B: Recargo solo si está habilitado en configuración (el toggle de gestión de negocio).
         porcentaje_recargo = 0.0
         if metodo_pago_upper == "TRANSFERENCIA":
-            # Leemos el valor que esta empresa específica tiene en su fila de la tabla 'configuracion_empresa'.
-            porcentaje_recargo = config_empresa.recargo_transferencia
+            if getattr(config_empresa, "recargo_transferencia_habilitado", False):
+                porcentaje_recargo = config_empresa.recargo_transferencia
         elif metodo_pago_upper == "BANCARIO":
-            # Leemos el otro valor dinámico de la base de datos.
-            porcentaje_recargo = config_empresa.recargo_banco
+            if getattr(config_empresa, "recargo_banco_habilitado", False):
+                porcentaje_recargo = config_empresa.recargo_banco
     
     # PASO C: Calculamos el recargo solo si el porcentaje obtenido de la base de datos es mayor a cero.
     if porcentaje_recargo > 0 and total_venta > 0:
@@ -170,10 +170,13 @@ def registrar_venta_y_movimiento_caja(
     
     afectar_stock = False
     afectar_caja = False
-    
-    tipo_lower = (tipo_comprobante_solicitado or "").lower()
+
+    tipo_lower = (tipo_comprobante_solicitado or "").strip().lower()
     if tipo_lower == "comprobante":
         tipo_lower = "recibo"
+    # El front envía factura_a / factura_b; antes no entraban al guardián y no impactaban caja ni Sheets.
+    if tipo_lower in ("factura_a", "factura_b", "factura_c") or tipo_lower.startswith("factura"):
+        tipo_lower = "factura"
 
     if tipo_lower in ["factura", "recibo", "comprobante interno", "ticket", "comprobante"]:
         print("   -> DECISIÓN: Afectar STOCK y CAJA.")

@@ -30,6 +30,18 @@ def verificar_permiso_admin(usuario: Usuario):
 STATIC_DIR = Path("back/static/logos_empresas")
 STATIC_DIR.mkdir(parents=True, exist_ok=True) # Asegura que el directorio exista
 
+
+def _configuracion_respuesta(config) -> ConfiguracionResponse:
+    """Arma la respuesta y evita rutas de logo huérfanas en BD (archivo no en disco)."""
+    respuesta = ConfiguracionResponse.model_validate(config)
+    ruta = respuesta.ruta_logo
+    if ruta and "logos_empresas" in ruta:
+        archivo = STATIC_DIR / Path(ruta).name
+        if not archivo.is_file():
+            respuesta = respuesta.model_copy(update={"ruta_logo": None})
+    return respuesta
+
+
 @router.get("/mi-empresa", response_model=ConfiguracionResponse)
 def obtener_mi_configuracion(
     db: Session = Depends(get_db),
@@ -51,7 +63,7 @@ def obtener_mi_configuracion(
             status_code=404,
             detail="No se encontró un registro de configuración para la empresa de este usuario."
         )
-    return config
+    return _configuracion_respuesta(config)
 
 @router.post("/upload-logo", response_model=RespuestaGenerica)
 async def subir_logo_empresa(
@@ -159,7 +171,7 @@ def actualizar_mi_configuracion(
             id_empresa=current_user.id_empresa,
             data=data
         )
-        return config_actualizada
+        return _configuracion_respuesta(config_actualizada)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:

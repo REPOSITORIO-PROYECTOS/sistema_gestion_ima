@@ -130,12 +130,14 @@ def obtener_recargo_por_tipo(db: Session, id_empresa: int, tipo: str) -> Recargo
     if tipo == "transferencia":
         return RecargoData(
             porcentaje=config_db.recargo_transferencia,
-            concepto=config_db.concepto_recargo_transferencia
+            concepto=config_db.concepto_recargo_transferencia,
+            habilitado=bool(getattr(config_db, "recargo_transferencia_habilitado", False)),
         )
     elif tipo == "banco":
         return RecargoData(
             porcentaje=config_db.recargo_banco,
-            concepto=config_db.concepto_recargo_banco
+            concepto=config_db.concepto_recargo_banco,
+            habilitado=bool(getattr(config_db, "recargo_banco_habilitado", False)),
         )
     else:
         raise ValueError("Tipo de recargo no válido. Debe ser 'transferencia' o 'banco'.")
@@ -148,13 +150,19 @@ def actualizar_recargo_por_tipo(db: Session, id_empresa: int, tipo: str, data: R
     config_db = obtener_configuracion_por_id_empresa(db, id_empresa)
 
     if tipo == "transferencia":
-        config_db.recargo_transferencia = data.porcentaje
+        if data.porcentaje is not None:
+            config_db.recargo_transferencia = data.porcentaje
         if data.concepto is not None:
             config_db.concepto_recargo_transferencia = data.concepto
+        if data.habilitado is not None:
+            config_db.recargo_transferencia_habilitado = data.habilitado
     elif tipo == "banco":
-        config_db.recargo_banco = data.porcentaje
+        if data.porcentaje is not None:
+            config_db.recargo_banco = data.porcentaje
         if data.concepto is not None:
             config_db.concepto_recargo_banco = data.concepto
+        if data.habilitado is not None:
+            config_db.recargo_banco_habilitado = data.habilitado
     else:
         raise ValueError("Tipo de recargo no válido. Debe ser 'transferencia' o 'banco'.")
         

@@ -1,6 +1,6 @@
 # back/schemas/configuracion_schemas.py
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Dict
 from enum import Enum
 
@@ -63,6 +63,11 @@ class ConfiguracionResponse(BaseModel):
     cuit: Optional[str]
     aclaraciones_legales: Optional[Dict[str, Optional[str]]]
 
+    @field_validator("aclaraciones_legales", mode="before")
+    @classmethod
+    def aclaraciones_por_defecto(cls, value: Optional[Dict[str, Optional[str]]]) -> Dict[str, Optional[str]]:
+        return value if value is not None else {}
+
     class Config:
         from_attributes = True
         
@@ -70,11 +75,13 @@ class RecargoData(BaseModel):
     """Schema para devolver la información de un recargo."""
     porcentaje: float
     concepto: str
+    habilitado: bool = False
 
 class RecargoUpdate(BaseModel):
     """Schema para recibir la actualización de un recargo."""
-    porcentaje: float = Field(..., ge=0) # El porcentaje debe ser 0 o mayor
-    concepto: Optional[str] = None # Hacemos el concepto opcional
+    porcentaje: Optional[float] = Field(default=None, ge=0)
+    concepto: Optional[str] = None
+    habilitado: Optional[bool] = None
     
 class ColorUpdateRequest(BaseModel):
     color_principal: str

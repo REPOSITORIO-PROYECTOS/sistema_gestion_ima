@@ -312,11 +312,8 @@ def get_lista_de_arqueos(
     Obtiene un informe de cajas abiertas y cerradas para la empresa del usuario.
     """
     try:
-        id_empresa = current_user.id_empresa
-        # Le pasamos el usuario completo a la función de lógica de negocio
-        return consultas_caja.obtener_arqueos_de_caja(id_empresa,db=db, usuario_actual=current_user)
-    except Exception as e:
-        # Si la capa de negocio lanza un error, lo convertimos en un 500.
+        return consultas_caja.obtener_arqueos_de_caja(db=db, usuario_actual=current_user)
+    except Exception:
         raise HTTPException(status_code=500, detail="Ocurrió un error al generar el informe de arqueos.")
     
 

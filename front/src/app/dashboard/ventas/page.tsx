@@ -18,6 +18,7 @@ import CajaForm from "./CajaForm";
 import { useCajaStore } from "@/lib/cajaStore";
 import { useFacturacionStore } from "@/lib/facturacionStore"; // Importar
 import EgresoForm from "./EgresoForm";
+import { API_CONFIG } from "@/lib/api-config";
 
 interface ProductoVendido {
   id?: string;
@@ -47,7 +48,16 @@ function DashboardVenta() {
   const [metodoPago, setMetodoPago] = useState("efectivo");
   const [montoPagado, setMontoPagado] = useState<number>(0);
   const [vuelto, setVuelto] = useState<number>(0);
-  const { recargoTransferenciaActivo, recargoTransferencia, recargoBancarioActivo, recargoBancario } = useFacturacionStore();
+  const {
+    recargoTransferenciaActivo,
+    recargoTransferencia,
+    recargoBancarioActivo,
+    recargoBancario,
+    setRecargoTransferencia,
+    setRecargoBancario,
+    setRecargoTransferenciaActivo,
+    setRecargoBancarioActivo,
+  } = useFacturacionStore();
 
   // Limpiar estado cuando se cierra la caja
   useEffect(() => {
@@ -99,6 +109,41 @@ function DashboardVenta() {
       verificarEstadoCaja(token);
     }
   }, [token, verificarEstadoCaja]);
+
+  useEffect(() => {
+    if (!token) return;
+    const cargarRecargos = async () => {
+      try {
+        const [resTransferencia, resBancario] = await Promise.all([
+          fetch(`${API_CONFIG.BASE_URL}/configuracion/mi-empresa/recargo/transferencia`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`${API_CONFIG.BASE_URL}/configuracion/mi-empresa/recargo/banco`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
+        if (resTransferencia.ok) {
+          const data = await resTransferencia.json();
+          setRecargoTransferencia(data.porcentaje || 0);
+          setRecargoTransferenciaActivo(Boolean(data.habilitado));
+        }
+        if (resBancario.ok) {
+          const data = await resBancario.json();
+          setRecargoBancario(data.porcentaje || 0);
+          setRecargoBancarioActivo(Boolean(data.habilitado));
+        }
+      } catch (error) {
+        console.error("Error al sincronizar recargos:", error);
+      }
+    };
+    cargarRecargos();
+  }, [
+    token,
+    setRecargoTransferencia,
+    setRecargoBancario,
+    setRecargoTransferenciaActivo,
+    setRecargoBancarioActivo,
+  ]);
 
   // Mapeamos el rol para mostrarlo legible en el panel de informacion
   const mostrarRol = () => {

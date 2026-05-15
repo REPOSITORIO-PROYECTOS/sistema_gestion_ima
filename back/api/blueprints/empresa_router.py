@@ -108,7 +108,7 @@ def api_obtener_configuracion_de_empresa(
             'link_visual_2': config.link_visual_2,
             'link_visual_3': config.link_visual_3,
             'cuit': config.cuit,
-            'aclaraciones_legales': config.aclaraciones_legales
+            'aclaraciones_legales': config.aclaraciones_legales or {}
         }
         
         return SchemaConfigResponse.model_validate(config_dict)
@@ -154,7 +154,7 @@ def api_actualizar_configuracion_de_empresa(
             'link_visual_2': config_actualizada.link_visual_2,
             'link_visual_3': config_actualizada.link_visual_3,
             'cuit': config_actualizada.cuit,
-            'aclaraciones_legales': config_actualizada.aclaraciones_legales
+            'aclaraciones_legales': config_actualizada.aclaraciones_legales or {}
         }
         
         return SchemaConfigResponse.model_validate(config_dict)

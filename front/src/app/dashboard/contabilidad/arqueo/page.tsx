@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuthStore } from "@/lib/authStore";
+import { API_CONFIG } from "@/lib/api-config";
 import { DataTable } from "./data-table";
 import { columns } from "./columns";
 import type { ArqueoCaja } from "./columns";
@@ -20,7 +21,7 @@ export default function ArqueoCajaPage() {
 
     const fetchData = async () => {
       try {
-        const res = await fetch("https://sistema-ima.sistemataup.online/api/caja/arqueos", {
+        const res = await fetch(`${API_CONFIG.BASE_URL}/caja/arqueos`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

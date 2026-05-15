@@ -32,11 +32,11 @@ export default function GestionNegocio() {
     habilitarExtras,
     toggleExtras,
     recargoTransferenciaActivo,
-    toggleRecargoTransferencia,
+    setRecargoTransferenciaActivo,
     recargoTransferencia,
     setRecargoTransferencia,
     recargoBancarioActivo,
-    toggleRecargoBancario,
+    setRecargoBancarioActivo,
     recargoBancario,
     setRecargoBancario,
     formatoComprobante,
@@ -83,6 +83,8 @@ export default function GestionNegocio() {
 
         setRecargoTransferencia(dataTransferencia.porcentaje || 0);
         setRecargoBancario(dataBancario.porcentaje || 0);
+        setRecargoTransferenciaActivo(Boolean(dataTransferencia.habilitado));
+        setRecargoBancarioActivo(Boolean(dataBancario.habilitado));
 
       } catch (error) {
         console.error("Error al obtener recargos:", error);
@@ -90,7 +92,7 @@ export default function GestionNegocio() {
     };
 
     fetchRecargos();
-  }, [token, setRecargoBancario, setRecargoTransferencia]);
+  }, [token, setRecargoBancario, setRecargoTransferencia, setRecargoBancarioActivo, setRecargoTransferenciaActivo]);
 
   // GET Configuración General (para ancho ticket cambio)
   const [ticketCambioAncho, setTicketCambioAncho] = useState("80mm");
@@ -242,55 +244,88 @@ export default function GestionNegocio() {
     }
   };
 
-  // PATCH Recargos transferencia
+  const patchRecargoTransferencia = async (body: { porcentaje?: number; habilitado?: boolean; concepto?: string }) => {
+    const res = await fetch(
+      `${API_CONFIG.BASE_URL}/configuracion/mi-empresa/recargo/transferencia`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      }
+    );
+    if (!res.ok) throw new Error("Error en el PATCH");
+    const data = await res.json();
+    setRecargoTransferencia(data.porcentaje ?? recargoTransferencia);
+    setRecargoTransferenciaActivo(Boolean(data.habilitado));
+  };
+
+  const onToggleRecargoTransferencia = async (habilitado: boolean) => {
+    setRecargoTransferenciaActivo(habilitado);
+    try {
+      await patchRecargoTransferencia({ habilitado });
+      toast.success(habilitado ? "Recargo por transferencia habilitado" : "Recargo por transferencia deshabilitado");
+    } catch (error) {
+      setRecargoTransferenciaActivo(!habilitado);
+      console.error(error);
+      toast.error("No se pudo actualizar el estado del recargo por transferencia");
+    }
+  };
+
   const actualizarRecargoTransferencia = async () => {
     try {
-      const res = await fetch(
-        `${API_CONFIG.BASE_URL}/configuracion/mi-empresa/recargo/transferencia`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            porcentaje: recargoTransferencia,
-            concepto: "Actualización recargo transferencia"
-          }),
-        }
-      );
-
-      if (!res.ok) throw new Error("Error en el PATCH");
+      await patchRecargoTransferencia({
+        porcentaje: recargoTransferencia,
+        habilitado: true,
+        concepto: "Actualización recargo transferencia",
+      });
       toast.success("Recargo por transferencia actualizado correctamente");
-
     } catch (error) {
       console.error(error);
       toast.error("Error al actualizar el recargo por transferencia");
     }
   };
 
-  // PATCH Recargos banco
+  const patchRecargoBancario = async (body: { porcentaje?: number; habilitado?: boolean; concepto?: string }) => {
+    const res = await fetch(
+      `${API_CONFIG.BASE_URL}/configuracion/mi-empresa/recargo/banco`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      }
+    );
+    if (!res.ok) throw new Error("Error en el PATCH");
+    const data = await res.json();
+    setRecargoBancario(data.porcentaje ?? recargoBancario);
+    setRecargoBancarioActivo(Boolean(data.habilitado));
+  };
+
+  const onToggleRecargoBancario = async (habilitado: boolean) => {
+    setRecargoBancarioActivo(habilitado);
+    try {
+      await patchRecargoBancario({ habilitado });
+      toast.success(habilitado ? "Recargo bancario habilitado" : "Recargo bancario deshabilitado");
+    } catch (error) {
+      setRecargoBancarioActivo(!habilitado);
+      console.error(error);
+      toast.error("No se pudo actualizar el estado del recargo bancario");
+    }
+  };
+
   const actualizarRecargoBancario = async () => {
     try {
-      const res = await fetch(
-        `${API_CONFIG.BASE_URL}/configuracion/mi-empresa/recargo/banco`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            porcentaje: recargoBancario,
-            concepto: "Actualización recargo bancario"
-          }),
-        }
-      );
-
-      if (!res.ok) throw new Error("Error en el PATCH");
-
+      await patchRecargoBancario({
+        porcentaje: recargoBancario,
+        habilitado: true,
+        concepto: "Actualización recargo bancario",
+      });
       toast.success("Recargo por banco actualizado correctamente");
-
     } catch (error) {
       console.error(error);
       toast.error("Error al actualizar el recargo por banco");
@@ -634,7 +669,7 @@ export default function GestionNegocio() {
               <div className="flex flex-col sm:flex-row items-center gap-4">
                 <Switch.Root
                   checked={recargoTransferenciaActivo}
-                  onCheckedChange={toggleRecargoTransferencia}
+                  onCheckedChange={onToggleRecargoTransferencia}
                   className={`relative w-16 h-8 rounded-full ${recargoTransferenciaActivo ? "bg-green-900" : "bg-gray-300"} cursor-pointer transition-colors`}
                 >
                   <Switch.Thumb
@@ -658,7 +693,7 @@ export default function GestionNegocio() {
               <div className="flex flex-col sm:flex-row items-center gap-4">
                 <Switch.Root
                   checked={recargoBancarioActivo}
-                  onCheckedChange={toggleRecargoBancario}
+                  onCheckedChange={onToggleRecargoBancario}
                   className={`relative w-16 h-8 rounded-full ${recargoBancarioActivo ? "bg-green-900" : "bg-gray-300"} cursor-pointer transition-colors`}
                 >
                   <Switch.Thumb

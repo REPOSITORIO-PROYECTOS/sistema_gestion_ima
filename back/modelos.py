@@ -377,8 +377,10 @@ class ConfiguracionEmpresa(SQLModel, table=True):
     ruta_logo: Optional[str] = Field(default="front\public\default-logo.png")
     ruta_icono: Optional[str] = Field(default="front\public\favicon.ico")
     recargo_transferencia: float = Field(default=0.0)
+    recargo_transferencia_habilitado: bool = Field(default=False)
     concepto_recargo_transferencia: str = Field(default="Recargo por Transferencia")
     recargo_banco: float = Field(default=0.0)
+    recargo_banco_habilitado: bool = Field(default=False)
     concepto_recargo_banco: str = Field(default="Recargo por Pago con Banco")
     formato_comprobante_predeterminado: str = Field(default="ticket")
     # --- Configuración Fiscal (AFIP) ---
