@@ -510,10 +510,10 @@ def registrar_ingreso_egreso(
 
             caller = TablasHandler(usuario_actual.id_empresa, db=db)
             if not caller.registrar_movimiento(datos_para_sheets):
-                print("⚠️ [DRIVE] La función registrar_movimiento devolvió False.")
-           
+                detalle = caller.ultimo_error_sync or "sin detalle"
+                print(f"⚠️ [DRIVE] No se registró el movimiento en Google Sheets: {detalle}")
             else:
-               print(f"⚠️ [DRIVE] No se pudo encontrar el cliente con ID . No se registrará el movimiento en Drive.")
+                print("✅ [DRIVE] Movimiento registrado en Google Sheets.")
 
         except Exception as e_sheets:
             print(f"❌ [DRIVE] Ocurrió un error al intentar registrar en Google Sheets: {e_sheets}")

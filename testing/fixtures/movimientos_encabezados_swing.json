@@ -1,0 +1,42 @@
+{
+  "descripcion": "Fila 1 real MOVIMIENTOS Swing (empresa id=1), leída de Google Sheets.",
+  "id_empresa_referencia": 1,
+  "encabezados": [
+    "ID Movimiento",
+    "ID Cliente",
+    "ID Ingresos",
+    "ID Repartidor",
+    "Repartidor",
+    "Fecha y Hora Entrega",
+    "Fecha",
+    "Cliente",
+    "CUIT",
+    "Razon Social",
+    "Tipo de Movimiento",
+    "Nro Comprobante",
+    "Descripción",
+    "Monto",
+    "Foto Comprobante",
+    "Observaciones",
+    "ID Pedido",
+    "Firma",
+    "Estado",
+    "Fecha de la Deuda",
+    "Hash Sync"
+  ],
+  "payload_ejemplo": {
+    "id_cliente": "0",
+    "id_ingresos": "99999",
+    "id_repartidor": "",
+    "Repartidor": "cajero_swing",
+    "cliente": "cliente final",
+    "cuit": "-",
+    "razon_social": "-",
+    "Tipo_movimiento": "[ticket] Venta en EFECTIVO",
+    "nro_comprobante": "",
+    "descripcion": "Venta de prueba",
+    "monto": 1500.5,
+    "foto_comprobante": "",
+    "observaciones": ""
+  }
+}

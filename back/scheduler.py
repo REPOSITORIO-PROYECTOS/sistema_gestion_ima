@@ -16,7 +16,7 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from back.database import engine
-from back.modelos import Empresa
+from back.modelos import ConfiguracionEmpresa, Empresa
 from back.gestion.sincronizacion_orquestador import sincronizar_empresa_unificada
 from back.gestion.sync_nube_queue_manager import procesar_cola_sync_nube
 
@@ -39,20 +39,25 @@ def _get_bool_env(name: str, default: bool) -> bool:
         return default
     return str(valor).strip().lower() in {"1", "true", "yes", "y", "on"}
 
-SYNC_INTERVAL_SECONDS = _get_int_env("SYNC_INTERVAL_SECONDS", 60)
+# Intervalo por defecto: 5 min (evita agotar cuota de lecturas de Google Sheets).
+SYNC_INTERVAL_SECONDS = _get_int_env("SYNC_INTERVAL_SECONDS", 300)
 SYNC_JOB_MISFIRE_GRACE_SECONDS = _get_int_env("SYNC_JOB_MISFIRE_GRACE_SECONDS", 30)
 SYNC_INCLUDE_PROVEEDORES = _get_bool_env("SYNC_INCLUDE_PROVEEDORES", False)
-SYNC_REFRESH_COMPANIES_SECONDS = _get_int_env("SYNC_REFRESH_COMPANIES_SECONDS", 120)
-SYNC_QUEUE_RETRY_SECONDS = _get_int_env("SYNC_QUEUE_RETRY_SECONDS", 20)
+SYNC_REFRESH_COMPANIES_SECONDS = _get_int_env("SYNC_REFRESH_COMPANIES_SECONDS", 300)
+SYNC_QUEUE_RETRY_SECONDS = _get_int_env("SYNC_QUEUE_RETRY_SECONDS", 60)
+SYNC_AUTO_ENABLED = _get_bool_env("SYNC_AUTO_ENABLED", True)
 
-# Requisito operativo: sincronización automática fija cada 10 segundos.
-SYNC_INTERVAL_SECONDS = 10
-
-def obtener_todas_las_empresas():
-    """Obtiene todas las empresas activas de la base de datos"""
+def obtener_todas_las_empresas() -> list[int]:
+    """Empresas activas con Google Sheets configurado (evita jobs inútiles)."""
     try:
         with Session(engine) as db:
-            empresas = db.exec(select(Empresa).where(Empresa.activa == True)).all()
+            empresas = db.exec(
+                select(Empresa)
+                .join(ConfiguracionEmpresa, ConfiguracionEmpresa.id_empresa == Empresa.id)
+                .where(Empresa.activa == True)
+                .where(ConfiguracionEmpresa.link_google_sheets.isnot(None))
+                .where(ConfiguracionEmpresa.link_google_sheets != "")
+            ).all()
             return [emp.id for emp in empresas if emp.id is not None]
     except Exception as e:
         print(f"⚠️ Error al obtener empresas: {e}")
@@ -102,11 +107,19 @@ def _reconciliar_jobs_empresas():
     if scheduler is None:
         return
 
-    empresas_activas = set(obtener_todas_las_empresas())
     jobs_actuales = {job.id: job for job in scheduler.get_jobs()}
     jobs_empresas_ids = {
         job_id for job_id in jobs_actuales.keys() if job_id.startswith("sync_empresa_")
     }
+
+    if not SYNC_AUTO_ENABLED:
+        for job_id in jobs_empresas_ids:
+            scheduler.remove_job(job_id)
+        if jobs_empresas_ids:
+            print("⏸️ Sync automático Sheets desactivado (SYNC_AUTO_ENABLED=false)")
+        return
+
+    empresas_activas = set(obtener_todas_las_empresas())
 
     # Crear faltantes
     for id_empresa in empresas_activas:
@@ -171,9 +184,10 @@ def init_scheduler():
         scheduler.start()
         print(
             f"✅ Background scheduler iniciado - "
-            f"Sincronización cada {SYNC_INTERVAL_SECONDS} segundos - "
-            f"Refresh de empresas cada {SYNC_REFRESH_COMPANIES_SECONDS} segundos - "
-            f"Reintento cola sync cada {SYNC_QUEUE_RETRY_SECONDS} segundos - "
+            f"Sync automático Sheets={'ON' if SYNC_AUTO_ENABLED else 'OFF'} - "
+            f"Intervalo sync={SYNC_INTERVAL_SECONDS}s - "
+            f"Refresh empresas={SYNC_REFRESH_COMPANIES_SECONDS}s - "
+            f"Cola sync={SYNC_QUEUE_RETRY_SECONDS}s - "
             f"Proveedores={'ON' if SYNC_INCLUDE_PROVEEDORES else 'OFF'}"
         )
         
