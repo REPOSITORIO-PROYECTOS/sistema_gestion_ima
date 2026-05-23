@@ -39,6 +39,8 @@ class ConfiguracionUpdate(BaseModel):
     cuit: Optional[int] = None
     formato_comprobante_predeterminado: Optional[FormatoComprobanteEnum] = None
     aclaraciones_legales: Optional[Dict[str, Optional[str]]] = None
+    ingresos_brutos: Optional[str] = None
+    inicio_actividades: Optional[str] = None
 
 class ConfiguracionResponse(BaseModel):
     """Schema completo para devolver la configuración de una empresa."""
@@ -62,6 +64,8 @@ class ConfiguracionResponse(BaseModel):
     link_visual_3: Optional[str]
     cuit: Optional[str]
     aclaraciones_legales: Optional[Dict[str, Optional[str]]]
+    ingresos_brutos: Optional[str] = None
+    inicio_actividades: Optional[str] = None
 
     @field_validator("aclaraciones_legales", mode="before")
     @classmethod

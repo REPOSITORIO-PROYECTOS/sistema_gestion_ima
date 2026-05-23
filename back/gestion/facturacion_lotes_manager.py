@@ -112,10 +112,12 @@ def facturar_lote_de_ventas(
 
     emisor_data = EmisorData(
         cuit=cuit_emisor,
-        razon_social=usuario_actual.empresa.nombre_legal,
+        razon_social=config_empresa_db.nombre_negocio or usuario_actual.empresa.nombre_legal,
         domicilio=config_empresa_db.direccion_negocio,
         punto_venta=config_empresa_db.afip_punto_venta_predeterminado,
         condicion_iva=config_empresa_db.afip_condicion_iva,
+        ingresos_brutos=config_empresa_db.ingresos_brutos,
+        inicio_actividades=config_empresa_db.inicio_actividades,
         afip_certificado=credenciales.get("certificado"),
         afip_clave_privada=credenciales.get("clave_privada")
     )
@@ -192,10 +194,12 @@ def crear_nota_credito_para_anular(
 
     emisor_data = EmisorData(
         cuit=cuit_emisor,
-        razon_social=usuario_actual.empresa.nombre_legal,
+        razon_social=config_empresa_db.nombre_negocio or usuario_actual.empresa.nombre_legal,
         domicilio=config_empresa_db.direccion_negocio,
         punto_venta=config_empresa_db.afip_punto_venta_predeterminado,
         condicion_iva=config_empresa_db.afip_condicion_iva,
+        ingresos_brutos=config_empresa_db.ingresos_brutos,
+        inicio_actividades=config_empresa_db.inicio_actividades,
         afip_certificado=credenciales.get("certificado"),
         afip_clave_privada=credenciales.get("clave_privada")
     )

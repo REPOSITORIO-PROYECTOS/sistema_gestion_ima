@@ -33,6 +33,8 @@ class EmisorData(BaseModel):
     domicilio: Optional[str] = None
     punto_venta: int
     condicion_iva: Optional[str] = None
+    ingresos_brutos: Optional[str] = None
+    inicio_actividades: Optional[str] = None
     aclaraciones_legales: Optional[Dict[str, str]] = None
     # Permitir inyectar credenciales cuando ya fueron obtenidas (ej. facturación por lotes)
     afip_certificado: Optional[str] = None

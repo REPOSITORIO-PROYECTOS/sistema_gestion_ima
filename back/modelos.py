@@ -395,6 +395,8 @@ class ConfiguracionEmpresa(SQLModel, table=True):
     direccion_negocio: Optional[str] = Field(default=None)
     telefono_negocio: Optional[str] = Field(default=None)
     mail_negocio: Optional[str] = Field(default=None)
+    ingresos_brutos: Optional[str] = Field(default=None)
+    inicio_actividades: Optional[str] = Field(default=None)
     
     # --- Bóveda de Secretos ---
     # Aquí irían los secretos ENCRIPTADOS. El nombre del campo lo deja claro.

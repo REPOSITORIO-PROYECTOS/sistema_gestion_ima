@@ -678,6 +678,8 @@ function FormVentas({
         domicilio: empresa?.direccion_negocio || "N/A",
         punto_venta: empresa?.afip_punto_venta_predeterminado || 1,
         condicion_iva: empresa?.afip_condicion_iva || "Responsable Inscripto",
+        ingresos_brutos: empresa?.ingresos_brutos || "",
+        inicio_actividades: empresa?.inicio_actividades || "",
       },
       receptor: {
         nombre_razon_social: tipoClienteSeleccionado.id === "0" ? "Consumidor Final" : clienteSeleccionado?.nombre_razon_social ?? "N/A",

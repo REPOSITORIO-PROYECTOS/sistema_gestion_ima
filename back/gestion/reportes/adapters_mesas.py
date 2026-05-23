@@ -8,7 +8,16 @@ def _obtener_emisor(db: Session, id_empresa: int) -> EmisorData:
     cuit = conf.cuit if conf and conf.cuit else ""
     pv = conf.afip_punto_venta_predeterminado if conf and conf.afip_punto_venta_predeterminado else 1
     aclar = conf.aclaraciones_legales if conf and conf.aclaraciones_legales else {}
-    return EmisorData(cuit=cuit, razon_social=None, domicilio=None, punto_venta=pv, condicion_iva=None, aclaraciones_legales=aclar)
+    return EmisorData(
+        cuit=cuit,
+        razon_social=conf.nombre_negocio if conf else None,
+        domicilio=conf.direccion_negocio if conf else None,
+        punto_venta=pv,
+        condicion_iva=conf.afip_condicion_iva if conf else None,
+        ingresos_brutos=conf.ingresos_brutos if conf else None,
+        inicio_actividades=conf.inicio_actividades if conf else None,
+        aclaraciones_legales=aclar,
+    )
 
 def construir_request_ticket_mesa(db: Session, consumo: ConsumoMesa) -> GenerarComprobanteRequest:
     items: List[ItemData] = []

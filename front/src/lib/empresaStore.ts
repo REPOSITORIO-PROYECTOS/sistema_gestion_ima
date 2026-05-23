@@ -14,6 +14,8 @@ interface Empresa {
   telefono_negocio?: string;
   mail_negocio?: string;
   link_google_sheets?: string;
+  ingresos_brutos?: string;
+  inicio_actividades?: string;
   aclaraciones_legales?: Record<string, string>;
 }
 

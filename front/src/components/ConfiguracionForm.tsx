@@ -70,6 +70,8 @@ const formSchema = z.object({
   afip_condicion_iva: z.enum(opcionesCondicionIVA, {
     required_error: "Debe seleccionar una condición de IVA.",
   }).nullable(),
+  ingresos_brutos: z.string().optional().nullable(),
+  inicio_actividades: z.string().optional().nullable(),
   link_google_sheets: z.string().optional().nullable(),
   aclaraciones_legales: z.record(z.string()).optional(),
   balanza_articulo_id: z.string().optional(),
@@ -216,6 +218,8 @@ export const ConfiguracionForm = (props: Props) => {
       cuit: "",
       afip_punto_venta_predeterminado: "",
       afip_condicion_iva: null,
+      ingresos_brutos: "",
+      inicio_actividades: "",
       link_google_sheets: "",
       aclaraciones_legales: {},
       balanza_articulo_id: "",
@@ -467,6 +471,33 @@ export const ConfiguracionForm = (props: Props) => {
                   <FormControl>
                     <Input type="number" placeholder="Ej: 1, 2, 3" {...field} value={field.value || ""} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="ingresos_brutos"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nº Ingresos Brutos (IIBB)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ej: 1008194" {...field} value={field.value || ""} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="inicio_actividades"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Inicio de Actividades</FormLabel>
+                  <FormControl>
+                    <Input placeholder="DD/MM/AAAA" {...field} value={field.value || ""} />
+                  </FormControl>
+                  <FormDescription>Formato sugerido: 01/06/2025</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

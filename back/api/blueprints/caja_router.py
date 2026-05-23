@@ -177,10 +177,12 @@ def api_registrar_venta(
             # Construir el schema del emisor con TODOS los datos recuperados
             emisor_data_schema = EmisorData(
                 cuit=empresa_db.cuit,
-                razon_social=empresa_db.nombre_legal,
+                razon_social=config_empresa_db.nombre_negocio or empresa_db.nombre_legal,
                 domicilio=config_empresa_db.direccion_negocio,
                 punto_venta=config_empresa_db.afip_punto_venta_predeterminado,
-                condicion_iva=config_empresa_db.afip_condicion_iva
+                condicion_iva=config_empresa_db.afip_condicion_iva,
+                ingresos_brutos=config_empresa_db.ingresos_brutos,
+                inicio_actividades=config_empresa_db.inicio_actividades,
             )
             print("ANTES DE LA FUNCION GENERAR FACTURA")
             # Llamar al especialista de facturación

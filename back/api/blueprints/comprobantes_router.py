@@ -11,7 +11,7 @@ from sqlmodel import Session # <-- 1. IMPORTACIÓN AÑADIDA
 # Dependencias de FastAPI y Seguridad
 from back.database import get_db
 from back.security import obtener_usuario_actual
-from back.modelos import Usuario # <-- 2. IMPORTACIÓN AÑADIDA
+from back.modelos import Usuario, ConfiguracionEmpresa # <-- 2. IMPORTACIÓN AÑADIDA
 
 # Especialistas de la capa de Gestión
 from back.gestion.reportes.generador_comprobantes import generar_comprobante_stateless
@@ -23,6 +23,7 @@ from back.gestion.reportes.ciclo_vida_comp import agrupar_comprobantes_en_uno_nu
 # Schemas necesarios para este router
 from back.schemas.comprobante_schemas import (
     GenerarComprobanteRequest,
+    EmisorData,
     FacturarLoteRequest,
     FacturarLoteResponse
 )
@@ -46,6 +47,23 @@ router = APIRouter(
     # dependencies=[Depends(obtener_usuario_actual)] # Puedes proteger todo el router si quieres
 )
 
+
+def _enriquecer_emisor_desde_config(db: Session, id_empresa: int, emisor: EmisorData) -> None:
+    """Completa datos fiscales del emisor desde configuracion_empresa si el cliente no los envió."""
+    config = db.get(ConfiguracionEmpresa, id_empresa)
+    if not config:
+        return
+    if not emisor.razon_social and config.nombre_negocio:
+        emisor.razon_social = config.nombre_negocio
+    if not emisor.domicilio and config.direccion_negocio:
+        emisor.domicilio = config.direccion_negocio
+    if not emisor.condicion_iva and config.afip_condicion_iva:
+        emisor.condicion_iva = config.afip_condicion_iva
+    if not emisor.ingresos_brutos and config.ingresos_brutos:
+        emisor.ingresos_brutos = config.ingresos_brutos
+    if not emisor.inicio_actividades and config.inicio_actividades:
+        emisor.inicio_actividades = config.inicio_actividades
+
 @router.post("/generar", summary="Generar un comprobante (factura, remito, etc.) on-demand",
     responses={
         200: {"content": {"application/pdf": {}}, "description": "El archivo PDF del comprobante."},
@@ -66,6 +84,8 @@ def api_generar_comprobante(
     print("entramos a generar comprobante")
     try:
         print("entramos al try de generar comprobante")
+        if current_user.id_empresa:
+            _enriquecer_emisor_desde_config(db, current_user.id_empresa, req.emisor)
         
         # Solo procesar por AFIP si:
         # 1. Es una factura o nota de crédito (los otros tipos como presupuesto, remito, etc. no se procesan)
