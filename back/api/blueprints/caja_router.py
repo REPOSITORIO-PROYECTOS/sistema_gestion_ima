@@ -252,36 +252,60 @@ def api_registrar_venta(
     )
 
 @router.post("/ingresos", response_model=RespuestaGenerica, tags=["Caja - Operaciones"])
-def api_registrar_ingreso(req: MovimientoSimpleRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: Usuario = Depends(obtener_usuario_actual)):
+def api_registrar_ingreso(
+    req: MovimientoSimpleRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(obtener_usuario_actual),
+):
     sesion_activa = apertura_cierre.obtener_caja_abierta_por_usuario(db, current_user)
     if not sesion_activa:
         raise HTTPException(status_code=400, detail="Operación denegada: El usuario no tiene una caja abierta.")
-    
+
+    db.info.pop("protocolo_sync_nube", None)
+
     try:
         movimiento_creado = registro_caja.registrar_ingreso_egreso(
-            db=db, usuario_actual=current_user, id_sesion_caja=sesion_activa.id,
-            monto=req.monto, concepto=req.concepto, tipo=TipoMovimiento.INGRESO,
-            metodo_pago=req.metodo_pago if req.metodo_pago else "EFECTIVO"
+            db=db,
+            usuario_actual=current_user,
+            id_sesion_caja=sesion_activa.id,
+            concepto=req.concepto,
+            monto=req.monto,
+            tipo=TipoMovimiento.INGRESO.value,
+            metodo_pago=req.metodo_pago if req.metodo_pago else "EFECTIVO",
         )
         db.commit()
-        
-        return RespuestaGenerica(status="success", message=f"Ingreso registrado con éxito. ID: {movimiento_creado.id}", data={"id_movimiento": movimiento_creado.id})
+        db.refresh(movimiento_creado)
+        background_tasks.add_task(procesar_cola_sync_nube_en_background)
+
+        return RespuestaGenerica(
+            status="success",
+            message=f"Ingreso registrado con éxito. ID: {movimiento_creado.id}",
+            data={"id_movimiento": movimiento_creado.id},
+        )
     except ValueError as e:
         db.rollback()
         raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        db.rollback()
+        logger.exception("Error registrando ingreso manual")
+        raise HTTPException(status_code=500, detail=f"Error interno al registrar el ingreso: {e}")
 
 
 @router.post("/egresos", response_model=CajaMovimientoResponse)
 def api_registrar_egreso(
     req: MovimientoSimpleRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(obtener_usuario_actual)
+    current_user: Usuario = Depends(obtener_usuario_actual),
 ):
     """Registra un egreso de efectivo de la caja."""
     sesion_activa = apertura_cierre.obtener_caja_abierta_por_usuario(db, current_user)
     if not sesion_activa:
         raise HTTPException(status_code=400, detail="Operación denegada: El usuario no tiene una caja abierta.")
-    
+
+    db.info.pop("protocolo_sync_nube", None)
+
     try:
         movimiento = registro_caja.registrar_ingreso_egreso(
             db=db,
@@ -289,28 +313,33 @@ def api_registrar_egreso(
             id_sesion_caja=sesion_activa.id,
             concepto=req.concepto,
             monto=req.monto,
-            tipo="EGRESO",
-            id_usuario=current_user.id,  
-            fecha_hora=datetime.now(timezone.utc),
-            facturado=False,
-            metodo_pago=req.metodo_pago
+            tipo=TipoMovimiento.EGRESO.value,
+            metodo_pago=req.metodo_pago if req.metodo_pago else "EFECTIVO",
         )
+        db.commit()
+        db.refresh(movimiento)
+        background_tasks.add_task(procesar_cola_sync_nube_en_background)
 
         return CajaMovimientoResponse(
             id=movimiento.id,
-            id_sesion_caja=movimiento.id_caja_sesion,  # ⚠️ Asegurate que este es el nombre correcto
+            id_sesion_caja=movimiento.id_caja_sesion,
             id_venta_asociada=movimiento.id_venta,
             id_usuario=movimiento.id_usuario,
             tipo=movimiento.tipo,
             concepto=movimiento.concepto,
             monto=movimiento.monto,
             metodo_pago=movimiento.metodo_pago,
-            fecha_hora=datetime.now(timezone.utc),  # Si usás timestamp, mapearlo aquí
-            facturado=False
+            fecha_hora=movimiento.timestamp,
+            facturado=False,
         )
 
-    except (ValueError, RuntimeError) as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        db.rollback()
+        logger.exception("Error registrando egreso manual")
+        raise HTTPException(status_code=500, detail=f"Error interno al registrar el egreso: {e}")
 
 
 

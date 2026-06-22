@@ -35,7 +35,7 @@ class AgruparRequest(BaseModel):
 
 class AnularFacturaRequest(BaseModel):
     id_movimiento: int
-    motivo: Optional[str]
+    motivo: Optional[str] = None
 
 class AnularComprobanteRequest(BaseModel):
     id_movimiento: int

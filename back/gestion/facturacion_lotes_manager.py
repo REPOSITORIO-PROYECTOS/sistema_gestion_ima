@@ -205,14 +205,21 @@ def crear_nota_credito_para_anular(
     cliente_db = db.get(Tercero, venta_original.id_cliente) if venta_original.id_cliente else None
     receptor_data = tercero_a_receptor_data(cliente_db)
     
-    # 3. Llamada al especialista de facturación para generar la NC (sin cambios)
+    datos_factura_original = venta_original.datos_factura or {}
+    if not all(
+        datos_factura_original.get(campo) is not None
+        for campo in ("tipo_afip", "punto_venta", "numero_comprobante")
+    ):
+        raise ValueError(
+            "La factura no tiene datos AFIP completos (tipo, punto de venta o número). "
+            "No se puede emitir la Nota de Crédito."
+        )
+
     resultado_afip_nc = generar_nota_credito_para_venta(
-        db=db,
-        venta_a_anular=venta_original,
         total=venta_original.total,
         cliente_data=receptor_data,
         emisor_data=emisor_data,
-        comprobante_asociado=venta_original.datos_factura
+        comprobante_asociado=datos_factura_original,
     )
 
     if not resultado_afip_nc or not resultado_afip_nc.get("cae"):
@@ -329,7 +336,6 @@ def anular_comprobante_no_fiscal(
     venta_original.datos_factura = datos_factura
     db.add(venta_original)
 
-    # Devolver stock
     if venta_original.items:
         for item in venta_original.items:
             articulo = item.articulo
@@ -351,20 +357,20 @@ def anular_comprobante_no_fiscal(
                 db.add(mov_stock)
                 db.add(articulo)
 
-        ticket_html = _render_ticket_anulacion_no_fiscal(
-            db=db,
-            empresa=usuario_actual.empresa,
-            venta=venta_original,
-            movimiento=mov_nc
-        )
+    ticket_html = _render_ticket_anulacion_no_fiscal(
+        db=db,
+        empresa=usuario_actual.empresa,
+        venta=venta_original,
+        movimiento=mov_nc,
+    )
 
-        return {
-                "status": "success",
-                "mensaje": "Comprobante no fiscal anulado y stock revertido.",
-                "venta_id": venta_original.id,
-                "movimiento_anulacion_id": mov_nc.id,
-                "ticket_html": ticket_html
-        }
+    return {
+        "status": "success",
+        "mensaje": "Comprobante no fiscal anulado y stock revertido.",
+        "venta_id": venta_original.id,
+        "movimiento_anulacion_id": mov_nc.id,
+        "ticket_html": ticket_html,
+    }
 
 
 def _render_ticket_anulacion_no_fiscal(

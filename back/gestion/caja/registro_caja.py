@@ -9,8 +9,6 @@ from back.gestion.caja.cliente_publico import obtener_cliente_por_id
 # Importa todos tus modelos. Asegúrate de que las rutas sean correctas.
 from back.modelos import Usuario, Venta, VentaDetalle, Articulo, CajaMovimiento, Tercero, CajaSesion, ConfiguracionEmpresa
 from back.schemas.caja_schemas import ArticuloVendido, RegistrarVentaRequest, TipoMovimiento, PagoMultiple
-from back.utils.tablas_handler import TablasHandler
-
 from back.gestion.contabilidad.clientes_contabilidad import manager as clientes_manager
 from back.gestion.sync_nube_queue_manager import (
     encolar_sync_nube_pendiente,
@@ -43,8 +41,8 @@ def _agregar_evento_sync_nube(
 def _encolar_movimiento_pendiente(
     db: Session,
     id_empresa: int,
-    id_venta: int,
     datos_para_sheets: Dict[str, Any],
+    id_venta: int | None = None,
 ) -> None:
     encolar_sync_nube_pendiente(
         db=db,
@@ -53,6 +51,34 @@ def _encolar_movimiento_pendiente(
         operacion=OPERACION_REGISTRAR_MOVIMIENTO,
         payload=datos_para_sheets,
     )
+
+
+def _construir_datos_movimiento_manual_sheets(
+    *,
+    usuario_actual: Usuario,
+    movimiento: CajaMovimiento,
+    tipo: str,
+    concepto: str,
+    monto: float,
+    metodo_pago: str,
+) -> Dict[str, Any]:
+    metodo = (metodo_pago or "EFECTIVO").upper()
+    tipo_upper = tipo.upper()
+    return {
+        "id_cliente": "0",
+        "id_ingresos": str(movimiento.id),
+        "id_repartidor": "",
+        "Repartidor": usuario_actual.nombre_usuario,
+        "cliente": "cliente final",
+        "cuit": "-",
+        "razon_social": "-",
+        "Tipo_movimiento": f"[{tipo_upper}] en {metodo}",
+        "nro_comprobante": "",
+        "descripcion": concepto,
+        "monto": monto,
+        "foto_comprobante": "",
+        "observaciones": "",
+    }
 
 def _encolar_stock_pendiente(
     db: Session,
@@ -155,8 +181,8 @@ def _encolar_sync_sheets_post_venta(
         _encolar_movimiento_pendiente(
             db=db,
             id_empresa=usuario_actual.id_empresa,
-            id_venta=nueva_venta.id,
             datos_para_sheets=datos_para_sheets,
+            id_venta=nueva_venta.id,
         )
 
     if afectar_stock and articulos_vendidos:
@@ -417,68 +443,60 @@ def registrar_ingreso_egreso(
     concepto: str,
     monto: float,
     tipo: str,
-    id_usuario: int,
-    facturado: bool,
-    fecha_hora: datetime,
-    metodo_pago:str
+    metodo_pago: str,
 ) -> CajaMovimiento:
     """
-    Registra un ingreso o egreso simple en la caja usando SQLModel.
+    Registra un ingreso o egreso simple en caja y encola sync con Google Sheets.
     'tipo' debe ser 'INGRESO' o 'EGRESO'. El monto siempre es positivo.
+    El commit lo realiza el router que invoca esta función.
     """
     print(f"\n--- [TRACE: REGISTRAR MOVIMIENTO] ---")
     print(f"1. Solicitud de {tipo} para Sesión ID: {id_sesion_caja}, Monto: {monto}")
 
-    if tipo.upper() not in ['INGRESO', 'EGRESO']:
+    tipo_upper = tipo.upper()
+    if tipo_upper not in ("INGRESO", "EGRESO"):
         raise ValueError("Tipo de movimiento no válido. Debe ser 'INGRESO' o 'EGRESO'.")
-    
+
     if monto <= 0:
         raise ValueError("El monto del movimiento debe ser un número positivo.")
 
-    # Creamos el objeto del movimiento directamente con SQLModel
+    metodo = (metodo_pago or "EFECTIVO").upper()
+
     nuevo_movimiento = CajaMovimiento(
         id_caja_sesion=id_sesion_caja,
-        id_usuario=id_usuario,
-        tipo=tipo.upper(),
+        id_usuario=usuario_actual.id,
+        tipo=tipo_upper,
         concepto=concepto,
-        monto=monto,  # El monto siempre se guarda en positivo
-        metodo_pago=metodo_pago, # Asumimos efectivo para movimientos simples
-        facturado=facturado,
-        fecha_hora=fecha_hora,
+        monto=monto,
+        metodo_pago=metodo,
+    )
+    db.add(nuevo_movimiento)
+    db.flush()
+
+    datos_para_sheets = _construir_datos_movimiento_manual_sheets(
+        usuario_actual=usuario_actual,
+        movimiento=nuevo_movimiento,
+        tipo=tipo_upper,
+        concepto=concepto,
+        monto=monto,
+        metodo_pago=metodo,
+    )
+    _encolar_movimiento_pendiente(
+        db=db,
+        id_empresa=usuario_actual.id_empresa,
+        datos_para_sheets=datos_para_sheets,
+    )
+    _agregar_evento_sync_nube(
+        db,
+        operacion="sync_nube_movimiento_manual",
+        estado="pendiente",
+        mensaje=f"Movimiento {tipo_upper} encolado para Google Sheets (ID local: {nuevo_movimiento.id}).",
+        requiere_reintento=True,
     )
 
-    try:
-        db.add(nuevo_movimiento)
-        db.commit()
-        db.refresh(nuevo_movimiento)
-        print(f"   -> ÉXITO. Movimiento registrado con ID: {nuevo_movimiento.id}")
-        print("--- [FIN TRACE] ---\n")
-
-        try:
-
-            datos_para_sheets = {
-                    "Tipo_movimiento": f"egreso en {metodo_pago}",
-                    "descripcion": concepto,
-                    "monto": monto,
-            }
-
-            caller = TablasHandler(usuario_actual.id_empresa, db=db)
-            if not caller.registrar_movimiento(datos_para_sheets):
-                detalle = caller.ultimo_error_sync or "sin detalle"
-                print(f"⚠️ [DRIVE] No se registró el movimiento en Google Sheets: {detalle}")
-            else:
-                print("✅ [DRIVE] Movimiento registrado en Google Sheets.")
-
-        except Exception as e_sheets:
-            print(f"❌ [DRIVE] Ocurrió un error al intentar registrar en Google Sheets: {e_sheets}")
-        
-        return nuevo_movimiento
-    
-    except Exception as e:
-        print(f"   -> ERROR de BD al registrar el movimiento: {e}")
-        db.rollback()
-        # Relanzamos la excepción para que el router la capture
-        raise RuntimeError(f"Error de base de datos al registrar el movimiento: {e}")
+    print(f"   -> Movimiento preparado con ID: {nuevo_movimiento.id} (pendiente de commit)")
+    print("--- [FIN TRACE] ---\n")
+    return nuevo_movimiento
 
 
 def registrar_venta_y_movimientos_caja_multiples(
