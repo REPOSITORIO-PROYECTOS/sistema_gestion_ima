@@ -78,6 +78,108 @@ def _encolar_stock_pendiente(
         payload=payload,
     )
 
+
+def _construir_descripcion_venta_sheets(
+    db: Session,
+    articulos_vendidos: List[ArticuloVendido],
+) -> str:
+    partes: List[str] = []
+    for item in articulos_vendidos:
+        articulo = db.get(Articulo, item.id_articulo)
+        codigo = articulo.codigo_interno if articulo else str(item.id_articulo)
+        partes.append(f"(articulo id = {codigo}, cantidad = {item.cantidad})")
+    return f"Venta de {', '.join(partes)}"
+
+
+def _resolver_datos_cliente_para_sheets(
+    db: Session,
+    id_empresa: int,
+    id_cliente_normalizado: int | None,
+) -> tuple[Any, str, str, str]:
+    if id_cliente_normalizado is not None:
+        cliente = clientes_manager.obtener_cliente_por_id(id_empresa, db, id_cliente_normalizado)
+        cliente_sheets_data = (
+            obtener_cliente_por_id(db, id_empresa=id_empresa, id_cliente=cliente.codigo_interno)
+            if cliente
+            else None
+        )
+        if cliente_sheets_data:
+            return (
+                id_cliente_normalizado,
+                cliente_sheets_data.get("nombre-usuario", "Cliente sin nombre"),
+                cliente_sheets_data.get("CUIT-CUIL", "N/A"),
+                cliente_sheets_data.get("Nombre de Contacto", "N/A"),
+            )
+        return (id_cliente_normalizado, "Público General", "N/A", "N/A")
+    return ("0", "cliente final", "-", "-")
+
+
+def _encolar_sync_sheets_post_venta(
+    db: Session,
+    *,
+    usuario_actual: Usuario,
+    nueva_venta: Venta,
+    articulos_vendidos: List[ArticuloVendido],
+    tipo_comprobante_solicitado: str | None,
+    id_cliente_normalizado: int | None,
+    afectar_stock: bool,
+    pagos: List[tuple[str, float]],
+) -> None:
+    """
+    Encola movimiento(s) y stock para Google Sheets.
+    Se procesa después del commit de la venta (background), sin bloquear MySQL.
+    """
+    id_cliente_payload, nombre_cliente, cuit_cliente, razon_social = _resolver_datos_cliente_para_sheets(
+        db,
+        usuario_actual.id_empresa,
+        id_cliente_normalizado,
+    )
+    descripcion = _construir_descripcion_venta_sheets(db, articulos_vendidos)
+
+    for metodo_pago, monto in pagos:
+        datos_para_sheets = {
+            "id_cliente": id_cliente_payload,
+            "id_ingresos": str(nueva_venta.id),
+            "id_repartidor": "",
+            "Repartidor": usuario_actual.nombre_usuario,
+            "cliente": nombre_cliente,
+            "cuit": cuit_cliente,
+            "razon_social": razon_social,
+            "Tipo_movimiento": f"[{tipo_comprobante_solicitado}] Venta en {metodo_pago}",
+            "nro_comprobante": "",
+            "descripcion": descripcion,
+            "monto": monto,
+            "foto_comprobante": "",
+            "observaciones": "",
+        }
+        _encolar_movimiento_pendiente(
+            db=db,
+            id_empresa=usuario_actual.id_empresa,
+            id_venta=nueva_venta.id,
+            datos_para_sheets=datos_para_sheets,
+        )
+
+    if afectar_stock and articulos_vendidos:
+        _encolar_stock_pendiente(
+            db=db,
+            id_empresa=usuario_actual.id_empresa,
+            id_venta=nueva_venta.id,
+            articulos_vendidos=articulos_vendidos,
+        )
+
+    _agregar_evento_sync_nube(
+        db,
+        operacion="sync_nube_venta",
+        estado="pendiente",
+        mensaje=(
+            f"Sincronización con Google Sheets encolada "
+            f"({len(pagos)} movimiento(s)"
+            f"{', stock' if afectar_stock and articulos_vendidos else ''}). "
+            "Se procesará en segundo plano."
+        ),
+        requiere_reintento=True,
+    )
+
 # =============================================================================
 # === ESPECIALISTA DE BASE DE DATOS ===
 # =============================================================================
@@ -100,7 +202,7 @@ def registrar_venta_y_movimiento_caja(
 ) -> Tuple[Venta, CajaMovimiento]:
     """
     Registra una Venta, aplica recargos dinámicos según la configuración
-    de la empresa, y sincroniza el resultado final con Google Sheets.
+    de la empresa, y encola la sincronización con Google Sheets para después del commit.
     """
     # --- 1. VALIDACIÓN DE ARTÍCULOS Y STOCK (Sin Cambios) ---
     for item in articulos_vendidos:
@@ -277,170 +379,19 @@ def registrar_venta_y_movimiento_caja(
         
     db.flush()
 
-    # --- 4. SINCRONIZACIÓN CON GOOGLE SHEETS (TU LÓGICA ORIGINAL) ---
-    # Esta parte ahora se ejecuta DENTRO de la misma función, antes del commit.
-    # El router la convertirá en una tarea en segundo plano.
-    # NOTA: Solo sincronizamos si se está creando el movimiento (no para pagos múltiples)
+    # --- 4. SYNC GOOGLE SHEETS: encolar para procesar después del commit (no bloquea MySQL) ---
     if (afectar_stock or afectar_caja) and crear_movimiento_caja:
-        try:
-                print("[DRIVE] Intentando registrar movimiento en Google Sheets...")
-                if id_cliente_normalizado is not None:
-                    cliente = clientes_manager.obtener_cliente_por_id(usuario_actual.id_empresa, db, id_cliente_normalizado)
-                    cliente_sheets_data = obtener_cliente_por_id(
-                        db,
-                        id_empresa=usuario_actual.id_empresa,
-                        id_cliente=cliente.codigo_interno
-                    ) if cliente else None
-                else:
-                    cliente_sheets_data = None
-                print("LA DATA DE CLIENTE_SHEETS_DATA ES   :  ")
-                print(cliente_sheets_data)
-                nombre_cliente_para_sheets = "Público General"
-                cuit_cliente_para_sheets = "N/A"
-                razon_social_para_sheets = "N/A"
-
-                # Si cliente_sheets_data NO es None (es decir, encontramos un diccionario)
-                if id_cliente_normalizado is not None and cliente_sheets_data:
-                    nombre_cliente_para_sheets = cliente_sheets_data.get("nombre-usuario", "Cliente sin nombre")
-                    cuit_cliente_para_sheets = cliente_sheets_data.get("CUIT-CUIL", "N/A")
-                    razon_social_para_sheets = cliente_sheets_data.get("Nombre de Contacto", "N/A")
-
-                    datos_para_sheets = {
-                        "id_cliente": id_cliente_normalizado,
-                        "id_ingresos": str(nueva_venta.id),
-                        "id_repartidor": "",
-                        "Repartidor": usuario_actual.nombre_usuario,
-                        "cliente": nombre_cliente_para_sheets,
-                        "cuit": cuit_cliente_para_sheets,
-                        "razon_social": razon_social_para_sheets,
-                        "Tipo_movimiento": f"[{tipo_comprobante_solicitado}] Venta en {metodo_pago}",
-                        "nro_comprobante": "",
-                        "descripcion": f"Venta de {', '.join(f'(articulo id = {db.get(Articulo, item.id_articulo).codigo_interno}, cantidad = {item.cantidad})' for item in articulos_vendidos)}",
-                        "monto": total_final_con_recargo,
-                        "foto_comprobante": "",
-                        "observaciones": ""
-                    }
-                
-                    caller = TablasHandler(id_empresa=usuario_actual.id_empresa, db=db)
-                    if not caller.registrar_movimiento(datos_para_sheets):
-                        detalle_sync = caller.ultimo_error_sync or "Causa no informada por integración Sheets."
-                        _encolar_movimiento_pendiente(
-                            db=db,
-                            id_empresa=usuario_actual.id_empresa,
-                            id_venta=nueva_venta.id,
-                            datos_para_sheets=datos_para_sheets,
-                        )
-                        _agregar_evento_sync_nube(
-                            db,
-                            operacion="registrar_movimiento",
-                            estado="fallido",
-                            mensaje=f"No se pudo registrar movimiento en Google Sheets para cliente actual. Detalle: {detalle_sync}",
-                            requiere_reintento=True,
-                        )
-                        raise RuntimeError(f"[DRIVE] Error registrando movimiento para cliente actual: {detalle_sync}")
-                    _agregar_evento_sync_nube(
-                        db,
-                        operacion="registrar_movimiento",
-                        estado="ok",
-                        mensaje="Movimiento registrado en Google Sheets.",
-                    )
-                    if afectar_stock and not caller.restar_stock(db, articulos_vendidos):
-                        detalle_sync = caller.ultimo_error_sync or "Causa no informada por integración Sheets."
-                        _encolar_stock_pendiente(
-                            db=db,
-                            id_empresa=usuario_actual.id_empresa,
-                            id_venta=nueva_venta.id,
-                            articulos_vendidos=articulos_vendidos,
-                        )
-                        _agregar_evento_sync_nube(
-                            db,
-                            operacion="restar_stock",
-                            estado="fallido",
-                            mensaje=f"No se pudo actualizar stock en Google Sheets. Detalle: {detalle_sync}",
-                            requiere_reintento=True,
-                        )
-                        raise RuntimeError(f"[DRIVE] Error crítico al actualizar stock en Google Sheets: {detalle_sync}")
-                    if afectar_stock:
-                        _agregar_evento_sync_nube(
-                            db,
-                            operacion="restar_stock",
-                            estado="ok",
-                            mensaje="Stock actualizado en Google Sheets.",
-                        )
-                else:
-                    datos_para_sheets = {
-                        "id_cliente": "0",
-                        "id_ingresos": str(nueva_venta.id),
-                        "id_repartidor": "",
-                        "Repartidor": usuario_actual.nombre_usuario,
-                        "cliente": "cliente final",
-                        "cuit": "-",
-                        "razon_social": "-",
-                        "Tipo_movimiento": f"[{tipo_comprobante_solicitado}] Venta en {metodo_pago}",
-                        "nro_comprobante": "",
-                        "descripcion": f"Venta de {', '.join(f'(articulo id = {db.get(Articulo, item.id_articulo).codigo_interno}, cantidad = {item.cantidad})' for item in articulos_vendidos)}",
-                        "monto": total_final_con_recargo,
-                        "foto_comprobante": "",
-                        "observaciones": ""
-                    }
-                    caller = TablasHandler(id_empresa=usuario_actual.id_empresa, db=db)
-                    if not caller.registrar_movimiento(datos_para_sheets):
-                        detalle_sync = caller.ultimo_error_sync or "Causa no informada por integración Sheets."
-                        _encolar_movimiento_pendiente(
-                            db=db,
-                            id_empresa=usuario_actual.id_empresa,
-                            id_venta=nueva_venta.id,
-                            datos_para_sheets=datos_para_sheets,
-                        )
-                        _agregar_evento_sync_nube(
-                            db,
-                            operacion="registrar_movimiento",
-                            estado="fallido",
-                            mensaje=f"No se pudo registrar movimiento en Google Sheets para cliente final. Detalle: {detalle_sync}",
-                            requiere_reintento=True,
-                        )
-                        raise RuntimeError(f"[DRIVE] Error registrando movimiento para cliente final: {detalle_sync}")
-                    _agregar_evento_sync_nube(
-                        db,
-                        operacion="registrar_movimiento",
-                        estado="ok",
-                        mensaje="Movimiento registrado en Google Sheets.",
-                    )
-                    if afectar_stock and not caller.restar_stock(db, articulos_vendidos):
-                        detalle_sync = caller.ultimo_error_sync or "Causa no informada por integración Sheets."
-                        _encolar_stock_pendiente(
-                            db=db,
-                            id_empresa=usuario_actual.id_empresa,
-                            id_venta=nueva_venta.id,
-                            articulos_vendidos=articulos_vendidos,
-                        )
-                        _agregar_evento_sync_nube(
-                            db,
-                            operacion="restar_stock",
-                            estado="fallido",
-                            mensaje=f"No se pudo actualizar stock en Google Sheets. Detalle: {detalle_sync}",
-                            requiere_reintento=True,
-                        )
-                        raise RuntimeError(f"[DRIVE] Error crítico al actualizar stock en Google Sheets: {detalle_sync}")
-                    if afectar_stock:
-                        _agregar_evento_sync_nube(
-                            db,
-                            operacion="restar_stock",
-                            estado="ok",
-                            mensaje="Stock actualizado en Google Sheets.",
-                        )
-
-        except Exception as e_sheets:
-            # No abortamos la venta por una falla externa de sincronización.
-            print(f"❌ [DRIVE] Error durante sincronización en Google Sheets: {e_sheets}")
-            print("⚠️ [DRIVE] La venta se registró en BD local, pero la sincronización con Sheets quedó pendiente.")
-            _agregar_evento_sync_nube(
-                db,
-                operacion="sync_nube_venta",
-                estado="pendiente",
-                mensaje=f"Sincronización pendiente por error externo: {str(e_sheets)}",
-                requiere_reintento=True,
-            )
+        print("[SYNC] Encolando sincronización con Google Sheets (post-commit)...")
+        _encolar_sync_sheets_post_venta(
+            db=db,
+            usuario_actual=usuario_actual,
+            nueva_venta=nueva_venta,
+            articulos_vendidos=articulos_vendidos,
+            tipo_comprobante_solicitado=tipo_comprobante_solicitado,
+            id_cliente_normalizado=id_cliente_normalizado,
+            afectar_stock=afectar_stock,
+            pagos=[(metodo_pago, total_final_con_recargo)],
+        )
     return nueva_venta, movimiento_principal
 
 
@@ -601,104 +552,29 @@ def registrar_venta_y_movimientos_caja_multiples(
     
     db.flush()
     
-    # --- 4. REGISTRAR EN GOOGLE SHEETS: Una fila por cada método de pago ---
-    try:
-        print("[SHEETS] Registrando desglose de pagos múltiples...")
-        
-        # Manejar correctamente cliente final (id_cliente = 0 o None)
-        if id_cliente_normalizado is not None:
-            cliente = db.get(Tercero, id_cliente_normalizado)
-            cliente_sheets_data = obtener_cliente_por_id(db, id_empresa=usuario_actual.id_empresa, id_cliente=cliente.codigo_interno) if cliente else None
-            nombre_cliente = cliente_sheets_data.get("nombre-usuario", "Cliente sin nombre") if cliente_sheets_data else "Público General"
-            cuit_cliente = cliente_sheets_data.get("CUIT-CUIL", "N/A") if cliente_sheets_data else "N/A"
-            razon_social = cliente_sheets_data.get("Nombre de Contacto", "N/A") if cliente_sheets_data else "N/A"
-        else:
-            # Cliente final
-            nombre_cliente = "cliente final"
-            cuit_cliente = "-"
-            razon_social = "-"
-        
-        caller = TablasHandler(id_empresa=usuario_actual.id_empresa, db=db)
-        
-        # Registrar en sheets por cada pago
-        for pago in pagos_multiples:
-            datos_para_sheets = {
-                "id_cliente": id_cliente_normalizado if id_cliente_normalizado is not None else "0",
-                "id_ingresos": str(nueva_venta.id),
-                "id_repartidor": "",
-                "Repartidor": usuario_actual.nombre_usuario,
-                "cliente": nombre_cliente,
-                "cuit": cuit_cliente,
-                "razon_social": razon_social,
-                "Tipo_movimiento": f"[{tipo_comprobante_solicitado}] Venta en {pago.metodo_pago.upper()}",
-                "nro_comprobante": "",
-                "descripcion": f"Venta de {', '.join(f'(articulo id = {db.get(Articulo, item.id_articulo).codigo_interno}, cantidad = {item.cantidad})' for item in articulos_vendidos)}",
-                "monto": pago.monto,
-                "foto_comprobante": "",
-                "observaciones": ""
-            }
-            if not caller.registrar_movimiento(datos_para_sheets):
-                detalle_sync = caller.ultimo_error_sync or "Causa no informada por integración Sheets."
-                _encolar_movimiento_pendiente(
-                    db=db,
-                    id_empresa=usuario_actual.id_empresa,
-                    id_venta=nueva_venta.id,
-                    datos_para_sheets=datos_para_sheets,
-                )
-                _agregar_evento_sync_nube(
-                    db,
-                    operacion="registrar_movimiento",
-                    estado="fallido",
-                    mensaje=f"No se pudo registrar el pago {pago.metodo_pago} en Google Sheets. Detalle: {detalle_sync}",
-                    requiere_reintento=True,
-                )
-                raise RuntimeError(
-                    f"[SHEETS] Error crítico: no se pudo registrar el pago {pago.metodo_pago} "
-                    f"por ${pago.monto:.2f} en Google Sheets. Detalle: {detalle_sync}"
-                )
-            _agregar_evento_sync_nube(
-                db,
-                operacion="registrar_movimiento",
-                estado="ok",
-                mensaje=f"Pago {pago.metodo_pago} registrado en Google Sheets.",
-            )
-        
-        # Registrar descuento de stock una sola vez (sincronizado con el primer pago)
-        if articulos_vendidos and not caller.restar_stock(db, articulos_vendidos):
-            detalle_sync = caller.ultimo_error_sync or "Causa no informada por integración Sheets."
-            _encolar_stock_pendiente(
-                db=db,
-                id_empresa=usuario_actual.id_empresa,
-                id_venta=nueva_venta.id,
-                articulos_vendidos=articulos_vendidos,
-            )
-            _agregar_evento_sync_nube(
-                db,
-                operacion="restar_stock",
-                estado="fallido",
-                mensaje=f"No se pudo actualizar stock en Google Sheets para pago múltiple. Detalle: {detalle_sync}",
-                requiere_reintento=True,
-            )
-            raise RuntimeError(f"[SHEETS] Error crítico al actualizar stock para pago múltiple: {detalle_sync}")
-        if articulos_vendidos:
-            _agregar_evento_sync_nube(
-                db,
-                operacion="restar_stock",
-                estado="ok",
-                mensaje="Stock actualizado en Google Sheets para pago múltiple.",
-            )
-            
-    except Exception as e_sheets:
-        # Mantener disponibilidad: no revertir una venta válida por caída de Sheets.
-        print(f"❌ [SHEETS] Error durante sincronización en Google Sheets: {e_sheets}")
-        print("⚠️ [SHEETS] Venta registrada en BD local; sincronización externa pendiente.")
-        _agregar_evento_sync_nube(
-            db,
-            operacion="sync_nube_venta",
-            estado="pendiente",
-            mensaje=f"Sincronización pendiente por error externo: {str(e_sheets)}",
-            requiere_reintento=True,
-        )
+    # --- 4. SYNC GOOGLE SHEETS: encolar para procesar después del commit ---
+    tipo_lower = (tipo_comprobante_solicitado or "").strip().lower()
+    if tipo_lower == "comprobante":
+        tipo_lower = "recibo"
+    if tipo_lower in ("factura_a", "factura_b", "factura_c") or tipo_lower.startswith("factura"):
+        tipo_lower = "factura"
+    afectar_stock_multiples = tipo_lower in [
+        "factura", "recibo", "comprobante interno", "ticket", "comprobante", "remito"
+    ]
+    if omitir_stock:
+        afectar_stock_multiples = False
+
+    print("[SYNC] Encolando desglose de pagos múltiples para Google Sheets (post-commit)...")
+    _encolar_sync_sheets_post_venta(
+        db=db,
+        usuario_actual=usuario_actual,
+        nueva_venta=nueva_venta,
+        articulos_vendidos=articulos_vendidos,
+        tipo_comprobante_solicitado=tipo_comprobante_solicitado,
+        id_cliente_normalizado=id_cliente_normalizado,
+        afectar_stock=afectar_stock_multiples,
+        pagos=[(p.metodo_pago.upper(), p.monto) for p in pagos_multiples],
+    )
     
     print(f"--- [FIN REGISTRO VENTA CON MÚLTIPLES PAGOS] ---\n")
     

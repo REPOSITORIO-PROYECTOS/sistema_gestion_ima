@@ -17,6 +17,7 @@ from back.modelos import ConfiguracionEmpresa, Empresa, Usuario, Tercero
 from back.gestion.caja import apertura_cierre, registro_caja, consultas_caja
 from back.gestion.facturacion_afip import generar_factura_para_venta
 from back.gestion.reportes import generador_comprobantes
+from back.gestion.sync_nube_queue_manager import procesar_cola_sync_nube_en_background
 
 # Schemas necesarios para este router
 from back.schemas.caja_schemas import (
@@ -24,7 +25,7 @@ from back.schemas.caja_schemas import (
     RegistrarVentaRequest, InformeCajasResponse, RespuestaGenerica,
     MovimientoSimpleRequest, TipoMovimiento, MovimientoContableResponse
 )
-from back.schemas.comprobante_schemas import EmisorData, ReceptorData
+from back.schemas.comprobante_schemas import EmisorData, ReceptorData, tercero_a_receptor_data
 
 router = APIRouter(
     prefix="/caja",
@@ -72,6 +73,7 @@ def api_cerrar_caja(req: CerrarCajaRequest, db: Session = Depends(get_db), curre
 @router.post("/ventas/registrar", response_model=RespuestaGenerica, tags=["Caja - Operaciones"])
 def api_registrar_venta(
     req: RegistrarVentaRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(obtener_usuario_actual)
 ):
@@ -137,7 +139,18 @@ def api_registrar_venta(
     except Exception as e:
         db.rollback()
         logger.exception("Error inesperado registrando venta", exc_info=e)
+        if "Lock wait timeout" in str(e):
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "La venta no pudo completarse porque otro proceso bloqueó el stock. "
+                    "Espere unos segundos e intente una sola vez."
+                ),
+            )
         raise HTTPException(status_code=500, detail="Error interno al registrar la venta.")
+
+    # Sheets: procesar cola encolada durante el registro (sin bloquear la respuesta HTTP).
+    background_tasks.add_task(procesar_cola_sync_nube_en_background)
 
     # --- PASO 2: INTEGRACIÓN CON AFIP Y ACTUALIZACIÓN DE LA VENTA ---
     print("TODAVIA NO SALIMOS DE CAJA ROUTER")
@@ -170,7 +183,7 @@ def api_registrar_venta(
             
             print("POR SACAR CLIENTE SCHEMA")
             # Usar model_validate para manejar el caso de que cliente_db sea None
-            cliente_data_schema = ReceptorData.model_validate(cliente_db, from_attributes=True) if cliente_db else None
+            cliente_data_schema = tercero_a_receptor_data(cliente_db) if cliente_db else None
             print("cliente data schema : ")
             print(cliente_data_schema)
 

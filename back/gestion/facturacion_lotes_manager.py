@@ -13,7 +13,7 @@ from back.modelos import ConfiguracionEmpresa, Usuario, Tercero, Venta, CajaMovi
 # Importamos el especialista de AFIP refactorizado
 from back.gestion.facturacion_afip import generar_factura_para_venta, generar_nota_credito_para_venta
 # Importamos los schemas que vamos a construir
-from back.schemas.comprobante_schemas import EmisorData, ReceptorData, TransaccionData, ItemData
+from back.schemas.comprobante_schemas import EmisorData, ReceptorData, TransaccionData, ItemData, tercero_a_receptor_data
 # Importamos la configuración para obtener las URLs y API Keys
 from back.config import URL_BOVEDA, API_KEY_INTERNA
 from back.gestion.reportes.generador_comprobantes import TEMPLATE_DIR, format_datetime
@@ -122,9 +122,7 @@ def facturar_lote_de_ventas(
         afip_clave_privada=credenciales.get("clave_privada")
     )
 
-    receptor_data = ReceptorData.model_validate(cliente_db, from_attributes=True) if cliente_db else ReceptorData(
-        nombre_razon_social="Consumidor Final", cuit_o_dni="0", domicilio="", condicion_iva="CONSUMIDOR_FINAL"
-    )
+    receptor_data = tercero_a_receptor_data(cliente_db)
 
     # Creamos la venta "virtual" que consolida el total.
     venta_consolidada_para_afip = Venta(total=total_a_facturar)
@@ -205,9 +203,7 @@ def crear_nota_credito_para_anular(
     )
     
     cliente_db = db.get(Tercero, venta_original.id_cliente) if venta_original.id_cliente else None
-    receptor_data = ReceptorData.model_validate(cliente_db, from_attributes=True) if cliente_db else ReceptorData(
-        nombre_razon_social="Consumidor Final", cuit_o_dni="0", domicilio="", condicion_iva="CONSUMIDOR_FINAL"
-    )
+    receptor_data = tercero_a_receptor_data(cliente_db)
     
     # 3. Llamada al especialista de facturación para generar la NC (sin cambios)
     resultado_afip_nc = generar_nota_credito_para_venta(

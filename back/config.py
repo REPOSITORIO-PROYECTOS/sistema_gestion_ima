@@ -83,11 +83,11 @@ AFIP_KEY: str = os.getenv("AFIP_KEY")
 AFIP_PRODUCTION: bool = os.getenv("AFIP_PRODUCTION", "false").lower() == "true"
     
     # URL del microservicio de facturación
-FACTURACION_API_URL: str = os.getenv("FACTURACION_API_URL", "http://localhost:8008/facturador/facturar-por-cantidad")
+FACTURACION_API_URL: str = os.getenv("FACTURACION_API_URL", "http://127.0.0.1:8012/facturador/facturar-por-cantidad")
 
 #===========================FIN FACTURADOR=========================================
 
-URL_BOVEDA: str = os.getenv("BOVEDA_URL", "http://localhost:8000/boveda")
+URL_BOVEDA: str = os.getenv("BOVEDA_URL", "http://127.0.0.1:8015")
 API_KEY_INTERNA: str = os.getenv("BOVEDA_API_KEY_INTERNA", "default_api_key")
 # ===== INICIO DE LA MODIFICACIÓN =====
 # Creamos una ruta absoluta al archivo de credenciales,

@@ -20,9 +20,18 @@ if not all([DB_USER, DB_PASSWORD, DB_HOST, DB_NAME]):
 # Línea corregida
 DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
+def _env_truthy(name: str, default: str = "false") -> bool:
+    return os.getenv(name, default).strip().lower() in ("1", "true", "yes", "on")
+
+
+# Solo en APP_ENV=development/local y SQL_ECHO=true (nunca en producción).
+_app_env = os.getenv("APP_ENV", "production").strip().lower()
+_is_dev_env = _app_env in ("dev", "development", "local")
+_sql_echo = _is_dev_env and _env_truthy("SQL_ECHO", "false")
+
 engine = create_engine(
-    DATABASE_URL, 
-    echo=True,
+    DATABASE_URL,
+    echo=_sql_echo,
     pool_pre_ping=True,  # Verifica la conexión antes de usarla (evita "MySQL server has gone away")
     pool_recycle=3600    # Recicla conexiones cada hora para prevenir timeouts
 )

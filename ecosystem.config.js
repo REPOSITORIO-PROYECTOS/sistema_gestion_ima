@@ -10,6 +10,10 @@ module.exports = {
         "/home/dev_taup/proyectos/sistema_gestion_ima/back/venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8011"
       ],
       cwd: "/home/dev_taup/proyectos/sistema_gestion_ima/back/",
+      env: {
+        APP_ENV: "production",
+        SQL_ECHO: "false",
+      },
       watch: false,
     },
     {

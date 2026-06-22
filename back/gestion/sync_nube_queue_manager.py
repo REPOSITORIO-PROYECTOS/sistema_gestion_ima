@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
@@ -6,6 +7,8 @@ from sqlmodel import Session, select
 from back.modelos import SyncNubePendiente
 from back.schemas.caja_schemas import ArticuloVendido
 from back.utils.tablas_handler import TablasHandler
+
+logger = logging.getLogger(__name__)
 
 
 OPERACION_REGISTRAR_MOVIMIENTO = "registrar_movimiento"
@@ -122,3 +125,16 @@ def procesar_cola_sync_nube(db: Session, max_items: int = 50) -> Dict[str, int]:
         "reprogramados": reprogramados,
         "fallidos": fallidos,
     }
+
+
+def procesar_cola_sync_nube_en_background(max_items: int = 50) -> None:
+    """Procesa la cola sync_nube en un hilo aparte, tras commit de la venta."""
+    from back.database import SessionLocal
+
+    try:
+        with SessionLocal() as db:
+            resumen = procesar_cola_sync_nube(db=db, max_items=max_items)
+            if resumen.get("procesados", 0) > 0:
+                logger.info("Cola sync_nube (background): %s", resumen)
+    except Exception:
+        logger.exception("Error procesando cola sync_nube en background")

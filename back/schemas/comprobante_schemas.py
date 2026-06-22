@@ -47,6 +47,28 @@ class ReceptorData(BaseModel):
     domicilio: Optional[str] = None
     condicion_iva: Optional[str] = None
 
+
+def tercero_a_receptor_data(cliente) -> "ReceptorData":
+    """Mapea un Tercero (SQLModel) al schema de AFIP/comprobantes."""
+    if cliente is None:
+        return ReceptorData(
+            nombre_razon_social="Consumidor Final",
+            cuit_o_dni="0",
+            domicilio="",
+            condicion_iva="CONSUMIDOR_FINAL",
+        )
+    cuit_o_dni = (
+        getattr(cliente, "cuit", None)
+        or getattr(cliente, "identificacion_fiscal", None)
+        or "0"
+    )
+    return ReceptorData(
+        nombre_razon_social=getattr(cliente, "nombre_razon_social", None) or "Cliente",
+        cuit_o_dni=str(cuit_o_dni),
+        domicilio=getattr(cliente, "direccion", None) or "",
+        condicion_iva=getattr(cliente, "condicion_iva", None) or "CONSUMIDOR_FINAL",
+    )
+
 class ItemData(BaseModel):
     cantidad: float
     descripcion: str

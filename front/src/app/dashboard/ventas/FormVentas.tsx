@@ -745,6 +745,10 @@ function FormVentas({
   }, [token, empresa, formatoComprobante, tipoClienteSeleccionado, clienteSeleccionado, cuitManual]);
 
   const procesarVenta = useCallback(async (tipo: string) => {
+    if (isLoading) {
+      return;
+    }
+
     // 1. Validaciones
     if (!checkoutVisible) {
       toast.error("Por favor seleccione método de pago primero (Sección Finalizar Compra)");
@@ -933,7 +937,12 @@ function FormVentas({
       }
 
       const data = await response.json();
-      toast.success(`✅ Venta registrada: ${data.message}`);
+      const afip = data?.data?.facturacion_afip;
+      if (tipo === "factura" && afip?.estado === "FALLIDO") {
+        toast.error(`❌ Venta registrada pero AFIP falló: ${afip.error || "Error desconocido"}`);
+      } else {
+        toast.success(`✅ Venta registrada: ${data.message}`);
+      }
 
       // Actualizamos el Store
       await refrescarProductos();
@@ -981,6 +990,7 @@ function FormVentas({
       setIsLoading(false);
     }
   }, [
+    isLoading,
     checkoutVisible,
     productosVendidos,
     metodoPago,
