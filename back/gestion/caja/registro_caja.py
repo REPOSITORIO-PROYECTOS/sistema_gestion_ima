@@ -38,12 +38,21 @@ def _agregar_evento_sync_nube(
         }
     )
 
+def _sincroniza_con_sheets(db: Session, id_empresa: int) -> bool:
+    config = db.get(ConfiguracionEmpresa, id_empresa)
+    if config and getattr(config, "modo_especial_habilitado", False):
+        return False
+    return True
+
+
 def _encolar_movimiento_pendiente(
     db: Session,
     id_empresa: int,
     datos_para_sheets: Dict[str, Any],
     id_venta: int | None = None,
 ) -> None:
+    if not _sincroniza_con_sheets(db, id_empresa):
+        return
     encolar_sync_nube_pendiente(
         db=db,
         id_empresa=id_empresa,
@@ -86,6 +95,8 @@ def _encolar_stock_pendiente(
     id_venta: int,
     articulos_vendidos: List[ArticuloVendido],
 ) -> None:
+    if not _sincroniza_con_sheets(db, id_empresa):
+        return
     payload = {
         "articulos_vendidos": [
             {
@@ -193,18 +204,19 @@ def _encolar_sync_sheets_post_venta(
             articulos_vendidos=articulos_vendidos,
         )
 
-    _agregar_evento_sync_nube(
-        db,
-        operacion="sync_nube_venta",
-        estado="pendiente",
-        mensaje=(
-            f"Sincronización con Google Sheets encolada "
-            f"({len(pagos)} movimiento(s)"
-            f"{', stock' if afectar_stock and articulos_vendidos else ''}). "
-            "Se procesará en segundo plano."
-        ),
-        requiere_reintento=True,
-    )
+    if _sincroniza_con_sheets(db, usuario_actual.id_empresa):
+        _agregar_evento_sync_nube(
+            db,
+            operacion="sync_nube_venta",
+            estado="pendiente",
+            mensaje=(
+                f"Sincronización con Google Sheets encolada "
+                f"({len(pagos)} movimiento(s)"
+                f"{', stock' if afectar_stock and articulos_vendidos else ''}). "
+                "Se procesará en segundo plano."
+            ),
+            requiere_reintento=True,
+        )
 
 # =============================================================================
 # === ESPECIALISTA DE BASE DE DATOS ===
@@ -243,8 +255,9 @@ def registrar_venta_y_movimiento_caja(
             raise ValueError(f"El artículo '{articulo_db.descripcion}' no pertenece a la empresa.")
         # Si omitir_stock es True, no validamos cantidad vs stock aquí, 
         # asumimos que ya se validó/descontó previamente (ej: en mesas)
-        if not omitir_stock and articulo_db.stock_actual < item.cantidad:
-            raise ValueError(f"Stock insuficiente para '{articulo_db.descripcion}'.")
+        if not omitir_stock and not getattr(articulo_db, "precio_manual", False):
+            if articulo_db.stock_actual < item.cantidad:
+                raise ValueError(f"Stock insuficiente para '{articulo_db.descripcion}'.")
 
     id_cliente_normalizado = id_cliente if id_cliente and id_cliente > 0 else None
 
@@ -372,7 +385,7 @@ def registrar_venta_y_movimiento_caja(
         db.add(detalle)
         if afectar_stock:
             articulo_a_actualizar = db.get(Articulo, item.id_articulo)
-            if articulo_a_actualizar:
+            if articulo_a_actualizar and not getattr(articulo_a_actualizar, "precio_manual", False):
                 print(f"      -> Descontando {item.cantidad} de stock para '{articulo_a_actualizar.descripcion}'")
                 articulo_a_actualizar.stock_actual -= item.cantidad
                 db.add(articulo_a_actualizar)
@@ -486,13 +499,14 @@ def registrar_ingreso_egreso(
         id_empresa=usuario_actual.id_empresa,
         datos_para_sheets=datos_para_sheets,
     )
-    _agregar_evento_sync_nube(
-        db,
-        operacion="sync_nube_movimiento_manual",
-        estado="pendiente",
-        mensaje=f"Movimiento {tipo_upper} encolado para Google Sheets (ID local: {nuevo_movimiento.id}).",
-        requiere_reintento=True,
-    )
+    if _sincroniza_con_sheets(db, usuario_actual.id_empresa):
+        _agregar_evento_sync_nube(
+            db,
+            operacion="sync_nube_movimiento_manual",
+            estado="pendiente",
+            mensaje=f"Movimiento {tipo_upper} encolado para Google Sheets (ID local: {nuevo_movimiento.id}).",
+            requiere_reintento=True,
+        )
 
     print(f"   -> Movimiento preparado con ID: {nuevo_movimiento.id} (pendiente de commit)")
     print("--- [FIN TRACE] ---\n")

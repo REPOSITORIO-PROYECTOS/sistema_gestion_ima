@@ -149,7 +149,9 @@ function DashboardVenta() {
   const mostrarRol = () => {
     if (role?.nombre === "Admin") return "Administrador";
     if (role?.nombre === "Cajero") return "Cajero";
+    if (role?.nombre === "Vendedora") return "Vendedora";
     if (role?.nombre === "Gerente") return "Gerente";
+    if (role?.nombre === "Encargada") return "Encargada";
     if (role?.nombre === "Soporte") return "Soporte";
     return "Rol no identificado";
   };
@@ -239,7 +241,7 @@ function DashboardVenta() {
 
 
   return (
-    <ProtectedRoute allowedRoles={["Admin", "Cajero", "Soporte"]}>
+    <ProtectedRoute allowedRoles={["Admin", "Cajero", "Vendedora", "Soporte"]}>
       <div className="flex flex-col gap-4">
 
         {/* Header de Informacion */}

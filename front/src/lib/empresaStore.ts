@@ -16,6 +16,7 @@ interface Empresa {
   link_google_sheets?: string;
   ingresos_brutos?: string;
   inicio_actividades?: string;
+  modo_especial_habilitado?: boolean;
   aclaraciones_legales?: Record<string, string>;
 }
 

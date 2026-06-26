@@ -83,6 +83,10 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
 
     const staticBase = apiBase.endsWith('/api') ? apiBase.slice(0, -4) : apiBase;
     const rutaNormalizada = raw.startsWith('/') ? raw : `/${raw}`;
+    // Preferir /api/static (montado en FastAPI y reescrito por Next en dev)
+    if (rutaNormalizada.startsWith('/static/')) {
+      return `${staticBase}/api${rutaNormalizada}`;
+    }
     return `${staticBase}${rutaNormalizada}`;
   };
 

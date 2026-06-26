@@ -13,6 +13,7 @@ from typing import List, Dict, Any, Type, Optional
 
 # Importamos los modelos de nuestra base de datos con los que vamos a trabajar
 from back.modelos import Articulo, Categoria, Marca, ConfiguracionEmpresa, ArticuloCodigo
+from back.utils.articulo_helpers import es_articulo_precio_manual
 
 # Importamos nuestro "operario" para leer Google Sheets
 from back.utils.tablas_handler import TablasHandler
@@ -202,6 +203,9 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int, nombr
                     articulo_existente.ubicacion = ubicacion
                     articulo_existente.unidad_venta = unidad_venta
                     articulo_existente.activo = activo_en_sheet
+                    if es_articulo_precio_manual(descripcion, codigo_interno):
+                        articulo_existente.precio_manual = True
+                        articulo_existente.auto_actualizar_precio = False
                     if categoria_obj:
                         articulo_existente.categoria = categoria_obj
                     if marca_obj:
@@ -213,6 +217,7 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int, nombr
                 else:
                     # --- CREAR NUEVO ARTÍCULO ---
                     print(f"  ✨ Creando nuevo: {codigo_interno} - {descripcion}")
+                    es_precio_manual = es_articulo_precio_manual(descripcion, codigo_interno)
                     nuevo_articulo = Articulo(
                         id_empresa=id_empresa_actual,
                         codigo_interno=codigo_interno,
@@ -225,6 +230,8 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int, nombr
                         ubicacion=ubicacion,
                         unidad_venta=unidad_venta,
                         activo=activo_en_sheet,
+                        precio_manual=es_precio_manual,
+                        auto_actualizar_precio=not es_precio_manual,
                         id_categoria=categoria_obj.id if categoria_obj else None,
                         id_marca=marca_obj.id if marca_obj else None
                     )

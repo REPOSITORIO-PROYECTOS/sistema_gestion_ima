@@ -64,6 +64,7 @@ type ProductoSeleccionado = {
   venta_negocio: number;
   stock_actual: number;
   unidad_venta: string;
+  precio_manual?: boolean;
 };
 
 // --- Constantes ---
@@ -172,8 +173,8 @@ function FormVentas({
   const [usarPagosMultiples, setUsarPagosMultiples] = useState(false);
   const [pagosMultiples, setPagosMultiples] = useState<Pago[]>([]);
 
-  // Estados para Venta a Granel
-  const [modoVenta, setModoVenta] = useState<'unidad' | 'granel'>('unidad');
+  // Estados para Venta a Granel / Precio Manual
+  const [modoVenta, setModoVenta] = useState<'unidad' | 'granel' | 'precio_manual'>('unidad');
   const [inputCantidadGranel, setInputCantidadGranel] = useState("1");
   const [inputPrecioGranel, setInputPrecioGranel] = useState("");
 
@@ -185,13 +186,26 @@ function FormVentas({
   }, [tipoClienteSeleccionado]);
 
 
-  const totalProducto = productoSeleccionado ? getPrecioProducto(productoSeleccionado) * cantidad : 0;
+  const totalProducto = productoSeleccionado
+    ? (modoVenta === 'precio_manual'
+        ? (parseFloat(inputPrecioGranel) || 0) * cantidad
+        : getPrecioProducto(productoSeleccionado) * cantidad)
+    : 0;
   const subtotal = totalProducto;
   const productoConDescuento = subtotal;
 
   // Hook para cambiar el modo de venta según el producto seleccionado
   useEffect(() => {
     if (productoSeleccionado) {
+      if (productoSeleccionado.precio_manual) {
+        setModoVenta('precio_manual');
+        setCantidad(1);
+        setInputCantidadGranel("1");
+        setInputPrecioGranel("");
+        setTimeout(() => cantidadInputRef.current?.focus(), 50);
+        return;
+      }
+
       // ✅ Normalizar unidad_venta: limpiar spaces, lowercase
       const unidadRaw = productoSeleccionado.unidad_venta || '';
       const unidad = unidadRaw.toLowerCase().trim().replace(/\s+/g, '');
@@ -273,6 +287,11 @@ function FormVentas({
   const handlePrecioGranelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const nuevoValor = e.target.value;
     setInputPrecioGranel(nuevoValor);
+    if (modoVenta === 'precio_manual') {
+      const precioNum = parseFloat(nuevoValor) || 0;
+      setCantidad(precioNum > 0 ? 1 : 0);
+      return;
+    }
     if (productoSeleccionado && getPrecioProducto(productoSeleccionado) > 0) {
       const precioNum = parseFloat(nuevoValor) || 0;
       const precioUnitario = getPrecioProducto(productoSeleccionado);
@@ -286,7 +305,11 @@ function FormVentas({
     if (!productoSeleccionado || cantidad <= 0) {
       toast.error("Seleccione un producto y una cantidad válida.");
       return;
-    };
+    }
+    if (modoVenta === 'precio_manual' && totalProducto <= 0) {
+      toast.error("Ingrese el precio de venta para este artículo.");
+      return;
+    }
     onAgregarProducto({
       id: productoSeleccionado.id,
       tipo: productoSeleccionado.nombre,
@@ -494,8 +517,17 @@ function FormVentas({
           precio_venta: data.precio_venta,
           venta_negocio: data.venta_negocio,
           stock_actual: data.stock_actual,
-          unidad_venta: data.unidad_venta || 'Unidad'
+          unidad_venta: data.unidad_venta || 'Unidad',
+          precio_manual: data.precio_manual ?? false,
         };
+
+        if (productoAdaptado.precio_manual) {
+          setProductoSeleccionado(productoAdaptado);
+          setCodigoEscaneado('');
+          toast.info(`Ingrese el precio para "${productoAdaptado.nombre}"`);
+          setTimeout(() => cantidadInputRef.current?.focus(), 100);
+          return;
+        }
 
         const precioUnitario =
           tipoClienteSeleccionado.id === "0"
@@ -598,6 +630,7 @@ function FormVentas({
         venta_negocio: number;
         stock_actual: number;
         unidad_venta: string;
+        precio_manual?: boolean;
       };
 
       const data: ProductoAPI[] = await res.json();
@@ -608,6 +641,7 @@ function FormVentas({
         venta_negocio: p.venta_negocio,
         stock_actual: p.stock_actual,
         unidad_venta: p.unidad_venta || 'Unidad',
+        precio_manual: p.precio_manual ?? false,
       }));
 
       // Actualizar store global y localStorage
@@ -888,9 +922,9 @@ function FormVentas({
         const productoReal = p.id
           ? productos.find((prod) => prod.id === p.id)
           : productos.find((prod) => prod.nombre === p.tipo);
-        const precioUnitario = productoReal
-          ? getPrecioProducto(productoReal)
-          : (p.cantidad ? p.precioBase / p.cantidad : 0);
+        const precioUnitario = p.cantidad
+          ? p.precioBase / p.cantidad
+          : (productoReal ? getPrecioProducto(productoReal) : 0);
         return {
           id_articulo: p.id ?? productoReal?.id ?? "0",
           nombre: productoReal?.nombre ?? p.tipo,
@@ -952,9 +986,9 @@ function FormVentas({
         const productoReal = p.id
           ? productos.find((prod) => prod.id === p.id)
           : productos.find((prod) => prod.nombre === p.tipo);
-        const precioUnitario = productoReal
-          ? getPrecioProducto(productoReal)
-          : (p.cantidad ? p.precioBase / p.cantidad : 0);
+        const precioUnitario = p.cantidad
+          ? p.precioBase / p.cantidad
+          : (productoReal ? getPrecioProducto(productoReal) : 0);
         const item: ItemComprobante = {
           descripcion: productoReal?.nombre || p.tipo,
           cantidad: p.cantidad,
@@ -1218,7 +1252,7 @@ function FormVentas({
             modoVenta={modoVenta}
             cantidadUnidad={cantidad}
             setCantidadUnidad={setCantidad}
-            stockActual={productoSeleccionado?.stock_actual ?? 9999}
+            stockActual={modoVenta === 'precio_manual' ? 9999 : (productoSeleccionado?.stock_actual ?? 9999)}
             unidadDeVenta={productoSeleccionado?.unidad_venta || ''}
             inputCantidadGranel={inputCantidadGranel}
             handleCantidadGranelChange={handleCantidadGranelChange}

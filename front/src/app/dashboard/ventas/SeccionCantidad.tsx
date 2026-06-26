@@ -7,7 +7,7 @@ import { LegacyRef } from "react"
 // Definimos las props que el componente necesita
 interface SeccionCantidadProps {
   cantidadInputRef: LegacyRef<HTMLInputElement>;
-  modoVenta: 'unidad' | 'granel';
+  modoVenta: 'unidad' | 'granel' | 'precio_manual';
 
   // Props para modo 'unidad'
   cantidadUnidad: number;
@@ -30,6 +30,30 @@ export function SeccionCantidad({
   inputPrecioGranel, handlePrecioGranelChange
 }: SeccionCantidadProps) {
   const limiteStock = Number.isFinite(stockActual) && stockActual > 0 ? stockActual : undefined;
+
+  // --- VISTA PARA MODO 'PRECIO MANUAL' (Panadería, Golosinas, etc.) ---
+  if (modoVenta === 'precio_manual') {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 items-center">
+        <Label className="text-xl font-semibold text-green-900 md:text-right">
+          Precio de venta
+        </Label>
+        <div className="md:col-span-2">
+          <Input
+            id="precio-manual"
+            ref={cantidadInputRef}
+            type="number"
+            min={0.01}
+            step="0.01"
+            placeholder="Ingrese el importe"
+            value={inputPrecioGranel}
+            onChange={handlePrecioGranelChange}
+            className="w-full text-black text-lg"
+          />
+        </div>
+      </div>
+    );
+  }
 
   // --- VISTA PARA MODO 'UNIDAD' ---
   if (modoVenta === 'unidad') {

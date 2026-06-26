@@ -15,11 +15,11 @@ type NavLink = {
 
 // Lista de secciones (paths) y sus roles permitidos - revisar si no va en ssr
 const links: NavLink[] = [
-  { name: "Ventas", href: "/dashboard/ventas", roles: ["Admin", "Cajero", "Gerente"] },
-  { name: "Mesas", href: "/dashboard/mesas", roles: ["Admin", "Cajero", "Gerente"] },
-  { name: "Cocina", href: "/dashboard/cocina", roles: ["Admin", "Cajero", "Gerente"] },
-  { name: "Contabilidad", href: "/dashboard/contabilidad", roles: ["Admin", "Gerente"] },
-  { name: "Stock", href: "/dashboard/stock", roles: ["Admin", "Gerente"] },
+  { name: "Ventas", href: "/dashboard/ventas", roles: ["Admin", "Cajero", "Vendedora", "Gerente", "Encargada"] },
+  { name: "Mesas", href: "/dashboard/mesas", roles: ["Admin", "Cajero", "Vendedora", "Gerente", "Encargada"] },
+  { name: "Cocina", href: "/dashboard/cocina", roles: ["Admin", "Cajero", "Vendedora", "Gerente", "Encargada"] },
+  { name: "Contabilidad", href: "/dashboard/contabilidad", roles: ["Admin", "Gerente", "Encargada"] },
+  { name: "Stock", href: "/dashboard/stock", roles: ["Admin", "Gerente", "Encargada"] },
 ]
 
 function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -31,7 +31,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
 
     // Al Dashboard inicial pueden acceder todos los roles
-    <ProtectedRoute allowedRoles={["Admin", "Cajero", "Gerente"]}>
+    <ProtectedRoute allowedRoles={["Admin", "Cajero", "Vendedora", "Gerente", "Encargada"]}>
 
       {/* NavBar - los roles disablean */}
       <NavBar links={links} role={role?.nombre ?? ""} />
@@ -42,7 +42,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* Monitor de Comandas (Solo visible si se activa manualmente y estamos en Mesas) */}
-      {(role?.nombre === 'Admin' || role?.nombre === 'Cajero') && pathname === '/dashboard/mesas' && <ComandaMonitor />}
+      {(role?.nombre === 'Admin' || role?.nombre === 'Cajero' || role?.nombre === 'Vendedora') && pathname === '/dashboard/mesas' && <ComandaMonitor />}
 
       {/* Copyright */}
       <footer className="text-center text-md text-gray-500 p-4">

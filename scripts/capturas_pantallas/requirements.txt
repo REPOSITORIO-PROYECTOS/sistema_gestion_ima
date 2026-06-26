@@ -1,0 +1,3 @@
+# Dependencias opcionales para scripts/capturas_pantallas/capturar.py
+playwright>=1.49.0
+httpx>=0.27.0

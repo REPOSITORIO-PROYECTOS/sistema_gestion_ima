@@ -16,6 +16,7 @@ type Producto = {
   venta_negocio: number;
   stock_actual: number;
   unidad_venta: string;
+  precio_manual?: boolean;
 };
 type MinimalArticulo = {
   id: number;
@@ -24,6 +25,7 @@ type MinimalArticulo = {
   venta_negocio?: number;
   stock_actual?: number;
   unidad_venta?: string;
+  precio_manual?: boolean;
 }
 
 // Props que el componente recibe del orquestador (FormVentas)
@@ -121,6 +123,7 @@ export function SeccionProducto(props: SeccionProductoProps) {
         venta_negocio: a.venta_negocio ?? a.precio_venta,
         stock_actual: a.stock_actual ?? 0,
         unidad_venta: a.unidad_venta ?? "unidad",
+        precio_manual: a.precio_manual ?? false,
       }))
       setMatches(mapped)
 
@@ -291,6 +294,7 @@ export function SeccionProducto(props: SeccionProductoProps) {
                     venta_negocio: a.venta_negocio ?? a.precio_venta,
                     stock_actual: a.stock_actual ?? 0,
                     unidad_venta: a.unidad_venta ?? "unidad",
+                    precio_manual: a.precio_manual ?? false,
                   }))
                   setMatches(mapped)
                   setPopoverOpen(true)
@@ -315,6 +319,7 @@ export function SeccionProducto(props: SeccionProductoProps) {
                     venta_negocio: a.venta_negocio ?? a.precio_venta,
                     stock_actual: a.stock_actual ?? 0,
                     unidad_venta: a.unidad_venta ?? "unidad",
+                    precio_manual: a.precio_manual ?? false,
                   }))
                   setMatches(mapped)
                   setPopoverOpen(true)

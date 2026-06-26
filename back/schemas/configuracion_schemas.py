@@ -41,6 +41,7 @@ class ConfiguracionUpdate(BaseModel):
     aclaraciones_legales: Optional[Dict[str, Optional[str]]] = None
     ingresos_brutos: Optional[str] = None
     inicio_actividades: Optional[str] = None
+    modo_especial_habilitado: Optional[bool] = None
 
 class ConfiguracionResponse(BaseModel):
     """Schema completo para devolver la configuración de una empresa."""
@@ -66,6 +67,7 @@ class ConfiguracionResponse(BaseModel):
     aclaraciones_legales: Optional[Dict[str, Optional[str]]]
     ingresos_brutos: Optional[str] = None
     inicio_actividades: Optional[str] = None
+    modo_especial_habilitado: bool = False
 
     @field_validator("aclaraciones_legales", mode="before")
     @classmethod

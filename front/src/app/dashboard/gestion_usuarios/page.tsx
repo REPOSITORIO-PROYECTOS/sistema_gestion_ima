@@ -106,7 +106,7 @@ export default function GestionUsuarios() {
               <Button
                 variant="success"
                 className="w-full !py-6 sm:!max-w-2/5 lg:w-1/4 text-lg font-semibold"
-                disabled={usuario?.rol?.nombre === "Cajero"}
+                disabled={usuario?.rol?.nombre === "Cajero" || usuario?.rol?.nombre === "Vendedora"}
               >
                 + Crear nuevo usuario
               </Button>

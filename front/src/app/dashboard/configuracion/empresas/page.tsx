@@ -124,72 +124,82 @@ export default function GestionEmpresasPage() {
           setIsConfigModalOpen(v);
           if (!v) setSelectedEmpresaId(null);
         }}>
-          <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-hidden">
-            <DialogHeader>
+          <DialogContent className="flex max-h-[92vh] w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
+            <DialogHeader className="shrink-0 border-b px-6 py-4 pr-12">
               <DialogTitle>Configuración de Empresa</DialogTitle>
             </DialogHeader>
-            {selectedEmpresaId && (
-              <div className="py-2 space-y-6">
-                <div className="space-y-2">
-                  <span className="text-sm text-muted-foreground">Empresa</span>
-                  <div className="text-2xl font-semibold text-slate-900">{empresaSeleccionada?.nombre_legal || `ID ${selectedEmpresaId}`}</div>
-                  <p className="text-sm text-slate-600">Aquí podés ajustar los datos fiscales y los certificados que se usan para emitir la FIP.</p>
-                </div>
 
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <p className="text-xs uppercase tracking-wider text-slate-500">CUIT</p>
-                    <p className="text-lg font-semibold text-slate-900">{empresaSeleccionada?.cuit || "-"}</p>
-                  </div>
-                  <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <p className="text-xs uppercase tracking-wider text-slate-500">Estado</p>
-                    <p className={`text-sm font-semibold ${empresaSeleccionada?.activa ? "text-emerald-700" : "text-rose-600"}`}>
-                      {empresaSeleccionada?.activa ? "Activa" : "Inactiva"}
+            {selectedEmpresaId && (
+              <>
+                <div className="shrink-0 space-y-4 border-b bg-slate-50/80 px-6 py-4">
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground">Empresa</span>
+                    <div className="text-xl font-semibold text-slate-900 sm:text-2xl">
+                      {empresaSeleccionada?.nombre_legal || `ID ${selectedEmpresaId}`}
+                    </div>
+                    <p className="text-sm text-slate-600">
+                      Datos fiscales, modo especial y certificados AFIP.
                     </p>
                   </div>
-                  <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <p className="text-xs uppercase tracking-wider text-slate-500">Admin</p>
-                    <p className="text-sm font-semibold text-slate-900">{empresaSeleccionada?.admin_username || "Sin admin"}</p>
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                      <p className="text-xs uppercase tracking-wider text-slate-500">CUIT</p>
+                      <p className="text-base font-semibold text-slate-900">{empresaSeleccionada?.cuit || "-"}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                      <p className="text-xs uppercase tracking-wider text-slate-500">Estado</p>
+                      <p className={`text-sm font-semibold ${empresaSeleccionada?.activa ? "text-emerald-700" : "text-rose-600"}`}>
+                        {empresaSeleccionada?.activa ? "Activa" : "Inactiva"}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                      <p className="text-xs uppercase tracking-wider text-slate-500">Admin</p>
+                      <p className="text-sm font-semibold text-slate-900">{empresaSeleccionada?.admin_username || "Sin admin"}</p>
+                    </div>
                   </div>
                 </div>
 
-                <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
-                  <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold text-slate-900">Configuración General & AFIP</h3>
-                      <span className={`text-xs font-semibold ${configSavedAt ? "text-emerald-600" : "text-slate-500"}`}>
-                        {configSavedAt ? `Guardado ${configSavedAt}` : "Sin guardar"}
-                      </span>
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4">
+                  <div className="space-y-6 pb-2">
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+                      <div className="mb-4 flex items-center justify-between gap-2">
+                        <h3 className="text-lg font-semibold text-slate-900">Configuración General & AFIP</h3>
+                        <span className={`shrink-0 text-xs font-semibold ${configSavedAt ? "text-emerald-600" : "text-slate-500"}`}>
+                          {configSavedAt ? `Guardado ${configSavedAt}` : "Sin guardar"}
+                        </span>
+                      </div>
+                      <ConfiguracionForm
+                        empresaId={selectedEmpresaId}
+                        sections={{ general: true, afip: true, balanza: false, modoEspecial: true }}
+                        onSave={() => setConfigSavedAt(new Date().toLocaleTimeString())}
+                      />
                     </div>
-                    <ConfiguracionForm
-                      empresaId={selectedEmpresaId}
-                      sections={{ general: true, afip: true, balanza: false }}
-                      onSave={() => setConfigSavedAt(new Date().toLocaleTimeString())}
-                    />
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold text-slate-900">Herramientas AFIP</h3>
-                      <span className={`text-xs font-semibold ${afipToolsStatus ? "text-emerald-600" : "text-slate-500"}`}>
-                        {afipToolsStatus || "Sin acciones"}
-                      </span>
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+                      <div className="mb-4 flex items-center justify-between gap-2">
+                        <h3 className="text-lg font-semibold text-slate-900">Herramientas AFIP</h3>
+                        <span className={`shrink-0 text-xs font-semibold ${afipToolsStatus ? "text-emerald-600" : "text-slate-500"}`}>
+                          {afipToolsStatus || "Sin acciones"}
+                        </span>
+                      </div>
+                      <AfipToolsPanel
+                        empresaId={selectedEmpresaId}
+                        onSuccess={(message) => setAfipToolsStatus(`${message} ${new Date().toLocaleTimeString()}`)}
+                      />
                     </div>
-                    <AfipToolsPanel
-                      empresaId={selectedEmpresaId}
-                      onSuccess={(message) => setAfipToolsStatus(`${message} ${new Date().toLocaleTimeString()}`)}
-                    />
                   </div>
                 </div>
-              </div>
+
+                <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
+                  <Button variant="ghost" onClick={() => {
+                    setIsConfigModalOpen(false);
+                    setSelectedEmpresaId(null);
+                  }}>
+                    Cerrar
+                  </Button>
+                </DialogFooter>
+              </>
             )}
-            <DialogFooter>
-              <Button variant="ghost" onClick={() => {
-                setIsConfigModalOpen(false);
-                setSelectedEmpresaId(null);
-              }}>
-                Cerrar
-              </Button>
-            </DialogFooter>
           </DialogContent>
         </Dialog>
 

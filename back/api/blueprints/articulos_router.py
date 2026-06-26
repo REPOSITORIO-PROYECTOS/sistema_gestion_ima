@@ -67,6 +67,7 @@ def api_buscar_articulos(
                 'unidad_venta': getattr(articulo, 'unidad_venta', 'unidad'),
                 'costo_ultimo': getattr(articulo, 'costo_ultimo', 0.0),
                 'categoria': getattr(articulo, 'categoria', None),
+                'precio_manual': getattr(articulo, 'precio_manual', False),
             }
             articuloread_list.append(ArticuloRead.model_validate(articulo_dict))
         except Exception as e:
@@ -109,6 +110,7 @@ def api_get_all_articulos(
                 'stock_actual': articulo.stock_actual,
                 'activo': articulo.activo,
                 'unidad_venta': articulo.unidad_venta,
+                'precio_manual': getattr(articulo, 'precio_manual', False),
                 'codigos': [{'codigo': c.codigo} for c in (articulo.codigos or [])]
             }
             resultado.append(ArticuloReadConCodigos.model_validate(articulo_dict))
@@ -127,6 +129,7 @@ def api_get_all_articulos(
                 'stock_actual': articulo.stock_actual,
                 'activo': articulo.activo,
                 'unidad_venta': articulo.unidad_venta,
+                'precio_manual': getattr(articulo, 'precio_manual', False),
                 'codigos': []
             }
             resultado.append(ArticuloReadConCodigos.model_validate(articulo_dict))

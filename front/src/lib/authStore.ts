@@ -15,7 +15,7 @@ export interface Usuario {
 // Tipos de usuario
 export interface Role {
   id: number
-  nombre: "Admin" | "Cajero" | "Gerente" | "Soporte"
+  nombre: "Admin" | "Cajero" | "Gerente" | "Encargada" | "Vendedora" | "Soporte"
 }
 
 interface AuthState {

@@ -73,6 +73,7 @@ const formSchema = z.object({
   ingresos_brutos: z.string().optional().nullable(),
   inicio_actividades: z.string().optional().nullable(),
   link_google_sheets: z.string().optional().nullable(),
+  modo_especial_habilitado: z.boolean().optional(),
   aclaraciones_legales: z.record(z.string()).optional(),
   balanza_articulo_id: z.string().optional(),
   balanza_auto_agregar: z.boolean().optional(),
@@ -88,6 +89,7 @@ interface Props {
     general?: boolean;
     balanza?: boolean;
     afip?: boolean;
+    modoEspecial?: boolean;
   };
   onSave?: () => void;
 }
@@ -99,6 +101,7 @@ export const ConfiguracionForm = (props: Props) => {
     general: true,
     afip: true,
     balanza: true,
+    modoEspecial: false,
     ...props.sections,
   };
   const [articulos, setArticulos] = React.useState<Articulo[]>([]);
@@ -221,6 +224,7 @@ export const ConfiguracionForm = (props: Props) => {
       ingresos_brutos: "",
       inicio_actividades: "",
       link_google_sheets: "",
+      modo_especial_habilitado: false,
       aclaraciones_legales: {},
       balanza_articulo_id: "",
       balanza_auto_agregar: false,
@@ -251,6 +255,7 @@ export const ConfiguracionForm = (props: Props) => {
         balanza_auto_agregar: (data.aclaraciones_legales?.balanza_auto_agregar ?? "false") === "true",
         balanza_auto_facturar: (data.aclaraciones_legales?.balanza_auto_facturar ?? "false") === "true",
         balanza_precio_fuente: (data.aclaraciones_legales?.balanza_precio_fuente ?? "producto"),
+        modo_especial_habilitado: Boolean(data.modo_especial_habilitado),
       };
       reset(transformedData);
     } catch (err) {
@@ -272,8 +277,10 @@ export const ConfiguracionForm = (props: Props) => {
     }
     try {
       const API_URL = `${API_CONFIG.BASE_URL}/empresas/admin/${empresaId}/configuracion`;
+      const { modo_especial_habilitado, ...restValues } = values;
       const payload = {
-        ...values,
+        ...restValues,
+        ...(sections.modoEspecial ? { modo_especial_habilitado } : {}),
         cuit: values.cuit === "" ? null : values.cuit,
         afip_punto_venta_predeterminado: values.afip_punto_venta_predeterminado === "" ? null : Number(values.afip_punto_venta_predeterminado),
         afip_condicion_iva: !values.afip_condicion_iva ? null : values.afip_condicion_iva,
@@ -311,11 +318,38 @@ export const ConfiguracionForm = (props: Props) => {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 p-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         {/* Sección General */}
         {sections.general && (
           <div className="space-y-4">
             <h2 className="text-xl font-bold text-green-950">Configuración General</h2>
+
+            {sections.modoEspecial && (
+              <FormField
+                control={form.control}
+                name="modo_especial_habilitado"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border-2 border-amber-400 bg-amber-50 p-4 shadow-sm">
+                    <div className="space-y-1 pr-4">
+                      <FormLabel className="text-base font-bold text-amber-950">Modo Especial</FormLabel>
+                      <FormDescription className="text-amber-900 text-sm leading-snug">
+                        Activa catálogo manual <strong>sin Google Sheets</strong>. La empresa podrá cargar productos,
+                        ingresar stock, subir precios e importar/exportar CSV desde <strong>Stock</strong>.
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch.Root
+                        checked={Boolean(field.value)}
+                        onCheckedChange={field.onChange}
+                        className="w-11 h-6 shrink-0 bg-gray-300 rounded-full relative data-[state=checked]:bg-amber-600 outline-none cursor-pointer"
+                      >
+                        <Switch.Thumb className="block w-5 h-5 bg-white rounded-full transition-transform duration-100 translate-x-0.5 will-change-transform data-[state=checked]:translate-x-[22px]" />
+                      </Switch.Root>
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            )}
 
             <FormField
               control={form.control}
@@ -410,13 +444,17 @@ export const ConfiguracionForm = (props: Props) => {
                 <FormItem>
                   <FormLabel>Link Google Sheets</FormLabel>
                   <FormControl>
-                    <Input placeholder="Link a tu hoja de cálculo de Google" {...field} value={field.value || ""} />
+                    <Input
+                      placeholder="Link a tu hoja de cálculo de Google"
+                      {...field}
+                      value={field.value || ""}
+                      disabled={sections.modoEspecial && form.watch("modo_especial_habilitado")}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-
 
           </div>
         )}
@@ -690,7 +728,7 @@ export const ConfiguracionForm = (props: Props) => {
           </div>
         )}
 
-        <Button type="submit" disabled={form.formState.isSubmitting}>
+        <Button type="submit" className="w-full sm:w-auto" disabled={form.formState.isSubmitting}>
           {form.formState.isSubmitting ? "Guardando..." : "Guardar Cambios"}
         </Button>
       </form>

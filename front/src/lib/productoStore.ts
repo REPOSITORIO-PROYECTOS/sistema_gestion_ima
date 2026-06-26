@@ -9,6 +9,7 @@ export type Producto = {
   venta_negocio: number;
   stock_actual: number;
   unidad_venta: string;
+  precio_manual?: boolean;
 };
 
 type ProductoStore = {

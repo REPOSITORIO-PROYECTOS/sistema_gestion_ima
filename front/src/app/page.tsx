@@ -22,6 +22,7 @@ type ProductoAPI = {
   venta_negocio: number;
   stock_actual: number;
   unidad_venta: string;
+  precio_manual?: boolean;
 };
 
 function Login() {
@@ -62,6 +63,7 @@ function Login() {
           venta_negocio: p.venta_negocio,
           stock_actual: p.stock_actual,
           unidad_venta: p.unidad_venta || 'Unidad',
+          precio_manual: p.precio_manual ?? false,
         }));
 
         setProductos(adaptados);
@@ -148,6 +150,7 @@ function Login() {
         venta_negocio: p.venta_negocio,
         stock_actual: p.stock_actual,
         unidad_venta: p.unidad_venta || 'Unidad',
+        precio_manual: p.precio_manual ?? false,
       }));
       setProductos(productosAdaptados);
       localStorage.setItem("productos", JSON.stringify(productosAdaptados));

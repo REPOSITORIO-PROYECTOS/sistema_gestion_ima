@@ -66,7 +66,7 @@ export default function ContabilidadPage() {
   }, [fetchData]); // La dependencia es la propia función, como recomienda ESLint.
 
   return (
-    <ProtectedRoute allowedRoles={["Admin", "Soporte"]}>
+    <ProtectedRoute allowedRoles={["Admin", "Encargada", "Soporte"]}>
       <div className="container mx-auto flex flex-col gap-6 py-4">
         <h1 className="text-2xl font-bold text-green-950">Movimientos de Caja</h1>
         

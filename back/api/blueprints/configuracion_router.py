@@ -18,17 +18,24 @@ from pydantic import BaseModel
 
 router = APIRouter(prefix="/configuracion", tags=["Configuración de Empresa"])
 
-def verificar_permiso_admin(usuario: Usuario):
-    """
-    Función de seguridad reutilizable que asegura que solo un 'Admin'
-    pueda acceder a los endpoints de configuración de su propia empresa.
-    """
-    if usuario.rol.nombre != "Admin":
-        raise HTTPException(status_code=403, detail="Permiso denegado. Se requiere rol de Administrador.")
+# Ruta absoluta al directorio static del backend (independiente del cwd de uvicorn/PM2).
+_BACK_DIR = Path(__file__).resolve().parents[2]
+STATIC_DIR = _BACK_DIR / "static" / "logos_empresas"
+# Compatibilidad: uploads viejos con Path("back/static/...") cuando cwd era back/
+STATIC_DIR_LEGACY = _BACK_DIR / "back" / "static" / "logos_empresas"
+STATIC_DIR.mkdir(parents=True, exist_ok=True)
 
-# Definimos la ruta base para los archivos estáticos
-STATIC_DIR = Path("back/static/logos_empresas")
-STATIC_DIR.mkdir(parents=True, exist_ok=True) # Asegura que el directorio exista
+
+def _resolver_archivo_logo(ruta: str | None) -> Path | None:
+    """Busca el archivo de logo en disco (ruta actual o legacy)."""
+    if not ruta or "logos_empresas" not in ruta:
+        return None
+    nombre = Path(ruta).name
+    for base in (STATIC_DIR, STATIC_DIR_LEGACY):
+        archivo = base / nombre
+        if archivo.is_file():
+            return archivo
+    return None
 
 
 def _configuracion_respuesta(config) -> ConfiguracionResponse:
@@ -36,10 +43,18 @@ def _configuracion_respuesta(config) -> ConfiguracionResponse:
     respuesta = ConfiguracionResponse.model_validate(config)
     ruta = respuesta.ruta_logo
     if ruta and "logos_empresas" in ruta:
-        archivo = STATIC_DIR / Path(ruta).name
-        if not archivo.is_file():
+        if _resolver_archivo_logo(ruta) is None:
             respuesta = respuesta.model_copy(update={"ruta_logo": None})
     return respuesta
+
+
+def verificar_permiso_admin(usuario: Usuario):
+    """
+    Función de seguridad reutilizable que asegura que solo un 'Admin'
+    pueda acceder a los endpoints de configuración de su propia empresa.
+    """
+    if usuario.rol.nombre != "Admin":
+        raise HTTPException(status_code=403, detail="Permiso denegado. Se requiere rol de Administrador.")
 
 
 @router.get("/mi-empresa", response_model=ConfiguracionResponse)
@@ -72,20 +87,24 @@ async def subir_logo_empresa(
     archivo: UploadFile = File(...)
 ):
     """Sube o reemplaza el logo de la empresa."""
-    
-    # Generamos un nombre de archivo único para evitar colisiones
-    file_extension = Path(archivo.filename).suffix
+    verificar_permiso_admin(current_user)
+
+    if not current_user.id_empresa:
+        raise HTTPException(status_code=404, detail="El usuario no está asociado a una empresa.")
+
+    file_extension = Path(archivo.filename or "").suffix.lower() or ".png"
+    if file_extension not in {".png", ".jpg", ".jpeg", ".webp"}:
+        raise HTTPException(status_code=400, detail="Formato no permitido. Use .png, .jpg, .jpeg o .webp.")
+
     file_name = f"logo_empresa_{current_user.id_empresa}{file_extension}"
     file_path = STATIC_DIR / file_name
-    
-    # Guardamos el archivo en el disco
+
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(archivo.file, buffer)
-        
-    # Guardamos la ruta PÚBLICA en la base de datos
+
     public_path = f"/static/logos_empresas/{file_name}"
     configuracion_manager.actualizar_ruta_archivo(db, current_user.id_empresa, "logo", public_path)
-    
+
     return RespuestaGenerica(status="ok", message=f"Logo subido correctamente. Ruta: {public_path}")
 
 @router.post("/upload-icono", response_model=RespuestaGenerica)
@@ -95,20 +114,24 @@ async def subir_icono_empresa(
     archivo: UploadFile = File(...)
 ):
     """Sube o reemplaza el icono de la empresa."""
-    
-    # Generamos un nombre de archivo único para evitar colisiones
-    file_extension = Path(archivo.filename).suffix
+    verificar_permiso_admin(current_user)
+
+    if not current_user.id_empresa:
+        raise HTTPException(status_code=404, detail="El usuario no está asociado a una empresa.")
+
+    file_extension = Path(archivo.filename or "").suffix.lower() or ".png"
+    if file_extension not in {".png", ".jpg", ".jpeg", ".webp", ".ico"}:
+        raise HTTPException(status_code=400, detail="Formato no permitido para icono.")
+
     file_name = f"icono_empresa_{current_user.id_empresa}{file_extension}"
     file_path = STATIC_DIR / file_name
-    
-    # Guardamos el archivo en el disco
+
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(archivo.file, buffer)
-        
-    # Guardamos la ruta PÚBLICA en la base de datos
+
     public_path = f"/static/logos_empresas/{file_name}"
     configuracion_manager.actualizar_ruta_archivo(db, current_user.id_empresa, "icono", public_path)
-    
+
     return RespuestaGenerica(status="ok", message=f"Icono subido correctamente. Ruta: {public_path}")
 
 @router.patch(
@@ -164,6 +187,11 @@ def actualizar_mi_configuracion(
     # --- VERIFICACIÓN DE SEGURIDAD AÑADIDA ---
     if not current_user.id_empresa:
         raise HTTPException(status_code=404, detail="El usuario actual no está asociado a ninguna empresa.")
+
+    # Modo especial solo lo habilita super-admin desde el panel de empresas
+    update_data = data.model_dump(exclude_unset=True)
+    update_data.pop("modo_especial_habilitado", None)
+    data = ConfiguracionUpdate(**update_data)
 
     try:
         config_actualizada = configuracion_manager.actualizar_configuracion_parcial(

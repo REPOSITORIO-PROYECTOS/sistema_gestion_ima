@@ -58,7 +58,8 @@ class ArticuloRead(ArticuloBase):
     codigo_interno: Optional[str]
     stock_actual: float
     activo: bool
-    unidad_venta: str 
+    unidad_venta: str
+    precio_manual: bool = False
 
     class Config:
         from_attributes = True 

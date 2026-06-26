@@ -3,7 +3,7 @@
 import logging
 import os
 import threading
-from back.api.blueprints import admin_router, afip_tools_router, articulos_router, auth_router,actualizacion_masiva_router,clientes_router, configuracion_router, empresa_router, importaciones_router, proveedores_router, comprobantes_router, mesas_router, scanner_router, ordenes_router, impresion_router
+from back.api.blueprints import admin_router, afip_tools_router, articulos_router, auth_router,actualizacion_masiva_router,clientes_router, configuracion_router, empresa_router, importaciones_router, proveedores_router, comprobantes_router, mesas_router, scanner_router, ordenes_router, impresion_router, modo_especial_router
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -121,6 +121,7 @@ app.include_router(mesas_router.router)
 app.include_router(scanner_router.router)
 app.include_router(ordenes_router.router)
 app.include_router(impresion_router.router)
+app.include_router(modo_especial_router.router)
 
 
 @app.get("/api/health", tags=["General"])

@@ -620,7 +620,7 @@ export default function GestionNegocio() {
           <>
             {empresaId && (
               <>
-                <ConfiguracionForm empresaId={empresaId} sections={{ general: true, balanza: false, afip: true }} />
+                <ConfiguracionForm empresaId={empresaId} sections={{ general: true, balanza: false, afip: true, modoEspecial: false }} />
                 <div className="mt-8">
                   <h3 className="text-lg font-semibold text-green-900 mb-4">Herramientas AFIP</h3>
                   <AfipToolsPanel empresaId={empresaId} />

@@ -116,10 +116,14 @@ class Articulo(SQLModel, table=True):
     cantidad_deseada_pedido: Optional[float]
     activo: bool = Field(default=True)
     es_combo: bool = Field(default=False)
+    # Artículos genéricos (ej. PANADERIA, GOLOSINAS): el cajero ingresa el precio al vender.
+    precio_manual: bool = Field(default=False)
     maneja_lotes: bool = Field(default=False)
     ubicacion: Optional[str] = Field(default="Sin definir")
     
     id_categoria: Optional[int] = Field(default=None, foreign_key="categorias.id")
+    # Array de categorías (modo especial / compatibilidad POS). La primera también se refleja en id_categoria.
+    categorias: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
     id_marca: Optional[int] = Field(default=None, foreign_key="marcas.id")
 
     categoria: Optional["Categoria"] = Relationship(back_populates="articulos")
@@ -405,6 +409,9 @@ class ConfiguracionEmpresa(SQLModel, table=True):
     
     # --- Versión de Catálogo ---
     catalogo_version: int = Field(default=0)
+
+    # --- Modo Especial: catálogo manual sin sincronización con Google Sheets ---
+    modo_especial_habilitado: bool = Field(default=False)
     
     
     # --- RELACIÓN ---

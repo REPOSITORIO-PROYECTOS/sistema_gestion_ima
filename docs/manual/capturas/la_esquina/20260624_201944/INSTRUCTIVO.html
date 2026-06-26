@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Instructivo — Sistema IMA — LA ESQUINA</title>
+  <style>
+    :root {
+      --verde-900: #14532d;
+      --verde-700: #15803d;
+      --verde-100: #dcfce7;
+      --gris-50: #f8fafc;
+      --gris-200: #e2e8f0;
+      --gris-600: #475569;
+      --gris-900: #0f172a;
+      --sombra: 0 10px 30px rgba(15, 23, 42, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      color: var(--gris-900);
+      background: var(--gris-50);
+      line-height: 1.6;
+    }
+    a { color: var(--verde-700); }
+    .layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      min-height: 100vh;
+    }
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      background: white;
+      border-right: 1px solid var(--gris-200);
+      padding: 1.5rem;
+    }
+    .sidebar h1 {
+      font-size: 1.1rem;
+      margin: 0 0 .25rem;
+      color: var(--verde-900);
+    }
+    .sidebar .sub {
+      font-size: .85rem;
+      color: var(--gris-600);
+      margin-bottom: 1rem;
+    }
+    .sidebar nav ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .sidebar nav li { margin-bottom: .5rem; }
+    .sidebar nav a {
+      text-decoration: none;
+      color: var(--gris-900);
+      display: block;
+      padding: .45rem .65rem;
+      border-radius: .5rem;
+    }
+    .sidebar nav a:hover { background: var(--verde-100); }
+    main { padding: 2rem 2.5rem 4rem; max-width: 1100px; }
+    .hero {
+      background: linear-gradient(135deg, var(--verde-900), var(--verde-700));
+      color: white;
+      border-radius: 1rem;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: var(--sombra);
+    }
+    .hero h2 { margin: 0 0 .5rem; font-size: 1.8rem; }
+    .hero p { margin: 0; opacity: .95; }
+    .hero-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+    .hero-meta div {
+      background: rgba(255,255,255,.12);
+      border-radius: .75rem;
+      padding: .85rem 1rem;
+    }
+    .hero-meta span {
+      display: block;
+      font-size: .75rem;
+      opacity: .8;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .hero-meta a { color: white; }
+    .hero-detalle { margin-top: 1rem; opacity: .95; }
+    .flujo {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: .75rem;
+      margin: 1.5rem 0 2rem;
+    }
+    .flujo-paso {
+      background: white;
+      border: 1px solid var(--gris-200);
+      border-radius: .75rem;
+      padding: .75rem 1rem;
+      min-width: 110px;
+      text-align: center;
+      box-shadow: var(--sombra);
+    }
+    .flujo-paso span {
+      display: inline-flex;
+      width: 1.75rem;
+      height: 1.75rem;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      background: var(--verde-700);
+      color: white;
+      font-weight: 700;
+      margin-bottom: .35rem;
+    }
+    .flujo-paso p { margin: 0; font-size: .9rem; }
+    .flujo-flecha { color: var(--gris-600); font-size: 1.2rem; }
+    .seccion { margin-bottom: 3rem; }
+    .seccion h2 {
+      font-size: 1.5rem;
+      color: var(--verde-900);
+      border-bottom: 3px solid var(--verde-100);
+      padding-bottom: .5rem;
+      margin-bottom: .75rem;
+    }
+    .seccion-intro { color: var(--gris-600); margin-bottom: 1.5rem; }
+    .pantalla {
+      background: white;
+      border: 1px solid var(--gris-200);
+      border-radius: 1rem;
+      margin-bottom: 1.5rem;
+      overflow: hidden;
+      box-shadow: var(--sombra);
+    }
+    .pantalla-header {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      padding: 1rem 1.25rem;
+      background: var(--gris-50);
+      border-bottom: 1px solid var(--gris-200);
+    }
+    .numero {
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: .75rem;
+      background: var(--verde-700);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .pantalla-header h3 { margin: 0; font-size: 1.15rem; }
+    .ruta { margin: .15rem 0 0; font-size: .85rem; color: var(--gris-600); }
+    .pantalla-body {
+      display: grid;
+      grid-template-columns: minmax(280px, 1.1fr) minmax(260px, .9fr);
+      gap: 0;
+    }
+    .captura {
+      margin: 0;
+      background: #eef2f7;
+      border-right: 1px solid var(--gris-200);
+    }
+    .captura img {
+      width: 100%;
+      display: block;
+      object-fit: contain;
+      max-height: 520px;
+      background: #dbeafe;
+    }
+    .captura figcaption {
+      padding: .5rem 1rem;
+      font-size: .8rem;
+      color: var(--gris-600);
+      background: white;
+    }
+    .img-missing {
+      padding: 2rem;
+      color: #b91c1c;
+      background: #fef2f2;
+    }
+    .detalle { padding: 1.25rem; }
+    .detalle h4 {
+      margin: 1rem 0 .35rem;
+      font-size: .95rem;
+      color: var(--verde-900);
+    }
+    .detalle h4:first-of-type { margin-top: 0; }
+    .detalle ol { margin: 0; padding-left: 1.2rem; }
+    .detalle li { margin-bottom: .35rem; }
+    .roles { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .5rem; }
+    .badge {
+      display: inline-block;
+      background: var(--verde-100);
+      color: var(--verde-900);
+      font-size: .75rem;
+      font-weight: 600;
+      padding: .2rem .55rem;
+      border-radius: 999px;
+    }
+    .nota {
+      margin-top: 1rem;
+      padding: .75rem .9rem;
+      background: #fffbeb;
+      border-left: 4px solid #f59e0b;
+      border-radius: .35rem;
+      font-size: .92rem;
+    }
+    .callout {
+      border-radius: .75rem;
+      padding: 1rem 1.15rem;
+      margin-bottom: 1.25rem;
+    }
+    .callout-info {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+    }
+    .callout ul { margin: .5rem 0 0; padding-left: 1.2rem; }
+    .leyenda {
+      background: white;
+      border: 1px solid var(--gris-200);
+      border-radius: 1rem;
+      padding: 1.25rem;
+      margin-bottom: 2rem;
+    }
+    .leyenda ul { margin: .5rem 0 0; padding-left: 0; list-style: none; }
+    .leyenda li { margin-bottom: .45rem; }
+    footer {
+      margin-top: 2rem;
+      color: var(--gris-600);
+      font-size: .85rem;
+    }
+    @media (max-width: 960px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { position: static; height: auto; }
+      .pantalla-body { grid-template-columns: 1fr; }
+      .captura { border-right: none; border-bottom: 1px solid var(--gris-200); }
+      main { padding: 1rem; }
+    }
+    @media print {
+      .sidebar { display: none; }
+      .layout { display: block; }
+      main { max-width: none; padding: 0; }
+      .pantalla { break-inside: avoid; box-shadow: none; page-break-inside: avoid; }
+      .pantalla-body { grid-template-columns: 1fr; }
+      .captura img { max-height: 380px; }
+      .hero { break-after: page; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <h1>Instructivo — Sistema IMA</h1>
+      <p class="sub">LA ESQUINA · 24/06/2026</p>
+      <nav>
+        <ul>
+          <li><a href="#inicio">Inicio</a></li>
+          <li><a href="#acceso">Acceso al sistema</a></li><li><a href="#operacion">Operación diaria</a></li><li><a href="#contabilidad">Contabilidad</a></li><li><a href="#stock">Stock y catálogo</a></li><li><a href="#administracion">Administración</a></li>
+          <li><a href="#roles">Roles</a></li>
+        </ul>
+      </nav>
+    </aside>
+    <main>
+      <section class="hero" id="inicio">
+        <h2>Manual de uso del sistema</h2>
+        <p>Instructivo visual con capturas reales de cada pantalla, explicando para qué sirve y cómo operar.</p>
+        
+        <div class="hero-meta">
+          <div><span>Empresa</span><strong>LA ESQUINA</strong></div>
+          <div><span>URL</span><strong><a href="https://sistema-ima.sistemataup.online">https://sistema-ima.sistemataup.online</a></strong></div>
+          <div><span>Usuario</span><strong>LA_ESQUINA</strong></div>
+          <div><span>Catálogo</span><strong>Modo especial (catálogo manual, sin Google Sheets)</strong></div>
+        </div>
+        <p class="hero-detalle">Catálogo de 5.295 productos cargado por importación CSV. Desde Stock podés consultar productos, ingresar mercadería, actualizar precios e importar/exportar el listado.</p>
+        
+        
+    <div class="flujo">
+      <div class="flujo-paso"><span>1</span><p>Login</p></div>
+      <div class="flujo-flecha">→</div>
+      <div class="flujo-paso"><span>2</span><p>Abrir caja</p></div>
+      <div class="flujo-flecha">→</div>
+      <div class="flujo-paso"><span>3</span><p>Vender</p></div>
+      <div class="flujo-flecha">→</div>
+      <div class="flujo-paso"><span>4</span><p>Cierre y arqueo</p></div>
+    </div>
+    
+      </section>
+
+      <section class="leyenda" id="roles">
+        <h2>Roles del sistema</h2>
+        <ul><li><span class="badge">Admin</span> Acceso completo a configuración, contabilidad y stock.</li><li><span class="badge">Gerente</span> Contabilidad, stock y supervisión operativa.</li><li><span class="badge">Cajero</span> Ventas, mesas y cocina.</li><li><span class="badge">Soporte</span> Soporte técnico IMA (configuración avanzada).</li><li><span class="badge">Todos</span> Cualquier usuario con credenciales válidas.</li></ul>
+      </section>
+
+      
+        <section class="seccion" id="acceso">
+          <h2>Acceso al sistema</h2>
+          <p class="seccion-intro">Primeros pasos para entrar y orientarse en el menú principal.</p>
+          
+          
+    <article class="pantalla" id="login">
+      <header class="pantalla-header">
+        <span class="numero">01</span>
+        <div>
+          <h3>Inicio de sesión</h3>
+          <p class="ruta"><code>/</code></p>
+        </div>
+      </header>
+      <div class="pantalla-body">
+        <figure class="captura"><img src="01_login.png" alt="Inicio de sesión" loading="lazy"><figcaption>Captura de pantalla</figcaption></figure>
+        <div class="detalle">
+          <div class="roles"><span class="badge">Todos</span></div>
+          <h4>¿Para qué sirve?</h4>
+          <p>Pantalla de acceso al sistema. Cada usuario ingresa con su nombre de usuario y contraseña asignados por el administrador de la empresa.</p>
+          <h4>Procedimiento</h4>
+          <ol><li>Abrir la URL del sistema en el navegador.</li><li>Ingresar usuario y contraseña.</li><li>Pulsar «Ingresar». El sistema carga la empresa, el catálogo y redirige al panel principal.</li></ol>
+          
+        </div>
+      </div>
+    </article>
+    
+    <article class="pantalla" id="dashboard">
+      <header class="pantalla-header">
+        <span class="numero">02</span>
+        <div>
+          <h3>Panel principal</h3>
+          <p class="ruta"><code>/dashboard</code></p>
+        </div>
+      </header>
+      <div class="pantalla-body">
+        <figure class="captura"><img src="02_dashboard.png" alt="Panel principal" loading="lazy"><figcaption>Captura de pantalla</figcaption></figure>
+        <div class="detalle">
+          <div class="roles"><span class="badge">Admin</span><span class="badge">Gerente</span><span class="badge">Cajero</span></div>
+          <h4>¿Para qué sirve?</h4>
+          <p>Página de bienvenida tras el login. Desde la barra superior se accede a Ventas, Mesas, Cocina, Contabilidad y Stock según el rol del usuario.</p>
+          <h4>Procedimiento</h4>
+          <ol><li>Tras iniciar sesión, llegás acá automáticamente.</li><li>Usá el menú superior para ir a cada módulo.</li><li>En el menú de usuario (arriba a la derecha) están Gestión de Usuarios y Gestión de Negocio.</li></ol>
+          
+        </div>
+      </div>
+    </article>
+    
+        </section>
+        
+        <section class="seccion" id="operacion">
+          <h2>Operación diaria</h2>
+          <p class="seccion-intro">Ventas de mostrador y emisión de comprobantes.</p>
+          
+          
+    <article class="pantalla" id="ventas">
+      <header class="pantalla-header">
+        <span class="numero">03</span>
+        <div>
+          <h3>Ventas (POS / Caja)</h3>
+          <p class="ruta"><code>/dashboard/ventas</code></p>
+        </div>
+      </header>
+      <div class="pantalla-body">
+        <figure class="captura"><img src="03_ventas.png" alt="Ventas (POS / Caja)" loading="lazy"><figcaption>Captura de pantalla</figcaption></figure>
+        <div class="detalle">
+          <div class="roles"><span class="badge">Admin</span><span class="badge">Cajero</span><span class="badge">Gerente</span></div>
+          <h4>¿Para qué sirve?</h4>
+          <p>Punto de venta principal: registrar ventas de mostrador, aplicar descuentos, elegir método de pago y emitir comprobantes. Requiere caja abierta para operar.</p>
+          <h4>Procedimiento</h4>
+          <ol><li>Verificar que la caja esté abierta (botón «Abrir caja» si está cerrada).</li><li>Buscar productos por código o nombre y agregarlos al ticket.</li><li>Ajustar cantidades, descuentos y método de pago.</li><li>Confirmar la venta y emitir ticket/factura según corresponda.</li><li>Para egresos de caja, usar el botón de egreso disponible en esta pantalla.</li></ol>
+          
+        </div>
+      </div>
+    </article>
+    
+        </section>
+        
+        <section class="seccion" id="contabilidad">
+          <h2>Contabilidad</h2>
+          <p class="seccion-intro">Movimientos, proveedores, clientes y arqueo de caja.</p>
+          
+          
+    <article class="pantalla" id="contabilidad_movimientos">
+      <header class="pantalla-header">
+        <span class="numero">04</span>
+        <div>
+          <h3>Contabilidad — Movimientos</h3>
+          <p class="ruta"><code>/dashboard/contabilidad</code></p>
+        </div>
+      </header>
+      <div class="pantalla-body">
+        <figure class="captura"><img src="06_contabilidad_movimientos.png" alt="Contabilidad — Movimientos" loading="lazy"><figcaption>Captura de pantalla</figcaption></figure>
+        <div class="detalle">
+          <div class="roles"><span class="badge">Admin</span><span class="badge">Gerente</span></div>
+          <h4>¿Para qué sirve?</h4>
+          <p>Historial de movimientos de caja: ventas, ingresos, egresos y otros registros contables vinculados a la operación diaria.</p>
+          <h4>Procedimiento</h4>
+          <ol><li>Entrar a Contabilidad desde el menú principal.</li><li>Revisar la tabla de movimientos (filtros y columnas según permisos).</li><li>Usar los datos para conciliación diaria o auditoría interna.</li></ol>
+          
+        </div>
+      </div>
+    </article>
+    
+    <article class="pantalla" id="contabilidad_proveedores">
+      <header class="pantalla-header">
+        <span class="numero">05</span>
+        <div>
+          <h3>Contabilidad — Proveedores</h3>
+          <p class="ruta"><code>/dashboard/contabilidad/proveedores</code></p>
+        </div>
+      </header>
+      <div class="pantalla-body">
+        <figure class="captura"><img src="07_contabilidad_proveedores.png" alt="Contabilidad — Proveedores" loading="lazy"><figcaption>Captura de pantalla</figcaption></figure>
+        <div class="detalle">
+          <div class="roles"><span class="badge">Admin</span><span class="badge">Gerente</span></div>
+          <h4>¿Para qué sirve?</h4>
+          <p>Alta y consulta de proveedores, configuración de plantillas de importación Excel y carga de listas de precios/costos desde archivos del proveedor.</p>
+          <h4>Procedimiento</h4>
+          <ol><li>Ir a Contabilidad → Proveedores.</li><li>Crear o editar un proveedor con sus datos fiscales.</li><li>Configurar la plantilla de mapeo de columnas del Excel del proveedor.</li><li>Subir el Excel y revisar la previsualización antes de confirmar cambios de costos.</li></ol>
+          
+        </div>
+      </div>
+    </article>
+    
+    <article class="pantalla" id="contabilidad_clientes">
+      <header class="pantalla-header">
+        <span class="numero">06</span>
+        <div>
+          <h3>Contabilidad — Clientes</h3>
+          <p class="ruta"><code>/dashboard/contabilidad/clientes</code></p>
+        </div>
+      </header>
+      <div class="pantalla-body">
+        <figure class="captura"><img src="08_contabilidad_clientes.png" alt="Contabilidad — Clientes" loading="lazy"><figcaption>Captura de pantalla</figcaption></figure>
+        <div class="detalle">
+          <div class="roles"><span class="badge">Admin</span><span class="badge">Gerente</span></div>
+          <h4>¿Para qué sirve?</h4>
+          <p>Gestión de clientes con cuenta corriente: datos fiscales, saldos y movimientos asociados a ventas a crédito.</p>
+          <h4>Procedimiento</h4>
+          <ol><li>Ir a Contabilidad → Clientes.</li><li>Alta o edición de clientes (CUIT, razón social, condición IVA).</li><li>Consultar saldo y movimientos desde el detalle de cada cliente.</li></ol>
+          
+        </div>
+      </div>
+    </article>
+    
+    <article class="pantalla" id="contabilidad_arqueo">
+      <header class="pantalla-header">
+        <span class="numero">07</span>
+        <div>
+          <h3>Contabilidad — Arqueo de caja</h3>
+          <p class="ruta"><code>/dashboard/contabilidad/arqueo</code></p>
+        </div>
+      </header>
+      <div class="pantalla-body">
+        <figure class="captura"><img src="09_contabilidad_arqueo.png" alt="Contabilidad — Arqueo de caja" loading="lazy"><figcaption>Captura de pantalla</figcaption></figure>
+        <div class="detalle">
+          <div class="roles"><span class="badge">Admin</span><span class="badge">Gerente</span></div>
+          <h4>¿Para qué sirve?</h4>
+          <p>Control de cierre de caja: comparar lo declarado vs. lo calculado por el sistema, incluyendo desglose por medio de pago.</p>
+          <h4>Procedimiento</h4>
+          <ol><li>Al final del turno, ir a Contabilidad → Arqueo de Caja.</li><li>Seleccionar la sesión de caja a revisar.</li><li>Comparar totales declarados con los calculados.</li><li>Registrar observaciones si hay diferencias y archivar el comprobante de cierre.</li></ol>
+          
+        </div>
+      </div>
+    </article>
+    
+        </section>
+        
+        <section class="seccion" id="stock">
+          <h2>Stock y catálogo</h2>
+          <p class="seccion-intro">Gestión de productos, precios y existencias.</p>
+          
+        <div class="callout callout-info">
+          <strong>La Esquina — importación CSV</strong>
+          <p>Columnas del archivo: <code>Codigo</code>, <code>Producto</code>, <code>Precio</code>,
+          <code>Costo</code>, <code>Categorias</code>, <code>Stock</code>, <code>StockMinimo</code>,
+          <code>CodigoBarras</code>, <code>Unidad</code>, <code>CantidadEnvase</code>, <code>Ubicacion</code>.</p>
+          <ul>
+            <li>En Stock → Modo especial → <em>Importar CSV</em>.</li>
+            <li>La columna <code>Unidad</code> puede decir «Unidades»; el sistema la normaliza.</li>
+            <li>Stock negativo en el CSV se guarda como <strong>0</strong>.</li>
+            <li>Importación masiva (~5.000 filas): puede tardar ~90 segundos; no cerrar la pestaña.</li>
+          </ul>
+        </div>
+        
+          
+    <article class="pantalla" id="stock">
+      <header class="pantalla-header">
+        <span class="numero">08</span>
+        <div>
+          <h3>Stock</h3>
+          <p class="ruta"><code>/dashboard/stock</code></p>
+        </div>
+      </header>
+      <div class="pantalla-body">
+        <figure class="captura"><img src="10_stock.png" alt="Stock" loading="lazy"><figcaption>Captura de pantalla</figcaption></figure>
+        <div class="detalle">
+          <div class="roles"><span class="badge">Admin</span><span class="badge">Gerente</span></div>
+          <h4>¿Para qué sirve?</h4>
+          <p>Consulta del catálogo y niveles de stock. En modo especial (sin Google Sheets) permite cargar productos, ingresar stock, subir precios e importar/exportar CSV.</p>
+          <h4>Procedimiento</h4>
+          <ol><li>Ir a Stock desde el menú principal.</li><li>Modo Sheets: la tabla refleja el catálogo sincronizado (solo lectura operativa).</li><li>Modo especial: usar las pestañas para alta manual, ingreso de stock, suba de precios o importación CSV.</li><li>Para importación masiva: preparar CSV con columnas Codigo, Producto, Precio, Stock, etc.</li></ol>
+          
+        </div>
+      </div>
+    </article>
+    
+        </section>
+        
+        <section class="seccion" id="administracion">
+          <h2>Administración</h2>
+          <p class="seccion-intro">Usuarios, configuración del negocio y datos fiscales.</p>
+          
+          
+    <article class="pantalla" id="gestion_usuarios">
+      <header class="pantalla-header">
+        <span class="numero">09</span>
+        <div>
+          <h3>Gestión de usuarios</h3>
+          <p class="ruta"><code>/dashboard/gestion_usuarios</code></p>
+        </div>
+      </header>
+      <div class="pantalla-body">
+        <figure class="captura"><img src="11_gestion_usuarios.png" alt="Gestión de usuarios" loading="lazy"><figcaption>Captura de pantalla</figcaption></figure>
+        <div class="detalle">
+          <div class="roles"><span class="badge">Admin</span><span class="badge">Soporte</span></div>
+          <h4>¿Para qué sirve?</h4>
+          <p>Administración de usuarios de la empresa: altas, roles (Admin, Cajero, Gerente), activación/desactivación y reseteo de accesos.</p>
+          <h4>Procedimiento</h4>
+          <ol><li>Menú usuario (arriba a la derecha) → Gestión de Usuarios.</li><li>Crear usuario con rol adecuado.</li><li>Editar o desactivar usuarios que ya no operan el sistema.</li></ol>
+          
+        </div>
+      </div>
+    </article>
+    
+    <article class="pantalla" id="gestion_negocio_fiscales">
+      <header class="pantalla-header">
+        <span class="numero">10</span>
+        <div>
+          <h3>Gestión de negocio — Datos fiscales</h3>
+          <p class="ruta"><code>/dashboard/gestion_de_negocio</code></p>
+        </div>
+      </header>
+      <div class="pantalla-body">
+        <figure class="captura"><img src="12_gestion_negocio_fiscales.png" alt="Gestión de negocio — Datos fiscales" loading="lazy"><figcaption>Captura de pantalla</figcaption></figure>
+        <div class="detalle">
+          <div class="roles"><span class="badge">Admin</span><span class="badge">Soporte</span></div>
+          <h4>¿Para qué sirve?</h4>
+          <p>Configuración de la empresa: nombre, CUIT, domicilio, condición IVA, punto de venta AFIP y datos que aparecen en comprobantes.</p>
+          <h4>Procedimiento</h4>
+          <ol><li>Menú usuario → Gestión de Negocio.</li><li>Pestaña «Negocio y Fiscales»: completar o actualizar datos legales.</li><li>Guardar cambios antes de emitir comprobantes fiscales.</li></ol>
+          
+        </div>
+      </div>
+    </article>
+    
+    <article class="pantalla" id="gestion_negocio_personalizacion">
+      <header class="pantalla-header">
+        <span class="numero">11</span>
+        <div>
+          <h3>Gestión de negocio — Personalización</h3>
+          <p class="ruta"><code>/dashboard/gestion_de_negocio</code></p>
+        </div>
+      </header>
+      <div class="pantalla-body">
+        <figure class="captura"><img src="13_gestion_negocio_personalizacion.png" alt="Gestión de negocio — Personalización" loading="lazy"><figcaption>Captura de pantalla</figcaption></figure>
+        <div class="detalle">
+          <div class="roles"><span class="badge">Admin</span><span class="badge">Soporte</span></div>
+          <h4>¿Para qué sirve?</h4>
+          <p>Apariencia del sistema: colores, logo, iconos y textos legales que se muestran en tickets y comprobantes.</p>
+          <h4>Procedimiento</h4>
+          <ol><li>Gestión de Negocio → pestaña «Personalización».</li><li>Subir logo e icono en formatos indicados.</li><li>Ajustar color principal y aclaraciones legales por tipo de comprobante.</li><li>Guardar y verificar en una venta de prueba.</li></ol>
+          
+        </div>
+      </div>
+    </article>
+    
+    <article class="pantalla" id="gestion_negocio_integraciones">
+      <header class="pantalla-header">
+        <span class="numero">12</span>
+        <div>
+          <h3>Gestión de negocio — Integraciones</h3>
+          <p class="ruta"><code>/dashboard/gestion_de_negocio</code></p>
+        </div>
+      </header>
+      <div class="pantalla-body">
+        <figure class="captura"><img src="14_gestion_negocio_integraciones.png" alt="Gestión de negocio — Integraciones" loading="lazy"><figcaption>Captura de pantalla</figcaption></figure>
+        <div class="detalle">
+          <div class="roles"><span class="badge">Admin</span><span class="badge">Soporte</span></div>
+          <h4>¿Para qué sirve?</h4>
+          <p>Vinculación con Google Sheets para sincronizar catálogo/stock, enlaces personalizados del menú y otras integraciones operativas.</p>
+          <h4>Procedimiento</h4>
+          <ol><li>Gestión de Negocio → pestaña «Integraciones».</li><li>Pegar el link de Google Sheets si la empresa usa sync automática.</li><li>Configurar enlaces rápidos visibles en la barra de navegación.</li><li>Guardar y ejecutar una sincronización de prueba si aplica.</li></ol>
+          
+        </div>
+      </div>
+    </article>
+    
+    <article class="pantalla" id="panel_usuario">
+      <header class="pantalla-header">
+        <span class="numero">13</span>
+        <div>
+          <h3>Panel de usuario</h3>
+          <p class="ruta"><code>/dashboard/panel_usuario</code></p>
+        </div>
+      </header>
+      <div class="pantalla-body">
+        <figure class="captura"><img src="15_panel_usuario.png" alt="Panel de usuario" loading="lazy"><figcaption>Captura de pantalla</figcaption></figure>
+        <div class="detalle">
+          <div class="roles"><span class="badge">Admin</span><span class="badge">Cajero</span><span class="badge">Gerente</span></div>
+          <h4>¿Para qué sirve?</h4>
+          <p>Vista personal del usuario logueado: datos de perfil y accesos rápidos según permisos.</p>
+          <h4>Procedimiento</h4>
+          <ol><li>Acceder desde el menú de usuario si está disponible.</li><li>Revisar datos personales y opciones de cuenta.</li></ol>
+          
+        </div>
+      </div>
+    </article>
+    
+        </section>
+        
+
+      <footer>
+        <p>Generado el 24/06/2026 · IMA Consultoría · Sistema de gestión comercial</p>
+        <p>Las capturas corresponden al entorno de producción. La Esquina opera con modo especial (sin módulo de mesas/cocina).</p>
+      </footer>
+    </main>
+  </div>
+</body>
+</html>

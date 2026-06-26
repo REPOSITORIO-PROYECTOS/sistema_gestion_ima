@@ -57,6 +57,7 @@ def obtener_todas_las_empresas() -> list[int]:
                 .where(Empresa.activa == True)
                 .where(ConfiguracionEmpresa.link_google_sheets.isnot(None))
                 .where(ConfiguracionEmpresa.link_google_sheets != "")
+                .where(ConfiguracionEmpresa.modo_especial_habilitado == False)
             ).all()
             return [emp.id for emp in empresas if emp.id is not None]
     except Exception as e:

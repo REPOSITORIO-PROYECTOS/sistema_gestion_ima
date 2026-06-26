@@ -108,7 +108,8 @@ def api_obtener_configuracion_de_empresa(
             'link_visual_2': config.link_visual_2,
             'link_visual_3': config.link_visual_3,
             'cuit': config.cuit,
-            'aclaraciones_legales': config.aclaraciones_legales or {}
+            'aclaraciones_legales': config.aclaraciones_legales or {},
+            'modo_especial_habilitado': bool(getattr(config, 'modo_especial_habilitado', False)),
         }
         
         return SchemaConfigResponse.model_validate(config_dict)
@@ -119,12 +120,19 @@ def api_obtener_configuracion_de_empresa(
 def api_actualizar_configuracion_de_empresa(
     id_empresa: int,
     data: ConfiguracionUpdate,
+    current_user: Usuario = Depends(obtener_usuario_actual),
     db: Session = Depends(get_db)
 ):
     """
     Actualiza parcialmente la configuración de una empresa específica.
     Puede actualizar campos de ConfiguracionEmpresa y también nombre_legal/nombre_fantasia de Empresa.
     """
+    # Modo especial: solo super-admin editando otra empresa (panel /configuracion/empresas)
+    update_data = data.model_dump(exclude_unset=True)
+    if current_user.id_empresa == id_empresa:
+        update_data.pop("modo_especial_habilitado", None)
+    data = ConfiguracionUpdate(**update_data)
+
     try:
         config_actualizada = configuracion_manager.actualizar_configuracion_parcial(
             db=db,
@@ -154,7 +162,8 @@ def api_actualizar_configuracion_de_empresa(
             'link_visual_2': config_actualizada.link_visual_2,
             'link_visual_3': config_actualizada.link_visual_3,
             'cuit': config_actualizada.cuit,
-            'aclaraciones_legales': config_actualizada.aclaraciones_legales or {}
+            'aclaraciones_legales': config_actualizada.aclaraciones_legales or {},
+            'modo_especial_habilitado': bool(getattr(config_actualizada, 'modo_especial_habilitado', False)),
         }
         
         return SchemaConfigResponse.model_validate(config_dict)

@@ -13,7 +13,7 @@ function ContabilidadLayout({ children } : { children: React.ReactNode }) {
 
   return (
 
-    <ProtectedRoute allowedRoles={["Admin", "Cajero"]}>
+    <ProtectedRoute allowedRoles={["Admin", "Cajero", "Vendedora"]}>
 
       <div className="flex flex-col lg:flex-row w-full items-center lg:justify-between gap-4">
         <h2 className="text-3xl font-semibold text-green-950">Sección de Contabilidad</h2>

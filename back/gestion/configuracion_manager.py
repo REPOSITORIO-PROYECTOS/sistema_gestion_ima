@@ -4,7 +4,7 @@ import os
 import shutil
 from fastapi import UploadFile, HTTPException, status
 from sqlmodel import Session
-from back.modelos import ConfiguracionEmpresa, Usuario, Empresa
+from back.modelos import ConfiguracionEmpresa, Empresa
 from back.schemas.configuracion_schemas import ConfiguracionUpdate, RecargoData, RecargoUpdate
 
 # Creamos una carpeta 'static/uploads' en la raíz del proyecto si no existe
@@ -20,21 +20,6 @@ def obtener_configuracion_por_id_empresa(db: Session, id_empresa: int) -> Config
         raise ValueError(f"No se encontró una configuración para la empresa con ID {id_empresa}. Esto no debería ocurrir si la empresa fue creada correctamente.")
     return config
 
-def actualizar_configuracion_parcial(db: Session, id_empresa: int, data: ConfiguracionUpdate) -> ConfiguracionEmpresa:
-    """
-    Actualiza solo los campos de la configuración que vienen en la petición.
-    """
-    config_db = obtener_configuracion_por_id_empresa(db, id_empresa)
-    
-    update_data = data.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(config_db, key, value)
-        
-    db.add(config_db)
-    db.commit()
-    db.refresh(config_db)
-    return config_db
-
 def guardar_archivo_configuracion(db: Session, id_empresa: int, file: UploadFile, tipo_archivo: str) -> ConfiguracionEmpresa:
     """
     Guarda un archivo (logo o ícono) en el disco y actualiza la ruta en la DB.
@@ -48,7 +33,6 @@ def guardar_archivo_configuracion(db: Session, id_empresa: int, file: UploadFile
     filename = f"{tipo_archivo}_empresa_{id_empresa}{file_extension}"
     
     file_path = os.path.join(UPLOADS_DIR, filename)
-    # La ruta que guardamos en la DB es relativa para que el frontend pueda usarla
     relative_path = f"/{file_path.replace(os.path.sep, '/')}"
 
     with open(file_path, "wb") as buffer:
@@ -65,17 +49,7 @@ def guardar_archivo_configuracion(db: Session, id_empresa: int, file: UploadFile
     return config_db
 
 def guardar_links_empresa(db: Session, id_empresa: int, link1: str | None = None, link2: str | None = None, link3: str | None = None) -> ConfiguracionEmpresa:
-    """
-    Guarda o actualiza los tres links visuales (link_visual_1/2/3) en la configuración de la empresa.
-
-    Args:
-        db: Session activa de DB.
-        id_empresa: ID de la empresa cuya configuración se actualizará.
-        link1/link2/link3: URLs (o None) a guardar.
-
-    Devuelve:
-        La instancia actualizada de `ConfiguracionEmpresa`.
-    """
+    """Guarda o actualiza los tres links visuales de la empresa."""
     config_db = obtener_configuracion_por_id_empresa(db, id_empresa)
 
     if link1 is not None:
@@ -97,11 +71,9 @@ def actualizar_configuracion_parcial(db: Session, id_empresa: int, data: Configu
     """
     config_db = obtener_configuracion_por_id_empresa(db, id_empresa)
     
-    # Separar los campos que pertenecen a Empresa vs ConfiguracionEmpresa
     campos_empresa = {'nombre_legal', 'nombre_fantasia'}
     update_data = data.model_dump(exclude_unset=True)
     
-    # Actualizar campos de Empresa
     campos_a_actualizar_empresa = {k: v for k, v in update_data.items() if k in campos_empresa}
     if campos_a_actualizar_empresa:
         empresa = db.get(Empresa, id_empresa)
@@ -110,7 +82,6 @@ def actualizar_configuracion_parcial(db: Session, id_empresa: int, data: Configu
                 setattr(empresa, key, value)
             db.add(empresa)
     
-    # Actualizar campos de ConfiguracionEmpresa
     campos_config = {k: v for k, v in update_data.items() if k not in campos_empresa}
     for key, value in campos_config.items():
         setattr(config_db, key, value)
@@ -121,10 +92,7 @@ def actualizar_configuracion_parcial(db: Session, id_empresa: int, data: Configu
     return config_db
 
 def obtener_recargo_por_tipo(db: Session, id_empresa: int, tipo: str) -> RecargoData:
-    """
-    Obtiene el porcentaje y concepto de un tipo de recargo específico
-    ('transferencia' o 'banco') para una empresa.
-    """
+    """Obtiene el porcentaje y concepto de un tipo de recargo específico."""
     config_db = obtener_configuracion_por_id_empresa(db, id_empresa)
     
     if tipo == "transferencia":
@@ -143,10 +111,7 @@ def obtener_recargo_por_tipo(db: Session, id_empresa: int, tipo: str) -> Recargo
         raise ValueError("Tipo de recargo no válido. Debe ser 'transferencia' o 'banco'.")
 
 def actualizar_recargo_por_tipo(db: Session, id_empresa: int, tipo: str, data: RecargoUpdate) -> RecargoData:
-    """
-    Actualiza el porcentaje y/o concepto de un tipo de recargo específico
-    para una empresa.
-    """
+    """Actualiza el porcentaje y/o concepto de un tipo de recargo específico."""
     config_db = obtener_configuracion_por_id_empresa(db, id_empresa)
 
     if tipo == "transferencia":
@@ -170,22 +135,10 @@ def actualizar_recargo_por_tipo(db: Session, id_empresa: int, tipo: str, data: R
     db.commit()
     db.refresh(config_db)
     
-    # Devolvemos los datos actualizados usando la otra función para no repetir código
     return obtener_recargo_por_tipo(db, id_empresa, tipo)
 
 def actualizar_ruta_archivo(db: Session, id_empresa: int, tipo_archivo: str, ruta_publica: str) -> ConfiguracionEmpresa:
-    """
-    Actualiza la ruta del logo o del icono de la empresa en la base de datos.
-    
-    Args:
-        db: La sesión de la base de datos.
-        id_empresa: El ID de la empresa a modificar.
-        tipo_archivo: Una cadena, debe ser "logo" o "icono".
-        ruta_publica: La ruta donde el archivo es accesible públicamente (ej: /static/logos/nombre_archivo.png).
-    """
-    print(f"Actualizando ruta para '{tipo_archivo}' de la empresa {id_empresa} a: {ruta_publica}")
-    
-    # Usamos nuestra función auxiliar para asegurarnos de que la configuración exista.
+    """Actualiza la ruta del logo o del icono de la empresa en la base de datos."""
     config_db = obtener_configuracion_empresa(db, id_empresa)
 
     if tipo_archivo == "logo":
@@ -193,7 +146,6 @@ def actualizar_ruta_archivo(db: Session, id_empresa: int, tipo_archivo: str, rut
     elif tipo_archivo == "icono":
         config_db.ruta_icono = ruta_publica
     else:
-        # Es importante validar para no intentar modificar campos que no existen.
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"El tipo de archivo '{tipo_archivo}' no es válido. Debe ser 'logo' o 'icono'."
@@ -202,18 +154,14 @@ def actualizar_ruta_archivo(db: Session, id_empresa: int, tipo_archivo: str, rut
     db.add(config_db)
     db.commit()
     db.refresh(config_db)
-
-    print(f"Ruta actualizada correctamente en la base de datos.")
     return config_db
 
 def obtener_configuracion_empresa(db: Session, id_empresa: int) -> ConfiguracionEmpresa:
     """
     Obtiene la configuración de una empresa. Si no existe, la crea con valores por defecto.
-    Esto asegura que siempre podamos trabajar con un objeto de configuración.
     """
     config = db.get(ConfiguracionEmpresa, id_empresa)
     if not config:
-        print(f"No se encontró configuración para la empresa ID {id_empresa}. Creando una nueva.")
         empresa = db.get(Empresa, id_empresa)
         cuit_val = empresa.cuit if empresa and getattr(empresa, "cuit", None) else ""
         nombre_val = None
@@ -229,32 +177,22 @@ def obtener_configuracion_empresa(db: Session, id_empresa: int) -> Configuracion
         db.refresh(config)
     return config
 
-def actualizar_color_principal_empresa(db: Session, id_empresa: int, nuevo_color: str) -> ConfiguracionEmpresa:
-    """
-    Actualiza específicamente el color principal de la configuración de una empresa.
-    Es llamada por el endpoint PATCH /mi-empresa/color.
-    """
-    print(f"\n--- [TRACE: ACTUALIZAR COLOR] ---")
-    print(f"Solicitud para actualizar color de Empresa ID: {id_empresa} a '{nuevo_color}'")
+def es_modo_especial_habilitado(db: Session, id_empresa: int) -> bool:
+    """Indica si la empresa opera en modo especial (sin sincronización con Google Sheets)."""
+    config = db.get(ConfiguracionEmpresa, id_empresa)
+    return bool(config and getattr(config, "modo_especial_habilitado", False))
 
-    # 1. Obtenemos el registro de configuración existente usando tu función.
-    #    'obtener_configuracion_por_id_empresa' ya maneja el caso de que no exista.
+def actualizar_color_principal_empresa(db: Session, id_empresa: int, nuevo_color: str) -> ConfiguracionEmpresa:
+    """Actualiza específicamente el color principal de la configuración de una empresa."""
     config_db = obtener_configuracion_por_id_empresa(db, id_empresa)
-    
-    # 2. Actualizamos únicamente el campo del color en el objeto.
     config_db.color_principal = nuevo_color
     
-    # 3. Guardamos los cambios en la base de datos.
     try:
         db.add(config_db)
         db.commit()
         db.refresh(config_db)
-        print("   -> ÉXITO. Color actualizado en la base de datos.")
     except Exception as e:
-        print(f"   -> ERROR de BD al actualizar el color: {e}")
         db.rollback()
-        # Relanzamos la excepción para que el router pueda manejarla
         raise RuntimeError(f"Error de base de datos al actualizar el color: {e}")
         
-    print("--- [FIN TRACE] ---\n")
     return config_db
