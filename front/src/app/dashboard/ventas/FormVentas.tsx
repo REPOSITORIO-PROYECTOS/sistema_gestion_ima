@@ -25,6 +25,7 @@ import { useAuthStore } from "@/lib/authStore"
 import { useEmpresaStore } from '@/lib/empresaStore';
 import { useProductoStore } from "@/lib/productoStore";
 import { API_CONFIG } from "@/lib/api-config";
+import { fetchAllArticulos, mapArticulosToStore } from "@/lib/articulos-api";
 import { attachAutoScaleBridge } from "@/lib/scaleSerial";
 
 // --- Componentes Hijos ---
@@ -425,11 +426,17 @@ function FormVentas({
         const ev = payload.event as { codigo?: string; id_articulo?: number; nombre?: string; precio?: number; peso?: number };
         if (ev.id_articulo) {
           const p = productos.find(pp => pp.id === String(ev.id_articulo));
-          if (p) {
-            const pUnit = typeof ev.precio === 'number' ? ev.precio : (tipoClienteSeleccionado.id === '0' ? p.precio_venta : p.venta_negocio);
-            const cantidadEv = typeof ev.peso === 'number' ? ev.peso : 1;
+          const nombre = p?.nombre ?? ev.nombre ?? "Producto escáner";
+          const pUnit = typeof ev.precio === 'number'
+            ? ev.precio
+            : (p
+              ? (tipoClienteSeleccionado.id === '0' ? p.precio_venta : p.venta_negocio)
+              : 0);
+          const cantidadEv = typeof ev.peso === 'number' ? ev.peso : 1;
+          if (p || pUnit > 0) {
             onAgregarProducto({
-              tipo: p.nombre,
+              id: String(ev.id_articulo),
+              tipo: nombre,
               cantidad: cantidadEv,
               precioTotal: pUnit * cantidadEv,
               precioBase: pUnit * cantidadEv,
@@ -437,7 +444,7 @@ function FormVentas({
               porcentajeDescuento: 0,
               descuentoNominal: 0
             });
-            toast.success(`Se agregó '${p.nombre}' desde escáner`);
+            toast.success(`Se agregó '${nombre}' desde escáner`);
             return;
           }
         }
@@ -455,6 +462,7 @@ function FormVentas({
                 : (tipoClienteSeleccionado.id === '0' ? p.precio_venta : p.venta_negocio);
               const cantidadEv = ev.peso;
               onAgregarProducto({
+                id: p.id,
                 tipo: p.nombre,
                 cantidad: cantidadEv,
                 precioTotal: pUnit * cantidadEv,
@@ -535,6 +543,7 @@ function FormVentas({
             : productoAdaptado.venta_negocio;
 
         onAgregarProducto({
+          id: productoAdaptado.id,
           tipo: productoAdaptado.nombre,
           cantidad: 1,
           precioTotal: precioUnitario * 1,
@@ -563,6 +572,7 @@ function FormVentas({
     }
 
     onAgregarProducto({
+      id: productoEscaneado.id,
       tipo: productoEscaneado.nombre,
       cantidad: cantidadEscaneada,
       precioTotal: productoEscaneado.precio_venta * cantidadEscaneada,
@@ -616,33 +626,8 @@ function FormVentas({
 
     try {
       setIsSyncing(true);
-      const res = await fetch(`${API_CONFIG.BASE_URL}/articulos/obtener_todos`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!res.ok) throw new Error("Error al refrescar productos desde el servidor");
-
-      type ProductoAPI = {
-        id: number | string;
-        nombre?: string;
-        descripcion?: string;
-        precio_venta: number;
-        venta_negocio: number;
-        stock_actual: number;
-        unidad_venta: string;
-        precio_manual?: boolean;
-      };
-
-      const data: ProductoAPI[] = await res.json();
-      const adaptados = data.map((p) => ({
-        id: String(p.id),
-        nombre: p.nombre ?? p.descripcion ?? "",
-        precio_venta: p.precio_venta,
-        venta_negocio: p.venta_negocio,
-        stock_actual: p.stock_actual,
-        unidad_venta: p.unidad_venta || 'Unidad',
-        precio_manual: p.precio_manual ?? false,
-      }));
+      const data = await fetchAllArticulos(token);
+      const adaptados = mapArticulosToStore(data);
 
       // Actualizar store global y localStorage
       setProductos(adaptados);
@@ -891,15 +876,10 @@ function FormVentas({
     const descuentoTotalCalculado = Math.max(0, totalLista - totalConDescuento);
 
     const articulosSinId = productosVendidos
-      .map((p) => {
-        const productoReal = p.id
-          ? productos.find((prod) => prod.id === p.id)
-          : productos.find((prod) => prod.nombre === p.tipo);
-        return {
-          nombre: p.tipo,
-          id: p.id ?? productoReal?.id,
-        };
-      })
+      .map((p) => ({
+        nombre: p.tipo,
+        id: p.id,
+      }))
       .filter((item) => !item.id || Number(item.id) <= 0);
 
     if (articulosSinId.length > 0) {

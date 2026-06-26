@@ -10,6 +10,7 @@ import { useAuthStore } from "@/lib/authStore";
 import { useEmpresaStore } from "@/lib/empresaStore";
 import { useProductoStore } from "@/lib/productoStore";
 import { API_CONFIG } from "@/lib/api-config";
+import { fetchAllArticulos, mapArticulosToStore } from "@/lib/articulos-api";
 
 const API_URL = API_CONFIG.BASE_URL;
 
@@ -49,23 +50,8 @@ function Login() {
   const iniciarPollingProductos = (token: string) => {
     const fetchProductos = async () => {
       try {
-        const res = await fetch(`${API_URL}/articulos/obtener_todos`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!res.ok) throw new Error("Error al refrescar productos");
-
-        const data: ProductoAPI[] = await res.json();
-        const adaptados = data.map((p) => ({
-          id: String(p.id),
-          nombre: p.nombre ?? p.descripcion ?? "",
-          precio_venta: p.precio_venta,
-          venta_negocio: p.venta_negocio,
-          stock_actual: p.stock_actual,
-          unidad_venta: p.unidad_venta || 'Unidad',
-          precio_manual: p.precio_manual ?? false,
-        }));
-
+        const data = await fetchAllArticulos(token);
+        const adaptados = mapArticulosToStore(data);
         setProductos(adaptados);
         localStorage.setItem("productos", JSON.stringify(adaptados));
       } catch (err) {
@@ -138,20 +124,8 @@ function Login() {
       }
 
       // --- PRODUCTOS inicial ---
-      const productosResponse = await fetch(`${API_URL}/articulos/obtener_todos`, {
-        headers: { Authorization: `Bearer ${access_token}` },
-      });
-      if (!productosResponse.ok) throw new Error("Error al obtener catálogo de productos");
-      const productosData: ProductoAPI[] = await productosResponse.json();
-      const productosAdaptados = productosData.map((p) => ({
-        id: String(p.id),
-        nombre: p.nombre ?? p.descripcion ?? "",
-        precio_venta: p.precio_venta,
-        venta_negocio: p.venta_negocio,
-        stock_actual: p.stock_actual,
-        unidad_venta: p.unidad_venta || 'Unidad',
-        precio_manual: p.precio_manual ?? false,
-      }));
+      const productosData = await fetchAllArticulos(access_token);
+      const productosAdaptados = mapArticulosToStore(productosData);
       setProductos(productosAdaptados);
       localStorage.setItem("productos", JSON.stringify(productosAdaptados));
 

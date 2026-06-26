@@ -25,11 +25,12 @@ interface SeccionCantidadProps {
 export function SeccionCantidad({
   cantidadInputRef,
   modoVenta,
-  cantidadUnidad, setCantidadUnidad, stockActual,
+  cantidadUnidad, setCantidadUnidad, stockActual: _stockActual,
   unidadDeVenta, inputCantidadGranel, handleCantidadGranelChange,
   inputPrecioGranel, handlePrecioGranelChange
 }: SeccionCantidadProps) {
-  const limiteStock = Number.isFinite(stockActual) && stockActual > 0 ? stockActual : undefined;
+  // Sin tope por stock: se permite vender aunque no haya existencias.
+  const limiteStock = undefined;
 
   // --- VISTA PARA MODO 'PRECIO MANUAL' (Panadería, Golosinas, etc.) ---
   if (modoVenta === 'precio_manual') {

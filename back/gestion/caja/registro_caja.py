@@ -253,11 +253,8 @@ def registrar_venta_y_movimiento_caja(
             raise ValueError(f"El artículo con ID {item.id_articulo} no existe en la base de datos.")
         if articulo_db.id_empresa != usuario_actual.id_empresa:
             raise ValueError(f"El artículo '{articulo_db.descripcion}' no pertenece a la empresa.")
-        # Si omitir_stock es True, no validamos cantidad vs stock aquí, 
-        # asumimos que ya se validó/descontó previamente (ej: en mesas)
-        if not omitir_stock and not getattr(articulo_db, "precio_manual", False):
-            if articulo_db.stock_actual < item.cantidad:
-                raise ValueError(f"Stock insuficiente para '{articulo_db.descripcion}'.")
+        # Stock: se permite vender sin stock (el saldo puede quedar negativo).
+        # precio_manual y omitir_stock no descuentan stock más adelante en este flujo.
 
     id_cliente_normalizado = id_cliente if id_cliente and id_cliente > 0 else None
 
