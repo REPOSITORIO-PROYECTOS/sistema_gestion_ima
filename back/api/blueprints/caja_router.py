@@ -10,7 +10,7 @@ from starlette.responses import Response
 
 # --- Módulos del Proyecto ---
 from back.database import get_db
-from back.security import obtener_usuario_actual, es_admin, es_cajero
+from back.security import obtener_usuario_actual, es_admin, es_cajero, es_supervisor_caja
 from back.modelos import ConfiguracionEmpresa, Empresa, Usuario, Tercero
 
 # Especialistas de la capa de gestión
@@ -18,12 +18,14 @@ from back.gestion.caja import apertura_cierre, registro_caja, consultas_caja
 from back.gestion.facturacion_afip import generar_factura_para_venta
 from back.gestion.reportes import generador_comprobantes
 from back.gestion.sync_nube_queue_manager import procesar_cola_sync_nube_en_background
+from back.utils.permisos_empresa import validar_descuentos_permitidos, empresa_tiene_panel_estadisticas_caja
 
 # Schemas necesarios para este router
 from back.schemas.caja_schemas import (
     AbrirCajaRequest, CajaMovimientoResponse, CerrarCajaRequest, EstadoCajaResponse,
     RegistrarVentaRequest, InformeCajasResponse, RespuestaGenerica,
-    MovimientoSimpleRequest, TipoMovimiento, MovimientoContableResponse
+    MovimientoSimpleRequest, TipoMovimiento, MovimientoContableResponse,
+    PanelEstadisticasCajaResponse,
 )
 from back.schemas.comprobante_schemas import EmisorData, ReceptorData, tercero_a_receptor_data
 
@@ -95,6 +97,16 @@ def api_registrar_venta(
             vuelto = registro_caja.calcular_vuelto(req.total_venta, req.paga_con)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
+
+    try:
+        validar_descuentos_permitidos(
+            db,
+            current_user,
+            req.articulos_vendidos,
+            req.descuento_total or 0.0,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     
     # --- PASO 1: TRANSACCIÓN CRÍTICA CON LA BASE DE DATOS ---
     try:
@@ -359,6 +371,31 @@ def get_lista_de_arqueos(
         return consultas_caja.obtener_arqueos_de_caja(db=db, usuario_actual=current_user)
     except Exception:
         raise HTTPException(status_code=500, detail="Ocurrió un error al generar el informe de arqueos.")
+
+
+@router.get(
+    "/panel-estadisticas",
+    response_model=PanelEstadisticasCajaResponse,
+    tags=["Caja - Supervisión"],
+    dependencies=[Depends(es_supervisor_caja)],
+)
+def get_panel_estadisticas_cajas(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(obtener_usuario_actual),
+):
+    """
+    Panel en tiempo real de cajas abiertas: quién abrió, ventas acumuladas y cantidad de movimientos.
+    Solo accesible para gerentes, encargadas y administradores de La Esquina y FULL24.
+    """
+    if not empresa_tiene_panel_estadisticas_caja(current_user.id_empresa):
+        raise HTTPException(
+            status_code=403,
+            detail="El panel de estadísticas no está habilitado para esta empresa.",
+        )
+    try:
+        return consultas_caja.obtener_panel_estadisticas_cajas(db=db, usuario_actual=current_user)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Ocurrió un error al generar el panel de estadísticas.")
     
 
 @router.get(

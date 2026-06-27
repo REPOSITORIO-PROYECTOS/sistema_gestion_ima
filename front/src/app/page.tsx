@@ -8,23 +8,9 @@ import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthStore } from "@/lib/authStore";
 import { useEmpresaStore } from "@/lib/empresaStore";
-import { useProductoStore } from "@/lib/productoStore";
 import { API_CONFIG } from "@/lib/api-config";
-import { fetchAllArticulos, mapArticulosToStore } from "@/lib/articulos-api";
 
 const API_URL = API_CONFIG.BASE_URL;
-
-// Tipado del producto que devuelve la API
-type ProductoAPI = {
-  id: number | string;
-  nombre?: string;
-  descripcion?: string;
-  precio_venta: number;
-  venta_negocio: number;
-  stock_actual: number;
-  unidad_venta: string;
-  precio_manual?: boolean;
-};
 
 function Login() {
   const router = useRouter();
@@ -38,36 +24,10 @@ function Login() {
   const setEmpresa = useEmpresaStore((state) => state.setEmpresa);
   const empresa = useEmpresaStore((state) => state.empresa);
 
-  // Catálogo de Productos
-  const setProductos = useProductoStore((state) => state.setProductos);
-
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  // Fetch Periódico de Productos para la Store de Productos
-  const iniciarPollingProductos = (token: string) => {
-    const fetchProductos = async () => {
-      try {
-        const data = await fetchAllArticulos(token);
-        const adaptados = mapArticulosToStore(data);
-        setProductos(adaptados);
-        localStorage.setItem("productos", JSON.stringify(adaptados));
-      } catch (err) {
-        console.error("Error actualizando productos:", err);
-      }
-    };
-
-    // Primer fetch inmediato
-    fetchProductos();
-
-    // Refetch cada 60 segundos (puedes ajustar)
-    const interval = setInterval(fetchProductos, 300000);   // cada 5 min fetch
-
-    // Guardamos referencia por si necesitamos limpiar
-    return interval;
-  };
 
   // Login App
   const handleLogin = async (e: FormEvent) => {
@@ -104,38 +64,29 @@ function Login() {
       const { access_token } = await response.json();
       setToken(access_token);
 
-      // --- USUARIO ---
-      const meResponse = await fetch(`${API_URL}/users/me`, {
-        headers: { Authorization: `Bearer ${access_token}` },
-      });
+      // --- USUARIO + EMPRESA en paralelo ---
+      const [meResponse, empresaResponse] = await Promise.all([
+        fetch(`${API_URL}/users/me`, {
+          headers: { Authorization: `Bearer ${access_token}` },
+        }),
+        !empresa
+          ? fetch(`${API_URL}/configuracion/mi-empresa`, {
+              headers: { Authorization: `Bearer ${access_token}` },
+            })
+          : Promise.resolve(null),
+      ]);
+
       if (!meResponse.ok) throw new Error("Error al obtener datos del usuario");
       const usuario = await meResponse.json();
       setUsuario(usuario);
       setRole(usuario.rol);
 
-      // --- EMPRESA ---
-      if (!empresa) {
-        const empresaResponse = await fetch(`${API_URL}/configuracion/mi-empresa`, {
-          headers: { Authorization: `Bearer ${access_token}` },
-        });
+      if (empresaResponse) {
         if (!empresaResponse.ok) throw new Error("Error al obtener datos de la empresa");
         const dataEmpresa = await empresaResponse.json();
         setEmpresa(dataEmpresa);
       }
 
-      // --- PRODUCTOS inicial ---
-      const productosData = await fetchAllArticulos(access_token);
-      const productosAdaptados = mapArticulosToStore(productosData);
-      setProductos(productosAdaptados);
-      localStorage.setItem("productos", JSON.stringify(productosAdaptados));
-
-      // --- INICIAR POLLING ---
-      const intervalId = iniciarPollingProductos(access_token);
-
-      // Guardar intervalId si querés limpiar luego en logout
-      localStorage.setItem("productosPollingId", String(intervalId));
-
-      // --- REDIRIGIR ---
       router.push("/dashboard");
     } catch (error) {
       console.error("Error:", error);

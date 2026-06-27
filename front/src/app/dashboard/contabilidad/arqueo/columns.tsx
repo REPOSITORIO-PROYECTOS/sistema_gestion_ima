@@ -1,9 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown } from "lucide-react";
+import { ArrowUpDown, Loader2, Printer } from "lucide-react";
 import { formatDateArgentina } from "@/utils/formatDate";
+import { useAuthStore } from "@/lib/authStore";
+import { imprimirArqueoCaja } from "@/lib/imprimir-arqueo";
+import { toast } from "sonner";
 
 // Este tipo debe coincidir con los datos reales
 export type ArqueoCaja = {
@@ -21,6 +25,50 @@ export type ArqueoCaja = {
   saldo_final_transferencias: number | null;
   saldo_final_bancario: number | null;
 };
+
+function ImprimirArqueoButton({ idSesion }: { idSesion: number }) {
+  const token = useAuthStore((state) => state.token);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleImprimir = async () => {
+    if (!token) {
+      toast.error("No se encontró el token.");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await imprimirArqueoCaja(idSesion, token);
+    } catch (err) {
+      console.error("Error al imprimir arqueo:", err);
+      if (err instanceof Error) {
+        toast.error(`Error al imprimir: ${err.message}`);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={handleImprimir}
+      disabled={isLoading}
+      title="Imprimir arqueo"
+      className="cursor-pointer"
+    >
+      {isLoading ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <>
+          <Printer className="h-4 w-4 mr-1" />
+          Imprimir
+        </>
+      )}
+    </Button>
+  );
+}
 
 export const columns: ColumnDef<ArqueoCaja>[] = [
   {
@@ -134,6 +182,14 @@ export const columns: ColumnDef<ArqueoCaja>[] = [
     cell: ({ row }) => {
       const valor = row.getValue("saldo_final_bancario") as number | null;
       return formatCurrency(valor);
+    },
+  },
+  {
+    id: "acciones",
+    header: "Acciones",
+    cell: ({ row }) => {
+      if (row.original.estado !== "CERRADA") return null;
+      return <ImprimirArqueoButton idSesion={row.original.id_sesion} />;
     },
   },
 ];

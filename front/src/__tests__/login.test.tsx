@@ -61,10 +61,6 @@ describe('Login retry flow', () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({ id_empresa: 1, nombre_negocio: 'Demo' }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ([] as unknown[]),
       });
   });
 
@@ -75,7 +71,7 @@ describe('Login retry flow', () => {
     fireEvent.click(getByText('Ingresar'));
 
     await waitFor(() => {
-      expect((global as unknown as { fetch: jest.Mock }).fetch).toHaveBeenCalledTimes(5);
+      expect((global as unknown as { fetch: jest.Mock }).fetch).toHaveBeenCalledTimes(4);
     });
   });
 });

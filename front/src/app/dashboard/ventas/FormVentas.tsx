@@ -23,10 +23,18 @@ import {
 import { useFacturacionStore } from "@/lib/facturacionStore";
 import { useAuthStore } from "@/lib/authStore"
 import { useEmpresaStore } from '@/lib/empresaStore';
-import { useProductoStore } from "@/lib/productoStore";
+import { useProductoStore, type Producto } from "@/lib/productoStore";
 import { API_CONFIG } from "@/lib/api-config";
-import { fetchAllArticulos, mapArticulosToStore } from "@/lib/articulos-api";
+import { fetchArticuloPorId, mapArticulosToStore } from "@/lib/articulos-api";
+import { actualizarProductosEnCache } from "@/lib/catalogo-sync";
 import { attachAutoScaleBridge } from "@/lib/scaleSerial";
+import {
+  VENTAS_CAMPOS,
+  focusVentasCampo,
+  TIPO_COMPROBANTE_DEFAULT,
+  tipoComprobanteDesdeFlecha,
+  esTipoComprobanteRecibo,
+} from "@/lib/ventas-form-flow";
 
 // --- Componentes Hijos ---
 import { SeccionCliente } from "./SeccionCliente";
@@ -132,8 +140,8 @@ function FormVentas({
 }: FormVentasProps) {
 
   /* Estados */
-  const productos = useProductoStore((state) => state.productos);
-  const setProductos = useProductoStore((state) => state.setProductos);
+  const upsertProductos = useProductoStore((state) => state.upsertProductos);
+  const getProductoById = useProductoStore((state) => state.getProductoById);
   const [productoSeleccionado, setProductoSeleccionado] = useState<ProductoSeleccionado | null>(null);
   const token = useAuthStore((state) => state.token);
   const { formatoComprobante } = useFacturacionStore();
@@ -151,7 +159,7 @@ function FormVentas({
   const [observaciones, setObservaciones] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { habilitarExtras } = useFacturacionStore();
-  const [tipoFacturacion, setTipoFacturacion] = useState("factura");
+  const [tipoFacturacion, setTipoFacturacion] = useState(TIPO_COMPROBANTE_DEFAULT);
   const [codigo, setCodigoEscaneado] = useState("");
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [productoEscaneado, setProductoEscaneado] = useState<ProductoSeleccionado | null>(null);
@@ -165,6 +173,21 @@ function FormVentas({
   const [autoSubmitFlag, setAutoSubmitFlag] = useState(false);
   const [balanzaRetry, setBalanzaRetry] = useState(0);
   const [catalogoResetTick, setCatalogoResetTick] = useState(0);
+
+  const resolverProductoPorId = useCallback(
+    async (id: string): Promise<Producto | null> => {
+      const enCache = getProductoById(id);
+      if (enCache) return enCache;
+
+      const data = await fetchArticuloPorId(token ?? "", id);
+      if (!data) return null;
+
+      const [adaptado] = mapArticulosToStore([data]);
+      upsertProductos([adaptado]);
+      return adaptado;
+    },
+    [getProductoById, token, upsertProductos],
+  );
 
   // Estados para Auto-Sincronización de Catálogo
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
@@ -347,7 +370,7 @@ function FormVentas({
     setMontoPagado(0);
     setPagoDividido(false);
     setDetallePagoDividido("");
-    setTipoFacturacion("factura");
+    setTipoFacturacion(TIPO_COMPROBANTE_DEFAULT);
     setClienteSeleccionado(null);
     setTipoClienteSeleccionado(tipoCliente[0]);
     setBusquedaCliente("");
@@ -395,6 +418,16 @@ function FormVentas({
     return parseFloat(limpio) || 0;
   }
 
+  const focusCantidad = useCallback(() => {
+    focusVentasCampo(
+      modoVenta === "granel"
+        ? VENTAS_CAMPOS.cantidadGranel
+        : modoVenta === "precio_manual"
+          ? VENTAS_CAMPOS.precioManual
+          : VENTAS_CAMPOS.cantidadUnidad,
+    );
+  }, [modoVenta]);
+
   useEffect(() => {
     inputRef.current?.focus();
   }, [inputRef]);
@@ -425,7 +458,7 @@ function FormVentas({
         if (!payload?.has_event) return;
         const ev = payload.event as { codigo?: string; id_articulo?: number; nombre?: string; precio?: number; peso?: number };
         if (ev.id_articulo) {
-          const p = productos.find(pp => pp.id === String(ev.id_articulo));
+          const p = await resolverProductoPorId(String(ev.id_articulo));
           const nombre = p?.nombre ?? ev.nombre ?? "Producto escáner";
           const pUnit = typeof ev.precio === 'number'
             ? ev.precio
@@ -450,12 +483,11 @@ function FormVentas({
         }
         const cfg = empresa?.aclaraciones_legales ?? {};
         const autoAgregar = (cfg?.balanza_auto_agregar ?? "false") === "true";
-        const autoFacturar = (cfg?.balanza_auto_facturar ?? "false") === "true";
         const precioFuente = (cfg?.balanza_precio_fuente ?? "producto") as 'producto' | 'evento';
         const balanzaId = cfg?.balanza_articulo_id ?? "";
         if (autoAgregar && typeof ev.peso === 'number') {
           if (balanzaId) {
-            const p = productos.find(pp => pp.id === String(balanzaId));
+            const p = await resolverProductoPorId(String(balanzaId));
             if (p) {
               const pUnit = precioFuente === 'evento' && typeof ev.precio === 'number'
                 ? ev.precio
@@ -472,7 +504,6 @@ function FormVentas({
                 descuentoNominal: 0
               });
               toast.success(`Se agregó '${p.nombre}' desde balanza`);
-              // Auto-facturación desactivada - usuario debe hacer click en Registrar
               return;
             }
           }
@@ -490,13 +521,12 @@ function FormVentas({
               descuentoNominal: 0
             });
             toast.success(`Se agregó '${nombre}' desde escáner`);
-            // Auto-facturación desactivada - usuario debe hacer click en Registrar
           }
         }
       } catch { }
     }, 1000);
     return () => clearInterval(interval);
-  }, [token, productos, productoSeleccionado, getPrecioProducto, onAgregarProducto, empresa?.aclaraciones_legales, setMetodoPago, setMontoPagado, tipoClienteSeleccionado?.id, totalVentaFinal]);
+  }, [token, resolverProductoPorId, onAgregarProducto, empresa?.aclaraciones_legales, tipoClienteSeleccionado?.id]);
 
   // Efecto para auto-enviar cuando viene desde balanza/escáner
   // Se posiciona después de la definición de handleSubmit para evitar uso antes de declaración
@@ -528,6 +558,16 @@ function FormVentas({
           unidad_venta: data.unidad_venta || 'Unidad',
           precio_manual: data.precio_manual ?? false,
         };
+
+        upsertProductos([{
+          id: productoAdaptado.id,
+          nombre: productoAdaptado.nombre,
+          precio_venta: productoAdaptado.precio_venta,
+          venta_negocio: productoAdaptado.venta_negocio,
+          stock_actual: productoAdaptado.stock_actual,
+          unidad_venta: productoAdaptado.unidad_venta,
+          precio_manual: productoAdaptado.precio_manual,
+        }]);
 
         if (productoAdaptado.precio_manual) {
           setProductoSeleccionado(productoAdaptado);
@@ -619,55 +659,25 @@ function FormVentas({
   }, [token]);
 
 
-  // Función que refresca el stock en el store después de cada venta
   const refrescarProductos = useCallback(async () => {
-    // Usamos el token que ya tienes disponible en el componente
     if (!token) return;
+
+    const ids = [...new Set(
+      productosVendidos.map((p) => p.id).filter((id): id is string => Boolean(id)),
+    )];
+    if (ids.length === 0) return;
 
     try {
       setIsSyncing(true);
-      const data = await fetchAllArticulos(token);
-      const adaptados = mapArticulosToStore(data);
-
-      // Actualizar store global y localStorage
-      setProductos(adaptados);
-      localStorage.setItem("productos", JSON.stringify(adaptados));
+      await actualizarProductosEnCache(token, ids, upsertProductos);
       setLastSyncTime(new Date());
-
-    } catch (err) {
-      toast.error("No se pudo actualizar el stock de productos en tiempo real.");
+      setCatalogoResetTick((t) => t + 1);
+    } catch {
+      toast.error("No se pudo actualizar el stock de productos vendidos.");
     } finally {
       setIsSyncing(false);
     }
-  }, [token, setProductos]);
-
-  // ✅ Refresco inteligente: solo si hay cambios de versión en el servidor
-  useEffect(() => {
-    if (!token) return;
-
-    let lastVersion = parseInt(localStorage.getItem("catalogo_version") || "0", 10);
-
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`${API_CONFIG.BASE_URL}/articulos/version`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!res.ok) return;
-
-        const data = await res.json() as { version?: number };
-        const v = typeof data.version === "number" ? data.version : 0;
-
-        // Solo refrescar si hay cambios
-        if (v > lastVersion) {
-          await refrescarProductos();
-          lastVersion = v;
-          localStorage.setItem("catalogo_version", String(v));
-        }
-      } catch { }
-    }, 30000); // Revisar cada 30 segundos (no 5 segundos)
-
-    return () => clearInterval(interval);
-  }, [token, refrescarProductos]);
+  }, [token, productosVendidos, upsertProductos]);
 
   const imprimirComprobante = useCallback(async (
     tipo: string,
@@ -831,7 +841,7 @@ function FormVentas({
 
     // Determinar un tipo_comprobante_solicitado más específico
     let tipoSolicitadoPayload = tipo.toLowerCase();
-    if (tipo === "comprobante") {
+    if (esTipoComprobanteRecibo(tipo)) {
       tipoSolicitadoPayload = "recibo";
     }
     const cuitReceptor = tipoClienteSeleccionado.id === "0" ? (cuitManual || "0") : (clienteSeleccionado?.cuit || clienteSeleccionado?.identificacion_fiscal || "0");
@@ -843,36 +853,11 @@ function FormVentas({
       }
     }
 
-    // --- VALIDACIÓN MEJORADA DE PRODUCTOS EN CARRITO ---
-    // Buscar productos no encontrados y dar diagnóstico
-    const productosNoEncontrados = productosVendidos.filter((p) => {
-      if (p.id) return false;
-      const encontrado = productos.find((prod) => prod.nombre === p.tipo);
-      return !encontrado;
-    });
-
-    if (productosNoEncontrados.length > 0) {
-      const nombresNoEncontrados = productosNoEncontrados.map(p => `"${p.tipo}"`).join(", ");
-      const sugerencia = productosNoEncontrados.length === 1
-        ? `El producto ${nombresNoEncontrados} no está en el catálogo cargado. Intente refrescar el catálogo o verificar el nombre exacto.`
-        : `Los productos ${nombresNoEncontrados} no están en el catálogo cargado. Haga clic en 🔄 para refrescar.`;
-
-      toast.error(`❌ ${sugerencia}`);
-      setIsLoading(false);
-      return;
-    }
-
-    // --- VALIDACIÓN ORIGINAL DE IDs ---
-    // Calcular el precio de lista total (sin ningún descuento)
-    const totalLista = productosVendidos.reduce((acc, p) => {
-      return acc + (p.precioBase || 0);
-    }, 0);
-
-    // 2. Calcular el total neto (lo que paga el cliente antes de recargos)
-    // totalVenta ya incluye descuentos por ítem.
-    const totalConDescuento = Math.max(0, totalVenta * (1 - (descuentoSobreTotal || 0) / 100) - (descuentoNominalTotal || 0));
-
-    // 3. El descuento total es la diferencia
+    const totalLista = productosVendidos.reduce((acc, p) => acc + (p.precioBase || 0), 0);
+    const totalConDescuento = Math.max(
+      0,
+      totalVenta * (1 - (descuentoSobreTotal || 0) / 100) - (descuentoNominalTotal || 0),
+    );
     const descuentoTotalCalculado = Math.max(0, totalLista - totalConDescuento);
 
     const articulosSinId = productosVendidos
@@ -899,21 +884,16 @@ function FormVentas({
       tipo_comprobante_solicitado: tipoSolicitadoPayload,
       quiere_factura: tipo === "factura",
       articulos_vendidos: productosVendidos.map((p) => {
-        const productoReal = p.id
-          ? productos.find((prod) => prod.id === p.id)
-          : productos.find((prod) => prod.nombre === p.tipo);
-        const precioUnitario = p.cantidad
-          ? p.precioBase / p.cantidad
-          : (productoReal ? getPrecioProducto(productoReal) : 0);
+        const precioUnitario = p.cantidad ? p.precioBase / p.cantidad : 0;
         return {
-          id_articulo: p.id ?? productoReal?.id ?? "0",
-          nombre: productoReal?.nombre ?? p.tipo,
+          id_articulo: p.id ?? "0",
+          nombre: p.tipo,
           cantidad: p.cantidad,
           precio_unitario: precioUnitario,
           subtotal: p.precioTotal,
-          tasa_iva: 21.0
+          tasa_iva: 21.0,
         };
-      })
+      }),
     };
 
     // Agregar información de pago (simple o múltiple)
@@ -963,18 +943,13 @@ function FormVentas({
 
       // Preparar datos para impresión
       const itemsBase = productosVendidos.map((p): ItemComprobante => {
-        const productoReal = p.id
-          ? productos.find((prod) => prod.id === p.id)
-          : productos.find((prod) => prod.nombre === p.tipo);
-        const precioUnitario = p.cantidad
-          ? p.precioBase / p.cantidad
-          : (productoReal ? getPrecioProducto(productoReal) : 0);
+        const precioUnitario = p.cantidad ? p.precioBase / p.cantidad : 0;
         const item: ItemComprobante = {
-          descripcion: productoReal?.nombre || p.tipo,
+          descripcion: p.tipo,
           cantidad: p.cantidad,
           precio_unitario: precioUnitario,
           subtotal: p.precioTotal,
-          tasa_iva: 21
+          tasa_iva: 21,
         };
         if (tipo !== "factura") {
           item.descuento_especifico = p.descuentoNominal || 0;
@@ -1016,7 +991,6 @@ function FormVentas({
     cuitManual,
     pagoDividido,
     detallePagoDividido,
-    productos,
     getPrecioProducto,
     empresa,
     token,
@@ -1082,11 +1056,21 @@ function FormVentas({
       } else if (e.key === 'F10') {
         e.preventDefault();
         handleF10();
+      } else if (checkoutVisible && !popoverOpen) {
+        const target = e.target as HTMLElement;
+        const enBusquedaProducto = target.id === VENTAS_CAMPOS.producto;
+        if (enBusquedaProducto) return;
+
+        const nuevoTipo = tipoComprobanteDesdeFlecha(e.key);
+        if (nuevoTipo) {
+          e.preventDefault();
+          setTipoFacturacion(nuevoTipo);
+        }
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleF5, handleF6, handleF8, handleF9, handleF10]);
+  }, [handleF5, handleF6, handleF8, handleF9, handleF10, checkoutVisible, popoverOpen]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1106,7 +1090,7 @@ function FormVentas({
 
   /* Renderizado del Componente */
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col w-full lg:w-1/2 rounded-xl bg-white shadow-md">
+    <form onSubmit={handleSubmit} className="flex flex-col w-full max-w-2xl mx-auto lg:max-w-none lg:w-1/2 rounded-xl bg-white shadow-md touch-manipulation">
 
       {/* Header del Form */}
       <div className="w-full flex flex-row justify-between items-center px-6 py-4 bg-green-700 rounded-t-xl">
@@ -1159,7 +1143,7 @@ function FormVentas({
       </div>
 
       {/* Cuerpo del Form */}
-      <div className="flex flex-col justify-between w-full gap-6 p-8">
+      <div className="flex flex-col justify-between w-full gap-6 p-4 sm:p-8">
 
         {/* Desplegable */}
         <Accordion type="single" collapsible className="w-full">
@@ -1200,6 +1184,10 @@ function FormVentas({
         </Accordion>
         <span className="block w-full h-0.5 bg-green-900"></span>
 
+        <p className="text-xs text-green-800 bg-green-50 border border-green-200 rounded-lg px-3 py-2 md:hidden">
+          Flujo rápido: producto → Enter → cantidad → Enter → agregar. En pago: ← comprobante | factura →, monto → Enter → registrar.
+        </p>
+
         {/* --- CONTENEDOR GRID PARA PRODUCTO Y CANTIDAD --- */}
         <div className="flex flex-col gap-6">
 
@@ -1209,7 +1197,6 @@ function FormVentas({
             codigo={codigo}
             setCodigoEscaneado={setCodigoEscaneado}
             handleKeyDown={handleKeyDown}
-            productos={productos}
             productoSeleccionado={productoSeleccionado}
             setProductoSeleccionado={setProductoSeleccionado}
             open={open}
@@ -1224,6 +1211,8 @@ function FormVentas({
             persistirProducto={persistirProducto}
             setPersistirProducto={setPersistirProducto}
             onRefrescarProductos={refrescarProductos}
+            catalogoResetTick={catalogoResetTick}
+            onProductoConfirmado={focusCantidad}
           />
 
           {/* Sección de Cantidad */}
@@ -1238,6 +1227,7 @@ function FormVentas({
             handleCantidadGranelChange={handleCantidadGranelChange}
             inputPrecioGranel={inputPrecioGranel}
             handlePrecioGranelChange={handlePrecioGranelChange}
+            onEnterConfirm={handleAgregarProducto}
           />
         </div>
         <span className="block w-full h-0.5 bg-green-900"></span>
@@ -1249,8 +1239,9 @@ function FormVentas({
 
         {/* Agrega producto al resumen */}
         <Button
+          id={VENTAS_CAMPOS.agregar}
           variant="success"
-          className="!py-6 mt-2"
+          className="!py-6 min-h-14 text-base mt-2"
           type="button"
           onClick={handleAgregarProducto}
         >
@@ -1261,9 +1252,22 @@ function FormVentas({
 
         {/* Sección para Finalizar compra */}
         <Button
-          className="!py-6 !bg-emerald-800"
+          id={VENTAS_CAMPOS.finalizar}
+          className="!py-6 min-h-14 text-base !bg-emerald-800"
           type="button"
-          onClick={() => setCheckoutVisible(!checkoutVisible)}
+          onClick={() => {
+            const abrir = !checkoutVisible;
+            setCheckoutVisible(abrir);
+            if (abrir) {
+              setTimeout(() => {
+                focusVentasCampo(
+                  metodoPago === "efectivo" && !usarPagosMultiples
+                    ? VENTAS_CAMPOS.montoEfectivo
+                    : VENTAS_CAMPOS.registrar,
+                );
+              }, 200);
+            }
+          }}
         >
           {checkoutVisible ? 'Ocultar Opciones de Pago' : 'Finalizar Compra'}
         </Button>
@@ -1321,14 +1325,22 @@ function FormVentas({
                   <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
                     <Label className="text-2xl font-semibold text-white">Con cuánto abona:</Label>
                     <Input
+                      id={VENTAS_CAMPOS.montoEfectivo}
                       inputMode="numeric"
+                      enterKeyHint="go"
                       value={inputEfectivo}
                       onChange={(e) => {
                         const valorInput = e.target.value;
                         setInputEfectivo(formatearMoneda(valorInput));
                         setMontoPagado(limpiarMoneda(valorInput));
                       }}
-                      className="w-full md:max-w-1/2 font-semibold text-white"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          focusVentasCampo(VENTAS_CAMPOS.registrar);
+                        }
+                      }}
+                      className="w-full md:max-w-1/2 font-semibold text-white min-h-12 text-lg"
                     />
                   </div>
                   <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
@@ -1364,14 +1376,31 @@ function FormVentas({
             </div>
             <span className="block w-full h-0.5 bg-green-900"></span>
 
+            <span className="block w-full h-0.5 bg-green-900"></span>
+
+            <p className="text-xs text-gray-600">
+              Tipo de comprobante: usá <kbd className="px-1 rounded bg-gray-200">←</kbd> Comprobante · <kbd className="px-1 rounded bg-gray-200">→</kbd> Factura
+              {tipoFacturacion === "recibo" ? " · predeterminado: comprobante básico" : ""}
+            </p>
+
             <RadioGroup value={tipoFacturacion} onValueChange={setTipoFacturacion} className="flex flex-col gap-4 md:flex-row flex-wrap">
-              <Label htmlFor="factura" className="flex flex-row items-center w-full md:w-[48%] lg:flex-row cursor-pointer text-black border-green-900 hover:bg-green-400 dark:hover:bg-green-700 gap-3 rounded-lg border p-3 transition-colors duration-200 data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900">
-                <RadioGroupItem value="factura" id="factura" className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
-                <span className="text-sm leading-none font-medium">Factura</span>
-              </Label>
-              <Label htmlFor="comprobante" className="flex flex-row items-center w-full md:w-[48%] lg:flex-row cursor-pointer text-black border-green-900 hover:bg-green-400 dark:hover:bg-green-700 gap-3 rounded-lg border p-3 transition-colors duration-200 data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900">
+              <Label
+                htmlFor="comprobante"
+                className={`flex flex-row items-center w-full md:w-[48%] cursor-pointer text-black border-green-900 gap-3 rounded-lg border p-3 transition-colors duration-200 hover:bg-green-400 dark:hover:bg-green-700 ${
+                  tipoFacturacion === "recibo" ? "ring-2 ring-green-700 bg-green-100 border-green-700" : ""
+                }`}
+              >
                 <RadioGroupItem value="recibo" id="comprobante" className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
                 <span className="text-sm leading-none font-medium">Comprobante</span>
+              </Label>
+              <Label
+                htmlFor="factura"
+                className={`flex flex-row items-center w-full md:w-[48%] cursor-pointer text-black border-green-900 gap-3 rounded-lg border p-3 transition-colors duration-200 hover:bg-green-400 dark:hover:bg-green-700 ${
+                  tipoFacturacion === "factura" ? "ring-2 ring-blue-700 bg-blue-50 border-blue-700" : ""
+                }`}
+              >
+                <RadioGroupItem value="factura" id="factura" className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
+                <span className="text-sm leading-none font-medium">Factura</span>
               </Label>
               <TooltipProvider>
                 <div className="flex flex-wrap gap-4 w-full">
@@ -1397,7 +1426,12 @@ function FormVentas({
               </TooltipProvider>
             </RadioGroup>
 
-            <Button type="submit" disabled={isLoading} className={`!py-6 bg-green-900 flex items-center justify-center gap-2 ${isLoading ? "cursor-not-allowed opacity-50" : "hover:bg-green-700 cursor-pointer"}`}>
+            <Button
+              id={VENTAS_CAMPOS.registrar}
+              type="submit"
+              disabled={isLoading}
+              className={`!py-6 min-h-14 text-base bg-green-900 flex items-center justify-center gap-2 ${isLoading ? "cursor-not-allowed opacity-50" : "hover:bg-green-700 cursor-pointer"}`}
+            >
               {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
               {isLoading ? "Registrando..." : "Registrar Venta"}
             </Button>

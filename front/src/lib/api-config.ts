@@ -57,6 +57,9 @@ export const API_CONFIG = {
 
     // Caja
     CAJA_ESTADO: '/caja/estado-actual',
+    CAJA_PANEL_ESTADISTICAS: '/caja/panel-estadisticas',
+    CAJA_TICKET_CIERRE: (idSesion: number) =>
+      `/caja/sesion/${idSesion}/ticket-cierre-detallado`,
   }
 };
 

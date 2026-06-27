@@ -188,7 +188,7 @@ class ArticuloCombo(SQLModel, table=True):
 class ArticuloCodigo(SQLModel, table=True):
     __tablename__ = "articulo_codigos"
     codigo: str = Field(primary_key=True, index=True)
-    id_articulo: int = Field(foreign_key="articulos.id")
+    id_articulo: int = Field(foreign_key="articulos.id", primary_key=True)
     articulo: "Articulo" = Relationship(back_populates="codigos")
 
 # ===================================================================
@@ -252,7 +252,35 @@ class StockMovimiento(SQLModel, table=True):
     consumo_mesa_detalle: Optional["ConsumoMesaDetalle"] = Relationship(back_populates="movimiento_stock")  # Nueva relación
     id_empresa: int = Field(foreign_key="empresas.id")
     empresa: "Empresa" = Relationship()
-    
+
+
+class TransferenciaStock(SQLModel, table=True):
+    __tablename__ = "transferencias_stock"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    estado: str = Field(default="PENDIENTE", index=True)
+    observacion: Optional[str] = None
+    creada_en: datetime = Field(default_factory=datetime.utcnow)
+    recibida_en: Optional[datetime] = None
+    id_empresa_origen: int = Field(foreign_key="empresas.id", index=True)
+    id_empresa_destino: int = Field(foreign_key="empresas.id", index=True)
+    id_usuario_envio: int = Field(foreign_key="usuarios.id")
+    id_usuario_recepcion: Optional[int] = Field(default=None, foreign_key="usuarios.id")
+    detalles: List["TransferenciaStockDetalle"] = Relationship(back_populates="transferencia")
+
+
+class TransferenciaStockDetalle(SQLModel, table=True):
+    __tablename__ = "transferencias_stock_detalle"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    id_transferencia: int = Field(foreign_key="transferencias_stock.id", index=True)
+    codigo_interno: str
+    descripcion: str
+    cantidad: float
+    cantidad_recibida: Optional[float] = None
+    precio_unitario: Optional[float] = None
+    id_articulo_origen: int = Field(foreign_key="articulos.id")
+    id_articulo_destino: Optional[int] = Field(default=None, foreign_key="articulos.id")
+    transferencia: TransferenciaStock = Relationship(back_populates="detalles")
+
 # ===================================================================
 # === MODELOS DE DOCUMENTOS (COMPRAS Y VENTAS)
 # ===================================================================

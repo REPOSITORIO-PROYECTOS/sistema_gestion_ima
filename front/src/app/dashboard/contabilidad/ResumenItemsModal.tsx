@@ -2,6 +2,7 @@
 
 // --- PASO 1: AÑADIR 'export' AL TIPO ---
 export type ItemParaResumen = {
+    id_articulo: number;
     descripcion: string;
     cantidad: number;
     precio_unitario_antiguo: number;

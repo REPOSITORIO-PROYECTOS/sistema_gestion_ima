@@ -2,72 +2,90 @@
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { LegacyRef } from "react"
+import { LegacyRef, KeyboardEvent } from "react"
+import { handleEnterAvanzar, VENTAS_CAMPOS, focusVentasCampo } from "@/lib/ventas-form-flow"
 
-// Definimos las props que el componente necesita
 interface SeccionCantidadProps {
   cantidadInputRef: LegacyRef<HTMLInputElement>;
   modoVenta: 'unidad' | 'granel' | 'precio_manual';
-
-  // Props para modo 'unidad'
   cantidadUnidad: number;
   setCantidadUnidad: (value: number) => void;
   stockActual: number;
-
-  // Props para modo 'granel'
   unidadDeVenta: string;
   inputCantidadGranel: string;
   handleCantidadGranelChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   inputPrecioGranel: string;
   handlePrecioGranelChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onEnterConfirm?: () => void;
 }
+
+const inputClass = "w-full text-black text-lg min-h-12 touch-manipulation";
 
 export function SeccionCantidad({
   cantidadInputRef,
   modoVenta,
   cantidadUnidad, setCantidadUnidad, stockActual: _stockActual,
   unidadDeVenta, inputCantidadGranel, handleCantidadGranelChange,
-  inputPrecioGranel, handlePrecioGranelChange
+  inputPrecioGranel, handlePrecioGranelChange,
+  onEnterConfirm,
 }: SeccionCantidadProps) {
-  // Sin tope por stock: se permite vender aunque no haya existencias.
   const limiteStock = undefined;
 
-  // --- VISTA PARA MODO 'PRECIO MANUAL' (Panadería, Golosinas, etc.) ---
+  const onCantidadKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (!onEnterConfirm) return;
+    handleEnterAvanzar(e, onEnterConfirm);
+  };
+
+  const onGranelCantidadKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    focusVentasCampo(VENTAS_CAMPOS.precioGranel);
+  };
+
+  const onGranelPrecioKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (!onEnterConfirm) return;
+    handleEnterAvanzar(e, onEnterConfirm);
+  };
+
   if (modoVenta === 'precio_manual') {
     return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 items-center">
-        <Label className="text-xl font-semibold text-green-900 md:text-right">
+        <Label htmlFor={VENTAS_CAMPOS.precioManual} className="text-xl font-semibold text-green-900 md:text-right">
           Precio de venta
         </Label>
         <div className="md:col-span-2">
           <Input
-            id="precio-manual"
+            id={VENTAS_CAMPOS.precioManual}
             ref={cantidadInputRef}
             type="number"
+            inputMode="decimal"
             min={0.01}
             step="0.01"
             placeholder="Ingrese el importe"
             value={inputPrecioGranel}
             onChange={handlePrecioGranelChange}
-            className="w-full text-black text-lg"
+            onKeyDown={onCantidadKeyDown}
+            className={inputClass}
+            enterKeyHint="done"
           />
         </div>
       </div>
     );
   }
 
-  // --- VISTA PARA MODO 'UNIDAD' ---
   if (modoVenta === 'unidad') {
     return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 items-center">
-        <Label htmlFor="cantidad-unidad" className="text-xl font-semibold text-green-900 md:text-right">
+        <Label htmlFor={VENTAS_CAMPOS.cantidadUnidad} className="text-xl font-semibold text-green-900 md:text-right">
           Cantidad
         </Label>
         <div className="md:col-span-2">
           <Input
-            id="cantidad-unidad"
+            id={VENTAS_CAMPOS.cantidadUnidad}
             ref={cantidadInputRef}
             type="number"
+            inputMode="numeric"
+            enterKeyHint="done"
             onWheel={(e) => (e.target as HTMLInputElement).blur()}
             min={1}
             max={limiteStock}
@@ -80,48 +98,51 @@ export function SeccionCantidad({
               const siguiente = limiteStock ? Math.min(parsed, limiteStock) : parsed;
               setCantidadUnidad(siguiente);
             }}
-            className="w-full text-black"
+            onKeyDown={onCantidadKeyDown}
+            className={inputClass}
           />
         </div>
       </div>
     );
   }
 
-  // --- VISTA PARA MODO 'GRANEL' ---
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 items-center">
       <Label className="text-xl font-semibold text-green-900 md:text-right">
         Cantidad / Precio
       </Label>
-      <div className="md:col-span-2 grid grid-cols-2 gap-x-4">
-        {/* Input de Cantidad (Kg, Lt, etc.) */}
+      <div className="md:col-span-2 grid grid-cols-2 gap-x-3 gap-y-2">
         <div className="flex flex-col gap-2">
-          <Label htmlFor="cantidad-granel" className="text-sm text-muted-foreground">
+          <Label htmlFor={VENTAS_CAMPOS.cantidadGranel} className="text-sm text-muted-foreground">
             ({unidadDeVenta})
           </Label>
           <Input
-            id="cantidad-granel"
+            id={VENTAS_CAMPOS.cantidadGranel}
             ref={cantidadInputRef}
             type="number"
+            inputMode="decimal"
+            enterKeyHint="next"
             value={inputCantidadGranel}
             onChange={handleCantidadGranelChange}
+            onKeyDown={onGranelCantidadKeyDown}
             step="0.01"
-            className="w-full text-black"
+            className={inputClass}
           />
         </div>
-
-        {/* Input de Precio ($) */}
         <div className="flex flex-col gap-2">
-          <Label htmlFor="precio-granel" className="text-sm text-muted-foreground">
+          <Label htmlFor={VENTAS_CAMPOS.precioGranel} className="text-sm text-muted-foreground">
             ($)
           </Label>
           <Input
-            id="precio-granel"
+            id={VENTAS_CAMPOS.precioGranel}
             type="number"
+            inputMode="decimal"
+            enterKeyHint="done"
             value={inputPrecioGranel}
             onChange={handlePrecioGranelChange}
+            onKeyDown={onGranelPrecioKeyDown}
             step="0.01"
-            className="w-full text-black"
+            className={inputClass}
           />
         </div>
       </div>

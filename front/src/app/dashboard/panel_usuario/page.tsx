@@ -1,16 +1,16 @@
 'use client';
 
 import { useState } from "react";
-import { useAuthStore } from "@/lib/authStore"; 
+import { useAuthStore } from "@/lib/authStore";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { puedeEditarCredenciales } from "@/lib/permisos";
 
 export default function PanelUsuario() {
 
   const usuario = useAuthStore((state) => state.usuario);
-  /* const setUsuario = useAuthStore((state) => state.setUsuario);
-  const setNombreUsuario = useAuthStore((state) => state.setNombreUsuario); */
+  const role = useAuthStore((state) => state.role);
 
   const [nuevoNombreUsuario, setNuevoNombreUsuario] = useState(usuario?.nombre_usuario ?? "");
   const [passwordActual, setPasswordActual] = useState("");
@@ -18,12 +18,11 @@ export default function PanelUsuario() {
   const [loading, setLoading] = useState(false);
 
   const token = useAuthStore((state) => state.token);
+  const puedeEditar = puedeEditarCredenciales(role?.nombre);
 
   if (!usuario) return null;
 
-  // PATCH Username
   const handleUsernameChange = async () => {
-    
     const confirmLogout = window.confirm(
       "Cambiar el nombre de usuario cerrará tu sesión actual y deberás volver a logearte, ¿Deseás continuar?"
     );
@@ -48,10 +47,8 @@ export default function PanelUsuario() {
       }
 
       toast.success("Nombre de usuario actualizado. Cerrando sesión...");
-
-      // Desloguea y redirige
       useAuthStore.getState().logout();
-      window.location.href = "/"; 
+      window.location.href = "/";
 
     } catch (error) {
       console.log(error);
@@ -61,9 +58,7 @@ export default function PanelUsuario() {
     }
   };
 
-  // PATCH Password
   const handlePasswordChange = async () => {
-
     if (!passwordActual || !passwordNueva) {
       toast.warning("Completa ambos campos de contraseña");
       return;
@@ -100,7 +95,7 @@ export default function PanelUsuario() {
 
     } catch (error) {
       console.error(error);
-
+      toast.error(error instanceof Error ? error.message : "Error al cambiar la contraseña");
     } finally {
       setLoading(false);
     }
@@ -109,48 +104,56 @@ export default function PanelUsuario() {
   return (
     <div className="flex flex-col gap-6 p-4 max-w-lg">
 
-      {/* Header */}
       <div className="space-y-4">
         <h2 className="text-3xl font-bold text-green-950">Panel de Usuario</h2>
-        <p className="text-muted-foreground">Administre su usuario. Acá podrá modificar su nombre y contraseña.</p>
+        <p className="text-muted-foreground">
+          {puedeEditar
+            ? "Administrá tu usuario. Acá podés modificar tu nombre y contraseña."
+            : "Datos de tu usuario. Para cambiar contraseña o nombre, contactá a un administrador."}
+        </p>
       </div>
 
-      {/* Cambiar nombre de usuario */}
       <div className="space-y-3">
         <h3 className="text-xl font-semibold">Nombre de usuario</h3>
         <Input
           value={nuevoNombreUsuario}
           onChange={(e) => setNuevoNombreUsuario(e.target.value)}
+          disabled={!puedeEditar}
         />
-        <Button
-          onClick={handleUsernameChange}
-          disabled={loading || nuevoNombreUsuario === usuario.nombre_usuario}
-        >
-          Guardar cambios
-        </Button>
+        {puedeEditar && (
+          <Button
+            onClick={handleUsernameChange}
+            disabled={loading || nuevoNombreUsuario === usuario.nombre_usuario}
+          >
+            Guardar cambios
+          </Button>
+        )}
       </div>
 
-      {/* Cambiar contraseña */}
-      <div className="space-y-3">
-        <h3 className="text-xl font-semibold">Cambiar contraseña</h3>
-        <Input
-          type="password"
-          placeholder="Contraseña actual"
-          value={passwordActual}
-          onChange={(e) => setPasswordActual(e.target.value)}
-        />
-        <Input
-          type="password"
-          placeholder="Nueva contraseña"
-          value={passwordNueva}
-          onChange={(e) => setPasswordNueva(e.target.value)}
-        />
-
-        {/* Submit */}
-        <Button onClick={handlePasswordChange} disabled={loading}>
-          Cambiar contraseña
-        </Button>
-      </div>
+      {puedeEditar ? (
+        <div className="space-y-3">
+          <h3 className="text-xl font-semibold">Cambiar contraseña</h3>
+          <Input
+            type="password"
+            placeholder="Contraseña actual"
+            value={passwordActual}
+            onChange={(e) => setPasswordActual(e.target.value)}
+          />
+          <Input
+            type="password"
+            placeholder="Nueva contraseña"
+            value={passwordNueva}
+            onChange={(e) => setPasswordNueva(e.target.value)}
+          />
+          <Button onClick={handlePasswordChange} disabled={loading}>
+            Cambiar contraseña
+          </Button>
+        </div>
+      ) : (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          Rol actual: <strong>{role?.nombre ?? "—"}</strong>. No tenés permiso para modificar credenciales.
+        </div>
+      )}
     </div>
   );
 }

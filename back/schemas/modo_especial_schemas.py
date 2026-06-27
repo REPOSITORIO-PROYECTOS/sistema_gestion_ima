@@ -39,8 +39,15 @@ class ProductoModoEspecialBase(BaseModel):
     def limpiar_barcodes(cls, v: Optional[List[str]]) -> Optional[List[str]]:
         if not v:
             return None
-        limpios = list(dict.fromkeys(b.strip() for b in v if b and b.strip()))
-        return limpios or None
+        limpios = [b.strip() for b in v if b and b.strip()]
+        if not limpios:
+            return None
+        vistos: set[str] = set()
+        for codigo in limpios:
+            if codigo in vistos:
+                raise ValueError(f"El código de barras '{codigo}' está repetido en la lista ingresada.")
+            vistos.add(codigo)
+        return limpios
 
 
 class ProductoModoEspecialCreate(ProductoModoEspecialBase):
@@ -59,6 +66,21 @@ class ProductoModoEspecialUpdate(BaseModel):
     cantidad_envase: Optional[float] = Field(default=None, ge=0)
     ubicacion: Optional[str] = None
     activo: Optional[bool] = None
+
+    @field_validator("barcodes")
+    @classmethod
+    def limpiar_barcodes(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        if not v:
+            return None
+        limpios = [b.strip() for b in v if b and b.strip()]
+        if not limpios:
+            return None
+        vistos: set[str] = set()
+        for codigo in limpios:
+            if codigo in vistos:
+                raise ValueError(f"El código de barras '{codigo}' está repetido en la lista ingresada.")
+            vistos.add(codigo)
+        return limpios
 
 
 class ProductoModoEspecialResponse(BaseModel):
@@ -86,6 +108,8 @@ class IngresoStockItem(BaseModel):
     id_articulo: Optional[int] = None
     cantidad: float = Field(gt=0)
     observacion: Optional[str] = None
+    precio_venta: Optional[float] = Field(default=None, ge=0)
+    precio_costo: Optional[float] = Field(default=None, ge=0)
 
 
 class IngresoStockRequest(BaseModel):
@@ -112,3 +136,52 @@ class ImportExportResumen(BaseModel):
     actualizados: int = 0
     errores: int = 0
     detalle_errores: List[str] = []
+
+
+class EmpresaTransferenciaResponse(BaseModel):
+    id: int
+    nombre: str
+
+
+class TransferenciaStockItem(BaseModel):
+    codigo_interno: str = Field(min_length=1)
+    cantidad: float = Field(gt=0)
+    precio_unitario: Optional[float] = Field(default=None, ge=0)
+
+
+class CrearTransferenciaStockRequest(BaseModel):
+    id_empresa_destino: int
+    observacion: Optional[str] = None
+    items: List[TransferenciaStockItem] = Field(min_length=1)
+
+
+class RecibirTransferenciaItem(BaseModel):
+    id_detalle: int
+    cantidad_recibida: Optional[float] = Field(default=None, gt=0)
+
+
+class RecibirTransferenciaRequest(BaseModel):
+    items: List[RecibirTransferenciaItem] = Field(min_length=1)
+    aplicar_precios: bool = True
+
+
+class TransferenciaStockDetalleResponse(BaseModel):
+    id: int
+    codigo_interno: str
+    descripcion: str
+    cantidad: float
+    cantidad_recibida: Optional[float]
+    precio_unitario: Optional[float]
+
+
+class TransferenciaStockResponse(BaseModel):
+    id: int
+    estado: str
+    observacion: Optional[str]
+    creada_en: str
+    recibida_en: Optional[str]
+    id_empresa_origen: int
+    id_empresa_destino: int
+    nombre_empresa_origen: str
+    nombre_empresa_destino: str
+    detalles: List[TransferenciaStockDetalleResponse]

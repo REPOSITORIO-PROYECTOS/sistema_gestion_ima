@@ -68,6 +68,7 @@ COMPRAS_DETALLE_SHEET = os.getenv('SHEET_NAME_COMPRAS_DETALLE', 'ComprasDetalle'
 
 
 # Otras configuraciones
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv('ACCESS_TOKEN_EXPIRE_MINUTES', 12 * 60))
 ADMIN_TOKEN_DURATION_SECONDS = int(os.getenv('ADMIN_TOKEN_DURATION_SECONDS', 8 * 60 * 60))
 
 # --- Verificaciones Críticas ---

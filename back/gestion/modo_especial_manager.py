@@ -5,22 +5,38 @@ import io
 import re
 import unicodedata
 from contextlib import nullcontext
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from sqlmodel import Session, select
 from sqlalchemy.orm import selectinload
 
-from back.modelos import Articulo, ArticuloCodigo, Categoria, ConfiguracionEmpresa, StockMovimiento
+from back.modelos import (
+    Articulo,
+    ArticuloCodigo,
+    Categoria,
+    ConfiguracionEmpresa,
+    Empresa,
+    StockMovimiento,
+    TransferenciaStock,
+    TransferenciaStockDetalle,
+)
+from back.utils.articulo_helpers import articulo_con_barcode_en_empresa, mensaje_barcode_duplicado
 from back.schemas.modo_especial_schemas import (
     BulkProductosRequest,
+    CrearTransferenciaStockRequest,
     ImportExportResumen,
     IngresoStockRequest,
     ProductoModoEspecialCreate,
     ProductoModoEspecialUpdate,
+    RecibirTransferenciaRequest,
     SubaPreciosRequest,
 )
 
 UNIDADES_VALIDAS = {"unidad", "gramos", "kilogramos", "litros", "mililitros"}
+
+# La Esquina (35) y FULL24 (36): transferencias de stock entre sucursales.
+EMPRESAS_TRANSFERENCIA_STOCK = frozenset({35, 36})
 
 _ALIASES_UNIDAD: Dict[str, str] = {
     "unidad": "unidad",
@@ -173,6 +189,14 @@ def _incrementar_catalogo_version(db: Session, id_empresa: int) -> None:
         db.add(config)
 
 
+def _validar_barcodes_lista(barcodes: List[str]) -> None:
+    vistos: set[str] = set()
+    for codigo in barcodes:
+        if codigo in vistos:
+            raise ValueError(f"El código de barras '{codigo}' está repetido en la lista ingresada.")
+        vistos.add(codigo)
+
+
 def _asignar_barcodes(
     db: Session,
     articulo: Articulo,
@@ -181,19 +205,21 @@ def _asignar_barcodes(
 ) -> None:
     if barcodes is None:
         return
+    _validar_barcodes_lista(barcodes)
     codigos_actuales = {c.codigo for c in (articulo.codigos or [])}
     deseados = set(barcodes)
-    for codigo in codigos_actuales - deseados:
-        obj = db.get(ArticuloCodigo, codigo)
-        if obj:
-            db.delete(obj)
+    # Eliminar vía la relación para no dejar instancias borradas en articulo.codigos
+    # (db.delete + db.add(articulo) provoca InvalidRequestError en SQLAlchemy).
+    for codigo_obj in list(articulo.codigos or []):
+        if codigo_obj.codigo not in deseados:
+            articulo.codigos.remove(codigo_obj)
     for codigo in deseados - codigos_actuales:
-        existente = db.get(ArticuloCodigo, codigo)
-        if existente and existente.id_articulo != articulo.id:
+        otro = articulo_con_barcode_en_empresa(db, codigo, articulo.id, articulo.id_empresa)
+        if otro:
             if omitir_conflictos:
                 continue
-            raise ValueError(f"El código de barras '{codigo}' ya está asignado a otro artículo.")
-        db.add(ArticuloCodigo(codigo=codigo, id_articulo=articulo.id))
+            raise ValueError(mensaje_barcode_duplicado(codigo, otro))
+        articulo.codigos.append(ArticuloCodigo(codigo=codigo, id_articulo=articulo.id))
 
 
 def _articulo_a_response(articulo: Articulo) -> Dict[str, Any]:
@@ -395,6 +421,11 @@ def ingresar_stock(db: Session, id_empresa: int, id_usuario: int, req: IngresoSt
         stock_anterior = articulo.stock_actual or 0.0
         stock_nuevo = stock_anterior + item.cantidad
         articulo.stock_actual = stock_nuevo
+        if item.precio_venta is not None:
+            articulo.precio_venta = item.precio_venta
+            articulo.venta_negocio = item.precio_venta
+        if item.precio_costo is not None:
+            articulo.precio_costo = item.precio_costo
         movimiento = StockMovimiento(
             tipo="INGRESO",
             cantidad=item.cantidad,
@@ -412,6 +443,8 @@ def ingresar_stock(db: Session, id_empresa: int, id_usuario: int, req: IngresoSt
             "cantidad": item.cantidad,
             "stock_nuevo": stock_nuevo,
             "observacion": item.observacion,
+            "precio_venta": item.precio_venta,
+            "precio_costo": item.precio_costo,
         })
 
     _incrementar_catalogo_version(db, id_empresa)
@@ -651,3 +684,218 @@ def importar_csv(db: Session, id_empresa: int, contenido: str) -> ImportExportRe
         resumen.detalle_errores.extend(bulk_resumen.detalle_errores)
 
     return resumen
+
+
+def _nombre_empresa(empresa: Optional[Empresa]) -> str:
+    if not empresa:
+        return "—"
+    return empresa.nombre_fantasia or empresa.nombre_legal
+
+
+def _verificar_empresa_transferencia(db: Session, id_empresa: int) -> None:
+    if id_empresa not in EMPRESAS_TRANSFERENCIA_STOCK:
+        raise ValueError("Esta empresa no participa en transferencias de stock.")
+    from back.gestion import configuracion_manager
+    if not configuracion_manager.es_modo_especial_habilitado(db, id_empresa):
+        raise ValueError("La empresa no tiene modo especial habilitado.")
+
+
+def _transferencia_a_response(db: Session, transferencia: TransferenciaStock) -> Dict[str, Any]:
+    origen = db.get(Empresa, transferencia.id_empresa_origen)
+    destino = db.get(Empresa, transferencia.id_empresa_destino)
+    return {
+        "id": transferencia.id,
+        "estado": transferencia.estado,
+        "observacion": transferencia.observacion,
+        "creada_en": transferencia.creada_en.isoformat() if transferencia.creada_en else "",
+        "recibida_en": transferencia.recibida_en.isoformat() if transferencia.recibida_en else None,
+        "id_empresa_origen": transferencia.id_empresa_origen,
+        "id_empresa_destino": transferencia.id_empresa_destino,
+        "nombre_empresa_origen": _nombre_empresa(origen),
+        "nombre_empresa_destino": _nombre_empresa(destino),
+        "detalles": [
+            {
+                "id": d.id,
+                "codigo_interno": d.codigo_interno,
+                "descripcion": d.descripcion,
+                "cantidad": d.cantidad,
+                "cantidad_recibida": d.cantidad_recibida,
+                "precio_unitario": d.precio_unitario,
+            }
+            for d in (transferencia.detalles or [])
+        ],
+    }
+
+
+def listar_empresas_transferencia(db: Session, id_empresa: int) -> List[Dict[str, Any]]:
+    _verificar_empresa_transferencia(db, id_empresa)
+    from back.gestion import configuracion_manager
+    resultado: List[Dict[str, Any]] = []
+    for id_dest in sorted(EMPRESAS_TRANSFERENCIA_STOCK):
+        if id_dest == id_empresa:
+            continue
+        if not configuracion_manager.es_modo_especial_habilitado(db, id_dest):
+            continue
+        empresa = db.get(Empresa, id_dest)
+        if empresa and empresa.activa:
+            resultado.append({"id": empresa.id, "nombre": _nombre_empresa(empresa)})
+    return resultado
+
+
+def crear_transferencia_stock(
+    db: Session,
+    id_empresa_origen: int,
+    id_usuario: int,
+    req: CrearTransferenciaStockRequest,
+) -> Dict[str, Any]:
+    _verificar_empresa_transferencia(db, id_empresa_origen)
+    if req.id_empresa_destino == id_empresa_origen:
+        raise ValueError("No puede transferir stock a la misma empresa.")
+    _verificar_empresa_transferencia(db, req.id_empresa_destino)
+
+    transferencia = TransferenciaStock(
+        estado="PENDIENTE",
+        observacion=(req.observacion or "").strip() or None,
+        id_empresa_origen=id_empresa_origen,
+        id_empresa_destino=req.id_empresa_destino,
+        id_usuario_envio=id_usuario,
+    )
+    db.add(transferencia)
+    db.flush()
+
+    for item in req.items:
+        codigo = item.codigo_interno.strip()
+        articulo = _obtener_articulo_por_codigo(db, id_empresa_origen, codigo)
+        if not articulo:
+            raise ValueError(f"Artículo '{codigo}' no encontrado en origen.")
+        stock_actual = articulo.stock_actual or 0.0
+        if stock_actual < item.cantidad:
+            raise ValueError(
+                f"Stock insuficiente para '{codigo}' ({articulo.descripcion}): "
+                f"disponible {stock_actual}, solicitado {item.cantidad}."
+            )
+        stock_nuevo = stock_actual - item.cantidad
+        articulo.stock_actual = stock_nuevo
+        db.add(articulo)
+        db.add(StockMovimiento(
+            tipo="EGRESO_TRANSFERENCIA",
+            cantidad=item.cantidad,
+            stock_anterior=stock_actual,
+            stock_nuevo=stock_nuevo,
+            id_articulo=articulo.id,
+            id_usuario=id_usuario,
+            id_empresa=id_empresa_origen,
+        ))
+        db.add(TransferenciaStockDetalle(
+            id_transferencia=transferencia.id,
+            codigo_interno=codigo,
+            descripcion=articulo.descripcion,
+            cantidad=item.cantidad,
+            precio_unitario=item.precio_unitario,
+            id_articulo_origen=articulo.id,
+        ))
+
+    _incrementar_catalogo_version(db, id_empresa_origen)
+    db.commit()
+    db.refresh(transferencia)
+    transferencia = db.exec(
+        select(TransferenciaStock)
+        .where(TransferenciaStock.id == transferencia.id)
+        .options(selectinload(TransferenciaStock.detalles))
+    ).first()
+    return _transferencia_a_response(db, transferencia)
+
+
+def listar_transferencias_pendientes(db: Session, id_empresa: int) -> List[Dict[str, Any]]:
+    _verificar_empresa_transferencia(db, id_empresa)
+    transferencias = db.exec(
+        select(TransferenciaStock)
+        .where(
+            TransferenciaStock.id_empresa_destino == id_empresa,
+            TransferenciaStock.estado == "PENDIENTE",
+        )
+        .order_by(TransferenciaStock.creada_en.desc())
+        .options(selectinload(TransferenciaStock.detalles))
+    ).all()
+    return [_transferencia_a_response(db, t) for t in transferencias]
+
+
+def listar_transferencias_enviadas(db: Session, id_empresa: int) -> List[Dict[str, Any]]:
+    _verificar_empresa_transferencia(db, id_empresa)
+    transferencias = db.exec(
+        select(TransferenciaStock)
+        .where(TransferenciaStock.id_empresa_origen == id_empresa)
+        .order_by(TransferenciaStock.creada_en.desc())
+        .options(selectinload(TransferenciaStock.detalles))
+        .limit(50)
+    ).all()
+    return [_transferencia_a_response(db, t) for t in transferencias]
+
+
+def recibir_transferencia_stock(
+    db: Session,
+    id_empresa: int,
+    id_usuario: int,
+    id_transferencia: int,
+    req: RecibirTransferenciaRequest,
+) -> Dict[str, Any]:
+    _verificar_empresa_transferencia(db, id_empresa)
+    transferencia = db.exec(
+        select(TransferenciaStock)
+        .where(
+            TransferenciaStock.id == id_transferencia,
+            TransferenciaStock.id_empresa_destino == id_empresa,
+        )
+        .options(selectinload(TransferenciaStock.detalles))
+    ).first()
+    if not transferencia:
+        raise ValueError("Transferencia no encontrada.")
+    if transferencia.estado != "PENDIENTE":
+        raise ValueError("La transferencia ya fue procesada.")
+
+    detalle_por_id = {d.id: d for d in transferencia.detalles}
+    if len(req.items) != len(transferencia.detalles):
+        raise ValueError("Debe confirmar todos los ítems de la transferencia.")
+
+    for item_req in req.items:
+        detalle = detalle_por_id.get(item_req.id_detalle)
+        if not detalle:
+            raise ValueError(f"Detalle {item_req.id_detalle} no pertenece a esta transferencia.")
+        cantidad_recibida = item_req.cantidad_recibida if item_req.cantidad_recibida is not None else detalle.cantidad
+        if cantidad_recibida > detalle.cantidad:
+            raise ValueError(
+                f"No puede recibir más de lo enviado para '{detalle.codigo_interno}'."
+            )
+        articulo_dest = _obtener_articulo_por_codigo(db, id_empresa, detalle.codigo_interno)
+        if not articulo_dest:
+            raise ValueError(
+                f"Artículo '{detalle.codigo_interno}' no existe en esta empresa. "
+                "Creá el producto antes de recibir la transferencia."
+            )
+        stock_anterior = articulo_dest.stock_actual or 0.0
+        stock_nuevo = stock_anterior + cantidad_recibida
+        articulo_dest.stock_actual = stock_nuevo
+        if req.aplicar_precios and detalle.precio_unitario is not None:
+            articulo_dest.precio_costo = detalle.precio_unitario
+        db.add(articulo_dest)
+        db.add(StockMovimiento(
+            tipo="INGRESO_TRANSFERENCIA",
+            cantidad=cantidad_recibida,
+            stock_anterior=stock_anterior,
+            stock_nuevo=stock_nuevo,
+            id_articulo=articulo_dest.id,
+            id_usuario=id_usuario,
+            id_empresa=id_empresa,
+        ))
+        detalle.cantidad_recibida = cantidad_recibida
+        detalle.id_articulo_destino = articulo_dest.id
+        db.add(detalle)
+
+    transferencia.estado = "RECIBIDA"
+    transferencia.recibida_en = datetime.utcnow()
+    transferencia.id_usuario_recepcion = id_usuario
+    db.add(transferencia)
+    _incrementar_catalogo_version(db, id_empresa)
+    db.commit()
+    db.refresh(transferencia)
+    return _transferencia_a_response(db, transferencia)

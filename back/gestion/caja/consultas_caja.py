@@ -4,7 +4,8 @@
 import logging
 from sqlmodel import Session, select
 from typing import List, Dict, Any, Optional
-from sqlalchemy.orm import aliased, selectinload  
+from sqlalchemy.orm import aliased, selectinload
+from sqlalchemy import case, func
 # Importamos los modelos necesarios, creando alias para evitar conflictos en el JOIN
 from back.modelos import Articulo, CajaSesion, Usuario, CajaMovimiento, Tercero, Venta
 from back.modelos import Usuario as UsuarioApertura
@@ -90,7 +91,71 @@ def obtener_arqueos_de_caja(db: Session, usuario_actual: Usuario) -> Dict[str, L
         logging.error(f"Error al generar el informe de cajas para la empresa {usuario_actual.id_empresa}: {e}", exc_info=True)
         # Relanzamos la excepción para que el router devuelva un 500, pero con el log ya escrito.
         raise e
-    
+
+
+def obtener_panel_estadisticas_cajas(db: Session, usuario_actual: Usuario) -> Dict[str, Any]:
+    """
+    Panel de supervisión: cajas abiertas de la empresa con totales de ventas y movimientos.
+    Pensado para gerentes/administradores en tiendas con múltiples cajeros (modo especial).
+    """
+    UsuarioApertura = aliased(Usuario, name="usuario_apertura_panel")
+
+    mov_stats = (
+        select(
+            CajaMovimiento.id_caja_sesion,
+            func.count(CajaMovimiento.id).label("cantidad_movimientos"),
+            func.coalesce(
+                func.sum(case((CajaMovimiento.tipo == "VENTA", CajaMovimiento.monto), else_=0.0)),
+                0.0,
+            ).label("total_ventas"),
+            func.coalesce(
+                func.sum(case((CajaMovimiento.tipo == "VENTA", 1), else_=0)),
+                0,
+            ).label("cantidad_ventas"),
+        )
+        .group_by(CajaMovimiento.id_caja_sesion)
+        .subquery()
+    )
+
+    consulta = (
+        select(
+            CajaSesion,
+            UsuarioApertura.nombre_usuario,
+            func.coalesce(mov_stats.c.cantidad_movimientos, 0),
+            func.coalesce(mov_stats.c.total_ventas, 0.0),
+            func.coalesce(mov_stats.c.cantidad_ventas, 0),
+        )
+        .join(UsuarioApertura, CajaSesion.id_usuario_apertura == UsuarioApertura.id)
+        .outerjoin(mov_stats, mov_stats.c.id_caja_sesion == CajaSesion.id)
+        .where(CajaSesion.id_empresa == usuario_actual.id_empresa)
+        .where(CajaSesion.estado == "ABIERTA")
+        .order_by(CajaSesion.fecha_apertura.asc())
+    )
+
+    resultados = db.exec(consulta).all()
+    cajas_abiertas: List[Dict[str, Any]] = []
+
+    for sesion, nombre_apertura, cant_mov, total_ventas, cant_ventas in resultados:
+        cajas_abiertas.append({
+            "id_sesion": sesion.id,
+            "fecha_apertura": sesion.fecha_apertura,
+            "usuario_apertura": nombre_apertura,
+            "saldo_inicial": sesion.saldo_inicial,
+            "cantidad_movimientos": int(cant_mov or 0),
+            "cantidad_ventas": int(cant_ventas or 0),
+            "total_ventas": float(total_ventas or 0.0),
+        })
+
+    return {
+        "cajas_abiertas": cajas_abiertas,
+        "resumen": {
+            "total_cajas_abiertas": len(cajas_abiertas),
+            "total_ventas": sum(c["total_ventas"] for c in cajas_abiertas),
+            "total_movimientos": sum(c["cantidad_movimientos"] for c in cajas_abiertas),
+        },
+    }
+
+
 def obtener_todos_los_movimientos_de_caja(db: Session, usuario_actual: Usuario) -> List[CajaMovimiento]:
     """
     Función maestra actualizada. Obtiene TODOS los movimientos de caja de la empresa

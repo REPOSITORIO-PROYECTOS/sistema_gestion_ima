@@ -20,7 +20,7 @@ from back.modelos import Usuario, Rol
 # --- Configuración de Seguridad ---
 SECRET_KEY = config.SECRET_KEY_SEC
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = getattr(config, 'ACCESS_TOKEN_EXPIRE_MINUTES', 210)
+ACCESS_TOKEN_EXPIRE_MINUTES = config.ACCESS_TOKEN_EXPIRE_MINUTES
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
@@ -158,3 +158,4 @@ def es_rol(roles_requeridos: List[str]):
 es_cajero = es_rol(["Cajero", "Vendedora", "Admin", "Gerente", "Encargada", "Soporte", "Mozo"])
 es_admin = es_rol(["Admin", "Soporte"])
 es_gerente = es_rol(["Gerente", "Encargada", "Admin", "Soporte"])
+es_supervisor_caja = es_rol(["Gerente", "Admin", "Encargada", "Soporte"])

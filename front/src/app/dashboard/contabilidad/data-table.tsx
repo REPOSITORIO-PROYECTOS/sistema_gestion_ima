@@ -38,7 +38,6 @@ import { Loader2 } from "lucide-react";
 
 import { ModalConfirmacionAccion } from "./ModalConfirmacionAccion";
 import { ResumenItemsModal, ItemParaResumen } from "./ResumenItemsModal";
-import { useProductoStore } from "@/lib/productoStore";
 
 interface DataTableProps<TData, TValue> {
     columns: ColumnDef<TData, TValue>[]
@@ -64,7 +63,6 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
     const [itemsResumen, setItemsResumen] = useState<ItemParaResumen[]>([]);
     const [totalResumen, setTotalResumen] = useState(0);
     const [tipoComprobanteAgrupado, setTipoComprobanteAgrupado] = useState("recibo");
-    const productos = useProductoStore((state) => state.productos);
 
     // --- LÓGICA DE VALIDACIÓN Y PREPARACIÓN (ON-CLICK) ---
 
@@ -106,10 +104,10 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
         let totalFinal = 0;
         selectedRows.forEach(row => {
             row.original.venta?.articulos_vendidos?.forEach(itemVendido => {
-                const productoActual = productos.find(p => String(p.id) === String(itemVendido.id_articulo));
-                const precioUnitarioActualizado = productoActual?.precio_venta ?? itemVendido.precio_unitario;
+                const precioUnitarioActualizado = itemVendido.precio_unitario;
                 const subtotalActualizado = itemVendido.cantidad * precioUnitarioActualizado;
                 itemsConsolidados.push({
+                    id_articulo: itemVendido.id_articulo,
                     descripcion: itemVendido.nombre,
                     cantidad: itemVendido.cantidad,
                     precio_unitario_antiguo: itemVendido.precio_unitario,
@@ -162,7 +160,7 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
 
             if (accionActual === 'agrupar') {
                 const payloadItems: ItemPayload[] = itemsResumen.map(item => ({
-                    id_articulo: Number(productos.find(p => p.nombre === item.descripcion)?.id) || 0,
+                    id_articulo: item.id_articulo,
                     cantidad: item.cantidad,
                     precio_unitario: item.precio_unitario_nuevo,
                     subtotal: item.subtotal_nuevo,

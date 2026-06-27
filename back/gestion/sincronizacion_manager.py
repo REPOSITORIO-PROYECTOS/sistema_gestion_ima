@@ -12,8 +12,12 @@ from sqlmodel import Session, select
 from typing import List, Dict, Any, Type, Optional
 
 # Importamos los modelos de nuestra base de datos con los que vamos a trabajar
-from back.modelos import Articulo, Categoria, Marca, ConfiguracionEmpresa, ArticuloCodigo
-from back.utils.articulo_helpers import es_articulo_precio_manual
+from back.modelos import Articulo, ArticuloCodigo, Categoria, ConfiguracionEmpresa, Marca
+from back.utils.articulo_helpers import (
+    conflicto_barcode_en_empresa,
+    es_articulo_precio_manual,
+    obtener_codigo_barras_articulo,
+)
 
 # Importamos nuestro "operario" para leer Google Sheets
 from back.utils.tablas_handler import TablasHandler
@@ -261,19 +265,20 @@ def sincronizar_articulos_desde_sheet(db: Session, id_empresa_actual: int, nombr
                             vistos_fila.add(c_norm)
 
                     for codigo_barra in codigos_unicos_fila:
-                        existente_codigo = db.get(ArticuloCodigo, codigo_barra)
+                        if obtener_codigo_barras_articulo(db, codigo_barra, articulo_actual.id):
+                            continue
 
-                        # Si el código ya pertenece a otro artículo, no forzamos inserción.
-                        if existente_codigo and existente_codigo.id_articulo != articulo_actual.id:
+                        if conflicto_barcode_en_empresa(
+                            db, codigo_barra, articulo_actual.id, id_empresa_actual
+                        ):
                             print(
                                 f"  ⚠️ Conflicto código '{codigo_barra}' para '{codigo_interno}' "
-                                f"(ya asignado a id_articulo={existente_codigo.id_articulo})."
+                                f"(ya asignado a otro artículo de la empresa)."
                             )
                             conflictos_codigos += 1
                             continue
 
-                        if not existente_codigo:
-                            db.add(ArticuloCodigo(codigo=codigo_barra, id_articulo=articulo_actual.id))
+                        db.add(ArticuloCodigo(codigo=codigo_barra, id_articulo=articulo_actual.id))
         
         except Exception as e:
             print(f"Error procesando la fila {i+2} ({fila_sheet.get('codigo_interno')}): {e}")

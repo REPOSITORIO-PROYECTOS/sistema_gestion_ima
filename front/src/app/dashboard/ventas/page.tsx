@@ -19,6 +19,8 @@ import { useCajaStore } from "@/lib/cajaStore";
 import { useFacturacionStore } from "@/lib/facturacionStore"; // Importar
 import EgresoForm from "./EgresoForm";
 import { API_CONFIG } from "@/lib/api-config";
+import { useEmpresaStore } from "@/lib/empresaStore";
+import { puedeAplicarDescuentos } from "@/lib/permisos";
 
 interface ProductoVendido {
   id?: string;
@@ -41,6 +43,11 @@ function DashboardVenta() {
   const [horaActual, setHoraActual] = useState("");
   const { cajaAbierta } = useCajaStore();
   const role = useAuthStore((state) => state.role);
+  const empresa = useEmpresaStore((state) => state.empresa);
+  const puedeDescuentos = puedeAplicarDescuentos(
+    role?.nombre,
+    empresa?.aclaraciones_legales,
+  );
 
   // Estados movidos desde FormVentas
   const [descuentoSobreTotal, setDescuentoSobreTotal] = useState(0);
@@ -241,7 +248,7 @@ function DashboardVenta() {
 
 
   return (
-    <ProtectedRoute allowedRoles={["Admin", "Cajero", "Vendedora", "Soporte"]}>
+    <ProtectedRoute allowedRoles={["Admin", "Cajero", "Vendedora", "Encargada", "Gerente", "Soporte"]}>
       <div className="flex flex-col gap-4">
 
         {/* Header de Informacion */}
@@ -321,29 +328,33 @@ function DashboardVenta() {
                     <span>{prod.tipo} - x{prod.cantidad} U. - {formatearMoneda(prod.precioTotal)}</span>
 
                     <div className="flex flex-row gap-4 items-center mt-1">
-                      <div className="flex flex-col w-24">
-                        <label className="text-xs font-normal text-green-800">Desc %</label>
-                        <Input
-                          type="number"
-                          min={0}
-                          max={100}
-                          value={prod.porcentajeDescuento || 0}
-                          onChange={(e) => handleUpdateProductDiscount(index, 'porcentaje', parseFloat(e.target.value) || 0)}
-                          className="h-8 text-sm bg-white"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </div>
-                      <div className="flex flex-col w-24">
-                        <label className="text-xs font-normal text-green-800">Desc $</label>
-                        <Input
-                          type="number"
-                          min={0}
-                          value={prod.descuentoNominal || 0}
-                          onChange={(e) => handleUpdateProductDiscount(index, 'nominal', parseFloat(e.target.value) || 0)}
-                          className="h-8 text-sm bg-white"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </div>
+                      {puedeDescuentos && (
+                        <>
+                          <div className="flex flex-col w-24">
+                            <label className="text-xs font-normal text-green-800">Desc %</label>
+                            <Input
+                              type="number"
+                              min={0}
+                              max={100}
+                              value={prod.porcentajeDescuento || 0}
+                              onChange={(e) => handleUpdateProductDiscount(index, 'porcentaje', parseFloat(e.target.value) || 0)}
+                              className="h-8 text-sm bg-white"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </div>
+                          <div className="flex flex-col w-24">
+                            <label className="text-xs font-normal text-green-800">Desc $</label>
+                            <Input
+                              type="number"
+                              min={0}
+                              value={prod.descuentoNominal || 0}
+                              onChange={(e) => handleUpdateProductDiscount(index, 'nominal', parseFloat(e.target.value) || 0)}
+                              className="h-8 text-sm bg-white"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -357,31 +368,33 @@ function DashboardVenta() {
               <div className="flex flex-col gap-4 p-6 bg-white border border-green-900 rounded-lg">
                 <h3 className="text-2xl font-semibold text-green-900">Resumen Final del Pedido</h3>
                 <p className="text-xl text-green-900"><span className="font-semibold">Total sin descuento:</span> {formatearMoneda(totalVenta)}</p>
-                <div className="flex flex-col gap-2 my-2">
-                  <div className="flex flex-row items-center justify-between gap-4">
-                    <span className="text-xl text-green-400 font-semibold">Descuento Global (%):</span>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={descuentoSobreTotal === 0 ? '' : descuentoSobreTotal}
-                      onChange={(e) => setDescuentoSobreTotal(Math.min(parseFloat(e.target.value) || 0, 100))}
-                      className="w-32 h-10 text-lg text-right"
-                      placeholder="0"
-                    />
+                {puedeDescuentos && (
+                  <div className="flex flex-col gap-2 my-2">
+                    <div className="flex flex-row items-center justify-between gap-4">
+                      <span className="text-xl text-green-400 font-semibold">Descuento Global (%):</span>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={descuentoSobreTotal === 0 ? '' : descuentoSobreTotal}
+                        onChange={(e) => setDescuentoSobreTotal(Math.min(parseFloat(e.target.value) || 0, 100))}
+                        className="w-32 h-10 text-lg text-right"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="flex flex-row items-center justify-between gap-4">
+                      <span className="text-xl text-green-400 font-semibold">Descuento Global ($):</span>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={descuentoNominalTotal === 0 ? '' : descuentoNominalTotal}
+                        onChange={(e) => setDescuentoNominalTotal(parseFloat(e.target.value) || 0)}
+                        className="w-32 h-10 text-lg text-right"
+                        placeholder="0.00"
+                      />
+                    </div>
                   </div>
-                  <div className="flex flex-row items-center justify-between gap-4">
-                    <span className="text-xl text-green-400 font-semibold">Descuento Global ($):</span>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={descuentoNominalTotal === 0 ? '' : descuentoNominalTotal}
-                      onChange={(e) => setDescuentoNominalTotal(parseFloat(e.target.value) || 0)}
-                      className="w-32 h-10 text-lg text-right"
-                      placeholder="0.00"
-                    />
-                  </div>
-                </div>
+                )}
 
                 {metodoPago === "transferencia" && recargoTransferenciaActivo && (
                   <p className="text-xl text-red-500"><span className="font-semibold">Recargo por Transferencia:</span> {recargoTransferencia}% ({formatearMoneda(totalConDescuento * recargoTransferencia / 100)})</p>

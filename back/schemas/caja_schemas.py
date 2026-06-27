@@ -218,3 +218,24 @@ class ArqueoCerradoInfo(BaseModel):
 class InformeArqueosResponse(BaseModel):
     cajas_abiertas: List[CajaAbiertaInfo]
     arqueos_cerrados: List[ArqueoCerradoInfo]
+
+
+class CajaAbiertaPanelItem(BaseModel):
+    id_sesion: int
+    fecha_apertura: datetime
+    usuario_apertura: str
+    saldo_inicial: float
+    cantidad_movimientos: int
+    cantidad_ventas: int
+    total_ventas: float
+
+
+class PanelEstadisticasResumen(BaseModel):
+    total_cajas_abiertas: int
+    total_ventas: float
+    total_movimientos: int
+
+
+class PanelEstadisticasCajaResponse(BaseModel):
+    cajas_abiertas: List[CajaAbiertaPanelItem]
+    resumen: PanelEstadisticasResumen

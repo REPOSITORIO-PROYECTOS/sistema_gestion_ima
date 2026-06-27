@@ -59,6 +59,7 @@ export const useAuthStore = create<AuthState>()(
 
         // 2️⃣ Limpiar productos
         useProductoStore.getState().clearProductos();
+        localStorage.removeItem("productos");
         localStorage.removeItem("producto-storage");
 
         // 3️⃣ Limpiar auth

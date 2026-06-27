@@ -11,6 +11,7 @@ export type ArticuloCatalogoAPI = {
   precio_manual?: boolean;
 };
 
+/** Catálogo completo con códigos de barras. Usar solo en pantalla de stock. */
 export async function fetchAllArticulos(
   token: string,
   limit = 200,
@@ -53,4 +54,18 @@ export function mapArticulosToStore(data: ArticuloCatalogoAPI[]) {
     unidad_venta: p.unidad_venta || "Unidad",
     precio_manual: p.precio_manual ?? false,
   }));
+}
+
+export async function fetchArticuloPorId(
+  token: string,
+  id: number | string,
+): Promise<ArticuloCatalogoAPI | null> {
+  if (!token || !id) return null;
+
+  const respuesta = await fetch(`${API_CONFIG.BASE_URL}/articulos/obtener/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!respuesta.ok) return null;
+  return respuesta.json();
 }

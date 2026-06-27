@@ -24,6 +24,7 @@ import { useEmpresaStore } from "@/lib/empresaStore";
 import { useCustomLinksStore } from "@/lib/customLinksStore";
 import { API_CONFIG } from "@/lib/api-config";
 import { useFeaturesStore } from "@/lib/featuresStore";
+import { puedeGestionarUsuarios, empresaTienePanelEstadisticas } from "@/lib/permisos";
 
 type NavLink = {
   href: string
@@ -33,6 +34,7 @@ type NavLink = {
 
 // Le pasamos como prop los links (pestañas de subsecciones) y los roles para habilitar o deshabilitar accesos
 function NavBar({ links, role }: { links: NavLink[], role: string }) {
+  const puedeAdministrar = puedeGestionarUsuarios(role);
 
   const pathname = usePathname();
   const router = useRouter();
@@ -41,6 +43,7 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
   const customLinks = useCustomLinksStore((s) => s.links);
   const mesasEnabled = useFeaturesStore((s) => s.mesasEnabled);
   const setMesasEnabled = useFeaturesStore((s) => s.setMesasEnabled);
+  const idEmpresa = useEmpresaStore((s) => s.empresa?.id_empresa);
 
   // Scroll y ocultación del Nav
   const [show, setShow] = useState(true);
@@ -307,6 +310,16 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
     return null;
   }
 
+  const linksVisibles = links.filter((l) => {
+    if (!mesasEnabled && (l.href.startsWith("/dashboard/mesas") || l.href.startsWith("/dashboard/cocina"))) {
+      return false;
+    }
+    if (l.href === "/dashboard/estadisticas" && !empresaTienePanelEstadisticas(idEmpresa)) {
+      return false;
+    }
+    return true;
+  });
+
   return (
     <nav className={`fixed top-0 z-10 w-full transition-transform duration-300 ${show ? 'translate-y-0' : '-translate-y-full'}`}>
 
@@ -327,7 +340,7 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
         {/* Menú de secciones - responsivo */}
         <NavigationMenu className="hidden md:block">
           <NavigationMenuList className="flex space-x-4">
-            {links.filter(l => (mesasEnabled ? true : !l.href.startsWith('/dashboard/mesas') && !l.href.startsWith('/dashboard/cocina'))).map(({ href, name, roles }) => {
+            {linksVisibles.map(({ href, name, roles }) => {
               const isActive = pathname.startsWith(href);
               const isAllowed = roles.includes(role);
 
@@ -388,10 +401,10 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                 </DropdownMenuItem>
 
                 <DropdownMenuItem
-                  className="text-black cursor-pointer"
+                  className="cursor-pointer"
                   onClick={() => router.push('/dashboard/panel_usuario')}
                 >
-                  Editar Usuario
+                  Mi perfil
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator />
@@ -407,19 +420,23 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                   Cerrar Sesión
                 </DropdownMenuItem>
 
-                <DropdownMenuItem
-                  className="cursor-pointer"
-                  onClick={() => router.push('/dashboard/gestion_usuarios')}
-                >
-                  Gestión de Usuarios
-                </DropdownMenuItem>
+                {puedeAdministrar && (
+                  <>
+                    <DropdownMenuItem
+                      className="cursor-pointer"
+                      onClick={() => router.push('/dashboard/gestion_usuarios')}
+                    >
+                      Gestión de Usuarios
+                    </DropdownMenuItem>
 
-                <DropdownMenuItem
-                  className="cursor-pointer"
-                  onClick={() => { router.push('/dashboard/gestion_de_negocio'); }}
-                >
-                  Gestión de Negocio
-                </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="cursor-pointer"
+                      onClick={() => { router.push('/dashboard/gestion_de_negocio'); }}
+                    >
+                      Gestión de Negocio
+                    </DropdownMenuItem>
+                  </>
+                )}
 
               </DropdownMenuContent>
             </DropdownMenu>
@@ -443,12 +460,12 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                   className="text-black cursor-pointer"
                   onClick={() => router.push('/dashboard/panel_usuario')}
                 >
-                  Editar Usuario
+                  Mi perfil
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator />
 
-                {links.filter(l => (mesasEnabled ? true : !l.href.startsWith('/dashboard/mesas') && !l.href.startsWith('/dashboard/cocina'))).map(({ href, name, roles }) => {
+                {linksVisibles.map(({ href, name, roles }) => {
                   const isAllowed = roles.includes(role);
                   return (
                     <DropdownMenuItem key={href} asChild>
@@ -494,17 +511,21 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
                   Cerrar Sesión
                 </DropdownMenuItem>
 
-                <DropdownMenuItem
-                  onClick={() => { router.push('/dashboard/gestion_usuarios'); }}
-                >
-                  Gestión de Usuarios
-                </DropdownMenuItem>
+                {puedeAdministrar && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => { router.push('/dashboard/gestion_usuarios'); }}
+                    >
+                      Gestión de Usuarios
+                    </DropdownMenuItem>
 
-                <DropdownMenuItem
-                  onClick={() => { router.push('/dashboard/gestion_de_negocio'); }}
-                >
-                  Gestión de Negocio
-                </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => { router.push('/dashboard/gestion_de_negocio'); }}
+                    >
+                      Gestión de Negocio
+                    </DropdownMenuItem>
+                  </>
+                )}
 
               </DropdownMenuContent>
             </DropdownMenu>

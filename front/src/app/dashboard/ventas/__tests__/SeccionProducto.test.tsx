@@ -13,24 +13,6 @@ describe('SeccionProducto - Tests del Scanner', () => {
         codigo: '',
         setCodigoEscaneado: jest.fn(),
         handleKeyDown: jest.fn(),
-        productos: [
-            {
-                id: '1',
-                nombre: 'Producto Test 1',
-                precio_venta: 100,
-                venta_negocio: 90,
-                stock_actual: 10,
-                unidad_venta: 'unidad',
-            },
-            {
-                id: '2',
-                nombre: 'Producto Test 2',
-                precio_venta: 200,
-                venta_negocio: 180,
-                stock_actual: 5,
-                unidad_venta: 'unidad',
-            },
-        ],
         productoSeleccionado: null,
         setProductoSeleccionado: jest.fn(),
         open: false,
@@ -68,7 +50,7 @@ describe('SeccionProducto - Tests del Scanner', () => {
 
             // Obtener el input
             const input = screen.getByPlaceholderText(
-                'Escribe código o nombre (máximo 3-4 coincidencias)'
+                'Escribí nombre o escaneá código de barras'
             );
 
             // Simular que el scanner escribe el código
@@ -104,7 +86,7 @@ describe('SeccionProducto - Tests del Scanner', () => {
             );
 
             const input = screen.getByPlaceholderText(
-                'Escribe código o nombre (máximo 3-4 coincidencias)'
+                'Escribí nombre o escaneá código de barras'
             );
 
             // Presionar ENTER sin código
@@ -146,7 +128,7 @@ describe('SeccionProducto - Tests del Scanner', () => {
             );
 
             const input = screen.getByPlaceholderText(
-                'Escribe código o nombre (máximo 3-4 coincidencias)'
+                'Escribí nombre o escaneá código de barras'
             );
 
             // Escribir en el input
@@ -170,7 +152,7 @@ describe('SeccionProducto - Tests del Scanner', () => {
             );
 
             const input = screen.getByPlaceholderText(
-                'Escribe código o nombre (máximo 3-4 coincidencias)'
+                'Escribí nombre o escaneá código de barras'
             );
 
             // Presionar ESC
@@ -185,6 +167,10 @@ describe('SeccionProducto - Tests del Scanner', () => {
     describe('Test 4: Arrow Down (mostrar productos)', () => {
         it('Debería abrir el dropdown cuando se presiona Arrow Down', async () => {
             const setPopoverOpen = jest.fn();
+            (apiClient.api.articulos.buscar as jest.Mock).mockResolvedValue({
+                success: true,
+                data: [],
+            });
 
             render(
                 React.createElement(SeccionProducto, {
@@ -192,19 +178,18 @@ describe('SeccionProducto - Tests del Scanner', () => {
                     codigo: '',
                     popoverOpen: false,
                     setPopoverOpen,
-                    productos: defaultProps.productos,
                 })
             );
 
             const input = screen.getByPlaceholderText(
-                'Escribe código o nombre (máximo 3-4 coincidencias)'
+                'Escribí nombre o escaneá código de barras'
             );
 
-            // Presionar Arrow Down
             fireEvent.keyDown(input, { key: 'ArrowDown', code: 'ArrowDown' });
 
-            // Verificar que setPopoverOpen fue llamado con true
-            expect(setPopoverOpen).toHaveBeenCalledWith(true);
+            await waitFor(() => {
+                expect(apiClient.api.articulos.buscar).toHaveBeenCalled();
+            });
         });
     });
 
@@ -234,7 +219,7 @@ describe('SeccionProducto - Tests del Scanner', () => {
             );
 
             const input = screen.getByPlaceholderText(
-                'Escribe código o nombre (máximo 3-4 coincidencias)'
+                'Escribí nombre o escaneá código de barras'
             );
 
             // Cambiar el código

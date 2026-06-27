@@ -18,6 +18,7 @@ const links: NavLink[] = [
   { name: "Ventas", href: "/dashboard/ventas", roles: ["Admin", "Cajero", "Vendedora", "Gerente", "Encargada"] },
   { name: "Mesas", href: "/dashboard/mesas", roles: ["Admin", "Cajero", "Vendedora", "Gerente", "Encargada"] },
   { name: "Cocina", href: "/dashboard/cocina", roles: ["Admin", "Cajero", "Vendedora", "Gerente", "Encargada"] },
+  { name: "Estadísticas", href: "/dashboard/estadisticas", roles: ["Admin", "Gerente", "Encargada", "Soporte"] },
   { name: "Contabilidad", href: "/dashboard/contabilidad", roles: ["Admin", "Gerente", "Encargada"] },
   { name: "Stock", href: "/dashboard/stock", roles: ["Admin", "Gerente", "Encargada"] },
 ]

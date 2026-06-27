@@ -7,6 +7,7 @@ from sqlalchemy.orm import selectinload
 
 # --- Modelos de la Base de Datos ---
 from back.modelos import Articulo, ArticuloCodigo
+from back.utils.articulo_helpers import conflicto_barcode_en_empresa, obtener_codigo_barras_articulo
 
 # --- Schemas (DTOs) para validación de datos ---
 # ¡ESTA ES LA IMPORTACIÓN QUE FALTABA Y CAUSABA EL ERROR DE ARRANQUE!
@@ -228,9 +229,10 @@ def anadir_codigo_a_articulo(db: Session, articulo_id: int, nuevo_codigo: str) -
     if not articulo:
         raise ValueError("El artículo no existe.")
         
-    codigo_existente = db.get(ArticuloCodigo, nuevo_codigo)
-    if codigo_existente:
+    if conflicto_barcode_en_empresa(db, nuevo_codigo, articulo_id, articulo.id_empresa):
         raise ValueError(f"El código '{nuevo_codigo}' ya está asignado a otro artículo.")
+    if obtener_codigo_barras_articulo(db, nuevo_codigo, articulo_id):
+        raise ValueError(f"El código '{nuevo_codigo}' ya está asignado a este artículo.")
 
     nuevo_codigo_obj = ArticuloCodigo(codigo=nuevo_codigo, id_articulo=articulo_id)
     db.add(nuevo_codigo_obj)
@@ -239,12 +241,26 @@ def anadir_codigo_a_articulo(db: Session, articulo_id: int, nuevo_codigo: str) -
     
     return nuevo_codigo_obj
 
-def eliminar_codigo_de_articulo(db: Session, codigo_a_borrar: str) -> bool:
-    """Elimina un código de barras de la base de datos."""
-    codigo_obj = db.get(ArticuloCodigo, codigo_a_borrar)
-    if not codigo_obj:
-        return False
+def eliminar_codigo_de_articulo(
+    db: Session,
+    codigo_a_borrar: str,
+    id_articulo: Optional[int] = None,
+) -> bool:
+    """Elimina un código de barras. Si id_articulo es None, elimina todas las filas con ese código."""
+    if id_articulo is not None:
+        codigo_obj = obtener_codigo_barras_articulo(db, codigo_a_borrar, id_articulo)
+        if not codigo_obj:
+            return False
+        db.delete(codigo_obj)
+        db.commit()
+        return True
 
-    db.delete(codigo_obj)
+    codigos_obj = db.exec(
+        select(ArticuloCodigo).where(ArticuloCodigo.codigo == codigo_a_borrar)
+    ).all()
+    if not codigos_obj:
+        return False
+    for codigo_obj in codigos_obj:
+        db.delete(codigo_obj)
     db.commit()
     return True
