@@ -45,10 +45,13 @@ def _startup_heavy() -> None:
             print(f"⚠️ No se pudieron crear tablas automáticamente: {e}")
 
         try:
-            from back.scheduler import init_scheduler
+            if os.getenv("API_ENABLE_SCHEDULER", "true").strip().lower() in ("1", "true", "yes", "on"):
+                from back.scheduler import init_scheduler
 
-            init_scheduler()
-            print("✅ Background scheduler de sincronización iniciado")
+                init_scheduler()
+                print("✅ Background scheduler de sincronización iniciado")
+            else:
+                print("ℹ️  Scheduler desactivado en este proceso (API_ENABLE_SCHEDULER=false)")
         except Exception as e:
             print(f"⚠️ No se pudo iniciar el scheduler: {e}")
     except Exception as e:

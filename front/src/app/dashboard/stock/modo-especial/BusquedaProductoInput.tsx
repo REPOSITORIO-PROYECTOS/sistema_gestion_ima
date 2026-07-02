@@ -1,12 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api-client";
 import { API_CONFIG } from "@/lib/api-config";
 import { useAuthStore } from "@/lib/authStore";
 
 const LIMITE_BUSQUEDA = 40;
+const DROPDOWN_GAP = 4;
+const DROPDOWN_MAX_HEIGHT_PX = 384;
 
 type ProductoMatch = {
   id: number;
@@ -22,11 +25,24 @@ type ArticuloBusqueda = {
   stock_actual?: number;
 };
 
+type DropdownPosition = {
+  top: number;
+  left: number;
+  width: number;
+  maxHeight: number;
+  placement: "bottom" | "top";
+};
+
 interface BusquedaProductoInputProps {
   codigoInterno: string;
   descripcion: string;
   onChange: (codigoInterno: string, descripcion: string) => void;
   placeholder?: string;
+}
+
+function getDropdownMaxHeight(): number {
+  if (typeof window === "undefined") return DROPDOWN_MAX_HEIGHT_PX;
+  return Math.min(DROPDOWN_MAX_HEIGHT_PX, window.innerHeight * 0.55);
 }
 
 export function BusquedaProductoInput({
@@ -42,6 +58,7 @@ export function BusquedaProductoInput({
   const [loading, setLoading] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(-1);
   const [justSelected, setJustSelected] = useState(Boolean(codigoInterno && descripcion));
+  const [dropdownPosition, setDropdownPosition] = useState<DropdownPosition | null>(null);
   const debounceRef = useRef<number | undefined>(undefined);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -56,6 +73,49 @@ export function BusquedaProductoInput({
         descripcion: a.descripcion,
         stock_actual: a.stock_actual ?? 0,
       }));
+
+  const updateDropdownPosition = useCallback(() => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    const rect = input.getBoundingClientRect();
+    const maxHeight = getDropdownMaxHeight();
+    const spaceBelow = window.innerHeight - rect.bottom - DROPDOWN_GAP;
+    const spaceAbove = rect.top - DROPDOWN_GAP;
+    const placement =
+      spaceBelow >= Math.min(maxHeight, 160) || spaceBelow >= spaceAbove ? "bottom" : "top";
+    const availableSpace = placement === "bottom" ? spaceBelow : spaceAbove;
+    const height = Math.min(maxHeight, Math.max(availableSpace, 120));
+
+    const top =
+      placement === "bottom"
+        ? rect.bottom + DROPDOWN_GAP
+        : Math.max(DROPDOWN_GAP, rect.top - height - DROPDOWN_GAP);
+
+    setDropdownPosition({
+      top,
+      left: rect.left,
+      width: rect.width,
+      maxHeight: height,
+      placement,
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setDropdownPosition(null);
+      return;
+    }
+
+    updateDropdownPosition();
+    window.addEventListener("scroll", updateDropdownPosition, true);
+    window.addEventListener("resize", updateDropdownPosition);
+
+    return () => {
+      window.removeEventListener("scroll", updateDropdownPosition, true);
+      window.removeEventListener("resize", updateDropdownPosition);
+    };
+  }, [open, matches.length, updateDropdownPosition]);
 
   useEffect(() => {
     if (!codigoInterno) {
@@ -79,15 +139,15 @@ export function BusquedaProductoInput({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
       if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node) &&
-        inputRef.current &&
-        !inputRef.current.contains(event.target as Node)
+        dropdownRef.current?.contains(target) ||
+        inputRef.current?.contains(target)
       ) {
-        setOpen(false);
-        setHighlightIndex(-1);
+        return;
       }
+      setOpen(false);
+      setHighlightIndex(-1);
     };
     if (open) {
       document.addEventListener("mousedown", handleClickOutside);
@@ -216,8 +276,70 @@ export function BusquedaProductoInput({
     }
   };
 
+  const dropdown =
+    open && dropdownPosition && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            ref={dropdownRef}
+            style={{
+              position: "fixed",
+              top: dropdownPosition.top,
+              left: dropdownPosition.left,
+              width: dropdownPosition.width,
+              maxHeight: dropdownPosition.maxHeight,
+              zIndex: 200,
+            }}
+            className="bg-white border-2 border-amber-300 rounded-lg shadow-xl flex flex-col"
+            onWheel={(e) => e.stopPropagation()}
+          >
+            <div className="px-2 py-1.5 text-xs text-amber-950 border-b border-amber-200 bg-amber-50 shrink-0">
+              {loading
+                ? "Buscando..."
+                : matches.length > 0
+                  ? `${matches.length} resultado${matches.length === 1 ? "" : "s"} — ↑↓ para moverte`
+                  : texto.trim()
+                    ? "Sin coincidencias"
+                    : "Escribí para buscar"}
+            </div>
+            <ul ref={listRef} className="overflow-y-auto flex-1 py-1 overscroll-contain" role="listbox">
+              {!loading && matches.length === 0 && (
+                <li className="py-3 text-center text-xs text-muted-foreground px-2">
+                  {texto.trim()
+                    ? `No se encontró "${texto}". Probá con el código de barras.`
+                    : "Escribí nombre o escaneá código."}
+                </li>
+              )}
+              {matches.map((prod, index) => {
+                const activo = index === highlightIndex;
+                return (
+                  <li key={prod.id} role="option" aria-selected={activo}>
+                    <button
+                      type="button"
+                      data-result-index={index}
+                      onMouseEnter={() => setHighlightIndex(index)}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => seleccionar(prod)}
+                      className={`w-full text-left px-2 py-2 flex items-center justify-between gap-2 text-sm border-b border-amber-100 last:border-b-0 ${
+                        activo ? "bg-amber-100" : "hover:bg-amber-50"
+                      }`}
+                    >
+                      <span className="font-medium truncate flex-1">{prod.descripcion}</span>
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        {prod.codigo_interno}
+                        {prod.stock_actual > 0 && ` · stk ${prod.stock_actual}`}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>,
+          document.body,
+        )
+      : null;
+
   return (
-    <div className="relative min-w-[12rem]">
+    <div className="relative min-w-[16rem]">
       <Input
         ref={inputRef}
         type="text"
@@ -238,58 +360,9 @@ export function BusquedaProductoInput({
         }}
         placeholder={placeholder}
         autoComplete="off"
-        className="min-w-[12rem]"
+        className="min-w-[16rem]"
       />
-
-      {open && (
-        <div
-          ref={dropdownRef}
-          className="absolute z-[100] w-full mt-1 bg-white border rounded-lg shadow-lg flex flex-col max-h-48"
-          onWheel={(e) => e.stopPropagation()}
-        >
-          <div className="px-2 py-1 text-xs text-muted-foreground border-b shrink-0">
-            {loading
-              ? "Buscando..."
-              : matches.length > 0
-                ? `${matches.length} resultado${matches.length === 1 ? "" : "s"}`
-                : texto.trim()
-                  ? "Sin coincidencias"
-                  : "Escribí para buscar"}
-          </div>
-          <ul ref={listRef} className="overflow-y-auto flex-1 py-1" role="listbox">
-            {!loading && matches.length === 0 && (
-              <li className="py-3 text-center text-xs text-muted-foreground px-2">
-                {texto.trim()
-                  ? `No se encontró "${texto}". Probá con el código de barras.`
-                  : "Escribí nombre o escaneá código."}
-              </li>
-            )}
-            {matches.map((prod, index) => {
-              const activo = index === highlightIndex;
-              return (
-                <li key={prod.id} role="option" aria-selected={activo}>
-                  <button
-                    type="button"
-                    data-result-index={index}
-                    onMouseEnter={() => setHighlightIndex(index)}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => seleccionar(prod)}
-                    className={`w-full text-left px-2 py-2 flex items-center justify-between gap-2 text-sm border-b last:border-b-0 ${
-                      activo ? "bg-accent" : "hover:bg-muted/50"
-                    }`}
-                  >
-                    <span className="font-medium truncate flex-1">{prod.descripcion}</span>
-                    <span className="text-xs text-muted-foreground shrink-0">
-                      {prod.codigo_interno}
-                      {prod.stock_actual > 0 && ` · stk ${prod.stock_actual}`}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
+      {dropdown}
     </div>
   );
 }

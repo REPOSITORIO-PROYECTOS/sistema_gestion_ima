@@ -451,84 +451,120 @@ function FormVentas({
   }, [empresa, token, balanzaRetry]);
 
   useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`${API_CONFIG.BASE_URL}/scanner/evento/poll`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!res.ok) return;
-        const payload = await res.json();
-        if (!payload?.has_event) return;
-        const ev = payload.event as { codigo?: string; id_articulo?: number; nombre?: string; precio?: number; peso?: number };
-        if (ev.id_articulo) {
-          const p = await resolverProductoPorId(String(ev.id_articulo));
-          const nombre = p?.nombre ?? ev.nombre ?? "Producto escáner";
-          const pUnit = typeof ev.precio === 'number'
-            ? ev.precio
-            : (p
-              ? (tipoClienteSeleccionado.id === '0' ? p.precio_venta : p.venta_negocio)
-              : 0);
-          const cantidadEv = typeof ev.peso === 'number' ? ev.peso : 1;
-          if (p || pUnit > 0) {
+    if (!token) return;
+
+    let cancelled = false;
+
+    const procesarEventoEscanner = async (ev: {
+      codigo?: string;
+      id_articulo?: number;
+      nombre?: string;
+      precio?: number;
+      peso?: number;
+    }) => {
+      if (ev.id_articulo) {
+        const p = await resolverProductoPorId(String(ev.id_articulo));
+        const nombre = p?.nombre ?? ev.nombre ?? "Producto escáner";
+        const pUnit = typeof ev.precio === "number"
+          ? ev.precio
+          : (p
+            ? (tipoClienteSeleccionado.id === "0" ? p.precio_venta : p.venta_negocio)
+            : 0);
+        const cantidadEv = typeof ev.peso === "number" ? ev.peso : 1;
+        if (p || pUnit > 0) {
+          onAgregarProducto({
+            id: String(ev.id_articulo),
+            tipo: nombre,
+            cantidad: cantidadEv,
+            precioTotal: pUnit * cantidadEv,
+            precioBase: pUnit * cantidadEv,
+            descuentoAplicado: false,
+            porcentajeDescuento: 0,
+            descuentoNominal: 0,
+          });
+          toast.success(`Se agregó '${nombre}' desde escáner`);
+          return;
+        }
+      }
+      const cfg = empresa?.aclaraciones_legales ?? {};
+      const autoAgregar = (cfg?.balanza_auto_agregar ?? "false") === "true";
+      const precioFuente = (cfg?.balanza_precio_fuente ?? "producto") as "producto" | "evento";
+      const balanzaId = cfg?.balanza_articulo_id ?? "";
+      if (autoAgregar && typeof ev.peso === "number") {
+        if (balanzaId) {
+          const p = await resolverProductoPorId(String(balanzaId));
+          if (p) {
+            const pUnit = precioFuente === "evento" && typeof ev.precio === "number"
+              ? ev.precio
+              : (tipoClienteSeleccionado.id === "0" ? p.precio_venta : p.venta_negocio);
+            const cantidadEv = ev.peso;
             onAgregarProducto({
-              id: String(ev.id_articulo),
-              tipo: nombre,
+              id: p.id,
+              tipo: p.nombre,
               cantidad: cantidadEv,
               precioTotal: pUnit * cantidadEv,
               precioBase: pUnit * cantidadEv,
               descuentoAplicado: false,
               porcentajeDescuento: 0,
-              descuentoNominal: 0
+              descuentoNominal: 0,
             });
-            toast.success(`Se agregó '${nombre}' desde escáner`);
+            toast.success(`Se agregó '${p.nombre}' desde balanza`);
             return;
           }
         }
-        const cfg = empresa?.aclaraciones_legales ?? {};
-        const autoAgregar = (cfg?.balanza_auto_agregar ?? "false") === "true";
-        const precioFuente = (cfg?.balanza_precio_fuente ?? "producto") as 'producto' | 'evento';
-        const balanzaId = cfg?.balanza_articulo_id ?? "";
-        if (autoAgregar && typeof ev.peso === 'number') {
-          if (balanzaId) {
-            const p = await resolverProductoPorId(String(balanzaId));
-            if (p) {
-              const pUnit = precioFuente === 'evento' && typeof ev.precio === 'number'
-                ? ev.precio
-                : (tipoClienteSeleccionado.id === '0' ? p.precio_venta : p.venta_negocio);
-              const cantidadEv = ev.peso;
-              onAgregarProducto({
-                id: p.id,
-                tipo: p.nombre,
-                cantidad: cantidadEv,
-                precioTotal: pUnit * cantidadEv,
-                precioBase: pUnit * cantidadEv,
-                descuentoAplicado: false,
-                porcentajeDescuento: 0,
-                descuentoNominal: 0
-              });
-              toast.success(`Se agregó '${p.nombre}' desde balanza`);
-              return;
-            }
-          }
-          if (typeof ev.precio === 'number') {
-            const nombre = ev.nombre || 'Producto escáner';
-            const cantidadEv = ev.peso;
-            const precioTotalEv = ev.precio * cantidadEv;
-            onAgregarProducto({
-              tipo: nombre,
-              cantidad: cantidadEv,
-              precioTotal: precioTotalEv,
-              precioBase: precioTotalEv,
-              descuentoAplicado: false,
-              porcentajeDescuento: 0,
-              descuentoNominal: 0
-            });
-            toast.success(`Se agregó '${nombre}' desde escáner`);
-          }
+        if (typeof ev.precio === "number") {
+          const nombre = ev.nombre || "Producto escáner";
+          const cantidadEv = ev.peso;
+          const precioTotalEv = ev.precio * cantidadEv;
+          onAgregarProducto({
+            tipo: nombre,
+            cantidad: cantidadEv,
+            precioTotal: precioTotalEv,
+            precioBase: precioTotalEv,
+            descuentoAplicado: false,
+            porcentajeDescuento: 0,
+            descuentoNominal: 0,
+          });
+          toast.success(`Se agregó '${nombre}' desde escáner`);
         }
-      } catch { }
-    }, 1000);
-    return () => clearInterval(interval);
+      }
+    };
+
+    const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+    const pollLoop = async () => {
+      while (!cancelled) {
+        if (typeof document !== "undefined" && document.hidden) {
+          await sleep(3000);
+          continue;
+        }
+        try {
+          const res = await fetch(
+            `${API_CONFIG.BASE_URL}/scanner/evento/poll?timeout=25`,
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
+          if (res.status === 401) {
+            toast.error("Sesión expirada. Vuelva a iniciar sesión para usar el escáner.");
+            break;
+          }
+          if (!res.ok) {
+            await sleep(2000);
+            continue;
+          }
+          const payload = await res.json();
+          if (payload?.has_event && payload.event) {
+            await procesarEventoEscanner(payload.event);
+          }
+        } catch {
+          await sleep(2000);
+        }
+      }
+    };
+
+    void pollLoop();
+    return () => {
+      cancelled = true;
+    };
   }, [token, resolverProductoPorId, onAgregarProducto, empresa?.aclaraciones_legales, tipoClienteSeleccionado?.id]);
 
   // Efecto para auto-enviar cuando viene desde balanza/escáner

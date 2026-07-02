@@ -23,9 +23,11 @@ function ensureHttpsPublicHost(url: string): string {
   return t.replace(/\/+$/, "");
 }
 
-const API_HOST = ensureHttpsPublicHost(
-  process.env.NEXT_PUBLIC_API_URL || "https://sistema-ima.sistemataup.online",
-);
+function resolveApiHost(): string {
+  return ensureHttpsPublicHost(
+    process.env.NEXT_PUBLIC_API_URL || "https://sistema-ima.sistemataup.online",
+  );
+}
 
 function hostnameFromApiHost(url: string): string {
   const trimmed = (url || "").trim();
@@ -40,7 +42,7 @@ function hostnameFromApiHost(url: string): string {
   }
 }
 
-const apiImageHostname = hostnameFromApiHost(API_HOST);
+const apiImageHostname = hostnameFromApiHost(resolveApiHost());
 
 const nextConfig: NextConfig = {
   eslint: {
@@ -70,14 +72,15 @@ const nextConfig: NextConfig = {
     ];
   },
   async rewrites() {
+    const apiHost = resolveApiHost();
     return [
       {
         source: "/api/static/:path*",
-        destination: `${API_HOST}/api/static/:path*`,
+        destination: `${apiHost}/api/static/:path*`,
       },
       {
         source: "/api/:path*",
-        destination: `${API_HOST}/:path*`,
+        destination: `${apiHost}/:path*`,
       },
     ];
   },

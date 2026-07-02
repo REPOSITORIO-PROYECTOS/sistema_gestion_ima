@@ -1,6 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import {
+  ArrowDownToLine,
+  Download,
+  Inbox,
+  PackagePlus,
+  TrendingUp,
+  Truck,
+  Upload,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useAuthStore } from "@/lib/authStore";
 import { Button } from "@/components/ui/button";
@@ -48,6 +57,12 @@ import {
 import { BusquedaProductoInput } from "./BusquedaProductoInput";
 
 const UNIDADES: UnidadMedida[] = ["unidad", "gramos", "kilogramos", "litros", "mililitros"];
+
+const MODAL_WIDE_CLASS =
+  "flex max-h-[92vh] w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl";
+
+const BTN_STOCK_OUTLINE =
+  "border-amber-300 text-amber-950 hover:bg-amber-50 hover:text-amber-950";
 
 const formVacio = (): ProductoFormData => ({
   codigo_interno: "",
@@ -409,43 +424,77 @@ export function ModoEspecialView() {
         Gestioná el catálogo manualmente desde aquí.
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-3 justify-between items-stretch lg:items-center">
-        <Input
-          placeholder="Buscar por nombre, código, barcode o categoría"
-          value={filtro}
-          onChange={(e) => setFiltro(e.target.value)}
-          className="lg:max-w-sm"
-        />
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={abrirCrear}>Agregar producto</Button>
-          <Button variant="outline" onClick={() => { setLineasIngreso([nuevaLineaIngreso()]); setModalIngreso(true); }}>
-            Ingreso de stock
-          </Button>
-          {empresasTransferencia.length > 0 && (
-            <>
-              <Button variant="outline" onClick={abrirTransferencia}>Enviar a sucursal</Button>
-              <Button variant="outline" onClick={() => setModalRecepcion(true)}>
-                Recepción{pendientes.length > 0 ? ` (${pendientes.length})` : ""}
-              </Button>
-            </>
-          )}
-          <Button variant="outline" onClick={() => setModalSuba(true)}>Suba de precios</Button>
-          <Button variant="outline" onClick={handleExportar}>Exportar CSV</Button>
-          <label className="inline-flex">
-            <input
-              type="file"
-              accept=".csv,text/csv"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleImportar(file);
-                e.target.value = "";
-              }}
-            />
-            <Button variant="outline" asChild>
-              <span>Importar CSV</span>
+      <div className="flex flex-col gap-4">
+        <h2 className="text-xl font-semibold text-green-950">Sección de Stock</h2>
+
+        <div className="flex flex-col xl:flex-row gap-3 justify-between items-stretch xl:items-center">
+          <Input
+            placeholder="Buscar por nombre, código, barcode o categoría"
+            value={filtro}
+            onChange={(e) => setFiltro(e.target.value)}
+            className="xl:max-w-sm"
+          />
+          <div className="flex flex-wrap gap-2 items-center">
+            <Button onClick={abrirCrear}>
+              <PackagePlus className="size-4" />
+              Agregar producto
             </Button>
-          </label>
+            <Button
+              variant="outline"
+              className={BTN_STOCK_OUTLINE}
+              onClick={() => { setLineasIngreso([nuevaLineaIngreso()]); setModalIngreso(true); }}
+            >
+              <ArrowDownToLine className="size-4" />
+              Ingreso de stock
+            </Button>
+
+            {empresasTransferencia.length > 0 && (
+              <div className="flex flex-wrap gap-2 items-center border-l border-amber-200 pl-2">
+                <Button variant="outline" className={BTN_STOCK_OUTLINE} onClick={abrirTransferencia}>
+                  <Truck className="size-4" />
+                  Enviar a sucursal
+                </Button>
+                <Button variant="outline" className={BTN_STOCK_OUTLINE} onClick={() => setModalRecepcion(true)}>
+                  <Inbox className="size-4" />
+                  Recepción
+                  {pendientes.length > 0 && (
+                    <span className="ml-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900">
+                      {pendientes.length}
+                    </span>
+                  )}
+                </Button>
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-2 items-center border-l border-amber-200 pl-2">
+              <Button variant="outline" className={BTN_STOCK_OUTLINE} onClick={() => setModalSuba(true)}>
+                <TrendingUp className="size-4" />
+                Suba de precios
+              </Button>
+              <Button variant="outline" className={BTN_STOCK_OUTLINE} onClick={handleExportar}>
+                <Download className="size-4" />
+                Exportar CSV
+              </Button>
+              <label className="inline-flex">
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleImportar(file);
+                    e.target.value = "";
+                  }}
+                />
+                <Button variant="outline" className={BTN_STOCK_OUTLINE} asChild>
+                  <span>
+                    <Upload className="size-4" />
+                    Importar CSV
+                  </span>
+                </Button>
+              </label>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -545,92 +594,97 @@ export function ModoEspecialView() {
       </Dialog>
 
       <Dialog open={modalIngreso} onOpenChange={setModalIngreso}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className={MODAL_WIDE_CLASS}>
+          <DialogHeader className="shrink-0 border-b px-6 py-4 pr-12">
             <DialogTitle>Ingreso masivo de stock</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Cargá varios productos a la vez. Los precios son opcionales; si los dejás en blanco no se modifican.
-          </p>
-          <div className="rounded-md border overflow-visible">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Producto *</TableHead>
-                  <TableHead>Cantidad *</TableHead>
-                  <TableHead>Precio venta</TableHead>
-                  <TableHead>Precio costo</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {lineasIngreso.map((linea) => (
-                  <TableRow key={linea.id}>
-                    <TableCell className="relative overflow-visible">
-                      <BusquedaProductoInput
-                        codigoInterno={linea.codigo_interno}
-                        descripcion={linea.descripcion}
-                        onChange={(codigoInterno, descripcion) => setLineasIngreso((prev) =>
-                          prev.map((l) => l.id === linea.id ? { ...l, codigo_interno: codigoInterno, descripcion } : l)
-                        )}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="any"
-                        placeholder="0"
-                        value={linea.cantidad}
-                        onChange={(e) => setLineasIngreso((prev) =>
-                          prev.map((l) => l.id === linea.id ? { ...l, cantidad: e.target.value } : l)
-                        )}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="any"
-                        placeholder="Opcional"
-                        value={linea.precio_venta}
-                        onChange={(e) => setLineasIngreso((prev) =>
-                          prev.map((l) => l.id === linea.id ? { ...l, precio_venta: e.target.value } : l)
-                        )}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="any"
-                        placeholder="Opcional"
-                        value={linea.precio_costo}
-                        onChange={(e) => setLineasIngreso((prev) =>
-                          prev.map((l) => l.id === linea.id ? { ...l, precio_costo: e.target.value } : l)
-                        )}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={lineasIngreso.length <= 1}
-                        onClick={() => setLineasIngreso((prev) => prev.filter((l) => l.id !== linea.id))}
-                      >
-                        Quitar
-                      </Button>
-                    </TableCell>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4 space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Cargá varios productos a la vez. Los precios son opcionales; si los dejás en blanco no se modifican.
+            </p>
+            <div className="rounded-md border overflow-visible">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[16rem]">Producto *</TableHead>
+                    <TableHead>Cantidad *</TableHead>
+                    <TableHead>Precio venta</TableHead>
+                    <TableHead>Precio costo</TableHead>
+                    <TableHead />
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {lineasIngreso.map((linea) => (
+                    <TableRow key={linea.id}>
+                      <TableCell className="relative overflow-visible align-top">
+                        <BusquedaProductoInput
+                          codigoInterno={linea.codigo_interno}
+                          descripcion={linea.descripcion}
+                          onChange={(codigoInterno, descripcion) => setLineasIngreso((prev) =>
+                            prev.map((l) => l.id === linea.id ? { ...l, codigo_interno: codigoInterno, descripcion } : l)
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell className="align-top">
+                        <Input
+                          type="number"
+                          min="0"
+                          step="any"
+                          placeholder="0"
+                          className="w-24"
+                          value={linea.cantidad}
+                          onChange={(e) => setLineasIngreso((prev) =>
+                            prev.map((l) => l.id === linea.id ? { ...l, cantidad: e.target.value } : l)
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell className="align-top">
+                        <Input
+                          type="number"
+                          min="0"
+                          step="any"
+                          placeholder="Opcional"
+                          className="w-28"
+                          value={linea.precio_venta}
+                          onChange={(e) => setLineasIngreso((prev) =>
+                            prev.map((l) => l.id === linea.id ? { ...l, precio_venta: e.target.value } : l)
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell className="align-top">
+                        <Input
+                          type="number"
+                          min="0"
+                          step="any"
+                          placeholder="Opcional"
+                          className="w-28"
+                          value={linea.precio_costo}
+                          onChange={(e) => setLineasIngreso((prev) =>
+                            prev.map((l) => l.id === linea.id ? { ...l, precio_costo: e.target.value } : l)
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell className="align-top">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={lineasIngreso.length <= 1}
+                          onClick={() => setLineasIngreso((prev) => prev.filter((l) => l.id !== linea.id))}
+                        >
+                          Quitar
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <Button variant="outline" size="sm" className={BTN_STOCK_OUTLINE} onClick={() => setLineasIngreso((prev) => [...prev, nuevaLineaIngreso()])}>
+              + Agregar línea
+            </Button>
+            <Input placeholder="Observación general (opcional)" value={ingresoObs} onChange={(e) => setIngresoObs(e.target.value)} />
           </div>
-          <Button variant="outline" size="sm" onClick={() => setLineasIngreso((prev) => [...prev, nuevaLineaIngreso()])}>
-            + Agregar línea
-          </Button>
-          <Input placeholder="Observación general (opcional)" value={ingresoObs} onChange={(e) => setIngresoObs(e.target.value)} />
-          <DialogFooter>
+          <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
             <Button variant="ghost" onClick={() => setModalIngreso(false)}>Cancelar</Button>
             <Button onClick={registrarIngreso} disabled={guardando}>Registrar ingreso</Button>
           </DialogFooter>
@@ -638,11 +692,11 @@ export function ModoEspecialView() {
       </Dialog>
 
       <Dialog open={modalTransferencia} onOpenChange={setModalTransferencia}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className={MODAL_WIDE_CLASS}>
+          <DialogHeader className="shrink-0 border-b px-6 py-4 pr-12">
             <DialogTitle>Enviar stock a otra sucursal</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4 space-y-4">
             <Select value={empresaDestinoId} onValueChange={setEmpresaDestinoId}>
               <SelectTrigger><SelectValue placeholder="Empresa destino" /></SelectTrigger>
               <SelectContent>
@@ -658,7 +712,7 @@ export function ModoEspecialView() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Producto *</TableHead>
+                    <TableHead className="min-w-[16rem]">Producto *</TableHead>
                     <TableHead>Cantidad *</TableHead>
                     <TableHead>Precio unit.</TableHead>
                     <TableHead />
@@ -667,7 +721,7 @@ export function ModoEspecialView() {
                 <TableBody>
                   {lineasTransferencia.map((linea) => (
                     <TableRow key={linea.id}>
-                      <TableCell className="relative overflow-visible">
+                      <TableCell className="relative overflow-visible align-top">
                         <BusquedaProductoInput
                           codigoInterno={linea.codigo_interno}
                           descripcion={linea.descripcion}
@@ -676,30 +730,32 @@ export function ModoEspecialView() {
                           )}
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="align-top">
                         <Input
                           type="number"
                           min="0"
                           step="any"
+                          className="w-24"
                           value={linea.cantidad}
                           onChange={(e) => setLineasTransferencia((prev) =>
                             prev.map((l) => l.id === linea.id ? { ...l, cantidad: e.target.value } : l)
                           )}
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="align-top">
                         <Input
                           type="number"
                           min="0"
                           step="any"
                           placeholder="Opcional"
+                          className="w-28"
                           value={linea.precio_unitario}
                           onChange={(e) => setLineasTransferencia((prev) =>
                             prev.map((l) => l.id === linea.id ? { ...l, precio_unitario: e.target.value } : l)
                           )}
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="align-top">
                         <Button
                           size="sm"
                           variant="ghost"
@@ -714,12 +770,12 @@ export function ModoEspecialView() {
                 </TableBody>
               </Table>
             </div>
-            <Button variant="outline" size="sm" onClick={() => setLineasTransferencia((prev) => [...prev, nuevaLineaTransferencia()])}>
+            <Button variant="outline" size="sm" className={BTN_STOCK_OUTLINE} onClick={() => setLineasTransferencia((prev) => [...prev, nuevaLineaTransferencia()])}>
               + Agregar producto
             </Button>
             <Input placeholder="Observación (opcional)" value={transferenciaObs} onChange={(e) => setTransferenciaObs(e.target.value)} />
           </div>
-          <DialogFooter>
+          <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
             <Button variant="ghost" onClick={() => setModalTransferencia(false)}>Cancelar</Button>
             <Button onClick={enviarTransferencia} disabled={guardando}>Enviar transferencia</Button>
           </DialogFooter>
@@ -730,88 +786,92 @@ export function ModoEspecialView() {
         setModalRecepcion(open);
         if (!open) setTransferenciaSeleccionada(null);
       }}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className={MODAL_WIDE_CLASS}>
+          <DialogHeader className="shrink-0 border-b px-6 py-4 pr-12">
             <DialogTitle>
               {transferenciaSeleccionada
                 ? `Recibir transferencia #${transferenciaSeleccionada.id}`
                 : "Recepción de transferencias"}
             </DialogTitle>
           </DialogHeader>
-          {!transferenciaSeleccionada ? (
-            <div className="space-y-3">
-              {pendientes.length === 0 ? (
-                <p className="text-muted-foreground text-sm py-4 text-center">No hay transferencias pendientes.</p>
-              ) : (
-                pendientes.map((t) => (
-                  <div key={t.id} className="flex items-center justify-between rounded-lg border p-3 gap-3">
-                    <div>
-                      <p className="font-medium">#{t.id} — desde {t.nombre_empresa_origen}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {t.detalles.length} producto(s) · {new Date(t.creada_en).toLocaleString("es-AR")}
-                      </p>
-                      {t.observacion && <p className="text-sm italic">{t.observacion}</p>}
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4">
+            {!transferenciaSeleccionada ? (
+              <div className="space-y-3">
+                {pendientes.length === 0 ? (
+                  <p className="text-muted-foreground text-sm py-4 text-center">No hay transferencias pendientes.</p>
+                ) : (
+                  pendientes.map((t) => (
+                    <div key={t.id} className="flex items-center justify-between rounded-lg border p-3 gap-3">
+                      <div>
+                        <p className="font-medium">#{t.id} — desde {t.nombre_empresa_origen}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {t.detalles.length} producto(s) · {new Date(t.creada_en).toLocaleString("es-AR")}
+                        </p>
+                        {t.observacion && <p className="text-sm italic">{t.observacion}</p>}
+                      </div>
+                      <Button size="sm" onClick={() => abrirRecepcion(t)}>Controlar e ingresar</Button>
                     </div>
-                    <Button size="sm" onClick={() => abrirRecepcion(t)}>Controlar e ingresar</Button>
-                  </div>
-                ))
-              )}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Origen: <strong>{transferenciaSeleccionada.nombre_empresa_origen}</strong>.
-                Verificá las cantidades recibidas antes de confirmar.
-              </p>
-              <div className="rounded-md border overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Código</TableHead>
-                      <TableHead>Producto</TableHead>
-                      <TableHead>Enviado</TableHead>
-                      <TableHead>Recibido</TableHead>
-                      <TableHead>Precio unit.</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {transferenciaSeleccionada.detalles.map((d) => (
-                      <TableRow key={d.id}>
-                        <TableCell className="font-mono text-sm">{d.codigo_interno}</TableCell>
-                        <TableCell>{d.descripcion}</TableCell>
-                        <TableCell>{d.cantidad}</TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            min="0"
-                            max={d.cantidad}
-                            step="any"
-                            className="w-24"
-                            value={cantidadesRecepcion[d.id] ?? String(d.cantidad)}
-                            onChange={(e) => setCantidadesRecepcion((prev) => ({ ...prev, [d.id]: e.target.value }))}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          {d.precio_unitario != null ? formatMoney(d.precio_unitario) : "—"}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                  ))
+                )}
               </div>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={aplicarPreciosRecepcion}
-                  onChange={(e) => setAplicarPreciosRecepcion(e.target.checked)}
-                />
-                Aplicar precio unitario como costo del producto
-              </label>
-              <DialogFooter>
-                <Button variant="ghost" onClick={() => setTransferenciaSeleccionada(null)}>Volver</Button>
-                <Button onClick={confirmarRecepcion} disabled={guardando}>Confirmar ingreso</Button>
-              </DialogFooter>
-            </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Origen: <strong>{transferenciaSeleccionada.nombre_empresa_origen}</strong>.
+                  Verificá las cantidades recibidas antes de confirmar.
+                </p>
+                <div className="rounded-md border overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Código</TableHead>
+                        <TableHead className="min-w-[12rem]">Producto</TableHead>
+                        <TableHead>Enviado</TableHead>
+                        <TableHead>Recibido</TableHead>
+                        <TableHead>Precio unit.</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {transferenciaSeleccionada.detalles.map((d) => (
+                        <TableRow key={d.id}>
+                          <TableCell className="font-mono text-sm">{d.codigo_interno}</TableCell>
+                          <TableCell>{d.descripcion}</TableCell>
+                          <TableCell>{d.cantidad}</TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              min="0"
+                              max={d.cantidad}
+                              step="any"
+                              className="w-24"
+                              value={cantidadesRecepcion[d.id] ?? String(d.cantidad)}
+                              onChange={(e) => setCantidadesRecepcion((prev) => ({ ...prev, [d.id]: e.target.value }))}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            {d.precio_unitario != null ? formatMoney(d.precio_unitario) : "—"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={aplicarPreciosRecepcion}
+                    onChange={(e) => setAplicarPreciosRecepcion(e.target.checked)}
+                  />
+                  Aplicar precio unitario como costo del producto
+                </label>
+              </div>
+            )}
+          </div>
+          {transferenciaSeleccionada && (
+            <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
+              <Button variant="ghost" onClick={() => setTransferenciaSeleccionada(null)}>Volver</Button>
+              <Button onClick={confirmarRecepcion} disabled={guardando}>Confirmar ingreso</Button>
+            </DialogFooter>
           )}
         </DialogContent>
       </Dialog>

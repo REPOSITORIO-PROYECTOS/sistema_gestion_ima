@@ -24,16 +24,30 @@ def _env_truthy(name: str, default: str = "false") -> bool:
     return os.getenv(name, default).strip().lower() in ("1", "true", "yes", "on")
 
 
+def _env_int(name: str, default: int) -> int:
+    try:
+        return max(1, int(os.getenv(name, str(default))))
+    except (TypeError, ValueError):
+        return default
+
+
 # Solo en APP_ENV=development/local y SQL_ECHO=true (nunca en producción).
 _app_env = os.getenv("APP_ENV", "production").strip().lower()
 _is_dev_env = _app_env in ("dev", "development", "local")
 _sql_echo = _is_dev_env and _env_truthy("SQL_ECHO", "false")
 
+_pool_size = _env_int("DB_POOL_SIZE", 20)
+_max_overflow = _env_int("DB_MAX_OVERFLOW", 20)
+_pool_timeout = _env_int("DB_POOL_TIMEOUT", 30)
+
 engine = create_engine(
     DATABASE_URL,
     echo=_sql_echo,
-    pool_pre_ping=True,  # Verifica la conexión antes de usarla (evita "MySQL server has gone away")
-    pool_recycle=3600    # Recicla conexiones cada hora para prevenir timeouts
+    pool_pre_ping=True,
+    pool_recycle=3600,
+    pool_size=_pool_size,
+    max_overflow=_max_overflow,
+    pool_timeout=_pool_timeout,
 )
 
 # --- ESTA ES LA ADICIÓN CLAVE ---

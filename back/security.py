@@ -1,6 +1,8 @@
 # back/security.py
 # VERSIÓN FINAL CON CORRECCIÓN DE LÓGICA EN `obtener_usuario_actual`
 
+import logging
+import os
 from datetime import datetime, timedelta
 from typing import Optional, List
 from fastapi import Depends, HTTPException, status
@@ -16,6 +18,14 @@ from back.modelos import LlaveMaestra # Asumimos que este modelo existe
 from back import config
 from back.database import get_db # Asegúrate que la ruta de importación sea la correcta
 from back.modelos import Usuario, Rol
+
+logger = logging.getLogger(__name__)
+_DEBUG_AUTH = os.getenv("APP_ENV", "production").strip().lower() in ("dev", "development", "local")
+
+
+def _auth_debug(msg: str, *args: object) -> None:
+    if _DEBUG_AUTH:
+        logger.debug(msg, *args)
 
 # --- Configuración de Seguridad ---
 SECRET_KEY = config.SECRET_KEY_SEC
@@ -38,15 +48,44 @@ def crear_access_token(data: dict, expires_delta: Optional[timedelta] = None) ->
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-# ===================================================================
-# === DEPENDENCIAS DE SEGURIDAD (NÚCLEO DEL SISTEMA) ===
-# ===================================================================
 
 CREDENTIALS_EXCEPTION = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
     detail="Credenciales inválidas, token expirado o permisos insuficientes.",
     headers={"WWW-Authenticate": "Bearer"},
 )
+
+
+def decodificar_token(token: str) -> dict:
+    try:
+        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError as exc:
+        raise CREDENTIALS_EXCEPTION from exc
+
+
+# ===================================================================
+# === DEPENDENCIAS DE SEGURIDAD (NÚCLEO DEL SISTEMA) ===
+# ===================================================================
+
+
+def obtener_id_empresa_desde_token(token: str = Depends(oauth2_scheme)) -> int:
+    """
+    Auth liviana para endpoints de alto volumen (p. ej. poll del escáner).
+    Solo decodifica JWT — sin sesión MySQL. Requiere claim id_empresa (login nuevo).
+    """
+    payload = decodificar_token(token)
+    raw_id = payload.get("id_empresa")
+    if raw_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token sin id_empresa. Cierre sesión e ingrese nuevamente.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    try:
+        return int(raw_id)
+    except (TypeError, ValueError) as exc:
+        raise CREDENTIALS_EXCEPTION from exc
+
 
 def obtener_usuario_actual(
     token: str = Depends(oauth2_scheme), 
@@ -56,51 +95,35 @@ def obtener_usuario_actual(
     Función central de seguridad. Valida el token y devuelve el objeto Usuario
     completo desde la base de datos con su rol actualizado en tiempo real.
     """
-    print("\n--- [RASTREO DE SEGURIDAD] ---")
-    print(f"1. Iniciando 'obtener_usuario_actual'.")
-    
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        print(f"2. Token decodificado. Username extraído: '{username}'")
-        if username is None:
-            print("   -> ERROR: 'sub' (username) no encontrado en el payload del token.")
-            raise CREDENTIALS_EXCEPTION
-    except JWTError as e:
-        print(f"   -> ERROR: El token JWT es inválido o ha expirado. Error: {e}")
+    _auth_debug("obtener_usuario_actual: iniciando validación")
+
+    payload = decodificar_token(token)
+    username: str | None = payload.get("sub")
+    _auth_debug("Token decodificado para username=%r", username)
+    if username is None:
         raise CREDENTIALS_EXCEPTION
-    
-    print(f"3. Buscando al usuario '{username}' en la base de datos (con carga de rol)...")
-    
+
     consulta = select(Usuario).where(Usuario.nombre_usuario == username).options(selectinload(Usuario.rol))
     usuario = db.exec(consulta).first()
-    
-    # --- INICIO DE LA CORRECCIÓN ---
-    # Reemplazamos la línea insegura 'if usuario is None or not usuario.activo:'
-    # por un bloque de validaciones separadas y seguras.
 
-    # 1. Validar si el usuario EXISTE. Esto previene el error 'AttributeError'
     if usuario is None:
-        print(f"   -> ERROR: Usuario '{username}' NO ENCONTRADO en la base de datos.")
+        _auth_debug("Usuario %r no encontrado en DB", username)
         raise CREDENTIALS_EXCEPTION
 
-    # 2. Solo si existe, validar si está ACTIVO.
     if not usuario.activo:
-        print(f"   -> ERROR: El usuario '{username}' (ID: {usuario.id}) no está activo.")
+        _auth_debug("Usuario %r (id=%s) inactivo", username, usuario.id)
         raise CREDENTIALS_EXCEPTION
-    
-    # --- FIN DE LA CORRECCIÓN ---
-    
-    print(f"4. Usuario encontrado en la DB. ID: {usuario.id}, Nombre: {usuario.nombre_usuario}, Activo: {usuario.activo}")
 
-    # Esta validación también es importante y está bien aquí.
     if not usuario.rol:
-        print(f"   -> ¡ADVERTENCIA CRÍTICA! El usuario '{username}' (ID: {usuario.id}) NO TIENE UN ROL ASIGNADO.")
+        logger.warning("Usuario %r (id=%s) sin rol asignado", username, usuario.id)
         raise CREDENTIALS_EXCEPTION
-        
-    print(f"5. Rol del usuario cargado correctamente: '{usuario.rol.nombre}' (ID: {usuario.rol.id})")
-    print("6. Autenticación exitosa. Devolviendo objeto Usuario completo.")
-    print("--- [FIN DEL RASTREO] ---\n")
+
+    _auth_debug(
+        "Auth OK: user=%r id=%s rol=%r",
+        usuario.nombre_usuario,
+        usuario.id,
+        usuario.rol.nombre,
+    )
     return usuario
 
 def verificar_llave_maestra_apertura(
@@ -110,46 +133,36 @@ def verificar_llave_maestra_apertura(
     """
     Dependencia de seguridad que valida la llave maestra para operaciones críticas.
     """
-    print("\n--- [TRACE: VERIFICACIÓN LLAVE MAESTRA] ---")
-    print(f"1. Llave recibida en la petición: '{req.llave_maestra}'")
+    _auth_debug("Verificando llave maestra de apertura de caja")
 
-    # Obtenemos la llave válida de la base de datos (asumimos que solo hay una)
     llave_valida = db.exec(select(LlaveMaestra)).first()
 
     if not llave_valida:
-        print("   -> ERROR: No hay ninguna llave maestra configurada en la base de datos.")
+        logger.error("No hay llave maestra configurada en la base de datos")
         raise HTTPException(status_code=500, detail="Error de configuración del sistema: Llave Maestra no encontrada.")
 
-    print(f"2. Llave válida encontrada en la DB: '{llave_valida.llave}'")
-
     if req.llave_maestra != llave_valida.llave:
-        print("   -> ¡ACCESO DENEGADO! La llave maestra no coincide.")
         raise HTTPException(status_code=403, detail="La llave maestra proporcionada es incorrecta.")
-    
-    print("3. ¡ACCESO PERMITIDO! La llave maestra es correcta.")
-    print("--- [FIN TRACE] ---\n")
 
 def es_rol(roles_requeridos: List[str]):
     """
     Factoría de dependencias que crea un "guardián" de roles.
     """
     def chequear_rol(current_user: Usuario = Depends(obtener_usuario_actual)) -> Usuario:
-        print("\n--- [RASTREO DE ROL] ---")
-        print(f"A. Verificando si el usuario '{current_user.nombre_usuario}' tiene uno de los roles: {roles_requeridos}")
-        
         user_rol = current_user.rol.nombre
-        print(f"B. Rol actual del usuario: '{user_rol}'")
-        
+        _auth_debug(
+            "Chequeo rol user=%r rol=%r requeridos=%s",
+            current_user.nombre_usuario,
+            user_rol,
+            roles_requeridos,
+        )
+
         if user_rol not in roles_requeridos:
-            print(f"   -> ¡ACCESO DENEGADO! El rol '{user_rol}' no está en la lista de roles permitidos.")
-            print("--- [FIN DEL RASTREO DE ROL] ---\n")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Acceso denegado. Se requiere uno de los siguientes roles: {', '.join(roles_requeridos)}.",
             )
-            
-        print("C. ¡ACCESO PERMITIDO! El rol es correcto.")
-        print("--- [FIN DEL RASTREO DE ROL] ---\n")
+
         return current_user
     
     return chequear_rol

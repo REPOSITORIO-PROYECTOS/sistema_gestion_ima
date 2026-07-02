@@ -8,11 +8,16 @@ const productionApiOrigin = (): string =>
     ),
   );
 
+const devApiOrigin = (): string =>
+  (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8011").replace(/\/+$/, "");
+
 // Configuración de la API
 export const API_CONFIG = {
-  // URL base de la API - usar variable de entorno o fallback
+  // Producción: /api vía nginx. Dev: backend directo (evita rewrites de Next en turbopack).
   BASE_URL:
-    (process.env.NODE_ENV === "production" ? productionApiOrigin() : "") + "/api",
+    process.env.NODE_ENV === "production"
+      ? `${productionApiOrigin()}/api`
+      : devApiOrigin(),
 
   // Endpoints
   ENDPOINTS: {

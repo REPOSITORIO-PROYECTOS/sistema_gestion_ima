@@ -125,6 +125,7 @@ function Login() {
         alt="Swing Jugos"
         width={80}
         height={80}
+        priority
       />
 
       <form
