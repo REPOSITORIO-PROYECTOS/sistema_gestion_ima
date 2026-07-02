@@ -157,5 +157,6 @@ def es_rol(roles_requeridos: List[str]):
 # --- Guardianes listos para usar en los routers ---
 es_cajero = es_rol(["Cajero", "Vendedora", "Admin", "Gerente", "Encargada", "Soporte", "Mozo"])
 es_admin = es_rol(["Admin", "Soporte"])
+es_admin_o_gerente = es_rol(["Admin", "Gerente", "Soporte"])
 es_gerente = es_rol(["Gerente", "Encargada", "Admin", "Soporte"])
 es_supervisor_caja = es_rol(["Gerente", "Admin", "Encargada", "Soporte"])

@@ -45,6 +45,7 @@ import {
   TransferenciaStock,
   UnidadMedida,
 } from "./api";
+import { BusquedaProductoInput } from "./BusquedaProductoInput";
 
 const UNIDADES: UnidadMedida[] = ["unidad", "gramos", "kilogramos", "litros", "mililitros"];
 
@@ -85,6 +86,7 @@ function formatMoney(value: number) {
 interface IngresoLinea {
   id: string;
   codigo_interno: string;
+  descripcion: string;
   cantidad: string;
   precio_venta: string;
   precio_costo: string;
@@ -93,6 +95,7 @@ interface IngresoLinea {
 interface TransferenciaLinea {
   id: string;
   codigo_interno: string;
+  descripcion: string;
   cantidad: string;
   precio_unitario: string;
 }
@@ -100,6 +103,7 @@ interface TransferenciaLinea {
 const nuevaLineaIngreso = (): IngresoLinea => ({
   id: crypto.randomUUID(),
   codigo_interno: "",
+  descripcion: "",
   cantidad: "",
   precio_venta: "",
   precio_costo: "",
@@ -108,6 +112,7 @@ const nuevaLineaIngreso = (): IngresoLinea => ({
 const nuevaLineaTransferencia = (): TransferenciaLinea => ({
   id: crypto.randomUUID(),
   codigo_interno: "",
+  descripcion: "",
   cantidad: "",
   precio_unitario: "",
 });
@@ -219,7 +224,7 @@ export function ModoEspecialView() {
       .filter((item): item is NonNullable<typeof item> => item !== null);
 
     if (items.length === 0) {
-      toast.error("Agregá al menos una línea con código y cantidad.");
+      toast.error("Agregá al menos una línea con producto y cantidad.");
       return;
     }
     setGuardando(true);
@@ -547,11 +552,11 @@ export function ModoEspecialView() {
           <p className="text-sm text-muted-foreground">
             Cargá varios productos a la vez. Los precios son opcionales; si los dejás en blanco no se modifican.
           </p>
-          <div className="rounded-md border overflow-x-auto">
+          <div className="rounded-md border overflow-visible">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Código *</TableHead>
+                  <TableHead>Producto *</TableHead>
                   <TableHead>Cantidad *</TableHead>
                   <TableHead>Precio venta</TableHead>
                   <TableHead>Precio costo</TableHead>
@@ -561,12 +566,12 @@ export function ModoEspecialView() {
               <TableBody>
                 {lineasIngreso.map((linea) => (
                   <TableRow key={linea.id}>
-                    <TableCell>
-                      <Input
-                        placeholder="SKU"
-                        value={linea.codigo_interno}
-                        onChange={(e) => setLineasIngreso((prev) =>
-                          prev.map((l) => l.id === linea.id ? { ...l, codigo_interno: e.target.value } : l)
+                    <TableCell className="relative overflow-visible">
+                      <BusquedaProductoInput
+                        codigoInterno={linea.codigo_interno}
+                        descripcion={linea.descripcion}
+                        onChange={(codigoInterno, descripcion) => setLineasIngreso((prev) =>
+                          prev.map((l) => l.id === linea.id ? { ...l, codigo_interno: codigoInterno, descripcion } : l)
                         )}
                       />
                     </TableCell>
@@ -649,11 +654,11 @@ export function ModoEspecialView() {
             <p className="text-sm text-muted-foreground">
               Al enviar se descuenta el stock de esta sucursal. El precio unitario es opcional (costo de transferencia).
             </p>
-            <div className="rounded-md border overflow-x-auto">
+            <div className="rounded-md border overflow-visible">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Código *</TableHead>
+                    <TableHead>Producto *</TableHead>
                     <TableHead>Cantidad *</TableHead>
                     <TableHead>Precio unit.</TableHead>
                     <TableHead />
@@ -662,12 +667,12 @@ export function ModoEspecialView() {
                 <TableBody>
                   {lineasTransferencia.map((linea) => (
                     <TableRow key={linea.id}>
-                      <TableCell>
-                        <Input
-                          placeholder="SKU"
-                          value={linea.codigo_interno}
-                          onChange={(e) => setLineasTransferencia((prev) =>
-                            prev.map((l) => l.id === linea.id ? { ...l, codigo_interno: e.target.value } : l)
+                      <TableCell className="relative overflow-visible">
+                        <BusquedaProductoInput
+                          codigoInterno={linea.codigo_interno}
+                          descripcion={linea.descripcion}
+                          onChange={(codigoInterno, descripcion) => setLineasTransferencia((prev) =>
+                            prev.map((l) => l.id === linea.id ? { ...l, codigo_interno: codigoInterno, descripcion } : l)
                           )}
                         />
                       </TableCell>

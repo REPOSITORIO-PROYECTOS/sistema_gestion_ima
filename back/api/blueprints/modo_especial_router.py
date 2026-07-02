@@ -20,7 +20,7 @@ from back.schemas.modo_especial_schemas import (
     SubaPreciosRequest,
     TransferenciaStockResponse,
 )
-from back.security import es_admin, es_gerente, obtener_usuario_actual
+from back.security import es_gerente, obtener_usuario_actual
 
 router = APIRouter(prefix="/modo-especial", tags=["Modo Especial"])
 
@@ -56,7 +56,7 @@ def api_listar_productos(
     "/productos",
     response_model=ProductoModoEspecialResponse,
     status_code=201,
-    dependencies=[Depends(es_admin)],
+    dependencies=[Depends(es_gerente)],
 )
 def api_crear_producto(
     req: ProductoModoEspecialCreate,
@@ -73,7 +73,7 @@ def api_crear_producto(
 @router.put(
     "/productos/bulk",
     response_model=ImportExportResumen,
-    dependencies=[Depends(es_admin)],
+    dependencies=[Depends(es_gerente)],
 )
 def api_bulk_productos(
     req: BulkProductosRequest,
@@ -87,7 +87,7 @@ def api_bulk_productos(
 @router.put(
     "/productos/{codigo_interno}",
     response_model=ProductoModoEspecialResponse,
-    dependencies=[Depends(es_admin)],
+    dependencies=[Depends(es_gerente)],
 )
 def api_actualizar_producto(
     codigo_interno: str,
@@ -117,7 +117,7 @@ def api_ingreso_stock(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/suba-precios", dependencies=[Depends(es_admin)])
+@router.post("/suba-precios", dependencies=[Depends(es_gerente)])
 def api_suba_precios(
     req: SubaPreciosRequest,
     current_user: Usuario = Depends(obtener_usuario_actual),
@@ -144,7 +144,7 @@ def api_exportar(
     )
 
 
-@router.post("/importar", response_model=ImportExportResumen, dependencies=[Depends(es_admin)])
+@router.post("/importar", response_model=ImportExportResumen, dependencies=[Depends(es_gerente)])
 async def api_importar(
     archivo: UploadFile = File(...),
     current_user: Usuario = Depends(obtener_usuario_actual),

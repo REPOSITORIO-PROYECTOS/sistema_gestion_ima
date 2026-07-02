@@ -4,6 +4,7 @@ import os
 import traceback
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
+from zoneinfo import ZoneInfo
 from jinja2 import Environment, FileSystemLoader
 from weasyprint import HTML, CSS
 
@@ -115,16 +116,21 @@ def _enrich_transaccion(transaccion) -> Any:
 
 # --- Constantes y Configuración ---
 TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'plantillas')
+TZ_ARGENTINA = ZoneInfo("America/Argentina/Buenos_Aires")
+TZ_UTC = ZoneInfo("UTC")
 
 def format_datetime(value, format='%d/%m/%Y %H:%M'):
-    """Filtro de Jinja2 para formatear fechas y horas de manera consistente."""
+    """Formatea fechas en hora Argentina. Las fechas naive del backend se asumen UTC."""
     if isinstance(value, str):
         try:
             value = datetime.fromisoformat(value.replace('Z', '+00:00'))
         except (ValueError, TypeError):
             return value
     if isinstance(value, datetime):
-        return value.strftime(format)
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=TZ_UTC)
+        local = value.astimezone(TZ_ARGENTINA)
+        return local.strftime(format)
     return value
 
 # --- Funciones Principales de Generación de PDF ---
@@ -301,7 +307,7 @@ def generar_ticket_cierre_pdf(datos: dict) -> bytes:
         
         contexto = {
             "datos": datos,
-            "fecha_emision": datetime.now()
+            "fecha_emision": datetime.now(TZ_ARGENTINA),
         }
         html_renderizado = template.render(contexto)
         print("1. Plantilla 'cierre_lote_detallado.html' renderizada con éxito.")

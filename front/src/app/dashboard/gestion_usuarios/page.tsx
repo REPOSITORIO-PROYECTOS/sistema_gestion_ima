@@ -88,7 +88,7 @@ export default function GestionUsuarios() {
   const fetchUsuariosRef = useRef<() => void>(() => {});
 
   return (
-    <ProtectedRoute allowedRoles={["Admin", "Soporte"]}>
+    <ProtectedRoute allowedRoles={["Admin", "Gerente", "Soporte"]}>
       <div className="flex flex-col gap-6 p-2">
 
         {/* Header */}

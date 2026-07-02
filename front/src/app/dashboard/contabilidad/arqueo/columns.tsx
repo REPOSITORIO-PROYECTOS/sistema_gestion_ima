@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowUpDown, Loader2, Printer } from "lucide-react";
 import { formatDateArgentina } from "@/utils/formatDate";
 import { useAuthStore } from "@/lib/authStore";
-import { imprimirArqueoCaja } from "@/lib/imprimir-arqueo";
+import { imprimirArqueoCaja, prepararVentanaImpresionCaja } from "@/lib/imprimir-arqueo";
 import { toast } from "sonner";
 
 // Este tipo debe coincidir con los datos reales
@@ -37,8 +37,14 @@ function ImprimirArqueoButton({ idSesion }: { idSesion: number }) {
     }
 
     setIsLoading(true);
+    const printWindow = prepararVentanaImpresionCaja();
+    if (!printWindow) {
+      toast.warning(
+        "El navegador bloqueó la ventana de impresión. Se intentará descargar el PDF.",
+      );
+    }
     try {
-      await imprimirArqueoCaja(idSesion, token);
+      await imprimirArqueoCaja(idSesion, token, printWindow);
     } catch (err) {
       console.error("Error al imprimir arqueo:", err);
       if (err instanceof Error) {

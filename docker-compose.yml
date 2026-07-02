@@ -1,0 +1,24 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: sgi_db
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3308:3306"
+    environment:
+      TZ: America/Argentina/Buenos_Aires
+      MYSQL_ROOT_PASSWORD: "SistemaIMA123."
+      MYSQL_DATABASE: "gestion_ima_db"
+      MYSQL_USER: "gestion_user"
+      MYSQL_PASSWORD: "SistemaIMA123."
+    volumes:
+      - sgi_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pSistemaIMA123."]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  sgi_db_data:

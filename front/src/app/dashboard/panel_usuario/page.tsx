@@ -5,7 +5,7 @@ import { useAuthStore } from "@/lib/authStore";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { puedeEditarCredenciales } from "@/lib/permisos";
+import { puedeModificarCredencialesPropias } from "@/lib/permisos";
 
 export default function PanelUsuario() {
 
@@ -18,7 +18,7 @@ export default function PanelUsuario() {
   const [loading, setLoading] = useState(false);
 
   const token = useAuthStore((state) => state.token);
-  const puedeEditar = puedeEditarCredenciales(role?.nombre);
+  const puedeEditar = puedeModificarCredencialesPropias(role?.nombre);
 
   if (!usuario) return null;
 

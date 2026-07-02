@@ -3,7 +3,7 @@
 import Image from "next/image";
 import "../styles/globals.css";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthStore } from "@/lib/authStore";
@@ -28,8 +28,19 @@ function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
 
-  // Login App
+  useEffect(() => {
+    if (!cooldownUntil) return;
+    const timer = setInterval(() => {
+      if (Date.now() >= cooldownUntil) {
+        setCooldownUntil(null);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldownUntil]);
+
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
     if (!username || !password) {
@@ -37,29 +48,40 @@ function Login() {
       return;
     }
 
+    if (cooldownUntil && Date.now() < cooldownUntil) {
+      const secs = Math.ceil((cooldownUntil - Date.now()) / 1000);
+      toast.error(`Espere ${secs}s antes de volver a intentar`);
+      return;
+    }
+
     try {
       setLoading(true);
 
-      // --- LOGIN ---
-      let response: Response;
-      try {
-        response = await fetch(`${API_URL}/auth/token`, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({ username, password }),
-          cache: "no-store",
-        });
-      } catch {
-        await new Promise((r) => setTimeout(r, 250));
-        response = await fetch(`${API_URL}/auth/token`, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({ username, password }),
-          cache: "no-store",
-        });
+      const response = await fetch(`${API_URL}/auth/token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ username, password }),
+        cache: "no-store",
+      });
+
+      if (response.status === 429) {
+        const retryAfter = Number(response.headers.get("Retry-After") || "60");
+        setCooldownUntil(Date.now() + retryAfter * 1000);
+        throw new Error("Demasiados intentos. Espere un momento e intente de nuevo.");
       }
 
-      if (!response.ok) throw new Error("Credenciales inválidas");
+      if (!response.ok) {
+        const nextFailed = failedAttempts + 1;
+        setFailedAttempts(nextFailed);
+        if (nextFailed >= 3) {
+          setCooldownUntil(Date.now() + 30_000);
+          setFailedAttempts(0);
+        }
+        throw new Error("Credenciales inválidas");
+      }
+
+      setFailedAttempts(0);
+      setCooldownUntil(null);
 
       const { access_token } = await response.json();
       setToken(access_token);
@@ -147,7 +169,7 @@ function Login() {
         {/* Submit */}
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || (cooldownUntil !== null && Date.now() < cooldownUntil)}
           className={`flex w-4/5 sm:max-w-1/2 sm:w-1/2 justify-center items-center px-4 py-3 text-white border-2 border-white bg-blue-700 rounded-xl cursor-pointer transition hover:bg-sky-800 ${
             loading ? "opacity-50 cursor-not-allowed" : ""
           }`}

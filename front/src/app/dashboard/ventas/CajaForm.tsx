@@ -9,6 +9,10 @@ import { toast } from "sonner";
 import { DialogClose } from "@/components/ui/dialog";
 import { Loader2, PrinterIcon } from "lucide-react";
 import { useCajaStore } from "@/lib/cajaStore";
+import {
+  imprimirArqueoCaja,
+  prepararVentanaImpresionCaja,
+} from "@/lib/imprimir-arqueo";
 
 
 
@@ -139,65 +143,6 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
     }
   };
 
-const handleImprimirCierre = async (idSesionCerrada: number) => {
-    if (!token) {
-      toast.error("Token no encontrado. No se puede imprimir.");
-      return;
-    }
-    
-    toast.info("Generando ticket, por favor espere...");
-    console.log(`[DEBUG] Iniciando impresión para sesión ID: ${idSesionCerrada}`);
-
-    try {
-      const url = `https://sistema-ima.sistemataup.online/api/caja/sesion/${idSesionCerrada}/ticket-cierre-detallado`;
-      console.log(`[DEBUG] Llamando a la URL: ${url}`);
-
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      console.log(`[DEBUG] Respuesta recibida de la API. Estado: ${res.status}, Tipo de Contenido: ${res.headers.get('Content-Type')}`);
-
-      if (!res.ok) {
-        // Si el servidor envía un error, intentamos leerlo como JSON
-        const errorData = await res.json();
-        throw new Error(errorData.detail || `El servidor respondió con un error ${res.status}`);
-      }
-      
-      // Convertimos la respuesta en un 'blob' (un objeto tipo archivo)
-      const blob = await res.blob();
-      console.log(`[DEBUG] Blob recibido. Tamaño: ${blob.size} bytes, Tipo: ${blob.type}`);
-
-      // --- Verificaciones Clave ---
-      if (blob.size === 0) {
-        throw new Error("El servidor devolvió un archivo vacío.");
-      }
-      if (blob.type !== "application/pdf") {
-        throw new Error(`El servidor devolvió un tipo de archivo incorrecto (${blob.type}), se esperaba un PDF.`);
-      }
-
-      // Creamos una URL temporal local para el archivo blob
-      const fileURL = URL.createObjectURL(blob);
-      
-      // Abrimos la URL en una nueva pestaña. El navegador se encargará de mostrar el visor de PDF.
-      const newWindow = window.open(fileURL, '_blank');
-      
-      if (!newWindow) {
-        throw new Error("El navegador bloqueó la apertura de la nueva pestaña. Por favor, revisa la configuración de pop-ups.");
-      }
-
-      // Limpiamos la URL temporal después de un breve instante para darle tiempo al navegador de procesarla.
-      setTimeout(() => URL.revokeObjectURL(fileURL), 100);
-
-    } catch (err) {
-      console.error("Error detallado al imprimir:", err); // Muestra el error completo en la consola
-      if (err instanceof Error) {
-        toast.error(`Error al imprimir: ${err.message}`);
-      }
-    }
-};
-
-
   // Cerrar caja
   const handleCerrarCaja = async (imprimirDespues: boolean) => {
     if (!nombreUsuario.trim()) {
@@ -205,6 +150,13 @@ const handleImprimirCierre = async (idSesionCerrada: number) => {
       return;
     }
     if (!token) return toast.error("No se encontró el token.");
+
+    const printWindow = imprimirDespues ? prepararVentanaImpresionCaja() : null;
+    if (imprimirDespues && !printWindow) {
+      toast.warning(
+        "El navegador bloqueó la ventana de impresión. Se intentará descargar el PDF al finalizar.",
+      );
+    }
     
     setIsLoading(true);
 
@@ -232,11 +184,17 @@ const handleImprimirCierre = async (idSesionCerrada: number) => {
       }
       toast.success(cerrarData.message || "✅ Caja cerrada correctamente.");
       
-      // LÓGICA CLAVE: Si se pidió imprimir, se llama a la función de impresión
-    const idSesionCerrada = cerrarData.data?.id_sesion;
-    if (imprimirDespues && idSesionCerrada) {
-      await handleImprimirCierre(idSesionCerrada);
-    }
+      const idSesionCerrada = cerrarData.data?.id_sesion;
+      if (imprimirDespues && idSesionCerrada) {
+        try {
+          await imprimirArqueoCaja(idSesionCerrada, token, printWindow);
+        } catch (err) {
+          console.error("Error al imprimir ticket de cierre:", err);
+          if (err instanceof Error) {
+            toast.error(`La caja se cerró, pero falló la impresión: ${err.message}`);
+          }
+        }
+      }
 
       // Limpiamos todo
       clearCaja();

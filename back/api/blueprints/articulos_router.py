@@ -8,7 +8,7 @@ from typing import List
 
 # --- Módulos del Proyecto ---
 from back.database import get_db
-from back.security import es_admin, obtener_usuario_actual
+from back.security import es_gerente, obtener_usuario_actual
 from back.modelos import Usuario
 from back.modelos import ConfiguracionEmpresa
 import back.gestion.stock.articulos as articulos_manager
@@ -170,7 +170,7 @@ def api_get_articulo(
 # === ENDPOINTS DE ESCRITURA (CREATE, UPDATE, DELETE) - Rutas mantenidas
 # ===================================================================
 
-@router.post("/crear", response_model=ArticuloResponse, status_code=201, dependencies=[Depends(es_admin)])
+@router.post("/crear", response_model=ArticuloResponse, status_code=201, dependencies=[Depends(es_gerente)])
 def api_create_articulo(
     req: ArticuloCreate,
     current_user: Usuario = Depends(obtener_usuario_actual),
@@ -183,7 +183,7 @@ def api_create_articulo(
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
 
-@router.patch("/actualizar/{id_articulo}", response_model=ArticuloResponse, dependencies=[Depends(es_admin)])
+@router.patch("/actualizar/{id_articulo}", response_model=ArticuloResponse, dependencies=[Depends(es_gerente)])
 def api_update_articulo(
     id_articulo: int,
     req: ArticuloUpdate,
@@ -196,7 +196,7 @@ def api_update_articulo(
         raise HTTPException(status_code=404, detail=f"Artículo con ID {id_articulo} no encontrado en su empresa.")
     return articulo_actualizado
 
-@router.delete("/eliminar/{id_articulo}", response_model=RespuestaGenerica, dependencies=[Depends(es_admin)])
+@router.delete("/eliminar/{id_articulo}", response_model=RespuestaGenerica, dependencies=[Depends(es_gerente)])
 def api_delete_articulo(
     id_articulo: int,
     current_user: Usuario = Depends(obtener_usuario_actual),
@@ -212,7 +212,7 @@ def api_delete_articulo(
 # === NUEVOS ENDPOINTS PARA GESTIÓN DE CÓDIGOS DE BARRAS
 # ===================================================================
 
-@router.post("/codigos/anadir", status_code=201, summary="Añadir un nuevo código de barras", dependencies=[Depends(es_admin)])
+@router.post("/codigos/anadir", status_code=201, summary="Añadir un nuevo código de barras", dependencies=[Depends(es_gerente)])
 def api_anadir_codigo(
     req: CodigoBarrasCreate,
     current_user: Usuario = Depends(obtener_usuario_actual),
@@ -230,7 +230,7 @@ def api_anadir_codigo(
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
 
-@router.delete("/codigos/eliminar/{codigo}", response_model=RespuestaGenerica, summary="Eliminar un código de barras", dependencies=[Depends(es_admin)])
+@router.delete("/codigos/eliminar/{codigo}", response_model=RespuestaGenerica, summary="Eliminar un código de barras", dependencies=[Depends(es_gerente)])
 def api_eliminar_codigo(
     codigo: str,
     # No es necesario current_user aquí si la lógica del manager no lo requiere,

@@ -34,7 +34,9 @@ import {
   TIPO_COMPROBANTE_DEFAULT,
   tipoComprobanteDesdeFlecha,
   esTipoComprobanteRecibo,
+  type TipoComprobanteRapido,
 } from "@/lib/ventas-form-flow";
+import { empresaSoloComprobanteCaja } from "@/lib/permisos";
 
 // --- Componentes Hijos ---
 import { SeccionCliente } from "./SeccionCliente";
@@ -159,7 +161,7 @@ function FormVentas({
   const [observaciones, setObservaciones] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { habilitarExtras } = useFacturacionStore();
-  const [tipoFacturacion, setTipoFacturacion] = useState(TIPO_COMPROBANTE_DEFAULT);
+  const [tipoFacturacion, setTipoFacturacion] = useState<TipoComprobanteRapido>(TIPO_COMPROBANTE_DEFAULT);
   const [codigo, setCodigoEscaneado] = useState("");
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [productoEscaneado, setProductoEscaneado] = useState<ProductoSeleccionado | null>(null);
@@ -168,6 +170,7 @@ function FormVentas({
   const inputRef = useRef<HTMLInputElement>(null);
   const cantidadInputRef = useRef<HTMLInputElement>(null);
   const empresa = useEmpresaStore((state) => state.empresa);
+  const soloComprobante = empresaSoloComprobanteCaja(empresa?.id_empresa);
   const [checkoutVisible, setCheckoutVisible] = useState(false);
   const checkoutSectionRef = useRef<HTMLDivElement>(null);
   const [autoSubmitFlag, setAutoSubmitFlag] = useState(false);
@@ -1010,9 +1013,14 @@ function FormVentas({
   }, [procesarVenta]);
 
   const handleF6 = useCallback(() => {
+    if (soloComprobante) {
+      setTipoFacturacion('recibo');
+      procesarVenta('recibo');
+      return;
+    }
     setTipoFacturacion('factura');
     procesarVenta('factura');
-  }, [procesarVenta]);
+  }, [procesarVenta, soloComprobante]);
 
   const handleF8 = useCallback(() => {
     setMetodoPago('efectivo');
@@ -1061,16 +1069,24 @@ function FormVentas({
         const enBusquedaProducto = target.id === VENTAS_CAMPOS.producto;
         if (enBusquedaProducto) return;
 
-        const nuevoTipo = tipoComprobanteDesdeFlecha(e.key);
-        if (nuevoTipo) {
-          e.preventDefault();
-          setTipoFacturacion(nuevoTipo);
+        if (!soloComprobante) {
+          const nuevoTipo = tipoComprobanteDesdeFlecha(e.key);
+          if (nuevoTipo) {
+            e.preventDefault();
+            setTipoFacturacion(nuevoTipo);
+          }
         }
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleF5, handleF6, handleF8, handleF9, handleF10, checkoutVisible, popoverOpen]);
+  }, [handleF5, handleF6, handleF8, handleF9, handleF10, checkoutVisible, popoverOpen, soloComprobante]);
+
+  useEffect(() => {
+    if (soloComprobante && tipoFacturacion !== "recibo") {
+      setTipoFacturacion("recibo");
+    }
+  }, [soloComprobante, tipoFacturacion]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1379,11 +1395,27 @@ function FormVentas({
             <span className="block w-full h-0.5 bg-green-900"></span>
 
             <p className="text-xs text-gray-600">
-              Tipo de comprobante: usá <kbd className="px-1 rounded bg-gray-200">←</kbd> Comprobante · <kbd className="px-1 rounded bg-gray-200">→</kbd> Factura
-              {tipoFacturacion === "recibo" ? " · predeterminado: comprobante básico" : ""}
+              {soloComprobante ? (
+                <>Tipo de comprobante: comprobante básico (única opción disponible)</>
+              ) : (
+                <>
+                  Tipo de comprobante: usá <kbd className="px-1 rounded bg-gray-200">←</kbd> Comprobante · <kbd className="px-1 rounded bg-gray-200">→</kbd> Factura
+                  {tipoFacturacion === "recibo" ? " · predeterminado: comprobante básico" : ""}
+                </>
+              )}
             </p>
 
-            <RadioGroup value={tipoFacturacion} onValueChange={setTipoFacturacion} className="flex flex-col gap-4 md:flex-row flex-wrap">
+            <RadioGroup
+              value={tipoFacturacion}
+              onValueChange={(v) => {
+                if (soloComprobante) {
+                  if (v === "recibo") setTipoFacturacion(v);
+                  return;
+                }
+                if (v === "recibo" || v === "factura") setTipoFacturacion(v);
+              }}
+              className="flex flex-col gap-4 md:flex-row flex-wrap"
+            >
               <Label
                 htmlFor="comprobante"
                 className={`flex flex-row items-center w-full md:w-[48%] cursor-pointer text-black border-green-900 gap-3 rounded-lg border p-3 transition-colors duration-200 hover:bg-green-400 dark:hover:bg-green-700 ${
@@ -1393,34 +1425,43 @@ function FormVentas({
                 <RadioGroupItem value="recibo" id="comprobante" className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
                 <span className="text-sm leading-none font-medium">Comprobante</span>
               </Label>
-              <Label
-                htmlFor="factura"
-                className={`flex flex-row items-center w-full md:w-[48%] cursor-pointer text-black border-green-900 gap-3 rounded-lg border p-3 transition-colors duration-200 hover:bg-green-400 dark:hover:bg-green-700 ${
-                  tipoFacturacion === "factura" ? "ring-2 ring-blue-700 bg-blue-50 border-blue-700" : ""
-                }`}
-              >
-                <RadioGroupItem value="factura" id="factura" className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
-                <span className="text-sm leading-none font-medium">Factura</span>
-              </Label>
               <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Label
+                      htmlFor="factura"
+                      className={`flex flex-row items-center w-full md:w-[48%] text-black border-green-900 gap-3 rounded-lg border p-3 transition-colors duration-200 ${
+                        soloComprobante
+                          ? "opacity-50 cursor-not-allowed"
+                          : `cursor-pointer hover:bg-green-400 dark:hover:bg-green-700 ${
+                              tipoFacturacion === "factura" ? "ring-2 ring-blue-700 bg-blue-50 border-blue-700" : ""
+                            }`
+                      }`}
+                    >
+                      <RadioGroupItem value="factura" id="factura" disabled={soloComprobante} className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
+                      <span className="text-sm leading-none font-medium">Factura</span>
+                    </Label>
+                  </TooltipTrigger>
+                  {soloComprobante && (<TooltipContent><p>No disponible en esta empresa</p></TooltipContent>)}
+                </Tooltip>
                 <div className="flex flex-wrap gap-4 w-full">
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Label htmlFor="remito" className={`flex flex-row items-center w-full md:w-[48%] lg:flex-row text-black border-green-900 gap-3 rounded-lg border p-3 transition-colors duration-200 ${!habilitarExtras ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-green-400 dark:hover:bg-green-700"} data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900`}>
-                        <RadioGroupItem value="remito" id="remito" disabled={!habilitarExtras} className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
+                      <Label htmlFor="remito" className={`flex flex-row items-center w-full md:w-[48%] lg:flex-row text-black border-green-900 gap-3 rounded-lg border p-3 transition-colors duration-200 ${!habilitarExtras || soloComprobante ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-green-400 dark:hover:bg-green-700"} data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900`}>
+                        <RadioGroupItem value="remito" id="remito" disabled={!habilitarExtras || soloComprobante} className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
                         <span className="text-sm leading-none font-medium">Remito</span>
                       </Label>
                     </TooltipTrigger>
-                    {!habilitarExtras && (<TooltipContent><p>Contactá al administrador</p></TooltipContent>)}
+                    {(!habilitarExtras || soloComprobante) && (<TooltipContent><p>{soloComprobante ? "No disponible en esta empresa" : "Contactá al administrador"}</p></TooltipContent>)}
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Label htmlFor="presupuesto" className={`flex flex-row items-center w-full md:w-[48%] lg:flex-row text-black border-green-900 gap-3 rounded-lg border p-3 transition-colors duration-200 ${!habilitarExtras ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-green-400 dark:hover:bg-green-700"} data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900`}>
-                        <RadioGroupItem value="presupuesto" id="presupuesto" disabled={!habilitarExtras} className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
+                      <Label htmlFor="presupuesto" className={`flex flex-row items-center w-full md:w-[48%] lg:flex-row text-black border-green-900 gap-3 rounded-lg border p-3 transition-colors duration-200 ${!habilitarExtras || soloComprobante ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-green-400 dark:hover:bg-green-700"} data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:border-blue-900 dark:data-[state=checked]:bg-blue-900`}>
+                        <RadioGroupItem value="presupuesto" id="presupuesto" disabled={!habilitarExtras || soloComprobante} className="data-[state=checked]:border-white data-[state=checked]:bg-white" />
                         <span className="text-sm leading-none font-medium">Presupuesto</span>
                       </Label>
                     </TooltipTrigger>
-                    {!habilitarExtras && (<TooltipContent><p>Contactá al administrador</p></TooltipContent>)}
+                    {(!habilitarExtras || soloComprobante) && (<TooltipContent><p>{soloComprobante ? "No disponible en esta empresa" : "Contactá al administrador"}</p></TooltipContent>)}
                   </Tooltip>
                 </div>
               </TooltipProvider>
