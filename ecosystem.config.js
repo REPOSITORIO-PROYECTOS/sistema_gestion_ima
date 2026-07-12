@@ -7,7 +7,7 @@ module.exports = {
       args: [
         "-c",
         "export PYTHONPATH=/home/dev_taup/proyectos/sistema_gestion_ima:$PYTHONPATH && " +
-        "cd /home/dev_taup/proyectos/sistema_gestion_ima/back && " +
+        "cd /home/dev_taup/proyectos/sistema_gestion_ima/back && set -a && . ./.env && set +a && " +
         "exec ../back/venv/bin/gunicorn main:app " +
         "-k uvicorn.workers.UvicornWorker " +
         "-w ${GUNICORN_WORKERS:-2} " +
@@ -45,6 +45,7 @@ module.exports = {
         SQL_ECHO: "false",
         DB_POOL_SIZE: "10",
         DB_MAX_OVERFLOW: "10",
+        SYNC_EMPRESA_IDS: "1",
       },
       watch: false,
       max_memory_restart: "384M",

@@ -9,8 +9,8 @@ from back.schemas.caja_schemas import ArticuloVendido
 
 ROLES_SIN_DESCUENTO = frozenset({"Cajero", "Vendedora"})
 
-# La Esquina (35) y FULL24 (36): panel de cajas abiertas en home/navbar.
-EMPRESAS_PANEL_ESTADISTICAS_CAJA = frozenset({35, 36})
+# La Esquina (35), FULL24 (36), de-campo (37) y La Esquina 2 (38).
+EMPRESAS_PANEL_ESTADISTICAS_CAJA = frozenset({35, 36, 37, 38})
 
 
 def empresa_tiene_panel_estadisticas_caja(id_empresa: int) -> bool:

@@ -1,10 +1,10 @@
 const ROLES_VENTA_SIN_DESCUENTO = new Set(["Cajero", "Vendedora"]);
 
-/** La Esquina (35) y FULL24 (36). */
-export const EMPRESAS_PANEL_ESTADISTICAS = new Set([35, 36]);
+/** La Esquina (35), FULL24 (36), de-campo (37) y La Esquina 2 (38). */
+export const EMPRESAS_PANEL_ESTADISTICAS = new Set([35, 36, 37, 38]);
 
-/** La Esquina (35) y FULL24 (36): en caja solo comprobante (sin factura/remito/presupuesto). */
-export const EMPRESAS_SOLO_COMPROBANTE_CAJA = new Set([35, 36]);
+/** Mismas empresas: en caja solo comprobante (sin factura/remito/presupuesto). */
+export const EMPRESAS_SOLO_COMPROBANTE_CAJA = new Set([35, 36, 37, 38]);
 
 export function empresaTienePanelEstadisticas(idEmpresa: number | undefined): boolean {
   if (!idEmpresa) return false;
