@@ -19,6 +19,7 @@ import { CreateEmpresaModal } from "./CreateEmpresaModal";
 import { ConfiguracionForm } from "@/components/ConfiguracionForm"; // Asumo que está en la misma carpeta
 import AdminGuard from "@/components/AdminGuard";
 import { AfipToolsPanel } from "@/components/AfipToolsPanel";
+import { PerfilOperativoPanel } from "@/components/PerfilOperativoPanel";
 
 // Definimos el tipo de dato para una Empresa, que será usado en todo el componente
 interface Empresa {
@@ -162,6 +163,15 @@ export default function GestionEmpresasPage() {
 
                 <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4">
                   <div className="space-y-6 pb-2">
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+                      <div className="mb-4">
+                        <h3 className="text-lg font-semibold text-slate-900">Esquema y perfil operativo</h3>
+                        <p className="text-sm text-slate-600">
+                          Migrar entre estándar y especial sin tocar datos fiscales.
+                        </p>
+                      </div>
+                      <PerfilOperativoPanel empresaId={selectedEmpresaId} />
+                    </div>
                     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
                       <div className="mb-4 flex items-center justify-between gap-2">
                         <h3 className="text-lg font-semibold text-slate-900">Configuración General & AFIP</h3>

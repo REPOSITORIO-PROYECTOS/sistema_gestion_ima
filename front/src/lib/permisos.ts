@@ -1,34 +1,39 @@
+import type { PerfilOperativoResuelto } from "@/types/perfilOperativo";
+
 const ROLES_VENTA_SIN_DESCUENTO = new Set(["Cajero", "Vendedora"]);
 
-/** La Esquina (35) y FULL24 (36). */
-export const EMPRESAS_PANEL_ESTADISTICAS = new Set([35, 36]);
-
-/** La Esquina (35) y FULL24 (36): en caja solo comprobante (sin factura/remito/presupuesto). */
-export const EMPRESAS_SOLO_COMPROBANTE_CAJA = new Set([35, 36]);
-
-export function empresaTienePanelEstadisticas(idEmpresa: number | undefined): boolean {
-  if (!idEmpresa) return false;
-  return EMPRESAS_PANEL_ESTADISTICAS.has(idEmpresa);
+export function empresaTienePanelEstadisticas(
+  perfil?: PerfilOperativoResuelto | null,
+): boolean {
+  return Boolean(perfil?.panel_estadisticas_caja);
 }
 
-export function empresaSoloComprobanteCaja(idEmpresa: number | undefined): boolean {
-  if (!idEmpresa) return false;
-  return EMPRESAS_SOLO_COMPROBANTE_CAJA.has(idEmpresa);
+export function empresaSoloComprobanteCaja(
+  perfil?: PerfilOperativoResuelto | null,
+): boolean {
+  return Boolean(perfil?.caja_solo_comprobante);
+}
+
+export function empresaModoEspecial(perfil?: PerfilOperativoResuelto | null): boolean {
+  return Boolean(perfil?.modo_especial);
 }
 
 export function empresaBloqueaDescuentosCajero(
+  perfil?: PerfilOperativoResuelto | null,
   aclaraciones?: Record<string, string>,
 ): boolean {
+  if (perfil?.bloquear_descuentos_cajero) return true;
   const valor = aclaraciones?.bloquear_descuentos_cajero ?? "false";
   return valor === "true" || valor === "1";
 }
 
 export function puedeAplicarDescuentos(
   rolNombre: string | undefined,
+  perfil?: PerfilOperativoResuelto | null,
   aclaraciones?: Record<string, string>,
 ): boolean {
   if (!rolNombre) return false;
-  if (!empresaBloqueaDescuentosCajero(aclaraciones)) return true;
+  if (!empresaBloqueaDescuentosCajero(perfil, aclaraciones)) return true;
   return !ROLES_VENTA_SIN_DESCUENTO.has(rolNombre);
 }
 

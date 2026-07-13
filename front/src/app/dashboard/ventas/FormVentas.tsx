@@ -25,6 +25,7 @@ import { useAuthStore } from "@/lib/authStore"
 import { useEmpresaStore } from '@/lib/empresaStore';
 import { useProductoStore, type Producto } from "@/lib/productoStore";
 import { API_CONFIG } from "@/lib/api-config";
+import { downloadPlainText, printPlainText } from "@/lib/printerService";
 import { fetchArticuloPorId, mapArticulosToStore } from "@/lib/articulos-api";
 import { actualizarProductosEnCache } from "@/lib/catalogo-sync";
 import { attachAutoScaleBridge } from "@/lib/scaleSerial";
@@ -37,6 +38,7 @@ import {
   type TipoComprobanteRapido,
 } from "@/lib/ventas-form-flow";
 import { empresaSoloComprobanteCaja } from "@/lib/permisos";
+import { usePerfilEmpresa } from "@/hooks/usePerfilEmpresa";
 
 // --- Componentes Hijos ---
 import { SeccionCliente } from "./SeccionCliente";
@@ -170,7 +172,8 @@ function FormVentas({
   const inputRef = useRef<HTMLInputElement>(null);
   const cantidadInputRef = useRef<HTMLInputElement>(null);
   const empresa = useEmpresaStore((state) => state.empresa);
-  const soloComprobante = empresaSoloComprobanteCaja(empresa?.id_empresa);
+  const { perfil } = usePerfilEmpresa();
+  const soloComprobante = empresaSoloComprobanteCaja(perfil);
   const [checkoutVisible, setCheckoutVisible] = useState(false);
   const checkoutSectionRef = useRef<HTMLDivElement>(null);
   const [autoSubmitFlag, setAutoSubmitFlag] = useState(false);
@@ -772,13 +775,26 @@ function FormVentas({
         throw new Error(errorComp.detail || "Error desconocido");
       }
 
+      const contentType = respComp.headers.get("content-type") || "";
+      const esTextoPlano = contentType.includes("text/plain");
+      const nombreArchivo = `Comprobante_${tipo}_${Date.now()}.${esTextoPlano ? "txt" : "pdf"}`;
+
+      if (esTextoPlano) {
+        const texto = await respComp.text();
+        downloadPlainText(nombreArchivo, texto);
+        printPlainText(`Comprobante ${tipo}`, texto);
+        toast.success("✅ Comprobante en texto plano enviado a impresión.");
+        console.log(`[${new Date().toISOString()}] Impresión texto plano enviada correctamente.`);
+        return;
+      }
+
       const blob = await respComp.blob();
       const url = URL.createObjectURL(blob);
 
       // Descarga automática de respaldo
       const link = document.createElement('a');
       link.href = url;
-      link.download = `Comprobante_${tipo}_${Date.now()}.pdf`;
+      link.download = nombreArchivo;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

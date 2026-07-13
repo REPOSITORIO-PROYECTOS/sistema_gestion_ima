@@ -35,8 +35,11 @@ from back.schemas.modo_especial_schemas import (
 
 UNIDADES_VALIDAS = {"unidad", "gramos", "kilogramos", "litros", "mililitros"}
 
-# La Esquina (35) y FULL24 (36): transferencias de stock entre sucursales.
-EMPRESAS_TRANSFERENCIA_STOCK = frozenset({35, 36})
+
+def _grupo_transferencia(db: Session, id_empresa: int) -> frozenset[int]:
+    from back.gestion.perfil_operativo_manager import obtener_grupo_transferencia
+
+    return obtener_grupo_transferencia(db, id_empresa)
 
 _ALIASES_UNIDAD: Dict[str, str] = {
     "unidad": "unidad",
@@ -693,8 +696,7 @@ def _nombre_empresa(empresa: Optional[Empresa]) -> str:
 
 
 def _verificar_empresa_transferencia(db: Session, id_empresa: int) -> None:
-    if id_empresa not in EMPRESAS_TRANSFERENCIA_STOCK:
-        raise ValueError("Esta empresa no participa en transferencias de stock.")
+    _grupo_transferencia(db, id_empresa)
     from back.gestion import configuracion_manager
     if not configuracion_manager.es_modo_especial_habilitado(db, id_empresa):
         raise ValueError("La empresa no tiene modo especial habilitado.")
@@ -730,8 +732,9 @@ def _transferencia_a_response(db: Session, transferencia: TransferenciaStock) ->
 def listar_empresas_transferencia(db: Session, id_empresa: int) -> List[Dict[str, Any]]:
     _verificar_empresa_transferencia(db, id_empresa)
     from back.gestion import configuracion_manager
+    grupo = _grupo_transferencia(db, id_empresa)
     resultado: List[Dict[str, Any]] = []
-    for id_dest in sorted(EMPRESAS_TRANSFERENCIA_STOCK):
+    for id_dest in sorted(grupo):
         if id_dest == id_empresa:
             continue
         if not configuracion_manager.es_modo_especial_habilitado(db, id_dest):
@@ -752,6 +755,8 @@ def crear_transferencia_stock(
     if req.id_empresa_destino == id_empresa_origen:
         raise ValueError("No puede transferir stock a la misma empresa.")
     _verificar_empresa_transferencia(db, req.id_empresa_destino)
+    if _grupo_transferencia(db, id_empresa_origen) != _grupo_transferencia(db, req.id_empresa_destino):
+        raise ValueError("No puede transferir stock entre empresas de distintos grupos.")
 
     transferencia = TransferenciaStock(
         estado="PENDIENTE",

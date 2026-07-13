@@ -25,6 +25,7 @@ import { useCustomLinksStore } from "@/lib/customLinksStore";
 import { API_CONFIG } from "@/lib/api-config";
 import { useFeaturesStore } from "@/lib/featuresStore";
 import { puedeGestionarUsuarios, empresaTienePanelEstadisticas } from "@/lib/permisos";
+import { usePerfilEmpresa } from "@/hooks/usePerfilEmpresa";
 
 type NavLink = {
   href: string
@@ -41,9 +42,10 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
   const usuario = useAuthStore((state) => state.usuario);
   const token = useAuthStore((state) => state.token);
   const customLinks = useCustomLinksStore((s) => s.links);
-  const mesasEnabled = useFeaturesStore((s) => s.mesasEnabled);
+  const mesasEnabledStore = useFeaturesStore((s) => s.mesasEnabled);
   const setMesasEnabled = useFeaturesStore((s) => s.setMesasEnabled);
-  const idEmpresa = useEmpresaStore((s) => s.empresa?.id_empresa);
+  const { perfil } = usePerfilEmpresa();
+  const mesasEnabled = perfil.mesas_habilitado || mesasEnabledStore;
 
   // Scroll y ocultación del Nav
   const [show, setShow] = useState(true);
@@ -232,14 +234,12 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
         const apiBase = API_CONFIG.BASE_URL;
         setLogoUrl(construirLogoUrl(apiBase, data.ruta_logo));
 
-        // Cargar estado de mesas habilitadas (desde aclaraciones_legales)
-        if (data.aclaraciones_legales) {
-          const mesasValue = data.aclaraciones_legales.mesas_enabled;
-          const mesasHabilitadas = String(mesasValue) === "true";
-          setMesasEnabled(mesasHabilitadas);
-        } else {
-          console.warn("⚠️ No hay aclaraciones_legales en los datos de empresa");
-        }
+        // Mesas: perfil resuelto (fallback legacy en backend si aún está en aclaraciones)
+        const mesasHabilitadas = Boolean(
+          data.perfil_operativo_resuelto?.mesas_habilitado
+            ?? data.aclaraciones_legales?.mesas_enabled === "true",
+        );
+        setMesasEnabled(mesasHabilitadas);
 
         // Actualizar la store global
         useEmpresaStore.getState().setEmpresa(data);
@@ -277,11 +277,11 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
         const apiBase = API_CONFIG.BASE_URL;
         setLogoUrl(construirLogoUrl(apiBase, data.ruta_logo));
 
-        if (data.aclaraciones_legales) {
-          const mesasValue = data.aclaraciones_legales.mesas_enabled;
-          const mesasHabilitadas = String(mesasValue) === "true";
-          setMesasEnabled(mesasHabilitadas);
-        }
+        const mesasHabilitadas = Boolean(
+          data.perfil_operativo_resuelto?.mesas_habilitado
+            ?? data.aclaraciones_legales?.mesas_enabled === "true",
+        );
+        setMesasEnabled(mesasHabilitadas);
 
         useEmpresaStore.getState().setEmpresa(data);
       } catch (error) {
@@ -314,7 +314,7 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
     if (!mesasEnabled && (l.href.startsWith("/dashboard/mesas") || l.href.startsWith("/dashboard/cocina"))) {
       return false;
     }
-    if (l.href === "/dashboard/estadisticas" && !empresaTienePanelEstadisticas(idEmpresa)) {
+    if (l.href === "/dashboard/estadisticas" && !empresaTienePanelEstadisticas(perfil)) {
       return false;
     }
     return true;

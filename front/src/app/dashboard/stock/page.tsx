@@ -8,6 +8,9 @@ import { useAuthStore } from "@/lib/authStore";
 import { useEmpresaStore } from "@/lib/empresaStore";
 import { API_CONFIG } from "@/lib/api-config";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { empresaModoEspecial } from "@/lib/permisos";
+import { usePerfilEmpresa } from "@/hooks/usePerfilEmpresa";
+
 import { ModoEspecialView } from "./modo-especial/ModoEspecialView";
 
 export default function StockPage() {
@@ -16,9 +19,18 @@ export default function StockPage() {
   const [modoEspecial, setModoEspecial] = useState<boolean | null>(null);
   const token = useAuthStore((state) => state.token);
   const empresa = useEmpresaStore((state) => state.empresa);
+  const { perfil } = usePerfilEmpresa();
 
   useEffect(() => {
     const resolverModoEspecial = async () => {
+      if (empresa?.perfil_operativo_resuelto) {
+        setModoEspecial(empresaModoEspecial(empresa.perfil_operativo_resuelto));
+        return;
+      }
+      if (perfil) {
+        setModoEspecial(empresaModoEspecial(perfil));
+        return;
+      }
       if (empresa?.modo_especial_habilitado !== undefined) {
         setModoEspecial(Boolean(empresa.modo_especial_habilitado));
         return;
@@ -33,7 +45,9 @@ export default function StockPage() {
         });
         if (res.ok) {
           const data = await res.json();
-          setModoEspecial(Boolean(data.modo_especial_habilitado));
+          setModoEspecial(
+            Boolean(data.perfil_operativo_resuelto?.modo_especial ?? data.modo_especial_habilitado),
+          );
           const current = useEmpresaStore.getState().empresa;
           useEmpresaStore.getState().setEmpresa({
             id_empresa: data.id_empresa,

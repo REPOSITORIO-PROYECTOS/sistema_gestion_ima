@@ -1,33 +1,77 @@
 name: Deploy Frontend (Next.js)
+
 on:
-  push:
-    branches: [ "main" ]
-    paths:
-      - 'front/**'
-      - '.github/workflows/deploy-frontend.yml'
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-frontend
+  cancel-in-progress: false
+
 jobs:
+  changes:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            frontend:
+              - 'front/**'
+              - 'ecosystem.config.js'
+              - '.github/workflows/deploy-frontend.yml'
+              - 'scripts/deploy-on-server.sh'
+
   deploy:
+    needs: changes
+    if: >
+      always() &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (needs.changes.result == 'success' && needs.changes.outputs.frontend == 'true')
+      )
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy Frontend
-        uses: appleboy/ssh-action@master
+      - name: Deploy Frontend via SSH
+        uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
+          port: 22
+          timeout: 60s
+          command_timeout: 20m
           script: |
-            export NVM_DIR="$HOME/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            set -euo pipefail
 
-            cd ${{ secrets.PROJECT_PATH }}
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+            PROJECT_PATH="${{ secrets.PROJECT_PATH }}"
+            cd "$PROJECT_PATH"
+
+            echo "📥 Actualizando código..."
             git fetch --all
             git reset --hard origin/main
 
             echo "🚀 Deploying Next.js Frontend..."
             cd front
             rm -rf .next/
-            npm install
+            npm ci
             npm run build
-            # Usamos la ruta absoluta al ecosistema y la ruta absoluta a pm2
-            $HOME/.nvm/versions/node/$(nvm version)/bin/pm2 reload ${{ secrets.PROJECT_PATH }}/ecosystem.config.js --only gestion-ima-front
-            echo "✅ Frontend Deployed!"
+
+            PM2_BIN="$HOME/.nvm/versions/node/$(nvm version)/bin/pm2"
+            "$PM2_BIN" reload "$PROJECT_PATH/ecosystem.config.js" --only gestion-ima-front
+
+            echo "✅ Frontend deployed"

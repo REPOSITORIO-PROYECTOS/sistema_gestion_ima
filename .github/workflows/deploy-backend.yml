@@ -1,25 +1,67 @@
 name: Deploy Backend (Python)
+
 on:
-  push:
-    branches: [ "main" ]
-    paths:
-      - 'back/**'
-      - '.github/workflows/deploy-backend.yml'
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
 jobs:
+  changes:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'back/**'
+              - 'ecosystem.config.js'
+              - '.github/workflows/deploy-backend.yml'
+              - 'scripts/deploy-on-server.sh'
+
   deploy:
+    needs: changes
+    if: >
+      always() &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (needs.changes.result == 'success' && needs.changes.outputs.backend == 'true')
+      )
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy Backend
-        uses: appleboy/ssh-action@master
+      - name: Deploy Backend via SSH
+        uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
+          port: 22
+          timeout: 60s
+          command_timeout: 15m
           script: |
-            export NVM_DIR="$HOME/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            set -euo pipefail
 
-            cd ${{ secrets.PROJECT_PATH }}
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+            PROJECT_PATH="${{ secrets.PROJECT_PATH }}"
+            cd "$PROJECT_PATH"
+
+            echo "📥 Actualizando código..."
             git fetch --all
             git reset --hard origin/main
 
@@ -28,6 +70,9 @@ jobs:
             source venv/bin/activate
             pip install -r requirements.txt
             deactivate
-            # Usamos la ruta absoluta al ecosistema y la ruta absoluta a pm2
-            $HOME/.nvm/versions/node/$(nvm version)/bin/pm2 reload ${{ secrets.PROJECT_PATH }}/ecosystem.config.js --only gestion-ima-api
-            echo "✅ Backend Deployed!"
+
+            PM2_BIN="$HOME/.nvm/versions/node/$(nvm version)/bin/pm2"
+            "$PM2_BIN" reload "$PROJECT_PATH/ecosystem.config.js" --only gestion-ima-api
+            "$PM2_BIN" reload "$PROJECT_PATH/ecosystem.config.js" --only gestion-ima-sync
+
+            echo "✅ Backend deployed"

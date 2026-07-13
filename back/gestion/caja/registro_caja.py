@@ -39,10 +39,9 @@ def _agregar_evento_sync_nube(
     )
 
 def _sincroniza_con_sheets(db: Session, id_empresa: int) -> bool:
-    config = db.get(ConfiguracionEmpresa, id_empresa)
-    if config and getattr(config, "modo_especial_habilitado", False):
-        return False
-    return True
+    from back.gestion.perfil_operativo_manager import empresa_sincroniza_google_sheets
+
+    return empresa_sincroniza_google_sheets(db, id_empresa)
 
 
 def _encolar_movimiento_pendiente(

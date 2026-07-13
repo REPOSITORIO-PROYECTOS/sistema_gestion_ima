@@ -14,6 +14,7 @@ class CondicionIVAEnum(str, Enum):
 class FormatoComprobanteEnum(str, Enum):
     ticket = "ticket"
     pdf = "pdf"
+    texto = "texto"
     
 class ConfiguracionUpdate(BaseModel):
     """
@@ -68,6 +69,7 @@ class ConfiguracionResponse(BaseModel):
     ingresos_brutos: Optional[str] = None
     inicio_actividades: Optional[str] = None
     modo_especial_habilitado: bool = False
+    facturacion_afip_habilitada: bool = False
 
     @field_validator("aclaraciones_legales", mode="before")
     @classmethod

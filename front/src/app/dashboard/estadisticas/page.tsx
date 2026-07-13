@@ -2,13 +2,13 @@
 
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PanelEstadisticasCaja from "@/components/PanelEstadisticasCaja";
-import { useEmpresaStore } from "@/lib/empresaStore";
 import { empresaTienePanelEstadisticas } from "@/lib/permisos";
+import { usePerfilEmpresa } from "@/hooks/usePerfilEmpresa";
 
 export default function EstadisticasPage() {
-  const empresa = useEmpresaStore((state) => state.empresa);
+  const { perfil } = usePerfilEmpresa();
 
-  if (!empresaTienePanelEstadisticas(empresa?.id_empresa)) {
+  if (!empresaTienePanelEstadisticas(perfil)) {
     return (
       <ProtectedRoute allowedRoles={["Admin", "Gerente", "Encargada", "Soporte"]}>
         <div className="text-center py-12 text-gray-600">

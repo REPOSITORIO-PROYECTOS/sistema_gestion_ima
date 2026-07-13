@@ -11,12 +11,19 @@ from back.modelos import Usuario, Empresa # Importamos los modelos necesarios
 
 # Importamos ambos managers porque este router orquesta acciones en ambos
 import back.gestion.empresa_manager as empresa_manager
-import back.gestion.configuracion_manager as configuracion_manager 
+import back.gestion.configuracion_manager as configuracion_manager
+import back.gestion.perfil_operativo_manager as perfil_operativo_manager
 
 # --- Schemas ---
 from back.schemas.empresa_schemas import EmpresaCreate, EmpresaResponse, EmpresaListaResponse
 # Renombramos la importación para que el código sea más claro y evitar conflictos
 from back.schemas.configuracion_schemas import ConfiguracionResponse as SchemaConfigResponse, ConfiguracionUpdate
+from back.schemas.perfil_operativo_schemas import (
+    MigrarEsquemaRequest,
+    PerfilOperativoAdminResponse,
+    PerfilOperativoUpdate,
+    PlantillaPerfilResponse,
+)
 
 router = APIRouter(
     prefix="/empresas",
@@ -110,6 +117,9 @@ def api_obtener_configuracion_de_empresa(
             'cuit': config.cuit,
             'aclaraciones_legales': config.aclaraciones_legales or {},
             'modo_especial_habilitado': bool(getattr(config, 'modo_especial_habilitado', False)),
+            'facturacion_afip_habilitada': configuracion_manager.empresa_tiene_facturacion_afip_habilitada(
+                db, id_empresa
+            ),
         }
         
         return SchemaConfigResponse.model_validate(config_dict)
@@ -164,6 +174,9 @@ def api_actualizar_configuracion_de_empresa(
             'cuit': config_actualizada.cuit,
             'aclaraciones_legales': config_actualizada.aclaraciones_legales or {},
             'modo_especial_habilitado': bool(getattr(config_actualizada, 'modo_especial_habilitado', False)),
+            'facturacion_afip_habilitada': configuracion_manager.empresa_tiene_facturacion_afip_habilitada(
+                db, id_empresa
+            ),
         }
         
         return SchemaConfigResponse.model_validate(config_dict)
@@ -219,4 +232,55 @@ def api_actualizar_nombre_legal(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error al actualizar empresa: {str(e)}")
+
+
+# =================================================================================
+# === PERFIL OPERATIVO (esquema estándar vs especial) — Soporte / Admin ===
+# =================================================================================
+
+@router.get("/admin/plantillas-perfil", response_model=List[PlantillaPerfilResponse])
+def api_listar_plantillas_perfil():
+    """Lista plantillas predefinidas para migrar empresas a esquema especial."""
+    return perfil_operativo_manager.listar_plantillas()
+
+
+@router.get("/admin/{id_empresa}/perfil-operativo", response_model=PerfilOperativoAdminResponse)
+def api_obtener_perfil_operativo(id_empresa: int, db: Session = Depends(get_db)):
+    """Perfil operativo raw + resuelto de una empresa."""
+    try:
+        return perfil_operativo_manager.obtener_perfil_admin(db, id_empresa)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.patch("/admin/{id_empresa}/perfil-operativo", response_model=PerfilOperativoAdminResponse)
+def api_actualizar_perfil_operativo(
+    id_empresa: int,
+    data: PerfilOperativoUpdate,
+    db: Session = Depends(get_db),
+):
+    """PATCH parcial del perfil (solo empresas con esquema especial)."""
+    try:
+        perfil_operativo_manager.actualizar_perfil_operativo(db, id_empresa, data)
+        return perfil_operativo_manager.obtener_perfil_admin(db, id_empresa)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/admin/{id_empresa}/migrar-esquema", response_model=PerfilOperativoAdminResponse)
+def api_migrar_esquema_empresa(
+    id_empresa: int,
+    req: MigrarEsquemaRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Migra empresa entre esquema estándar y especial.
+    Body ejemplo especial: {"tipo_esquema": "especial", "plantilla_id": "modo_especial_pos"}
+    Body estándar: {"tipo_esquema": "estandar"}
+    """
+    try:
+        perfil_operativo_manager.migrar_esquema(db, id_empresa, req)
+        return perfil_operativo_manager.obtener_perfil_admin(db, id_empresa)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 

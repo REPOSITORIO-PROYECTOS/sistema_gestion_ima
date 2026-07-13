@@ -1,7 +1,7 @@
 alembic==1.16.3
 annotated-types==0.7.0
 anyio==4.9.0
-bcrypt==4.3.0
+bcrypt==4.0.1
 cachetools==5.5.2
 certifi==2025.6.15
 cffi==1.17.1

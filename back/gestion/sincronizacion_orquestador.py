@@ -17,7 +17,7 @@ from back.gestion.actualizaciones.actualizaciones_masivas import (
     sincronizar_clientes_desde_sheets,
     sincronizar_proveedores_desde_sheets,
 )
-from back.gestion.configuracion_manager import es_modo_especial_habilitado
+from back.gestion.perfil_operativo_manager import empresa_sincroniza_google_sheets
 
 logger = logging.getLogger(__name__)
 
@@ -107,12 +107,12 @@ def sincronizar_empresa_unificada(
                 "pasos": {},
             }
 
-    if es_modo_especial_habilitado(db, id_empresa):
+    if not empresa_sincroniza_google_sheets(db, id_empresa):
         if usar_lock and lock_adquirido:
             _release_sync_lock(db, id_empresa)
         return {
             "status": "omitido",
-            "message": "Sincronización omitida: la empresa opera en modo especial (sin Google Sheets).",
+            "message": "Sincronización omitida: la empresa no sincroniza con Google Sheets.",
             "id_empresa": id_empresa,
             "duracion_total_ms": round((perf_counter() - inicio_total) * 1000, 2),
             "resumen": {

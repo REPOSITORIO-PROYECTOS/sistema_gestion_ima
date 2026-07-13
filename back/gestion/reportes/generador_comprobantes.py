@@ -118,6 +118,126 @@ def _enrich_transaccion(transaccion) -> Any:
 TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'plantillas')
 TZ_ARGENTINA = ZoneInfo("America/Argentina/Buenos_Aires")
 TZ_UTC = ZoneInfo("UTC")
+ANCHOS_IMPRESORA_VALIDOS = frozenset({"58mm", "80mm"})
+
+def _resolver_ancho_impresora(aclaraciones: Optional[Dict[str, str]] = None) -> str:
+    """Lee el ancho configurado de la empresa (58mm o 80mm)."""
+    if not aclaraciones:
+        return "80mm"
+    ancho = aclaraciones.get("ticket_cambio_ancho", "80mm")
+    return ancho if ancho in ANCHOS_IMPRESORA_VALIDOS else "80mm"
+
+def _estilos_impresora_termica(ancho: str = "80mm") -> Dict[str, str]:
+    """Estilos coherentes para PDF térmico sin depender de media queries."""
+    if ancho == "58mm":
+        return {
+            "chars_per_line": "32",
+            "font_size": "9px",
+            "font_size_header": "12px",
+            "font_size_total": "11px",
+            "max_width": "58mm",
+            "padding": "0",
+            "page_size": "58mm auto",
+            "page_margin": "0",
+            "page_width": "58mm",
+            "print_width": "100%",
+            "qr_max_width": "65px",
+            "ticket_width": "100%",
+        }
+    return {
+        "chars_per_line": "40",
+        "font_size": "10px",
+        "font_size_header": "14px",
+        "font_size_total": "13px",
+        "max_width": "80mm",
+        "padding": "0",
+        "page_size": "80mm auto",
+        "page_margin": "0",
+        "page_width": "80mm",
+        "print_width": "100%",
+        "qr_max_width": "90px",
+        "ticket_width": "100%",
+    }
+
+def _wrap_ticket_text(texto: str, ancho: int) -> list[str]:
+    """Parte texto en líneas de hasta `ancho` caracteres (estilo ticket plano)."""
+    if not texto:
+        return []
+    palabras = str(texto).split()
+    lineas: list[str] = []
+    actual = ""
+    for palabra in palabras:
+        candidato = f"{actual} {palabra}".strip()
+        if len(candidato) <= ancho:
+            actual = candidato
+            continue
+        if actual:
+            lineas.append(actual)
+        actual = palabra[:ancho]
+    if actual:
+        lineas.append(actual)
+    return lineas
+
+def _ticket_line(izquierda: str, derecha: str, ancho: int = 40) -> str:
+    """Formatea una línea con descripción a la izquierda y monto a la derecha."""
+    derecha_str = str(derecha)
+    espacio_izq = max(1, ancho - len(derecha_str))
+    izq = izquierda[:espacio_izq] if len(izquierda) > espacio_izq else izquierda
+    return f"{izq:<{espacio_izq}}{derecha_str}"
+
+def _css_ticket_termico(estilos: Dict[str, str]) -> str:
+    """CSS de página para que el contenido ocupe todo el ancho del rollo."""
+    return f"""
+    @page {{
+        size: {estilos['page_size']};
+        margin: {estilos['page_margin']};
+    }}
+    html, body {{
+        margin: 0;
+        padding: 0;
+        width: {estilos['page_width']};
+    }}
+    .ticket {{
+        width: {estilos['ticket_width']} !important;
+        max-width: 100% !important;
+        box-sizing: border-box;
+        margin: 0;
+        padding: {estilos['padding']};
+    }}
+    """
+
+def _css_comprobante_termico(estilos: Dict[str, str]) -> str:
+    """CSS estricto para comprobantes en rollo continuo (recibo, factura)."""
+    return f"""
+    @page {{
+        size: {estilos['page_size']};
+        margin: 0;
+    }}
+    html, body {{
+        margin: 0;
+        padding: 0;
+        width: {estilos['page_width']};
+        font-family: 'Courier New', Courier, monospace;
+        font-size: {estilos['font_size']};
+        color: #000;
+    }}
+    .ticket-termico, .ticket-recibo {{
+        width: {estilos['page_width']};
+        max-width: 100%;
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }}
+    """
+
+TIPOS_TICKET_TERMICO = frozenset({"recibo", "factura", "comprobante"})
+
+def _crear_env_jinja() -> Environment:
+    env = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
+    env.filters['date'] = format_datetime
+    env.filters['wrap_ticket'] = _wrap_ticket_text
+    env.filters['ticket_line'] = _ticket_line
+    return env
 
 def format_datetime(value, format='%d/%m/%Y %H:%M'):
     """Formatea fechas en hora Argentina. Las fechas naive del backend se asumen UTC."""
@@ -137,11 +257,21 @@ def format_datetime(value, format='%d/%m/%Y %H:%M'):
 
 def generar_comprobante_stateless(data: GenerarComprobanteRequest) -> bytes:
     """
-    Genera un comprobante en PDF. Ahora lee las aclaraciones legales desde los
-    datos del emisor, haciéndolo 100% multi-empresa.
+    Genera un comprobante en PDF o texto plano según el formato solicitado.
     """
+    from back.gestion.reportes.generador_texto_plano import (
+        es_formato_texto_plano,
+        generar_comprobante_texto_plano,
+    )
+
     print(f"\n--- [TRACE: Iniciando generación de comprobante] ---")
     print(f"Tipo: {data.tipo}, Formato: {data.formato}")
+
+    if es_formato_texto_plano(data.formato):
+        texto_bytes = generar_comprobante_texto_plano(data)
+        print(f"-> Texto plano generado. Tamaño: {len(texto_bytes)} bytes.")
+        print("--- [FIN TRACE: Generación exitosa] ---\n")
+        return texto_bytes
 
     # --- PASO 1: Generar Código QR ---
     qr_base64_string = generar_qr_para_comprobante(data)
@@ -153,6 +283,8 @@ def generar_comprobante_stateless(data: GenerarComprobanteRequest) -> bytes:
     
     # Obtenemos las aclaraciones de la empresa específica desde el payload
     aclaraciones_de_la_empresa = data.emisor.aclaraciones_legales or {}
+    ancho_impresora = _resolver_ancho_impresora(aclaraciones_de_la_empresa)
+    estilos_ticket = _estilos_impresora_termica(ancho_impresora)
     texto_legal = aclaraciones_de_la_empresa.get(data.tipo) # Busca el texto para el tipo de comprobante actual
     
     observaciones_finales = observaciones_usuario
@@ -180,13 +312,13 @@ def generar_comprobante_stateless(data: GenerarComprobanteRequest) -> bytes:
         "fecha_emision": datetime.now(),
         # Se deja qr_base64 para retrocompatibilidad, pero las plantillas nuevas usan afip.qr_base64
         "qr_base64": qr_base64_string,
-        "afip": afip_context
+        "afip": afip_context,
+        "estilos": estilos_ticket,
     }
     
     # --- PASO 4: Renderizar Plantilla HTML ---
     try:
-        env = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
-        env.filters['date'] = format_datetime
+        env = _crear_env_jinja()
         template = env.get_template(f"{data.formato}/{data.tipo}.html")
         html_renderizado = template.render(contexto)
         print(f"-> Plantilla renderizada con éxito.")
@@ -215,27 +347,6 @@ def generar_comprobante_stateless(data: GenerarComprobanteRequest) -> bytes:
                 except Exception as e_date:
                     print(f"No se pudo calcular fecha límite exacta: {e_date}")
 
-            # Obtener configuración de ancho (default 80mm)
-            ancho_ticket = aclaraciones_de_la_empresa.get('ticket_cambio_ancho', '80mm')
-            
-            # Pre-calcular estilos para evitar lógica en el template (y errores de linter)
-            estilos = {
-                "font_size": "10px",
-                "max_width": "80mm",
-                "padding": "2mm",
-                "page_size": "80mm auto", # auto permite largo variable
-                "print_width": "76mm"
-            }
-            
-            if ancho_ticket == '58mm':
-                estilos = {
-                    "font_size": "9px",
-                    "max_width": "58mm",
-                    "padding": "1mm",
-                    "page_size": "58mm auto", # auto permite largo variable
-                    "print_width": "54mm"
-                }
-
             contexto_cambio = {
                 "emisor": data.emisor,
                 "receptor": data.receptor,
@@ -243,7 +354,7 @@ def generar_comprobante_stateless(data: GenerarComprobanteRequest) -> bytes:
                 "fecha_emision": datetime.now(),
                 "numero": data.numero_comprobante if hasattr(data, 'numero_comprobante') else "",
                 "fecha_limite_cambio": fecha_limite,
-                "estilos": estilos
+                "estilos": estilos_ticket,
             }
             template_cambio = env.get_template("ticket/ticket_cambio.html")
             html_cambio_renderizado = template_cambio.render(contexto_cambio)
@@ -256,19 +367,11 @@ def generar_comprobante_stateless(data: GenerarComprobanteRequest) -> bytes:
     try:
         css_string = ""
         if data.formato == "ticket":
-            # CSS adaptable para impresoras de diferentes tamaños
-            css_string = """
-            @page { 
-                size: 80mm auto; 
-                margin: 1mm; 
-            }
-            @media (max-width: 60mm) {
-                @page { 
-                    size: 58mm auto; 
-                    margin: 0.5mm; 
-                }
-            }
-            """
+            css_string = (
+                _css_comprobante_termico(estilos_ticket)
+                if data.tipo in TIPOS_TICKET_TERMICO
+                else _css_ticket_termico(estilos_ticket)
+            )
         
         # Renderizar documento principal
         main_doc = HTML(string=html_renderizado).render(stylesheets=[CSS(string=css_string)])
@@ -300,14 +403,16 @@ def generar_ticket_cierre_pdf(datos: dict) -> bytes:
     print(f"\n--- [TRACE: GENERAR TICKET CIERRE] ---")
     
     try:
-        env = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
-        env.filters['date'] = format_datetime
+        env = _crear_env_jinja()
         
         template = env.get_template("ticket/cierre_lote_detallado.html")
         
+        ancho_impresora = datos.get("ancho_impresora", "80mm")
+        estilos_ticket = _estilos_impresora_termica(ancho_impresora)
         contexto = {
             "datos": datos,
             "fecha_emision": datetime.now(TZ_ARGENTINA),
+            "estilos": estilos_ticket,
         }
         html_renderizado = template.render(contexto)
         print("1. Plantilla 'cierre_lote_detallado.html' renderizada con éxito.")
@@ -316,7 +421,7 @@ def generar_ticket_cierre_pdf(datos: dict) -> bytes:
         raise RuntimeError(f"Error al procesar la plantilla del ticket de cierre: {e}")
 
     try:
-        css_string = "@page { size: 58mm auto; margin: 2mm; }"
+        css_string = _css_ticket_termico(estilos_ticket)
         pdf_bytes = HTML(string=html_renderizado).write_pdf(stylesheets=[CSS(string=css_string)])
         print(f"2. PDF de cierre generado. Tamaño: {len(pdf_bytes)} bytes.")
     except Exception as e:

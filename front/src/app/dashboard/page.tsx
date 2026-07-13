@@ -3,14 +3,16 @@
 import { useEmpresaStore } from "@/lib/empresaStore";
 import { useAuthStore } from "@/lib/authStore";
 import { puedeVerPanelEstadisticas, empresaTienePanelEstadisticas } from "@/lib/permisos";
+import { usePerfilEmpresa } from "@/hooks/usePerfilEmpresa";
 import PanelEstadisticasCaja from "@/components/PanelEstadisticasCaja";
 
 export default function Inicio() {
   const empresa = useEmpresaStore((state) => state.empresa);
   const role = useAuthStore((state) => state.role);
+  const { perfil } = usePerfilEmpresa();
 
   const mostrarPanel =
-    empresaTienePanelEstadisticas(empresa?.id_empresa) &&
+    empresaTienePanelEstadisticas(perfil) &&
     puedeVerPanelEstadisticas(role?.nombre);
 
   return (

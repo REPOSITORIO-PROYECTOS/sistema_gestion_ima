@@ -52,47 +52,19 @@ import {
   recibirTransferenciaStock,
   subaPreciosModoEspecial,
   TransferenciaStock,
-  UnidadMedida,
 } from "./api";
 import { BusquedaProductoInput } from "./BusquedaProductoInput";
-
-const UNIDADES: UnidadMedida[] = ["unidad", "gramos", "kilogramos", "litros", "mililitros"];
+import {
+  formVacio,
+  productoAForm,
+  ProductoWizardModal,
+} from "./ProductoWizardModal";
 
 const MODAL_WIDE_CLASS =
   "flex max-h-[92vh] w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl";
 
 const BTN_STOCK_OUTLINE =
   "border-amber-300 text-amber-950 hover:bg-amber-50 hover:text-amber-950";
-
-const formVacio = (): ProductoFormData => ({
-  codigo_interno: "",
-  descripcion: "",
-  precio_venta: "",
-  precio_costo: "",
-  categorias: "",
-  stock: "",
-  stock_minimo: "",
-  barcodes: "",
-  unidad: "unidad",
-  cantidad_envase: "",
-  ubicacion: "",
-});
-
-function productoAForm(p: ProductoModoEspecial): ProductoFormData {
-  return {
-    codigo_interno: p.codigo_interno,
-    descripcion: p.descripcion,
-    precio_venta: String(p.precio_venta),
-    precio_costo: p.precio_costo ? String(p.precio_costo) : "",
-    categorias: p.categorias.join(", "),
-    stock: String(p.stock_actual),
-    stock_minimo: p.stock_minimo != null ? String(p.stock_minimo) : "",
-    barcodes: p.barcodes.join(", "),
-    unidad: (p.unidad as UnidadMedida) || "unidad",
-    cantidad_envase: p.cantidad_envase != null ? String(p.cantidad_envase) : "",
-    ubicacion: p.ubicacion || "",
-  };
-}
 
 function formatMoney(value: number) {
   return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(value);
@@ -542,56 +514,16 @@ export function ModoEspecialView() {
         </Table>
       </div>
 
-      <Dialog open={modalProducto} onOpenChange={setModalProducto}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editando ? "Editar producto" : "Agregar producto"}</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-3 py-2">
-            <Input
-              placeholder="Código / SKU *"
-              value={form.codigo_interno}
-              disabled={Boolean(editando)}
-              onChange={(e) => setForm({ ...form, codigo_interno: e.target.value })}
-            />
-            <Input
-              placeholder="Nombre *"
-              value={form.descripcion}
-              onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
-            />
-            <Input
-              placeholder="Categorías (separadas por coma) *"
-              value={form.categorias}
-              onChange={(e) => setForm({ ...form, categorias: e.target.value })}
-            />
-            <Select value={form.unidad} onValueChange={(v) => setForm({ ...form, unidad: v as UnidadMedida })}>
-              <SelectTrigger><SelectValue placeholder="Unidad" /></SelectTrigger>
-              <SelectContent>
-                {UNIDADES.map((u) => (
-                  <SelectItem key={u} value={u}>{u}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="grid grid-cols-2 gap-2">
-              <Input placeholder="Precio venta *" value={form.precio_venta} onChange={(e) => setForm({ ...form, precio_venta: e.target.value })} />
-              <Input placeholder="Costo" value={form.precio_costo} onChange={(e) => setForm({ ...form, precio_costo: e.target.value })} />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <Input placeholder="Stock" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} />
-              <Input placeholder="Stock mínimo" value={form.stock_minimo} onChange={(e) => setForm({ ...form, stock_minimo: e.target.value })} />
-            </div>
-            <Input placeholder="Cantidad envase (ej. 500)" value={form.cantidad_envase} onChange={(e) => setForm({ ...form, cantidad_envase: e.target.value })} />
-            <Input placeholder="Códigos de barra (separados por coma)" value={form.barcodes} onChange={(e) => setForm({ ...form, barcodes: e.target.value })} />
-            <Input placeholder="Ubicación" value={form.ubicacion} onChange={(e) => setForm({ ...form, ubicacion: e.target.value })} />
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setModalProducto(false)}>Cancelar</Button>
-            <Button onClick={guardarProducto} disabled={guardando}>
-              {guardando ? "Guardando..." : "Guardar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ProductoWizardModal
+        open={modalProducto}
+        onOpenChange={setModalProducto}
+        editando={editando}
+        form={form}
+        onFormChange={setForm}
+        codigosExistentes={productos.map((p) => p.codigo_interno)}
+        guardando={guardando}
+        onGuardar={guardarProducto}
+      />
 
       <Dialog open={modalIngreso} onOpenChange={setModalIngreso}>
         <DialogContent className={MODAL_WIDE_CLASS}>

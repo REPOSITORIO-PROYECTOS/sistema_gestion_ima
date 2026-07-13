@@ -1,0 +1,21 @@
+{# Estilos base para tickets térmicos. Requiere variable 'estilos' en el contexto. #}
+<style>
+    body {
+        font-family: 'Courier New', Courier, monospace;
+        font-size: {{ estilos.font_size }};
+        margin: 0;
+        padding: 0;
+        color: #000;
+    }
+
+    *, *::before, *::after {
+        box-sizing: border-box;
+    }
+
+    .ticket {
+        width: {{ estilos.ticket_width }};
+        max-width: 100%;
+        padding: {{ estilos.padding }};
+        margin: 0;
+    }
+</style>

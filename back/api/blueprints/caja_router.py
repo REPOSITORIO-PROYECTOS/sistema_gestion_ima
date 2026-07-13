@@ -385,9 +385,9 @@ def get_panel_estadisticas_cajas(
 ):
     """
     Panel en tiempo real de cajas abiertas: quién abrió, ventas acumuladas y cantidad de movimientos.
-    Solo accesible para gerentes, encargadas y administradores de La Esquina y FULL24.
+    Solo accesible para gerentes, encargadas y administradores de empresas con panel habilitado.
     """
-    if not empresa_tiene_panel_estadisticas_caja(current_user.id_empresa):
+    if not empresa_tiene_panel_estadisticas_caja(current_user.id_empresa, db):
         raise HTTPException(
             status_code=403,
             detail="El panel de estadísticas no está habilitado para esta empresa.",

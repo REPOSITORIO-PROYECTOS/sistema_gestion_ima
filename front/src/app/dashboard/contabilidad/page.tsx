@@ -6,6 +6,7 @@ import { columns } from "./columns";
 import { MovimientoAPI } from "./columns";
 import { useAuthStore } from "@/lib/authStore";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { API_CONFIG } from "@/lib/api-config";
 
 export default function ContabilidadPage() {
 
@@ -29,7 +30,7 @@ export default function ContabilidadPage() {
 
     setLoading(true);
     try {
-      const res = await fetch("https://sistema-ima.sistemataup.online/api/caja/movimientos/todos", {
+      const res = await fetch(`${API_CONFIG.BASE_URL}/caja/movimientos/todos`, {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,

@@ -440,6 +440,17 @@ class ConfiguracionEmpresa(SQLModel, table=True):
 
     # --- Modo Especial: catálogo manual sin sincronización con Google Sheets ---
     modo_especial_habilitado: bool = Field(default=False)
+
+    # --- Esquema operativo: estándar (IMA clásico) vs especial (perfil JSON) ---
+    tipo_esquema_empresa: str = Field(default="estandar", max_length=32)
+    perfil_operativo: Optional[Dict[str, Any]] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON),
+    )
+    perfil_operativo_archivado: Optional[Dict[str, Any]] = Field(
+        default=None,
+        sa_column=Column(JSON),
+    )
     
     
     # --- RELACIÓN ---

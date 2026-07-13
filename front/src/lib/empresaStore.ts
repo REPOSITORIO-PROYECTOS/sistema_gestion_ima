@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import type { PerfilOperativoResuelto, TipoEsquemaEmpresa } from '@/types/perfilOperativo';
 
 interface Empresa {
   id_empresa: number;
@@ -17,6 +18,8 @@ interface Empresa {
   ingresos_brutos?: string;
   inicio_actividades?: string;
   modo_especial_habilitado?: boolean;
+  tipo_esquema?: TipoEsquemaEmpresa;
+  perfil_operativo_resuelto?: PerfilOperativoResuelto;
   aclaraciones_legales?: Record<string, string>;
 }
 
@@ -39,3 +42,5 @@ export const useEmpresaStore = create<EmpresaStore>()(
     }
   )
 );
+
+export type { Empresa };

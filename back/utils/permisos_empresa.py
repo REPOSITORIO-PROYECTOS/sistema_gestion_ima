@@ -1,36 +1,25 @@
 """Reglas de permisos por empresa y rol."""
 
-from typing import Optional
-
 from sqlmodel import Session
 
-from back.modelos import ConfiguracionEmpresa, Rol, Usuario
+from back.gestion import perfil_operativo_manager
+from back.modelos import Rol, Usuario
 from back.schemas.caja_schemas import ArticuloVendido
 
 ROLES_SIN_DESCUENTO = frozenset({"Cajero", "Vendedora"})
 
-# La Esquina (35) y FULL24 (36): panel de cajas abiertas en home/navbar.
-EMPRESAS_PANEL_ESTADISTICAS_CAJA = frozenset({35, 36})
 
-
-def empresa_tiene_panel_estadisticas_caja(id_empresa: int) -> bool:
-    return id_empresa in EMPRESAS_PANEL_ESTADISTICAS_CAJA
-
-
-def empresa_bloquea_descuentos_cajero(config: Optional[ConfiguracionEmpresa]) -> bool:
-    if not config:
-        return False
-    aclaraciones = config.aclaraciones_legales or {}
-    valor = str(aclaraciones.get("bloquear_descuentos_cajero", "")).lower()
-    return valor in {"true", "1", "si", "sí"}
+def empresa_tiene_panel_estadisticas_caja(id_empresa: int, db: Session) -> bool:
+    return perfil_operativo_manager.empresa_tiene_panel_estadisticas_caja(db, id_empresa)
 
 
 def usuario_puede_aplicar_descuentos(db: Session, usuario: Usuario) -> bool:
     rol = db.get(Rol, usuario.id_rol) if usuario.id_rol else None
     if not rol or rol.nombre not in ROLES_SIN_DESCUENTO:
         return True
-    config = db.get(ConfiguracionEmpresa, usuario.id_empresa)
-    return not empresa_bloquea_descuentos_cajero(config)
+    if not usuario.id_empresa:
+        return True
+    return not perfil_operativo_manager.empresa_bloquea_descuentos_cajero(db, usuario.id_empresa)
 
 
 def validar_descuentos_permitidos(

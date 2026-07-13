@@ -21,6 +21,7 @@ import EgresoForm from "./EgresoForm";
 import { API_CONFIG } from "@/lib/api-config";
 import { useEmpresaStore } from "@/lib/empresaStore";
 import { puedeAplicarDescuentos } from "@/lib/permisos";
+import { usePerfilEmpresa } from "@/hooks/usePerfilEmpresa";
 
 interface ProductoVendido {
   id?: string;
@@ -44,8 +45,10 @@ function DashboardVenta() {
   const { cajaAbierta } = useCajaStore();
   const role = useAuthStore((state) => state.role);
   const empresa = useEmpresaStore((state) => state.empresa);
+  const { perfil } = usePerfilEmpresa();
   const puedeDescuentos = puedeAplicarDescuentos(
     role?.nombre,
+    perfil,
     empresa?.aclaraciones_legales,
   );
 

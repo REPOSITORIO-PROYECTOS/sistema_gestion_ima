@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (Python)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: back
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: back/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Syntax check (compileall)
+        run: python -m compileall -q .
+
+      - name: Import smoke test
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          SECRET_KEY_SEGURIDAD: ci-dummy-secret
+          DB_HOST: 127.0.0.1
+          DB_USER: ci
+          DB_PASSWORD: ci
+          DB_NAME: ci
+          GOOGLE_SERVICE_ACCOUNT_FILE: credencial_ci.json
+        run: |
+          printf '%s\n' '{"type":"service_account","project_id":"ci"}' > credencial_ci.json
+          python -c "from back.main import app; assert app.title"
+
+  frontend:
+    name: Frontend (Next.js)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: front
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: front/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Production build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: https://sistema-ima.sistemataup.online
+
+      - name: Unit tests
+        run: npm test -- --ci --testPathIgnorePatterns=login.test.tsx
