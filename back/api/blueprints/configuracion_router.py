@@ -38,14 +38,17 @@ def _resolver_archivo_logo(ruta: str | None) -> Path | None:
     return None
 
 
-def _configuracion_respuesta(config) -> ConfiguracionResponse:
+def _configuracion_respuesta(config, db: Session) -> ConfiguracionResponse:
     """Arma la respuesta y evita rutas de logo huérfanas en BD (archivo no en disco)."""
     respuesta = ConfiguracionResponse.model_validate(config)
     ruta = respuesta.ruta_logo
     if ruta and "logos_empresas" in ruta:
         if _resolver_archivo_logo(ruta) is None:
             respuesta = respuesta.model_copy(update={"ruta_logo": None})
-    return respuesta
+    facturacion_afip = configuracion_manager.empresa_tiene_facturacion_afip_habilitada(
+        db, config.id_empresa
+    )
+    return respuesta.model_copy(update={"facturacion_afip_habilitada": facturacion_afip})
 
 
 def verificar_permiso_admin(usuario: Usuario):
@@ -78,7 +81,7 @@ def obtener_mi_configuracion(
             status_code=404,
             detail="No se encontró un registro de configuración para la empresa de este usuario."
         )
-    return _configuracion_respuesta(config)
+    return _configuracion_respuesta(config, db)
 
 @router.post("/upload-logo", response_model=RespuestaGenerica)
 async def subir_logo_empresa(
@@ -199,7 +202,7 @@ def actualizar_mi_configuracion(
             id_empresa=current_user.id_empresa,
             data=data
         )
-        return _configuracion_respuesta(config_actualizada)
+        return _configuracion_respuesta(config_actualizada, db)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:

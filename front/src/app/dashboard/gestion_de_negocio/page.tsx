@@ -45,7 +45,7 @@ export default function GestionNegocio() {
   const [navbarColor, setNavbarColor] = useState("bg-sky-600");
 
   // Formatos de impresión de ticket - escalable a mas opciones 
-  const formatosDisponibles = ["PDF", "Ticket"];
+  const formatosDisponibles = ["PDF", "Ticket", "Texto"];
 
   /* Edición y manejo de empresas - obtenemos la empresa a partir del user para una cosa*/
   const usuario = useAuthStore((state) => state.usuario);

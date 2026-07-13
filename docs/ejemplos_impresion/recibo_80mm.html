@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recibo de Pago</title>
+    
+<style>
+    html, body {
+        margin: 0;
+        padding: 0;
+        width: 80mm;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 10px;
+        color: #000;
+        background: #fff;
+    }
+
+    .ticket-termico {
+        width: 80mm;
+        max-width: 100%;
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    .bloque-centrado {
+        margin: 0;
+        padding: 0;
+        text-align: center;
+        white-space: pre-wrap;
+        font-family: inherit;
+        font-size: inherit;
+        line-height: 1.25;
+    }
+
+    .bloque-centrado.titulo {
+        font-size: 14px;
+        font-weight: bold;
+    }
+
+    .bloque-centrado.subtitulo {
+        font-weight: bold;
+    }
+
+    .separador {
+        margin: 4px 0;
+        padding: 0;
+        border: none;
+        border-top: 1px dashed #000;
+        width: 100%;
+    }
+
+    .linea {
+        margin: 2px 0;
+        padding: 0;
+        width: 100%;
+        max-width: 40ch;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-family: inherit;
+        font-size: inherit;
+        line-height: 1.25;
+    }
+
+    .linea-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 4px;
+        width: 100%;
+        margin: 2px 0;
+    }
+
+    .linea-item .desc {
+        flex: 1;
+        text-align: left;
+        word-break: break-word;
+        min-width: 0;
+    }
+
+    .linea-item .precio {
+        text-align: right;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    .linea-detalle {
+        margin: 0 0 2px 0;
+        padding-left: 2ch;
+        color: #444;
+        font-size: 0.92em;
+    }
+
+    .linea-descuento {
+        color: #a33;
+    }
+
+    .total-final {
+        margin: 6px 0 0 0;
+        padding: 4px 0 0 0;
+        border-top: 1px solid #000;
+        font-size: 13px;
+        font-weight: bold;
+        text-align: right;
+    }
+
+    .pie {
+        margin-top: 10px;
+        text-align: center;
+    }
+
+    .aviso {
+        margin-top: 8px;
+        font-weight: bold;
+        text-align: center;
+    }
+
+    .anulado {
+        display: inline-block;
+        margin: 4px 0;
+        padding: 2px 6px;
+        border: 1px solid #d9534f;
+        color: #d9534f;
+        font-weight: bold;
+    }
+
+    .qr-afip {
+        display: block;
+        margin: 6px auto 0;
+        max-width: 90px;
+        height: auto;
+    }
+
+    .logo-emisor {
+        display: block;
+        margin: 0 auto 4px;
+        max-width: 60%;
+        height: auto;
+    }
+</style>
+</head>
+<body>
+    
+    
+
+    <div class="ticket-termico">
+        <pre class="bloque-centrado titulo">LA ESQUINA SRL</pre>
+        <pre class="bloque-centrado">CUIT: 30-71234567-8</pre>
+        
+        
+        <pre class="bloque-centrado">Av. Corrientes 1234 - CABA</pre>
+        
+        
+
+        <hr class="separador">
+        <pre class="bloque-centrado subtitulo">RECIBO DE PAGO</pre>
+        
+        <hr class="separador">
+
+        <pre class="linea">Fecha: 12/07/2026 21:00</pre>
+        
+        <pre class="linea">Cliente: Maria Gonzalez</pre>
+        
+        <pre class="linea">CUIT/DNI: 27-33445566-7</pre>
+
+        <hr class="separador">
+
+        
+        <div class="linea-item">
+            <span class="desc">Cafe con leche</span>
+            <span class="precio">$1700.00</span>
+        </div>
+        <pre class="linea linea-detalle">2 x $850.00</pre>
+        
+        
+        <div class="linea-item">
+            <span class="desc">Medialunas x6</span>
+            <span class="precio">$3200.00</span>
+        </div>
+        <pre class="linea linea-detalle">1 x $3200.00</pre>
+        
+        
+        <pre class="linea linea-detalle linea-descuento">Desc. (6%)                     - $200.00</pre>
+        
+        
+
+        <hr class="separador">
+
+        <pre class="linea">SUBTOTAL:                       $5700.00</pre>
+
+        
+
+        <pre class="total-final">TOTAL: $5700.00</pre>
+
+        
+        <hr class="separador">
+        <pre class="linea">Observaciones:</pre>
+        
+        <pre class="linea">Gracias por su compra!</pre>
+        
+        
+
+        <pre class="aviso">COMPROBANTE NO VALIDO
+COMO FACTURA</pre>
+
+        <pre class="pie">----------------------------------------
+Firma y Aclaracion
+----------------------------------------</pre>
+    </div>
+</body>
+</html>

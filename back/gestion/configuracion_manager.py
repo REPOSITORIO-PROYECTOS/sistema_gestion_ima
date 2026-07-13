@@ -182,6 +182,33 @@ def es_modo_especial_habilitado(db: Session, id_empresa: int) -> bool:
     config = db.get(ConfiguracionEmpresa, id_empresa)
     return bool(config and getattr(config, "modo_especial_habilitado", False))
 
+
+def empresa_tiene_facturacion_afip_habilitada(db: Session, id_empresa: int) -> bool:
+    """
+    True si la empresa tiene CUIT, punto de venta y credenciales AFIP en la bóveda.
+    Usado para habilitar facturación en empresas modo especial (La Esquina, etc.).
+    """
+    empresa = db.get(Empresa, id_empresa)
+    config = db.get(ConfiguracionEmpresa, id_empresa)
+    if not empresa or not empresa.cuit or not config:
+        return False
+    if not config.afip_punto_venta_predeterminado:
+        return False
+
+    try:
+        from back.cliente_boveda import ClienteBoveda
+        from back.config import URL_BOVEDA, API_KEY_INTERNA
+
+        cliente = ClienteBoveda(base_url=URL_BOVEDA, api_key=API_KEY_INTERNA)
+        secreto = cliente.obtener_secreto(empresa.cuit)
+        return bool(
+            secreto
+            and getattr(secreto, "certificado", None)
+            and getattr(secreto, "clave_privada", None)
+        )
+    except Exception:
+        return False
+
 def actualizar_color_principal_empresa(db: Session, id_empresa: int, nuevo_color: str) -> ConfiguracionEmpresa:
     """Actualiza específicamente el color principal de la configuración de una empresa."""
     config_db = obtener_configuracion_por_id_empresa(db, id_empresa)

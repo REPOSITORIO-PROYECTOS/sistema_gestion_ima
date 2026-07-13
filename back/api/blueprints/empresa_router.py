@@ -110,6 +110,9 @@ def api_obtener_configuracion_de_empresa(
             'cuit': config.cuit,
             'aclaraciones_legales': config.aclaraciones_legales or {},
             'modo_especial_habilitado': bool(getattr(config, 'modo_especial_habilitado', False)),
+            'facturacion_afip_habilitada': configuracion_manager.empresa_tiene_facturacion_afip_habilitada(
+                db, id_empresa
+            ),
         }
         
         return SchemaConfigResponse.model_validate(config_dict)
@@ -164,6 +167,9 @@ def api_actualizar_configuracion_de_empresa(
             'cuit': config_actualizada.cuit,
             'aclaraciones_legales': config_actualizada.aclaraciones_legales or {},
             'modo_especial_habilitado': bool(getattr(config_actualizada, 'modo_especial_habilitado', False)),
+            'facturacion_afip_habilitada': configuracion_manager.empresa_tiene_facturacion_afip_habilitada(
+                db, id_empresa
+            ),
         }
         
         return SchemaConfigResponse.model_validate(config_dict)

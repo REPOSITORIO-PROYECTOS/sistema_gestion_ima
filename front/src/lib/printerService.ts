@@ -116,3 +116,54 @@ export const printHtml = (html: string) => {
     w.document.close();
   }
 };
+
+export const buildPlainTextPrintHtml = (titulo: string, contenido: string): string => {
+  const seguro = contenido
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  return `<!doctype html>
+  <html>
+    <head>
+      <meta charset="utf-8" />
+      <title>${titulo}</title>
+      <style>
+        @page { margin: 0; }
+        body {
+          margin: 0;
+          padding: 0;
+          background: #fff;
+        }
+        pre {
+          font-family: 'Courier New', Courier, monospace;
+          font-size: 12px;
+          line-height: 1.25;
+          white-space: pre-wrap;
+          word-break: break-word;
+          margin: 0;
+          padding: 0;
+        }
+      </style>
+    </head>
+    <body onload="window.print()">
+      <pre>${seguro}</pre>
+    </body>
+  </html>`;
+};
+
+export const printPlainText = (titulo: string, contenido: string): void => {
+  printHtml(buildPlainTextPrintHtml(titulo, contenido));
+};
+
+export const downloadPlainText = (nombreArchivo: string, contenido: string): void => {
+  const blob = new Blob([contenido], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = nombreArchivo;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+};

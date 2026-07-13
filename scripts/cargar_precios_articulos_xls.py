@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """
-Resetea y carga precios SOLO desde articulos.xls (columna PrecioVenta).
+Resetea y carga precios SOLO desde TU articulos.xls (columna PrecioVenta).
 
 - Empresas 37 y 38: precio_venta = 0 primero, luego solo PrecioVenta del Excel.
-- Sin márgenes estimados ni otras fuentes.
+- NO usa Elixia, CSV ni otros catálogos.
 - Empresa 38: no modifica stock (sigue en 1000).
+
+Copiá tu archivo de OneDrive/Descargas a: datos /articulos.xls
 
 Uso:
   PYTHONPATH=. back/venv/bin/python scripts/cargar_precios_articulos_xls.py
@@ -31,7 +33,6 @@ from back.gestion.modo_especial_manager import _incrementar_catalogo_version
 from back.modelos import Articulo, ConfiguracionEmpresa
 
 DEFAULT_XLS = ROOT / "datos /articulos.xls"
-FALLBACK_CSV = ROOT / "02_articulos_artsxls_elixia.csv"
 ID_EMPRESAS = (37, 38)
 
 COLUMNAS_PRECIO_VENTA = (
@@ -39,7 +40,6 @@ COLUMNAS_PRECIO_VENTA = (
     "Precio Venta",
     "PRECIOVENTA",
     "precioventa",
-    "PVMay",  # export CSV Elixia del mismo articulos.xls
 )
 
 
@@ -114,19 +114,45 @@ def _variantes_codigo(codigo: str) -> list[str]:
     return list(variantes)
 
 
-def _barcode(row: dict[str, str]) -> str:
-    for col in (
+def _parece_barcode(valor: str) -> bool:
+    cod = _norm_barcode(valor)
+    if not cod or not cod.isdigit():
+        return False
+    return 6 <= len(cod) <= 14
+
+
+def _barcodes_fila(row: dict[str, str]) -> list[str]:
+    """Todas las claves posibles de la fila (Elixia usa columnas distintas)."""
+    encontrados: list[str] = []
+    vistos: set[str] = set()
+    preferidas = (
+        "Codigo",
+        "Código",
         "CodBarra",
         "CodigoBarras",
         "Código de Barras",
         "Codigo de Barras",
         "codigo_barras",
         "Barra",
-    ):
+        "EAN",
+        "GTIN",
+    )
+    for col in preferidas:
         v = _norm_barcode(row.get(col))
-        if v:
-            return v
-    return ""
+        if v and v not in vistos:
+            vistos.add(v)
+            encontrados.append(v)
+    for valor in row.values():
+        v = _norm_barcode(valor)
+        if v and _parece_barcode(v) and v not in vistos:
+            vistos.add(v)
+            encontrados.append(v)
+    return encontrados
+
+
+def _barcode(row: dict[str, str]) -> str:
+    barras = _barcodes_fila(row)
+    return barras[0] if barras else ""
 
 
 def _codigo(row: dict[str, str]) -> str:
@@ -143,6 +169,35 @@ def _descripcion(row: dict[str, str]) -> str:
         if v and v.lower() != "nan":
             return _norm(v)
     return ""
+
+
+def _excel_engine(ruta: Path) -> str | None:
+    """xlrd para .xls legacy (export POS); openpyxl para .xlsx."""
+    suf = ruta.suffix.lower()
+    if suf == ".xls":
+        return "xlrd"
+    if suf in {".xlsx", ".xlsm"}:
+        return "openpyxl"
+    return None
+
+
+def _read_excel(ruta: Path, **kwargs):
+    import pandas as pd
+
+    if "engine" not in kwargs:
+        engine = _excel_engine(ruta)
+        if engine:
+            kwargs["engine"] = engine
+    return pd.read_excel(ruta, **kwargs)
+
+
+def _open_excel(ruta: Path):
+    import pandas as pd
+
+    engine = _excel_engine(ruta)
+    if engine:
+        return pd.ExcelFile(ruta, engine=engine)
+    return pd.ExcelFile(ruta)
 
 
 def _iter_csv(ruta: Path) -> Iterable[dict[str, str]]:
@@ -168,14 +223,21 @@ def _iter_csv(ruta: Path) -> Iterable[dict[str, str]]:
 def _iter_excel(ruta: Path) -> Iterable[dict[str, str]]:
     import pandas as pd
 
-    df = pd.read_excel(ruta, dtype=str)
-    df.columns = [str(c).strip() for c in df.columns]
-    print(f"  Columnas Excel: {list(df.columns)}")
-    for _, series in df.iterrows():
-        yield {
-            str(k): ("" if pd.isna(v) else str(v).strip())
-            for k, v in series.items()
-        }
+    libro = _open_excel(ruta)
+    print(f"  Hojas Excel: {libro.sheet_names}")
+    engine = _excel_engine(ruta)
+    for hoja in libro.sheet_names:
+        kwargs: dict = {"sheet_name": hoja, "dtype": str}
+        if engine:
+            kwargs["engine"] = engine
+        df = _read_excel(ruta, **kwargs)
+        df.columns = [str(c).strip() for c in df.columns]
+        print(f"  Hoja '{hoja}' ({len(df)} filas) columnas: {list(df.columns)}")
+        for _, series in df.iterrows():
+            yield {
+                str(k): ("" if pd.isna(v) else str(v).strip())
+                for k, v in series.items()
+            }
 
 
 def cargar_precios(ruta: Path) -> tuple[Dict[str, float], Dict[str, float], Dict[str, float], int]:
@@ -190,11 +252,12 @@ def cargar_precios(ruta: Path) -> tuple[Dict[str, float], Dict[str, float], Dict
         if precio is None:
             continue
         filas += 1
-        bc = _barcode(row)
         cod = _codigo(row)
         desc = _descripcion(row)
-        if bc:
+        for bc in _barcodes_fila(row):
             by_barcode[bc] = precio
+            for variant in _variantes_codigo(bc):
+                by_barcode[variant] = precio
         if cod:
             for variant in _variantes_codigo(cod):
                 by_codigo[variant] = precio
@@ -254,18 +317,47 @@ def resetear_y_cargar(db: Session, id_empresa: int, nombre: str, by_bc, by_cod, 
     print(f"  Sin PrecioVenta en Excel (quedó $0): {stats['sin_match']}")
 
 
+def _validar_excel_usuario(ruta: Path) -> None:
+    """Rechaza el xls parcial generado en servidor; exige columna PrecioVenta."""
+    libro = _open_excel(ruta)
+    engine = _excel_engine(ruta)
+    kwargs: dict = {"sheet_name": libro.sheet_names[0], "nrows": 5, "dtype": str}
+    if engine:
+        kwargs["engine"] = engine
+    df = _read_excel(ruta, **kwargs)
+    columnas = {str(c).strip() for c in df.columns}
+    if "PrecioVenta" not in columnas:
+        raise ValueError(
+            f"El Excel no tiene columna PrecioVenta. Columnas: {sorted(columnas)}"
+        )
+    if columnas == {"IDArt", "Articulo", "CodBarra", "PrecioCosto", "PrecioVenta"}:
+        total_kwargs: dict = {"sheet_name": libro.sheet_names[0], "dtype": str}
+        if engine:
+            total_kwargs["engine"] = engine
+        total = len(_read_excel(ruta, **total_kwargs))
+        if total <= 3100:
+            raise FileNotFoundError(
+                f"El archivo {ruta} parece un export parcial del servidor ({total} filas).\n"
+                f"Subí tu articulos.xls real a:\n  {DEFAULT_XLS}"
+            )
+
+
 def _resolver_archivo(ruta: Optional[Path]) -> Path:
     if ruta and ruta.exists():
-        return ruta
-    if DEFAULT_XLS.exists():
-        return DEFAULT_XLS
-    if FALLBACK_CSV.exists():
-        print(f"AVISO: no está {DEFAULT_XLS.name}; usando export CSV Elixia (PVMay = PrecioVenta).")
-        print("       Subí articulos.xls a 'datos /articulos.xls' para usar la columna PrecioVenta del Excel.")
-        return FALLBACK_CSV
-    raise FileNotFoundError(
-        f"No se encontró articulos.xls. Copiá el archivo a:\n  {DEFAULT_XLS}"
-    )
+        archivo = ruta
+    elif DEFAULT_XLS.exists():
+        archivo = DEFAULT_XLS
+    else:
+        raise FileNotFoundError(
+            "No está tu articulos.xls en el servidor.\n"
+            "Desde tu PC copiá el archivo a:\n"
+            f"  {DEFAULT_XLS}\n"
+            "En Cursor: arrastralo a la carpeta 'datos ' del proyecto."
+        )
+    if archivo.suffix.lower() not in {".xls", ".xlsx", ".xlsm"}:
+        raise ValueError(f"Se espera un Excel (.xls/.xlsx), no: {archivo}")
+    _validar_excel_usuario(archivo)
+    return archivo
 
 
 def main() -> int:

@@ -6,8 +6,6 @@ from datetime import datetime
 from sqlmodel import Session, select
 from sqlalchemy.orm import selectinload
 from typing import List, Dict, Any
-from jinja2 import Environment, FileSystemLoader
-
 # --- Módulos del Proyecto ---
 from back.modelos import ConfiguracionEmpresa, Usuario, Tercero, Venta, CajaMovimiento, VentaDetalle, Articulo, StockMovimiento
 # Importamos el especialista de AFIP refactorizado
@@ -16,7 +14,7 @@ from back.gestion.facturacion_afip import generar_factura_para_venta, generar_no
 from back.schemas.comprobante_schemas import EmisorData, ReceptorData, TransaccionData, ItemData, tercero_a_receptor_data
 # Importamos la configuración para obtener las URLs y API Keys
 from back.config import URL_BOVEDA, API_KEY_INTERNA
-from back.gestion.reportes.generador_comprobantes import TEMPLATE_DIR, format_datetime
+from back.gestion.reportes.generador_comprobantes import _crear_env_jinja, format_datetime
 
 # Límite para Consumidor Final
 LIMITE_CONSUMIDOR_FINAL = 200000.00
@@ -455,8 +453,7 @@ def _render_ticket_anulacion_no_fiscal(
     template_name = _resolver_template(getattr(venta, "tipo_comprobante_solicitado", None))
 
     try:
-        env = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
-        env.filters["date"] = format_datetime
+        env = _crear_env_jinja()
         template = env.get_template(f"ticket/{template_name}.html")
         return template.render(contexto)
     except Exception:

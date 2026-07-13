@@ -25,6 +25,7 @@ import { useAuthStore } from "@/lib/authStore"
 import { useEmpresaStore } from '@/lib/empresaStore';
 import { useProductoStore, type Producto } from "@/lib/productoStore";
 import { API_CONFIG } from "@/lib/api-config";
+import { downloadPlainText, printPlainText } from "@/lib/printerService";
 import { fetchArticuloPorId, mapArticulosToStore } from "@/lib/articulos-api";
 import { actualizarProductosEnCache } from "@/lib/catalogo-sync";
 import { attachAutoScaleBridge } from "@/lib/scaleSerial";
@@ -772,13 +773,26 @@ function FormVentas({
         throw new Error(errorComp.detail || "Error desconocido");
       }
 
+      const contentType = respComp.headers.get("content-type") || "";
+      const esTextoPlano = contentType.includes("text/plain");
+      const nombreArchivo = `Comprobante_${tipo}_${Date.now()}.${esTextoPlano ? "txt" : "pdf"}`;
+
+      if (esTextoPlano) {
+        const texto = await respComp.text();
+        downloadPlainText(nombreArchivo, texto);
+        printPlainText(`Comprobante ${tipo}`, texto);
+        toast.success("✅ Comprobante en texto plano enviado a impresión.");
+        console.log(`[${new Date().toISOString()}] Impresión texto plano enviada correctamente.`);
+        return;
+      }
+
       const blob = await respComp.blob();
       const url = URL.createObjectURL(blob);
 
       // Descarga automática de respaldo
       const link = document.createElement('a');
       link.href = url;
-      link.download = `Comprobante_${tipo}_${Date.now()}.pdf`;
+      link.download = nombreArchivo;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

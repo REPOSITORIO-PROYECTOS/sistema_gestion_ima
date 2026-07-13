@@ -47,6 +47,27 @@ SYNC_REFRESH_COMPANIES_SECONDS = _get_int_env("SYNC_REFRESH_COMPANIES_SECONDS", 
 SYNC_QUEUE_RETRY_SECONDS = _get_int_env("SYNC_QUEUE_RETRY_SECONDS", 60)
 SYNC_AUTO_ENABLED = _get_bool_env("SYNC_AUTO_ENABLED", True)
 
+
+def _parse_empresa_ids_env(name: str) -> set[int] | None:
+    """Lista opcional de IDs permitidos para sync automático (ej. SYNC_EMPRESA_IDS=1,5)."""
+    valor = os.getenv(name)
+    if valor is None or not str(valor).strip():
+        return None
+    ids: set[int] = set()
+    for part in str(valor).split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            ids.add(int(part))
+        except ValueError:
+            logger.warning("ID de empresa inválido en %s: %r", name, part)
+    return ids if ids else None
+
+
+SYNC_EMPRESA_IDS = _parse_empresa_ids_env("SYNC_EMPRESA_IDS")
+
+
 def obtener_todas_las_empresas() -> list[int]:
     """Empresas activas con Google Sheets configurado (evita jobs inútiles)."""
     try:
@@ -121,6 +142,8 @@ def _reconciliar_jobs_empresas():
         return
 
     empresas_activas = set(obtener_todas_las_empresas())
+    if SYNC_EMPRESA_IDS is not None:
+        empresas_activas &= SYNC_EMPRESA_IDS
 
     # Crear faltantes
     for id_empresa in empresas_activas:
@@ -189,7 +212,8 @@ def init_scheduler():
             f"Intervalo sync={SYNC_INTERVAL_SECONDS}s - "
             f"Refresh empresas={SYNC_REFRESH_COMPANIES_SECONDS}s - "
             f"Cola sync={SYNC_QUEUE_RETRY_SECONDS}s - "
-            f"Proveedores={'ON' if SYNC_INCLUDE_PROVEEDORES else 'OFF'}"
+            f"Proveedores={'ON' if SYNC_INCLUDE_PROVEEDORES else 'OFF'} - "
+            f"Empresas sync={sorted(SYNC_EMPRESA_IDS) if SYNC_EMPRESA_IDS else 'todas'}"
         )
         
         # Imprimir próximas ejecuciones

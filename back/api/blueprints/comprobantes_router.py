@@ -15,6 +15,7 @@ from back.modelos import Usuario, ConfiguracionEmpresa # <-- 2. IMPORTACIÓN AÑ
 
 # Especialistas de la capa de Gestión
 from back.gestion.reportes.generador_comprobantes import generar_comprobante_stateless
+from back.gestion.reportes.generador_texto_plano import es_formato_texto_plano
 from back.gestion import facturacion_lotes_manager # <-- Importamos el módulo completo
 from back.gestion import facturacion_afip
 from back.schemas.venta_ciclo_de_vida_schemas import VentaResponse # Reutilizamos el schema de respuesta
@@ -66,7 +67,13 @@ def _enriquecer_emisor_desde_config(db: Session, id_empresa: int, emisor: Emisor
 
 @router.post("/generar", summary="Generar un comprobante (factura, remito, etc.) on-demand",
     responses={
-        200: {"content": {"application/pdf": {}}, "description": "El archivo PDF del comprobante."},
+        200: {
+            "content": {
+                "application/pdf": {},
+                "text/plain": {},
+            },
+            "description": "Comprobante en PDF o texto plano para impresora térmica.",
+        },
         404: {"description": "Plantilla no encontrada."},
         503: {"description": "Servicio de AFIP no disponible."}
     }
@@ -166,14 +173,16 @@ def api_generar_comprobante(
         else:
             print(f"Comprobante tipo '{req.tipo}' no requiere procesamiento AFIP")
         
-        pdf_bytes = generar_comprobante_stateless(req)
+        contenido = generar_comprobante_stateless(req)
         print("salimos de genrerar comprobantes stateless")
-        # Generamos un nombre de archivo más robusto
-        filename = f"{req.tipo}_{req.emisor.punto_venta}_{req.receptor.cuit_o_dni or 'consumidor'}.pdf"
+
+        extension = "txt" if es_formato_texto_plano(req.formato) else "pdf"
+        media_type = "text/plain; charset=utf-8" if extension == "txt" else "application/pdf"
+        filename = f"{req.tipo}_{req.emisor.punto_venta}_{req.receptor.cuit_o_dni or 'consumidor'}.{extension}"
         print("estamos por hacer la response")
         return Response(
-            content=pdf_bytes,
-            media_type="application/pdf",
+            content=contenido,
+            media_type=media_type,
             headers={"Content-Disposition": f'inline; filename="{filename}"'}
         )
     except ValueError as e:

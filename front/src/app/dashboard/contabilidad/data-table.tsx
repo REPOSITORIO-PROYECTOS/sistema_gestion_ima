@@ -38,6 +38,23 @@ import { Loader2 } from "lucide-react";
 
 import { ModalConfirmacionAccion } from "./ModalConfirmacionAccion";
 import { ResumenItemsModal, ItemParaResumen } from "./ResumenItemsModal";
+import { API_CONFIG } from "@/lib/api-config";
+
+function parseApiErrorDetail(detail: unknown): string {
+    if (typeof detail === "string") return detail;
+    if (Array.isArray(detail)) {
+        return detail
+            .map((item) => {
+                if (typeof item === "string") return item;
+                if (item && typeof item === "object" && "msg" in item) {
+                    return String((item as { msg?: string }).msg ?? JSON.stringify(item));
+                }
+                return JSON.stringify(item);
+            })
+            .join("; ");
+    }
+    return "Error desconocido";
+}
 
 interface DataTableProps<TData, TValue> {
     columns: ColumnDef<TData, TValue>[]
@@ -167,19 +184,23 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
                     nombre: item.descripcion
                 }));
 
-                url = 'https://sistema-ima.sistemataup.online/api/comprobantes/agrupar';
+                url = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.COMPROBANTES_AGRUPAR}`;
                 body = { ids_comprobantes: ids_para_procesar, id_cliente_final, items: payloadItems, total_final: totalResumen, nuevo_tipo_comprobante: tipoComprobanteAgrupado };
                 successMessage = `Se creó el nuevo Comprobante a partir de ${ids_para_procesar.length} movimientos.`;
             } else {
-                // Facturación en lote, enviando UNO POR UNO
-                url = "https://sistema-ima.sistemataup.online/api/comprobantes/facturar-lote";
+                url = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.COMPROBANTES_FACTURAR_LOTE}`;
+                body = {
+                    ids_movimientos: ids_para_procesar,
+                    id_cliente_final,
+                };
+                successMessage = `Se facturaron ${ids_para_procesar.length} movimiento(s) en un único comprobante fiscal.`;
             }
         } else if (accionActual === 'anular') {
             const venta = selectedRows[0].original.venta;
             const esFiscal = !!venta?.facturada;
             url = esFiscal
-                ? 'https://sistema-ima.sistemataup.online/api/comprobantes/anular-factura'
-                : 'https://sistema-ima.sistemataup.online/api/comprobantes/anular-comprobante';
+                ? `${API_CONFIG.BASE_URL}/comprobantes/anular-factura`
+                : `${API_CONFIG.BASE_URL}/comprobantes/anular-comprobante`;
             body = { id_movimiento: selectedRows[0].original.id, };
             successMessage = esFiscal
                 ? "La factura ha sido anulada con éxito."
@@ -190,44 +211,17 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
             if (!url) throw new Error("Acción no reconocida.");
 
             if (accionActual === 'facturar') {
-                let exitos = 0;
-                let fallos: string[] = [];
-
-                for (const row of selectedRows) {
-                    const venta = row.original.venta;
-                    const idCliente = venta?.cliente?.id ?? null;
-
-                    // Simplified body with only required fields per FacturarLoteRequest schema
-                    const bodyPorFila: BodyType = {
-                        ids_movimientos: [row.original.id],
-                        id_cliente_final: idCliente,
-                    };
-
-                    try {
-                        const response = await fetch(url, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                            body: JSON.stringify(bodyPorFila)
-                        });
-                        if (!response.ok) {
-                            const errorData = await response.json();
-                            throw new Error(errorData.detail || `Error en facturación de movimiento ${row.original.id}`);
-                        }
-                        await response.json();
-                        exitos += 1;
-                    } catch (err) {
-                        const msg = err instanceof Error ? err.message : String(err);
-                        fallos.push(`ID ${row.original.id}: ${msg}`);
-                    }
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify(body),
+                });
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(parseApiErrorDetail(errorData.detail) || "Error en la facturación en lote");
                 }
-
-                if (exitos > 0) {
-                    toast.success(`Facturación completada`, { description: `Se facturaron ${exitos} movimiento(s).` });
-                }
-                if (fallos.length > 0) {
-                    toast.error("Algunos movimientos no se facturaron", { description: fallos.join(" | ") });
-                }
-
+                await response.json();
+                toast.success("¡Operación Exitosa!", { description: successMessage });
             } else {
                 const response = await fetch(url, {
                     method: 'POST',
@@ -236,7 +230,7 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
                 });
                 if (!response.ok) {
                     const errorData = await response.json();
-                    throw new Error(errorData.detail || `Error en la operación: ${accionActual}`);
+                    throw new Error(parseApiErrorDetail(errorData.detail) || `Error en la operación: ${accionActual}`);
                 }
                 await response.json();
                 toast.success("¡Operación Exitosa!", { description: successMessage });
@@ -250,7 +244,7 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
                 if (esFiscal && idVenta) {
                     toast.info("Generando PDF de Nota de Crédito...");
                     try {
-                        const pdfRes = await fetch(`https://sistema-ima.sistemataup.online/api/comprobantes/venta/${idVenta}/nota-credito/pdf`, {
+                        const pdfRes = await fetch(`${API_CONFIG.BASE_URL}/comprobantes/venta/${idVenta}/nota-credito/pdf`, {
                             headers: { Authorization: `Bearer ${token}` }
                         });
                         if (pdfRes.ok) {
