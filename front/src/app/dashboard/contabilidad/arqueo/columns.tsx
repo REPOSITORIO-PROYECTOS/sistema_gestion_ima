@@ -1,13 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { ColumnDef } from "@tanstack/react-table";
+import { ColumnDef, RowData } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { ArrowUpDown, Loader2, Printer } from "lucide-react";
 import { formatDateArgentina } from "@/utils/formatDate";
 import { useAuthStore } from "@/lib/authStore";
 import { imprimirArqueoCaja, prepararVentanaImpresionCaja } from "@/lib/imprimir-arqueo";
 import { toast } from "sonner";
+import { AccionesArqueo } from "./AccionesArqueo";
+
+// Permite que la tabla comparta el refetch con las celdas de acciones.
+declare module "@tanstack/react-table" {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface TableMeta<TData extends RowData> {
+    onActionComplete?: () => void;
+  }
+}
 
 // Este tipo debe coincidir con los datos reales
 export type ArqueoCaja = {
@@ -193,9 +202,18 @@ export const columns: ColumnDef<ArqueoCaja>[] = [
   {
     id: "acciones",
     header: "Acciones",
-    cell: ({ row }) => {
-      if (row.original.estado !== "CERRADA") return null;
-      return <ImprimirArqueoButton idSesion={row.original.id_sesion} />;
+    cell: ({ row, table }) => {
+      return (
+        <div className="flex items-center gap-2">
+          {row.original.estado === "CERRADA" && (
+            <ImprimirArqueoButton idSesion={row.original.id_sesion} />
+          )}
+          <AccionesArqueo
+            arqueo={row.original}
+            onActionComplete={table.options.meta?.onActionComplete}
+          />
+        </div>
+      );
     },
   },
 ];

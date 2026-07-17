@@ -24,6 +24,7 @@ class PerfilOperativoEmpresa(BaseModel):
     bloquear_descuentos_cajero: bool = False
     balanza_auto_agregar: bool = False
     balanza_auto_facturar: bool = False
+    cache_degradado: bool = False
     empresas_transferencia_ids: list[int] = Field(default_factory=list)
     casos_especiales: dict[str, str | int | bool] = Field(default_factory=dict)
 
@@ -47,6 +48,7 @@ class PerfilOperativoUpdate(BaseModel):
     bloquear_descuentos_cajero: Optional[bool] = None
     balanza_auto_agregar: Optional[bool] = None
     balanza_auto_facturar: Optional[bool] = None
+    cache_degradado: Optional[bool] = None
     empresas_transferencia_ids: Optional[list[int]] = None
     casos_especiales: Optional[dict[str, str | int | bool]] = None
 

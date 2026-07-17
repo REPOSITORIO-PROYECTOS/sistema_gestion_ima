@@ -35,6 +35,7 @@ def test_plantilla_modo_especial_pos():
     perfil = PLANTILLAS["modo_especial_pos"]
     assert perfil.modo_especial is True
     assert perfil.caja_solo_comprobante is True
+    assert perfil.cache_degradado is True
     assert perfil.empresas_transferencia_ids == [35, 36]
 
 
@@ -93,3 +94,16 @@ def test_plantilla_demo_transferencias_y_factura():
     perfil = PLANTILLAS["modo_especial_demo"]
     assert perfil.empresas_transferencia_ids == [37, 38]
     assert perfil.caja_solo_comprobante is False
+
+
+def test_cargar_perfil_backfill_cache_degradado_desde_plantilla():
+    config = _config(
+        tipo_esquema_empresa=TipoEsquemaEmpresa.ESPECIAL.value,
+        perfil_operativo={
+            "plantilla_origen": "modo_especial_demo",
+            "modo_especial": True,
+            "panel_estadisticas_caja": True,
+        },
+    )
+    perfil = cargar_perfil_desde_json(config)
+    assert perfil.cache_degradado is True

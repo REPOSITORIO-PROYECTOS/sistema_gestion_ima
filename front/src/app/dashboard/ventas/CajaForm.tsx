@@ -13,19 +13,44 @@ import {
   imprimirArqueoCaja,
   prepararVentanaImpresionCaja,
 } from "@/lib/imprimir-arqueo";
+import { API_CONFIG } from "@/lib/api-config";
+import { useOfflineCache } from "@/hooks/useOfflineCache";
+import { useEmpresaStore } from "@/lib/empresaStore";
+import { intentarCerrarCaja } from "@/lib/offline/cierre-caja";
 
 
 
 interface CajaFormProps {
+  idEmpresa?: number;
+  offlineHabilitado?: boolean;
   onAbrirCaja: () => void;
   onCerrarCaja: () => void;
 }
 
-export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
+type CajaResponse = {
+  message?: string;
+  detail?: string;
+  data?: {
+    id_sesion?: number;
+  };
+};
+
+export default function CajaForm({
+  idEmpresa,
+  offlineHabilitado = false,
+  onAbrirCaja,
+  onCerrarCaja,
+}: CajaFormProps) {
   
-  const { cajaAbierta, setCajaAbierta, clearCaja } = useCajaStore();
+  const { cajaAbierta, idSesion, setCajaAbierta, clearCaja } = useCajaStore();
   const token = useAuthStore((state) => state.token);
   const usuario = useAuthStore((state) => state.usuario);
+  const empresa = useEmpresaStore((state) => state.empresa);
+  const { refrescarTrasAperturaCaja, refrescarTrasCierreCaja } = useOfflineCache({
+    token,
+    idEmpresa,
+    enabled: offlineHabilitado,
+  });
   
   const [nombreUsuario, setNombreUsuario] = useState(usuario?.nombre_usuario || "");
   // const [llave, setLlave] = useState(""); // ELIMINADO POR PEDIDO DEL USUARIO
@@ -107,12 +132,16 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
     }
 
     if (!token) return toast.error("No se encontró el token.");
+    if (offlineHabilitado && typeof navigator !== "undefined" && navigator.onLine === false) {
+      toast.error("Para abrir caja necesitás conexión con el servidor.");
+      return;
+    }
 
     setIsLoading(true);
 
     try {
       // Paso 2: Abrir la caja (Validación de llave eliminada por pedido)
-      const abrirRes = await fetch("https://sistema-ima.sistemataup.online/api/caja/abrir", {
+      const abrirRes = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.CAJA_ABRIR}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -123,13 +152,27 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
         }),
       });
 
-      const abrirData = await abrirRes.json();
+      const abrirData = (await abrirRes.json()) as CajaResponse;
 
       if (!abrirRes.ok) {
         return toast.error(`⛔ ${abrirData.detail || "No se pudo abrir la caja."}`);
       }
 
-      setCajaAbierta(true);
+      const idSesion = abrirData.data?.id_sesion ?? null;
+      if (offlineHabilitado && idSesion) {
+        try {
+          await refrescarTrasAperturaCaja(idSesion);
+        } catch (cacheError) {
+          console.error("Error refrescando caché offline:", cacheError);
+          toast.warning("Caja abierta, pero no se pudo actualizar la caché offline.");
+        }
+      }
+
+      setCajaAbierta(true, {
+        idEmpresa,
+        usarCacheDegradado: offlineHabilitado,
+        idSesion,
+      });
       toast.success(abrirData.message || "✅ Caja abierta correctamente.");
       onAbrirCaja();
 
@@ -150,61 +193,82 @@ export default function CajaForm({ onAbrirCaja, onCerrarCaja }: CajaFormProps) {
       return;
     }
     if (!token) return toast.error("No se encontró el token.");
+    if (!idEmpresa) return toast.error("No se encontró la empresa.");
 
-    const printWindow = imprimirDespues ? prepararVentanaImpresionCaja() : null;
-    if (imprimirDespues && !printWindow) {
+    const printWindow =
+      imprimirDespues && offlineHabilitado === false
+        ? prepararVentanaImpresionCaja()
+        : null;
+    if (imprimirDespues && offlineHabilitado === false && !printWindow) {
       toast.warning(
         "El navegador bloqueó la ventana de impresión. Se intentará descargar el PDF al finalizar.",
       );
     }
-    
+
     setIsLoading(true);
 
+    const saldoFinalLimpio = limpiarMoneda(saldoFinalDeclarado);
+    const efectivo = limpiarMoneda(saldoFinalEfectivo);
+    const transferencias = limpiarMoneda(saldoFinalTransferencias);
+    const bancario = limpiarMoneda(saldoFinalBancario);
+
     try {
-      // Paso 2: Cerrar la caja
-      const saldoFinalLimpio = limpiarMoneda(saldoFinalDeclarado);
-      const efectivo = limpiarMoneda(saldoFinalEfectivo);
-      const transferencias = limpiarMoneda(saldoFinalTransferencias);
-      const bancario = limpiarMoneda(saldoFinalBancario);
-      
-      const cerrarRes = await fetch("https://sistema-ima.sistemataup.online/api/caja/cerrar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
+      const resultado = await intentarCerrarCaja({
+        token,
+        idEmpresa,
+        offlineHabilitado,
+        idSesionCaja: idSesion,
+        saldos: {
           saldo_final_declarado: saldoFinalLimpio,
           saldo_final_efectivo: efectivo,
           saldo_final_transferencias: transferencias,
           saldo_final_bancario: bancario,
-        }),
+        },
+        nombreUsuario: nombreUsuario.trim(),
+        imprimir: imprimirDespues,
+        empresaNombre: empresa?.nombre_negocio,
       });
 
-      const cerrarData = await cerrarRes.json();
-      if (!cerrarRes.ok) {
-        throw new Error(cerrarData.detail || "Error al cerrar la caja");
+      if (resultado.mode === "online") {
+        toast.success(resultado.message || "✅ Caja cerrada correctamente.");
+
+        if (imprimirDespues && resultado.id_sesion) {
+          try {
+            await imprimirArqueoCaja(resultado.id_sesion, token, printWindow);
+          } catch (err) {
+            console.error("Error al imprimir ticket de cierre:", err);
+            if (err instanceof Error) {
+              toast.error(`La caja se cerró, pero falló la impresión: ${err.message}`);
+            }
+          }
+        }
+      } else {
+        toast.success(resultado.message);
+        if (imprimirDespues) {
+          toast.message("Se imprimió un resumen local del cierre.");
+        }
       }
-      toast.success(cerrarData.message || "✅ Caja cerrada correctamente.");
-      
-      const idSesionCerrada = cerrarData.data?.id_sesion;
-      if (imprimirDespues && idSesionCerrada) {
+
+      if (offlineHabilitado) {
         try {
-          await imprimirArqueoCaja(idSesionCerrada, token, printWindow);
-        } catch (err) {
-          console.error("Error al imprimir ticket de cierre:", err);
-          if (err instanceof Error) {
-            toast.error(`La caja se cerró, pero falló la impresión: ${err.message}`);
+          await refrescarTrasCierreCaja();
+        } catch (cacheError) {
+          if (resultado.mode === "online") {
+            console.error("Error refrescando caché offline al cerrar caja:", cacheError);
+            toast.warning("Caja cerrada, pero no se pudo actualizar la caché offline.");
           }
         }
       }
 
-      // Limpiamos todo
-      clearCaja();
+      clearCaja({
+        idEmpresa,
+        usarCacheDegradado: offlineHabilitado,
+      });
       onCerrarCaja();
-      // setLlave(""); // ELIMINADO
       setSaldoFinalDeclarado("");
       setSaldoFinalEfectivo("");
       setSaldoFinalBancario("");
       setSaldoFinalTransferencias("");
-
     } catch (error) {
       if (error instanceof Error) toast.error(`⛔ ${error.message}`);
     } finally {

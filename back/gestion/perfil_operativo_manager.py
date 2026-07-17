@@ -46,12 +46,31 @@ def _perfil_raw_dict(config: ConfiguracionEmpresa) -> dict[str, Any]:
     return {}
 
 
+def _backfill_perfil_desde_plantilla(
+    data: dict[str, Any],
+    perfil: PerfilOperativoEmpresa,
+) -> PerfilOperativoEmpresa:
+    """Completa flags nuevos ausentes en JSON persistido (p. ej. cache_degradado)."""
+    plantilla_id = data.get("plantilla_origen")
+    if not plantilla_id or plantilla_id not in PLANTILLAS:
+        return perfil
+
+    updates: dict[str, Any] = {}
+    plantilla = PLANTILLAS[plantilla_id]
+    if "cache_degradado" not in data:
+        updates["cache_degradado"] = plantilla.cache_degradado
+    if not updates:
+        return perfil
+    return perfil.model_copy(update=updates)
+
+
 def cargar_perfil_desde_json(config: ConfiguracionEmpresa) -> PerfilOperativoEmpresa:
     data = _perfil_raw_dict(config)
     if not data:
         return PerfilOperativoEmpresa()
     try:
-        return PerfilOperativoEmpresa.model_validate(data)
+        perfil = PerfilOperativoEmpresa.model_validate(data)
+        return _backfill_perfil_desde_plantilla(data, perfil)
     except Exception as exc:
         logger.warning(
             "perfil_operativo inválido en empresa %s: %s",

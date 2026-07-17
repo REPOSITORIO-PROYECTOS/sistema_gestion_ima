@@ -61,7 +61,12 @@ export const API_CONFIG = {
     ARTICULOS_BUSCAR: '/articulos/buscar',
 
     // Caja
+    CAJA_ABRIR: '/caja/abrir',
+    CAJA_CERRAR: '/caja/cerrar',
+    CAJA_EGRESOS: '/caja/egresos',
+    CAJA_INGRESOS: '/caja/ingresos',
     CAJA_ESTADO: '/caja/estado-actual',
+    ARTICULOS_VERSION: '/articulos/version',
     CAJA_PANEL_ESTADISTICAS: '/caja/panel-estadisticas',
     CAJA_TICKET_CIERRE: (idSesion: number) =>
       `/caja/sesion/${idSesion}/ticket-cierre-detallado`,

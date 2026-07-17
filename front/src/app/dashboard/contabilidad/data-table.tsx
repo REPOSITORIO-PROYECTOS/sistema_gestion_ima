@@ -34,10 +34,21 @@ import {
 import { MovimientoAPI } from "./columns";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Loader2 } from "lucide-react";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
+import { useAuthStore } from "@/lib/authStore";
 
 import { ModalConfirmacionAccion } from "./ModalConfirmacionAccion";
 import { ResumenItemsModal, ItemParaResumen } from "./ResumenItemsModal";
+import { DetalleVentaModal } from "./DetalleVentaModal";
 import { API_CONFIG } from "@/lib/api-config";
 
 function parseApiErrorDetail(detail: unknown): string {
@@ -80,6 +91,12 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
     const [itemsResumen, setItemsResumen] = useState<ItemParaResumen[]>([]);
     const [totalResumen, setTotalResumen] = useState(0);
     const [tipoComprobanteAgrupado, setTipoComprobanteAgrupado] = useState("recibo");
+    const [movimientoDetalle, setMovimientoDetalle] = useState<MovimientoAPI | null>(null);
+    const [modalAnularMov, setModalAnularMov] = useState(false);
+    const [motivoAnulacion, setMotivoAnulacion] = useState("");
+
+    const rol = useAuthStore((state) => state.usuario?.rol?.nombre);
+    const esAdmin = rol === "Admin";
 
     // --- LÓGICA DE VALIDACIÓN Y PREPARACIÓN (ON-CLICK) ---
 
@@ -120,12 +137,12 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
         const itemsConsolidados: ItemParaResumen[] = [];
         let totalFinal = 0;
         selectedRows.forEach(row => {
-            row.original.venta?.articulos_vendidos?.forEach(itemVendido => {
+            row.original.venta?.items?.forEach(itemVendido => {
                 const precioUnitarioActualizado = itemVendido.precio_unitario;
                 const subtotalActualizado = itemVendido.cantidad * precioUnitarioActualizado;
                 itemsConsolidados.push({
                     id_articulo: itemVendido.id_articulo,
-                    descripcion: itemVendido.nombre,
+                    descripcion: itemVendido.descripcion,
                     cantidad: itemVendido.cantidad,
                     precio_unitario_antiguo: itemVendido.precio_unitario,
                     precio_unitario_nuevo: precioUnitarioActualizado,
@@ -156,6 +173,68 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
         }
 
         setAccionActual('anular');
+    };
+
+    const handleAnularMovimientoClick = () => {
+        const selectedRows = table.getSelectedRowModel().flatRows;
+
+        if (selectedRows.length !== 1) {
+            toast.error("Selección inválida", { description: "Seleccione un único movimiento (ingreso o egreso) para anular." });
+            return;
+        }
+
+        const mov = selectedRows[0].original;
+        const tipo = mov.tipo?.toUpperCase();
+
+        if (tipo !== "INGRESO" && tipo !== "EGRESO") {
+            toast.error("Acción no permitida", { description: "Solo se pueden anular movimientos de tipo INGRESO o EGRESO. Las ventas se anulan con el botón Anular." });
+            return;
+        }
+
+        if (mov.estado === "ANULADO") {
+            toast.info("Este movimiento ya se encuentra anulado.");
+            return;
+        }
+
+        setMotivoAnulacion("");
+        setModalAnularMov(true);
+    };
+
+    const handleConfirmarAnularMovimiento = async () => {
+        const selectedRows = table.getSelectedRowModel().flatRows;
+        if (selectedRows.length !== 1) return;
+
+        if (!motivoAnulacion.trim()) {
+            toast.error("Debe indicar un motivo para anular el movimiento.");
+            return;
+        }
+
+        const idMovimiento = selectedRows[0].original.id;
+
+        try {
+            setIsLoading(true);
+            const res = await fetch(
+                `${API_CONFIG.BASE_URL}/caja/admin/movimientos/${idMovimiento}/anular`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ motivo: motivoAnulacion.trim() }),
+                },
+            );
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(parseApiErrorDetail(errorData.detail) || "No se pudo anular el movimiento");
+            }
+            await res.json();
+            toast.success("Movimiento anulado correctamente.");
+            setModalAnularMov(false);
+            table.resetRowSelection();
+            onActionComplete();
+        } catch (error) {
+            if (error instanceof Error) toast.error("Error al anular", { description: error.message });
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleConfirmarAccion = async () => {
@@ -290,6 +369,9 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
         getPaginationRowModel: getPaginationRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
+        meta: {
+            onVerDetalle: (movimiento) => setMovimientoDetalle(movimiento),
+        },
     });
 
     return (
@@ -310,7 +392,7 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
                         onValueChange={(value) => table.getColumn("tipo")?.setFilterValue(value === "all" ? undefined : value)}
                     >
                         <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Tipo Movimiento" /></SelectTrigger>
-                        <SelectContent><SelectGroup><SelectLabel>Tipo</SelectLabel><SelectItem value="all">Todos</SelectItem><SelectItem value="VENTA">Venta</SelectItem><SelectItem value="APERTURA">Apertura</SelectItem><SelectItem value="CIERRE">Cierre</SelectItem><SelectItem value="EGRESO">Egreso</SelectItem></SelectGroup></SelectContent>
+                        <SelectContent><SelectGroup><SelectLabel>Tipo</SelectLabel><SelectItem value="all">Todos</SelectItem><SelectItem value="VENTA">Venta</SelectItem><SelectItem value="APERTURA">Apertura</SelectItem><SelectItem value="CIERRE">Cierre</SelectItem><SelectItem value="INGRESO">Ingreso</SelectItem><SelectItem value="EGRESO">Egreso</SelectItem></SelectGroup></SelectContent>
                     </Select>
                     <Select
                         value={facturadoFilter}
@@ -347,6 +429,16 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
                     >
                         {isLoading ? <Loader2 className="animate-spin h-4 w-4" /> : `Anular`}
                     </Button>
+                    {esAdmin && (
+                        <Button
+                            className="flex-1 md:flex-initial"
+                            variant="destructive"
+                            onClick={handleAnularMovimientoClick}
+                            disabled={isLoading}
+                        >
+                            {isLoading ? <Loader2 className="animate-spin h-4 w-4" /> : `Anular Movimiento`}
+                        </Button>
+                    )}
                 </div>
             </div>
 
@@ -427,6 +519,40 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
                     <ResumenItemsModal items={itemsResumen} totalFinal={totalResumen} />
                 )}
             </ModalConfirmacionAccion>
+
+            {/* Modal de Detalle de Venta */}
+            <DetalleVentaModal
+                movimiento={movimientoDetalle}
+                isOpen={movimientoDetalle !== null}
+                onClose={() => setMovimientoDetalle(null)}
+            />
+
+            {/* Modal Anular Movimiento (Admin) */}
+            <Dialog open={modalAnularMov} onOpenChange={setModalAnularMov}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Anular movimiento</DialogTitle>
+                        <DialogDescription>
+                            El movimiento se marcará como ANULADO y no impactará en el saldo de la caja.
+                            Esta acción queda registrada con su usuario y fecha.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-2 py-2">
+                        <Label>Motivo de la anulación</Label>
+                        <Input
+                            value={motivoAnulacion}
+                            onChange={(e) => setMotivoAnulacion(e.target.value)}
+                            placeholder="Ej: error de carga, monto incorrecto..."
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="destructive" onClick={handleConfirmarAnularMovimiento} disabled={isLoading}>
+                            {isLoading && <Loader2 className="animate-spin mr-2 h-4 w-4" />}
+                            Anular movimiento
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

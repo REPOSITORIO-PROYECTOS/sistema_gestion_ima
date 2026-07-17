@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { API_CONFIG } from "@/lib/api-config";
 
 export default function EgresosForm() {
   
@@ -26,9 +27,12 @@ export default function EgresosForm() {
     const [fechaActual, setFechaActual] = useState("");
     const [horaActual, setHoraActual] = useState("");
 
+    const [tipoMovimiento, setTipoMovimiento] = useState<"egreso" | "ingreso">("egreso");
     const [metodoPago, setMetodoPago] = useState("efectivo");
     const [monto, setMonto] = useState("");
     const [concepto, setConcepto] = useState("");
+
+    const esEgreso = tipoMovimiento === "egreso";
 
     // Ayuda a limpiar el numero de input
     function limpiarMoneda(valor: string): number {
@@ -57,7 +61,7 @@ export default function EgresosForm() {
         }));
     });
    
-    // POST Egreso de Dinero
+    // POST Movimiento de Dinero (ingreso o egreso)
     const handleSubmit = async () => {
 
         if (!concepto || !monto) {
@@ -71,10 +75,15 @@ export default function EgresosForm() {
             metodo_pago: metodoPago,
         };
 
+        const endpoint = esEgreso
+            ? API_CONFIG.ENDPOINTS.CAJA_EGRESOS
+            : API_CONFIG.ENDPOINTS.CAJA_INGRESOS;
+        const etiquetaTipo = esEgreso ? "Egreso" : "Ingreso";
+
         try {
             setIsLoading(true);
 
-            const response = await fetch("https://sistema-ima.sistemataup.online/api/caja/egresos", {
+            const response = await fetch(`${API_CONFIG.BASE_URL}${endpoint}`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -84,11 +93,11 @@ export default function EgresosForm() {
             });
 
             if (!response.ok) {
-                throw new Error("Error al enviar el egreso");
+                throw new Error("Error al registrar el movimiento");
             }
 
             // Éxito
-            toast.success("Egreso de dinero registrado correctamente!")
+            toast.success(`${etiquetaTipo} de dinero registrado correctamente!`)
 
             // Cierra Modal
             document.getElementById("close-caja-modal")?.click();
@@ -100,7 +109,7 @@ export default function EgresosForm() {
         } catch (error) {
 
             console.error("Error:", error);
-            toast.error("Ocurrió un error al registrar el egreso.");
+            toast.error("Ocurrió un error al registrar el movimiento.");
 
         } finally { setIsLoading(false); }
     };
@@ -115,6 +124,23 @@ export default function EgresosForm() {
                     <div className="flex items-center justify-between gap-4">
                         <Label className="text-right text-md md:text-lg">Nombre</Label>
                         <Input value={nombreUsuario} onChange={(e) => setNombreUsuario(e.target.value)} placeholder="Nombre de Usuario" className="w-full max-w-3/5" />
+                    </div>
+
+                    {/* Tipo de movimiento */}
+                    <div className="flex flex-row items-center w-full justify-between">
+                        <Label className="text-md md:text-lg">Tipo de Movimiento</Label>
+                        <Select
+                            value={tipoMovimiento}
+                            onValueChange={(value) => setTipoMovimiento(value as "egreso" | "ingreso")}
+                        >
+                            <SelectTrigger className="w-full max-w-3/5 cursor-pointer text-black">
+                            <SelectValue placeholder="Seleccionar tipo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                            <SelectItem value="egreso">Egreso (salida de dinero)</SelectItem>
+                            <SelectItem value="ingreso">Ingreso (entrada de dinero)</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
 
                     {/* Input monto a solicitar */}
@@ -168,13 +194,13 @@ export default function EgresosForm() {
                         </Select>
                     </div>
 
-                    {/* Detalle del egreso */}
+                    {/* Detalle del movimiento */}
                     <div className="flex items-center justify-between gap-4">
                         <Label className="text-right text-md md:text-lg">Concepto</Label>
                         <Input
                             value={concepto}
                             onChange={(e) => setConcepto(e.target.value)}
-                            placeholder="Detalle del egreso"
+                            placeholder={esEgreso ? "Detalle del egreso" : "Detalle del ingreso"}
                             className="w-full max-w-3/5"
                         />
                     </div>
@@ -192,12 +218,12 @@ export default function EgresosForm() {
                     </div>
                     </div>
 
-                    {/* Boton para enviar el egreso */}
+                    {/* Boton para enviar el movimiento */}
                     
                     <div className="flex justify-end mt-4 gap-2">
-                    <Button type="button" variant="destructive" className="w-full" onClick={handleSubmit} disabled={isLoading} aria-label="Enviar egreso">
+                    <Button type="button" variant={esEgreso ? "destructive" : "default"} className="w-full" onClick={handleSubmit} disabled={isLoading} aria-label="Registrar movimiento">
                     {isLoading && <Loader2 className="animate-spin mr-2 h-4 w-4" />}
-                        Enviar egreso
+                        {esEgreso ? "Registrar egreso" : "Registrar ingreso"}
                     </Button>
                 </div>
 

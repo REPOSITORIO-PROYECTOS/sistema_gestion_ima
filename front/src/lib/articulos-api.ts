@@ -9,7 +9,26 @@ export type ArticuloCatalogoAPI = {
   stock_actual: number;
   unidad_venta: string;
   precio_manual?: boolean;
+  activo?: boolean;
+  codigo_interno?: string | null;
+  codigos?: { codigo: string }[];
 };
+
+export async function fetchCatalogoVersion(token: string): Promise<number> {
+  if (!token) return 0;
+
+  const respuesta = await fetch(
+    `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.ARTICULOS_VERSION}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+
+  if (!respuesta.ok) {
+    throw new Error(`Fallo al obtener versión de catálogo (status ${respuesta.status})`);
+  }
+
+  const data = (await respuesta.json()) as { version?: number };
+  return data.version ?? 0;
+}
 
 /** Catálogo completo con códigos de barras. Usar solo en pantalla de stock. */
 export async function fetchAllArticulos(

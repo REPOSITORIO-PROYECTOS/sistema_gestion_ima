@@ -7,7 +7,7 @@ from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import aliased, selectinload
 from sqlalchemy import case, func
 # Importamos los modelos necesarios, creando alias para evitar conflictos en el JOIN
-from back.modelos import Articulo, CajaSesion, Usuario, CajaMovimiento, Tercero, Venta
+from back.modelos import Articulo, CajaSesion, Usuario, CajaMovimiento, Tercero, Venta, VentaDetalle
 from back.modelos import Usuario as UsuarioApertura
 from back.modelos import Usuario as UsuarioCierre
 from back.schemas.caja_schemas import TipoMovimiento
@@ -173,6 +173,7 @@ def obtener_todos_los_movimientos_de_caja(db: Session, usuario_actual: Usuario) 
     # 3. Cargamos las relaciones necesarias de forma eficiente.
     query = query.options(
         selectinload(CajaMovimiento.venta).selectinload(Venta.cliente),
+        selectinload(CajaMovimiento.venta).selectinload(Venta.items).selectinload(VentaDetalle.articulo),
         selectinload(CajaMovimiento.usuario)
     )
 

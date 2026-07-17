@@ -25,7 +25,7 @@ from back.schemas.caja_schemas import (
     AbrirCajaRequest, CajaMovimientoResponse, CerrarCajaRequest, EstadoCajaResponse,
     RegistrarVentaRequest, InformeCajasResponse, RespuestaGenerica,
     MovimientoSimpleRequest, TipoMovimiento, MovimientoContableResponse,
-    PanelEstadisticasCajaResponse,
+    PanelEstadisticasCajaResponse, EditarSesionCajaRequest, AnularMovimientoRequest,
 )
 from back.schemas.comprobante_schemas import EmisorData, ReceptorData, tercero_a_receptor_data
 
@@ -511,3 +511,71 @@ def api_cerrar_caja_por_id(
     except (ValueError, PermissionError) as e:
         db.rollback()
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.patch("/admin/sesion/{id_sesion}", response_model=RespuestaGenerica)
+def api_editar_sesion_caja(
+    id_sesion: int,
+    req: EditarSesionCajaRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(es_admin),
+):
+    """
+    [Admin] Edita los saldos de una sesión de caja. Recalcula saldo calculado y
+    diferencia desde los movimientos (fuente de verdad) y registra trazabilidad.
+    """
+    try:
+        sesion = apertura_cierre.editar_sesion_caja(
+            db=db,
+            id_sesion=id_sesion,
+            usuario_admin=current_user,
+            saldo_inicial=req.saldo_inicial,
+            saldo_final_declarado=req.saldo_final_declarado,
+            saldo_final_efectivo=req.saldo_final_efectivo,
+            saldo_final_transferencias=req.saldo_final_transferencias,
+            saldo_final_bancario=req.saldo_final_bancario,
+        )
+        return RespuestaGenerica(
+            status="success",
+            message=f"Sesión de caja ID {sesion.id} actualizada correctamente.",
+            data={"id_sesion": sesion.id},
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.exception("Error editando sesión de caja")
+        raise HTTPException(status_code=500, detail=f"Error interno al editar la sesión: {e}")
+
+
+@router.post("/admin/movimientos/{id_movimiento}/anular", response_model=RespuestaGenerica)
+def api_anular_movimiento(
+    id_movimiento: int,
+    req: AnularMovimientoRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(es_admin),
+):
+    """
+    [Admin] Anula un movimiento manual de caja (INGRESO/EGRESO). Las ventas se
+    anulan por el flujo fiscal de comprobantes.
+    """
+    try:
+        movimiento = apertura_cierre.anular_movimiento(
+            db=db,
+            id_movimiento=id_movimiento,
+            usuario_admin=current_user,
+            motivo=req.motivo,
+        )
+        return RespuestaGenerica(
+            status="success",
+            message=f"Movimiento ID {movimiento.id} anulado correctamente.",
+            data={"id_movimiento": movimiento.id},
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        logger.exception("Error anulando movimiento de caja")
+        raise HTTPException(status_code=500, detail=f"Error interno al anular el movimiento: {e}")

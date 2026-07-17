@@ -1,7 +1,7 @@
 # back/schemas/caja_schemas.py
 # VERSIÓN FINAL Y SINCRONIZADA
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
@@ -76,6 +76,21 @@ class MovimientoSimpleRequest(BaseModel):
     concepto: str
     monto: float = Field(..., ge=0)
     metodo_pago: Optional[str] = None
+
+
+class EditarSesionCajaRequest(BaseModel):
+    """[Admin] Edicion de saldos de una sesion de caja. Todos los campos son opcionales;
+    solo se actualizan los que se envian."""
+    saldo_inicial: Optional[float] = Field(default=None, ge=0)
+    saldo_final_declarado: Optional[float] = Field(default=None, ge=0)
+    saldo_final_efectivo: Optional[float] = None
+    saldo_final_transferencias: Optional[float] = None
+    saldo_final_bancario: Optional[float] = None
+
+
+class AnularMovimientoRequest(BaseModel):
+    """[Admin] Anulacion de un movimiento de caja (ingreso/egreso)."""
+    motivo: str = Field(..., min_length=1)
 
 
 class EstadoCajaResponse(BaseModel):
@@ -158,6 +173,41 @@ class _InfoUsuarioMovimiento(BaseModel):
     # nombre_completo no existe en el modelo Usuario actual
 
 
+class _InfoItemVenta(BaseModel):
+    """
+    Sub-schema privado para representar cada ítem (línea) de una venta.
+    Deriva 'descripcion' y 'subtotal' desde el ORM VentaDetalle + su artículo.
+    """
+    id_articulo: int
+    descripcion: str
+    cantidad: float
+    precio_unitario: float
+    descuento_aplicado: float = 0.0
+    subtotal: float
+
+    @model_validator(mode="before")
+    @classmethod
+    def _desde_detalle(cls, data: Any) -> Any:
+        # Si ya viene como dict (o similar), no transformamos.
+        if isinstance(data, dict):
+            return data
+        articulo = getattr(data, "articulo", None)
+        descripcion = getattr(articulo, "descripcion", None) or "Artículo"
+        cantidad = getattr(data, "cantidad", 0.0) or 0.0
+        precio_unitario = getattr(data, "precio_unitario", 0.0) or 0.0
+        return {
+            "id_articulo": getattr(data, "id_articulo", 0) or 0,
+            "descripcion": descripcion,
+            "cantidad": cantidad,
+            "precio_unitario": precio_unitario,
+            "descuento_aplicado": getattr(data, "descuento_aplicado", 0.0) or 0.0,
+            "subtotal": round(cantidad * precio_unitario, 2),
+        }
+
+    class Config:
+        from_attributes = True
+
+
 class _InfoVentaAnidada(BaseModel):
     """
     Sub-schema privado para anidar la información clave de la venta.
@@ -168,6 +218,7 @@ class _InfoVentaAnidada(BaseModel):
     datos_factura: Optional[Dict[str, Any]] = None
     tipo_comprobante_solicitado: Optional[str] = None
     cliente: Optional[_InfoClienteAnidado] = None
+    items: List[_InfoItemVenta] = []
 
 class MovimientoContableResponse(BaseModel):
     """
@@ -179,6 +230,7 @@ class MovimientoContableResponse(BaseModel):
     id: int
     timestamp: datetime # Usamos 'timestamp' para coincidir con tu modelo 'CajaMovimiento'
     tipo: str
+    estado: str = "ACTIVO" # "ACTIVO" | "ANULADO"
     concepto: str
     monto: float
     metodo_pago: Optional[str] = None # Hacemos opcional para cubrir todos los casos

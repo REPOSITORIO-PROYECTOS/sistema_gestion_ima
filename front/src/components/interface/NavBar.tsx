@@ -26,6 +26,8 @@ import { API_CONFIG } from "@/lib/api-config";
 import { useFeaturesStore } from "@/lib/featuresStore";
 import { puedeGestionarUsuarios, empresaTienePanelEstadisticas } from "@/lib/permisos";
 import { usePerfilEmpresa } from "@/hooks/usePerfilEmpresa";
+import { OfflineStatusBadge } from "@/components/OfflineStatusBadge";
+import { isCacheDegradadoActivo } from "@/lib/offline/gate";
 
 type NavLink = {
   href: string
@@ -44,7 +46,9 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
   const customLinks = useCustomLinksStore((s) => s.links);
   const mesasEnabledStore = useFeaturesStore((s) => s.mesasEnabled);
   const setMesasEnabled = useFeaturesStore((s) => s.setMesasEnabled);
-  const { perfil } = usePerfilEmpresa();
+  const empresa = useEmpresaStore((state) => state.empresa);
+  const { tipoEsquema, perfil } = usePerfilEmpresa();
+  const offlineHabilitado = isCacheDegradadoActivo(tipoEsquema, perfil);
   const mesasEnabled = perfil.mesas_habilitado || mesasEnabledStore;
 
   // Scroll y ocultación del Nav
@@ -385,6 +389,12 @@ function NavBar({ links, role }: { links: NavLink[], role: string }) {
 
         {/* Desplegables */}
         <div className="flex items-center">
+          <OfflineStatusBadge
+            enabled={offlineHabilitado}
+            token={token}
+            idEmpresa={empresa?.id_empresa}
+            className="mr-3 hidden md:inline-flex"
+          />
 
           {/* DESKTOP - Avatar con desplegable */}
           <div className="hidden md:flex">

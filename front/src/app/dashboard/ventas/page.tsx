@@ -22,6 +22,11 @@ import { API_CONFIG } from "@/lib/api-config";
 import { useEmpresaStore } from "@/lib/empresaStore";
 import { puedeAplicarDescuentos } from "@/lib/permisos";
 import { usePerfilEmpresa } from "@/hooks/usePerfilEmpresa";
+import { useOfflineMeta } from "@/hooks/useOfflineMeta";
+import { useOfflineStatus } from "@/hooks/useOfflineStatus";
+import { useOfflineSync } from "@/hooks/useOfflineSync";
+import { isCacheDegradadoActivo } from "@/lib/offline/gate";
+import { mensajeSnapshotDesactualizado } from "@/lib/offline/offline-meta-format";
 
 interface ProductoVendido {
   id?: string;
@@ -43,9 +48,27 @@ function DashboardVenta() {
   const [fechaActual, setFechaActual] = useState("");
   const [horaActual, setHoraActual] = useState("");
   const { cajaAbierta } = useCajaStore();
+  const modoOfflineCaja = useCajaStore((state) => state.modoOfflineCaja);
   const role = useAuthStore((state) => state.role);
   const empresa = useEmpresaStore((state) => state.empresa);
-  const { perfil } = usePerfilEmpresa();
+  const { tipoEsquema, perfil } = usePerfilEmpresa();
+  const offlineHabilitado = isCacheDegradadoActivo(tipoEsquema, perfil);
+  const idEmpresa = empresa?.id_empresa;
+  const offlineMeta = useOfflineMeta(idEmpresa, offlineHabilitado);
+  const offlineStatus = useOfflineStatus({
+    enabled: offlineHabilitado,
+    token,
+    idEmpresa,
+  });
+  useOfflineSync({
+    enabled: offlineHabilitado,
+    token,
+    idEmpresa,
+  });
+  const mensajeSnapshot = mensajeSnapshotDesactualizado(offlineMeta?.stock_snapshot_at);
+  const operandoSinServidor =
+    offlineHabilitado &&
+    (modoOfflineCaja || offlineStatus.status !== "online");
   const puedeDescuentos = puedeAplicarDescuentos(
     role?.nombre,
     perfil,
@@ -116,9 +139,12 @@ function DashboardVenta() {
 
   useEffect(() => {
     if (token) {
-      verificarEstadoCaja(token);
+      verificarEstadoCaja(token, {
+        idEmpresa,
+        usarCacheDegradado: offlineHabilitado,
+      });
     }
-  }, [token, verificarEstadoCaja]);
+  }, [idEmpresa, offlineHabilitado, token, verificarEstadoCaja]);
 
   useEffect(() => {
     if (!token) return;
@@ -254,6 +280,17 @@ function DashboardVenta() {
     <ProtectedRoute allowedRoles={["Admin", "Cajero", "Vendedora", "Encargada", "Gerente", "Soporte"]}>
       <div className="flex flex-col gap-4">
 
+        {operandoSinServidor && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
+            Operando sin conexión al servidor. Se usa caché local de caja y catálogo.
+          </div>
+        )}
+        {operandoSinServidor && mensajeSnapshot && (
+          <div className="rounded-lg border border-orange-300 bg-orange-50 px-4 py-3 text-sm font-semibold text-orange-900">
+            {mensajeSnapshot}
+          </div>
+        )}
+
         {/* Header de Informacion */}
         <div className="flex flex-wrap justify-between items-center p-4 gap-4 bg-neutral-800/90 rounded-xl px-6">
           {/* Fecha y Hora */}
@@ -269,20 +306,20 @@ function DashboardVenta() {
             className="w-full sm:w-[48%] lg:w-[23%] text-white font-semibold border border-white bg-transparent placeholder-white disabled:opacity-100 rounded-lg"
           />
 
-          {/* Modal para egresos de dinero en efectivo */}
+          {/* Modal para registrar movimiento de dinero (ingreso o egreso) */}
           <Dialog>
             <DialogTrigger asChild className="w-full sm:w-[48%] lg:w-[23%]">
               <Button type="button" variant="success" disabled={!cajaAbierta}>
-                Egresos de Dinero
+                Registrar Movimiento
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-lg">
               <DialogHeader>
-                <DialogTitle>Egresos de Dinero en Efectivo</DialogTitle>
-                <DialogDescription>Si desea retirar dinero en efectivo de la caja, complete los datos</DialogDescription>
+                <DialogTitle>Registrar Movimiento de Dinero</DialogTitle>
+                <DialogDescription>Registre un ingreso o egreso de dinero de la caja completando los datos</DialogDescription>
               </DialogHeader>
 
-              {/* Modal de Egreso de Dinero */}
+              {/* Modal de Movimiento de Dinero */}
               <EgresoForm />
             </DialogContent>
           </Dialog>
@@ -302,6 +339,8 @@ function DashboardVenta() {
 
               {/* Modal de Apertura / Cierre de caja */}
               <CajaForm
+                idEmpresa={idEmpresa}
+                offlineHabilitado={offlineHabilitado}
                 onAbrirCaja={() => { }}
                 onCerrarCaja={() => { }}
               />
@@ -419,6 +458,8 @@ function DashboardVenta() {
           {/* Panel derecho: Formulario */}
           {cajaAbierta ? (
             <FormVentas
+              idEmpresa={idEmpresa}
+              offlineHabilitado={offlineHabilitado}
               onAgregarProducto={handleAgregarProducto}
               totalVenta={totalVenta}
               productosVendidos={productos}

@@ -23,7 +23,9 @@ from sqlmodel import Session, select
 
 from back.database import create_db_and_tables, engine
 from back.gestion.admin import admin_manager
+from back.gestion.plantillas_perfil import PLANTILLA_MODO_ESPECIAL_DEMO
 from back.modelos import Articulo, ArticuloCodigo, ConfiguracionEmpresa, Empresa, Rol, Usuario
+from back.schemas.perfil_operativo_schemas import TipoEsquemaEmpresa
 from back.schemas.admin_schemas import UsuarioCreate
 
 ADMIN_USER = "admin_local"
@@ -100,6 +102,13 @@ def ensure_roles(db: Session) -> dict[str, Rol]:
     return by_name
 
 
+def _aplicar_perfil_modo_especial_local(config: ConfiguracionEmpresa) -> None:
+    config.modo_especial_habilitado = True
+    config.tipo_esquema_empresa = TipoEsquemaEmpresa.ESPECIAL.value
+    config.perfil_operativo = PLANTILLA_MODO_ESPECIAL_DEMO.model_dump()
+    config.nombre_negocio = "Demo Modo Especial Local"
+
+
 def ensure_empresa_modo_especial(db: Session) -> Empresa:
     empresa = db.exec(
         select(Empresa).where(Empresa.cuit == "20999999999")
@@ -107,8 +116,7 @@ def ensure_empresa_modo_especial(db: Session) -> Empresa:
     if empresa:
         config = db.get(ConfiguracionEmpresa, empresa.id)
         if config:
-            config.modo_especial_habilitado = True
-            config.nombre_negocio = "Demo Modo Especial Local"
+            _aplicar_perfil_modo_especial_local(config)
             db.add(config)
             db.commit()
         return empresa
@@ -127,6 +135,8 @@ def ensure_empresa_modo_especial(db: Session) -> Empresa:
         cuit=empresa.cuit,
         nombre_negocio="Demo Modo Especial Local",
         modo_especial_habilitado=True,
+        tipo_esquema_empresa=TipoEsquemaEmpresa.ESPECIAL.value,
+        perfil_operativo=PLANTILLA_MODO_ESPECIAL_DEMO.model_dump(),
         color_principal="bg-amber-700",
     )
     db.add(config)

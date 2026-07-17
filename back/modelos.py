@@ -210,6 +210,8 @@ class CajaSesion(SQLModel, table=True):
     estado: str = Field(default="ABIERTA")
     id_usuario_apertura: int = Field(foreign_key="usuarios.id")
     id_usuario_cierre: Optional[int] = Field(default=None, foreign_key="usuarios.id")
+    id_usuario_ultima_edicion: Optional[int] = Field(default=None, foreign_key="usuarios.id")
+    fecha_ultima_edicion: Optional[datetime] = None
     id_empresa: int = Field(foreign_key="empresas.id")
     usuario_apertura: Usuario = Relationship(back_populates="sesiones_abiertas", sa_relationship_kwargs={'foreign_keys': '[CajaSesion.id_usuario_apertura]'})
     usuario_cierre: Optional[Usuario] = Relationship(back_populates="sesiones_cerradas", sa_relationship_kwargs={'foreign_keys': '[CajaSesion.id_usuario_cierre]'})
@@ -224,9 +226,13 @@ class CajaMovimiento(SQLModel, table=True):
     concepto: str
     monto: float
     metodo_pago: str
+    estado: str = Field(default="ACTIVO")
     id_caja_sesion: int = Field(foreign_key="caja_sesiones.id")
     id_usuario: int = Field(foreign_key="usuarios.id")
     id_venta: Optional[int] = Field(default=None, foreign_key="ventas.id")
+    id_usuario_anulacion: Optional[int] = Field(default=None, foreign_key="usuarios.id")
+    fecha_anulacion: Optional[datetime] = None
+    motivo_anulacion: Optional[str] = None
     caja_sesion: CajaSesion = Relationship(back_populates="movimientos")
     usuario: Usuario = Relationship(back_populates="movimientos_de_caja")
     venta: Optional["Venta"] = Relationship(back_populates="movimientos_de_caja")

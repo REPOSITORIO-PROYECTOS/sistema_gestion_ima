@@ -13,6 +13,7 @@ export type PerfilOperativoResuelto = {
   bloquear_descuentos_cajero: boolean;
   balanza_auto_agregar: boolean;
   balanza_auto_facturar: boolean;
+  cache_degradado: boolean;
   empresas_transferencia_ids: number[];
   casos_especiales?: Record<string, string | number | boolean>;
   facturacion_afip_habilitada?: boolean;
@@ -31,5 +32,6 @@ export const PERFIL_ESTANDAR_DEFAULT: PerfilOperativoResuelto = {
   bloquear_descuentos_cajero: false,
   balanza_auto_agregar: false,
   balanza_auto_facturar: false,
+  cache_degradado: false,
   empresas_transferencia_ids: [],
 };

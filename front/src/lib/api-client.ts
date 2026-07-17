@@ -53,10 +53,18 @@ class ApiClient {
         data,
       };
     } catch (error) {
-      console.error('API Error:', error);
+      const message = error instanceof Error ? error.message : "Unknown error";
+      const isNetworkError =
+        error instanceof TypeError ||
+        /failed to fetch|networkerror|load failed|timeout/i.test(message);
+      if (isNetworkError) {
+        console.warn("API unreachable:", message);
+      } else {
+        console.error("API Error:", error);
+      }
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: message,
       };
     }
   }

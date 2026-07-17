@@ -6,6 +6,9 @@ import { Label } from "@/components/ui/label"
 import { ChevronsDown, RefreshCw, Lock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { api } from "@/lib/api-client"
+import { toast } from "sonner"
+import { buscarArticulosLocal } from "@/lib/offline/catalogo-search"
+import { isBrowserOnline } from "@/lib/offline/connectivity"
 
 const LIMITE_BUSQUEDA = 40
 const LIMITE_LISTADO = 100
@@ -30,6 +33,14 @@ type MinimalArticulo = {
   precio_manual?: boolean;
 };
 
+const buscarServidorConTimeout = async (termino: string, limit: number) =>
+  Promise.race([
+    api.articulos.buscar(termino, limit),
+    new Promise<never>((_, reject) =>
+      window.setTimeout(() => reject(new Error("Timeout buscando productos")), 5000),
+    ),
+  ]);
+
 interface SeccionProductoProps {
   inputRef: LegacyRef<HTMLInputElement>;
   codigo: string;
@@ -51,6 +62,8 @@ interface SeccionProductoProps {
   onRefrescarProductos: () => void | Promise<void>;
   catalogoResetTick?: number;
   onProductoConfirmado?: () => void;
+  offlineHabilitado?: boolean;
+  idEmpresa?: number;
 }
 
 export function SeccionProducto(props: SeccionProductoProps) {
@@ -67,6 +80,8 @@ export function SeccionProducto(props: SeccionProductoProps) {
     setPersistirProducto,
     onRefrescarProductos,
     onProductoConfirmado,
+    offlineHabilitado = false,
+    idEmpresa,
   } = props;
 
   const [matches, setMatches] = useState<Producto[]>([]);
@@ -105,11 +120,30 @@ export function SeccionProducto(props: SeccionProductoProps) {
     [inputRef, onProductoConfirmado, setCodigoEscaneado, setPopoverOpen, setProductoSeleccionado],
   );
 
-  const buscarEnServidor = useCallback(
+  const buscarProductos = useCallback(
     async (termino: string, limit: number) => {
       setLoading(true);
       try {
-        const resp = await api.articulos.buscar(termino, limit);
+        const puedeUsarLocal = Boolean(offlineHabilitado && idEmpresa);
+        const sinRed = puedeUsarLocal && !isBrowserOnline();
+
+        if (sinRed) {
+          const mapped = await buscarArticulosLocal(idEmpresa!, termino, limit);
+          setMatches(mapped);
+          setHighlightIndex(mapped.length > 0 ? 0 : -1);
+          if (mapped.length > 0) {
+            setPopoverOpen(true);
+            setJustSelected(false);
+          } else if (termino.trim()) {
+            toast.warning("Sin caché de productos. Abrí la caja con conexión.");
+          }
+          return;
+        }
+
+        const resp = await buscarServidorConTimeout(termino, limit);
+        if (!resp.success) {
+          throw new Error(resp.error || "No se pudo buscar en servidor");
+        }
         const data = (resp.success ? (resp.data as MinimalArticulo[]) : []) || [];
         const mapped = mapBusqueda(data);
         setMatches(mapped);
@@ -118,11 +152,30 @@ export function SeccionProducto(props: SeccionProductoProps) {
           setPopoverOpen(true);
           setJustSelected(false);
         }
+      } catch {
+        if (!offlineHabilitado || !idEmpresa) {
+          setMatches([]);
+          setHighlightIndex(-1);
+          return;
+        }
+
+        const mapped = await buscarArticulosLocal(idEmpresa, termino, limit);
+        setMatches(mapped);
+        setHighlightIndex(mapped.length > 0 ? 0 : -1);
+        if (mapped.length > 0) {
+          setPopoverOpen(true);
+          setJustSelected(false);
+          return;
+        }
+
+        if (termino.trim()) {
+          toast.warning("Sin caché de productos. Abrí la caja con conexión.");
+        }
       } finally {
         setLoading(false);
       }
     },
-    [setPopoverOpen],
+    [idEmpresa, offlineHabilitado, setPopoverOpen],
   );
 
   useEffect(() => {
@@ -168,24 +221,11 @@ export function SeccionProducto(props: SeccionProductoProps) {
         return;
       }
 
-      setLoading(true);
-      try {
-        const resp = await api.articulos.buscar(q, LIMITE_BUSQUEDA);
-        const data = (resp.success ? (resp.data as MinimalArticulo[]) : []) || [];
-        const mapped = mapBusqueda(data);
-        setMatches(mapped);
-        setHighlightIndex(mapped.length > 0 ? 0 : -1);
-        if (mapped.length > 0) {
-          setPopoverOpen(true);
-          setJustSelected(false);
-        }
-      } finally {
-        setLoading(false);
-      }
+      void buscarProductos(q, LIMITE_BUSQUEDA);
     }, debounceDelay);
 
     return () => window.clearTimeout(debounceRef.current);
-  }, [codigo, justSelected, setPopoverOpen]);
+  }, [buscarProductos, codigo, justSelected, setPopoverOpen]);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Escape") {
@@ -200,7 +240,7 @@ export function SeccionProducto(props: SeccionProductoProps) {
       setJustSelected(false);
 
       if (!popoverOpen || matches.length === 0) {
-        void buscarEnServidor(codigo.trim(), codigo.trim() ? LIMITE_BUSQUEDA : LIMITE_LISTADO);
+        void buscarProductos(codigo.trim(), codigo.trim() ? LIMITE_BUSQUEDA : LIMITE_LISTADO);
         return;
       }
 
@@ -365,7 +405,7 @@ export function SeccionProducto(props: SeccionProductoProps) {
               type="button"
               variant="outline"
               className="shrink-0"
-              onClick={() => void buscarEnServidor("", LIMITE_LISTADO)}
+              onClick={() => void buscarProductos("", LIMITE_LISTADO)}
               aria-label="Ver listado de productos"
               title="Ver hasta 100 productos (scroll en la lista)"
             >
@@ -377,7 +417,7 @@ export function SeccionProducto(props: SeccionProductoProps) {
               className="shrink-0"
               onClick={() => {
                 void onRefrescarProductos();
-                void buscarEnServidor(
+                void buscarProductos(
                   codigo.trim(),
                   codigo.trim() ? LIMITE_BUSQUEDA : LIMITE_LISTADO,
                 );

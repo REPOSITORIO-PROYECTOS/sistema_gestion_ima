@@ -1,19 +1,21 @@
 "use client";
 
-import { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown } from "lucide-react";
+import { ColumnDef, RowData } from "@tanstack/react-table";
+import { ArrowUpDown, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatDateArgentina } from "@/utils/formatDate";
 
-// 1. (Recomendado) Define el tipo para un ítem individual dentro de una venta.
-type ArticuloVendido = {
+// 1. Tipo de cada ítem (línea) de una venta, alineado con el backend (_InfoItemVenta).
+export interface VentaItem {
   id_articulo: number;
-  nombre: string;
+  descripcion: string;
   cantidad: number;
   precio_unitario: number;
-};
+  descuento_aplicado: number;
+  subtotal: number;
+}
 
 // 2. Esta es la modificación principal: enriquecemos la interfaz MovimientoAPI.
 export interface MovimientoAPI {
@@ -25,6 +27,7 @@ export interface MovimientoAPI {
   concepto: string;
   monto: number;
   metodo_pago?: string;
+  estado?: string; // "ACTIVO" | "ANULADO"
   timestamp: string; // Corregido para coincidir con el backend
   usuario?: {
     nombre_usuario: string;
@@ -41,12 +44,20 @@ export interface MovimientoAPI {
       nombre_razon_social: string;
     } | null; // El cliente puede ser nulo (Consumidor Final)
 
-    // ¡AÑADIMOS LA PROPIEDAD QUE FALTABA!
-    articulos_vendidos: ArticuloVendido[];
+    // Ítems reales de la venta (los envía el backend en 'items').
+    items: VentaItem[];
   } | null; // La venta puede ser nula
 
   // Este campo parece ser redundante si ya tienes venta.tipo_comprobante_solicitado
   tipo_comprobante: "comprobante" | "remito" | "presupuesto" | "factura";
+}
+
+// Permite que la tabla comparta callbacks con las celdas (ver detalle de venta).
+declare module "@tanstack/react-table" {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface TableMeta<TData extends RowData> {
+    onVerDetalle?: (movimiento: MovimientoAPI) => void;
+  }
 }
 
 export const columns: ColumnDef<MovimientoAPI>[] = [
@@ -94,14 +105,26 @@ export const columns: ColumnDef<MovimientoAPI>[] = [
         case "EGRESO":
           customClass = "ml-6 bg-red-800 text-white";
           break;
+        case "INGRESO":
+          customClass = "ml-6 bg-emerald-600 text-white";
+          break;
         default:
           variant = "secondary";
       }
 
+      const anulado = row.original.estado === "ANULADO";
+
       return (
-        <Badge className={customClass} variant={variant}>
-          {tipo}
-        </Badge>
+        <div className="flex items-center gap-1">
+          <Badge className={customClass} variant={variant}>
+            {tipo}
+          </Badge>
+          {anulado && (
+            <Badge variant="outline" className="border-red-500 text-red-600">
+              ANULADO
+            </Badge>
+          )}
+        </div>
       );
     },
   },
@@ -218,10 +241,16 @@ export const columns: ColumnDef<MovimientoAPI>[] = [
     header: "Monto",
     cell: ({ row }) => {
       const value = row.getValue("monto") as number;
-      return new Intl.NumberFormat("es-AR", {
+      const anulado = row.original.estado === "ANULADO";
+      const formateado = new Intl.NumberFormat("es-AR", {
         style: "currency",
         currency: "ARS",
       }).format(value);
+      return (
+        <span className={anulado ? "line-through text-muted-foreground" : ""}>
+          {formateado}
+        </span>
+      );
     },
   },
   {
@@ -234,6 +263,30 @@ export const columns: ColumnDef<MovimientoAPI>[] = [
     cell: ({ row }) => {
       const fecha = row.getValue("timestamp") as string;
       return <span>{formatDateArgentina(fecha)}</span>;
+    },
+  },
+  {
+    id: "detalle",
+    header: "Detalle",
+    enableSorting: false,
+    enableHiding: false,
+    cell: ({ row, table }) => {
+      const movimiento = row.original;
+      const tieneVenta = !!movimiento.venta;
+
+      if (!tieneVenta) return <span className="text-muted-foreground">—</span>;
+
+      return (
+        <Button
+          variant="outline"
+          size="sm"
+          className="cursor-pointer"
+          onClick={() => table.options.meta?.onVerDetalle?.(movimiento)}
+        >
+          <Eye className="h-4 w-4 mr-1" />
+          Ver
+        </Button>
+      );
     },
   },
 ];

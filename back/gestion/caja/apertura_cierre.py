@@ -77,6 +77,7 @@ def cerrar_caja(db: Session, usuario_cierre: Usuario, saldo_final_declarado: flo
     print(f"2. Sesión Abierta encontrada. ID: {sesion_a_cerrar.id}, Saldo Inicial: {sesion_a_cerrar.saldo_inicial}")
 
     # Lógica de cálculo corregida para sumar/restar según el tipo de movimiento
+    # (los movimientos ANULADOS no impactan en el saldo)
     suma_condicional = func.sum(
         case(
             (CajaMovimiento.tipo.in_(["EGRESO"]), -CajaMovimiento.monto),
@@ -87,6 +88,7 @@ def cerrar_caja(db: Session, usuario_cierre: Usuario, saldo_final_declarado: flo
         select(suma_condicional)
         .where(CajaMovimiento.id_caja_sesion == sesion_a_cerrar.id)
         .where(CajaMovimiento.tipo.not_in(["APERTURA"]))
+        .where(CajaMovimiento.estado != "ANULADO")
     )
     suma_movimientos = db.exec(consulta_movimientos).first() or 0.0
     print(f"3. Suma NETA de movimientos (Ingresos - Egresos): {suma_movimientos}")
@@ -151,6 +153,7 @@ def cerrar_caja_por_id(
     print(f"2. Sesión Abierta encontrada. ID: {sesion_a_cerrar.id}, Abierta por usuario ID: {sesion_a_cerrar.id_usuario_apertura}")
 
     # 3. Lógica de cálculo (es idéntica a la otra función de cierre)
+    #    (los movimientos ANULADOS no impactan en el saldo)
     suma_condicional = func.sum(
         case(
             (CajaMovimiento.tipo.in_(["EGRESO"]), -CajaMovimiento.monto),
@@ -161,6 +164,7 @@ def cerrar_caja_por_id(
         select(suma_condicional)
         .where(CajaMovimiento.id_caja_sesion == sesion_a_cerrar.id)
         .where(CajaMovimiento.tipo.not_in(["APERTURA"]))
+        .where(CajaMovimiento.estado != "ANULADO")
     )
     suma_movimientos = db.exec(consulta_movimientos).first() or 0.0
     print(f"3. Suma NETA de movimientos: {suma_movimientos}")
@@ -194,3 +198,135 @@ def cerrar_caja_por_id(
 
     print("--- [FIN TRACE] ---\n")
     return sesion_a_cerrar
+
+
+def _calcular_suma_neta_movimientos(db: Session, id_sesion: int) -> float:
+    """Suma neta de movimientos de una sesion (EGRESO resta, resto suma),
+    ignorando la APERTURA y los movimientos ANULADOS."""
+    suma_condicional = func.sum(
+        case(
+            (CajaMovimiento.tipo.in_(["EGRESO"]), -CajaMovimiento.monto),
+            else_=CajaMovimiento.monto
+        )
+    )
+    consulta = (
+        select(suma_condicional)
+        .where(CajaMovimiento.id_caja_sesion == id_sesion)
+        .where(CajaMovimiento.tipo.not_in(["APERTURA"]))
+        .where(CajaMovimiento.estado != "ANULADO")
+    )
+    return db.exec(consulta).first() or 0.0
+
+
+def editar_sesion_caja(
+    db: Session,
+    id_sesion: int,
+    usuario_admin: Usuario,
+    saldo_inicial: Optional[float] = None,
+    saldo_final_declarado: Optional[float] = None,
+    saldo_final_efectivo: Optional[float] = None,
+    saldo_final_transferencias: Optional[float] = None,
+    saldo_final_bancario: Optional[float] = None,
+) -> CajaSesion:
+    """
+    [Admin] Edita los saldos de una sesion de caja y recalcula el saldo calculado
+    y la diferencia desde los movimientos (fuente de verdad). Registra trazabilidad
+    de quien y cuando edito.
+    """
+    sesion = db.get(CajaSesion, id_sesion)
+    if not sesion:
+        raise ValueError(f"No se encontró ninguna sesión de caja con el ID {id_sesion}.")
+    if sesion.id_empresa != usuario_admin.id_empresa:
+        raise PermissionError("Permiso denegado. No puede editar una caja de otra empresa.")
+
+    # 1. Actualizar saldo inicial (y sincronizar el movimiento de APERTURA asociado)
+    if saldo_inicial is not None:
+        sesion.saldo_inicial = saldo_inicial
+        mov_apertura = db.exec(
+            select(CajaMovimiento)
+            .where(CajaMovimiento.id_caja_sesion == sesion.id)
+            .where(CajaMovimiento.tipo == "APERTURA")
+        ).first()
+        if mov_apertura:
+            mov_apertura.monto = saldo_inicial
+            db.add(mov_apertura)
+
+    # 2. Actualizar saldos declarados de cierre (si vienen)
+    if saldo_final_declarado is not None:
+        sesion.saldo_final_declarado = saldo_final_declarado
+    if saldo_final_efectivo is not None:
+        sesion.saldo_final_efectivo = saldo_final_efectivo
+    if saldo_final_transferencias is not None:
+        sesion.saldo_final_transferencias = saldo_final_transferencias
+    if saldo_final_bancario is not None:
+        sesion.saldo_final_bancario = saldo_final_bancario
+
+    # 3. Recalcular saldo calculado y diferencia SOLO si la caja esta cerrada
+    #    (una caja abierta todavia no tiene cierre declarado).
+    if sesion.estado == "CERRADA":
+        suma_movimientos = _calcular_suma_neta_movimientos(db, sesion.id)
+        saldo_final_calculado = sesion.saldo_inicial + suma_movimientos
+        sesion.saldo_final_calculado = round(saldo_final_calculado, 2)
+        if sesion.saldo_final_declarado is not None:
+            sesion.diferencia = round(sesion.saldo_final_declarado - saldo_final_calculado, 2)
+
+    # 4. Trazabilidad de la edicion
+    sesion.id_usuario_ultima_edicion = usuario_admin.id
+    sesion.fecha_ultima_edicion = datetime.utcnow()
+
+    try:
+        db.add(sesion)
+        db.commit()
+        db.refresh(sesion)
+    except Exception:
+        db.rollback()
+        raise
+
+    return sesion
+
+
+def anular_movimiento(
+    db: Session,
+    id_movimiento: int,
+    usuario_admin: Usuario,
+    motivo: str,
+) -> CajaMovimiento:
+    """
+    [Admin] Anula un movimiento manual de caja (INGRESO/EGRESO) marcandolo como
+    ANULADO con trazabilidad. No permite anular APERTURA ni VENTA (las ventas se
+    anulan por el flujo fiscal de comprobantes).
+    """
+    movimiento = db.get(CajaMovimiento, id_movimiento)
+    if not movimiento:
+        raise ValueError(f"No se encontró ningún movimiento con el ID {id_movimiento}.")
+
+    # Seguridad multi-empresa via la sesion de caja
+    sesion = db.get(CajaSesion, movimiento.id_caja_sesion)
+    if not sesion or sesion.id_empresa != usuario_admin.id_empresa:
+        raise PermissionError("Permiso denegado. No puede anular un movimiento de otra empresa.")
+
+    tipo_upper = (movimiento.tipo or "").upper()
+    if tipo_upper == "APERTURA":
+        raise ValueError("No se puede anular el movimiento de APERTURA de la caja.")
+    if tipo_upper == "VENTA":
+        raise ValueError(
+            "Los movimientos de VENTA se anulan desde el flujo de comprobantes "
+            "(anular factura / anular comprobante), no desde aquí."
+        )
+    if (movimiento.estado or "").upper() == "ANULADO":
+        raise ValueError("El movimiento ya se encuentra anulado.")
+
+    movimiento.estado = "ANULADO"
+    movimiento.id_usuario_anulacion = usuario_admin.id
+    movimiento.fecha_anulacion = datetime.utcnow()
+    movimiento.motivo_anulacion = motivo
+
+    try:
+        db.add(movimiento)
+        db.commit()
+        db.refresh(movimiento)
+    except Exception:
+        db.rollback()
+        raise
+
+    return movimiento

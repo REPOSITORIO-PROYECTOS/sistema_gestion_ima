@@ -39,6 +39,12 @@ import {
 } from "@/lib/ventas-form-flow";
 import { empresaSoloComprobanteCaja } from "@/lib/permisos";
 import { usePerfilEmpresa } from "@/hooks/usePerfilEmpresa";
+import { buscarPorCodigoLocal } from "@/lib/offline/catalogo-search";
+import { useCajaStore } from "@/lib/cajaStore";
+import {
+  intentarRegistrarVenta,
+  type VentaPendientePayload,
+} from "@/lib/offline/venta-offline";
 
 // --- Componentes Hijos ---
 import { SeccionCliente } from "./SeccionCliente";
@@ -77,6 +83,16 @@ type ProductoSeleccionado = {
   venta_negocio: number;
   stock_actual: number;
   unidad_venta: string;
+  precio_manual?: boolean;
+};
+
+type ArticuloCodigoResponse = {
+  id: number | string;
+  descripcion?: string;
+  precio_venta: number;
+  venta_negocio: number;
+  stock_actual: number;
+  unidad_venta?: string;
   precio_manual?: boolean;
 };
 
@@ -122,6 +138,8 @@ interface FormVentasProps {
   vuelto: number;
   montoPagado: number;
   setMontoPagado: (value: number) => void;
+  idEmpresa?: number;
+  offlineHabilitado?: boolean;
 }
 
 
@@ -141,6 +159,8 @@ function FormVentas({
   vuelto,
   montoPagado,
   setMontoPagado,
+  idEmpresa,
+  offlineHabilitado = false,
 }: FormVentasProps) {
 
   /* Estados */
@@ -148,6 +168,7 @@ function FormVentas({
   const getProductoById = useProductoStore((state) => state.getProductoById);
   const [productoSeleccionado, setProductoSeleccionado] = useState<ProductoSeleccionado | null>(null);
   const token = useAuthStore((state) => state.token);
+  const idSesion = useCajaStore((state) => state.idSesion);
   const { formatoComprobante } = useFacturacionStore();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null);
@@ -581,25 +602,42 @@ function FormVentas({
       if (!codigo) return;
 
       try {
-        const res = await fetch(`${API_CONFIG.BASE_URL}/articulos/codigos/buscar/${codigo}`, {
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        });
+        let productoAdaptado: ProductoSeleccionado | null = null;
 
-        if (!res.ok) {
-          throw new Error('Producto no encontrado');
+        try {
+          const res = await fetch(`${API_CONFIG.BASE_URL}/articulos/codigos/buscar/${codigo}`, {
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          });
+
+          if (!res.ok) {
+            throw new Error('Producto no encontrado');
+          }
+
+          const data = (await res.json()) as ArticuloCodigoResponse;
+          productoAdaptado = {
+            id: data.id.toString(),
+            nombre: data.descripcion || "Producto sin nombre",
+            precio_venta: data.precio_venta,
+            venta_negocio: data.venta_negocio,
+            stock_actual: data.stock_actual,
+            unidad_venta: data.unidad_venta || 'Unidad',
+            precio_manual: data.precio_manual ?? false,
+          };
+        } catch (serverError) {
+          if (!offlineHabilitado || !idEmpresa) {
+            throw serverError;
+          }
+
+          const productoLocal = await buscarPorCodigoLocal(idEmpresa, codigo);
+          if (!productoLocal) {
+            throw serverError;
+          }
+          productoAdaptado = productoLocal;
         }
 
-        const data = await res.json();
-
-        const productoAdaptado: ProductoSeleccionado = {
-          id: data.id.toString(),
-          nombre: data.descripcion || "Producto sin nombre",
-          precio_venta: data.precio_venta,
-          venta_negocio: data.venta_negocio,
-          stock_actual: data.stock_actual,
-          unidad_venta: data.unidad_venta || 'Unidad',
-          precio_manual: data.precio_manual ?? false,
-        };
+        if (!productoAdaptado) {
+          throw new Error('Producto no encontrado');
+        }
 
         upsertProductos([{
           id: productoAdaptado.id,
@@ -929,10 +967,10 @@ function FormVentas({
       return;
     }
 
-    const ventaPayload: any = {
+    const ventaBody = {
       id_cliente: tipoClienteSeleccionado.id === "0" ? 0 : clienteSeleccionado?.id ?? 0,
-      total_venta: totalConDescuento, // Enviamos el total NETO para cálculo correcto de recargos
-      descuento_total: descuentoTotalCalculado, // Nuevo campo para historial
+      total_venta: totalConDescuento,
+      descuento_total: descuentoTotalCalculado,
       paga_con: montoPagado,
       pago_separado: pagoDividido,
       detalles_pago_separado: detallePagoDividido,
@@ -941,7 +979,7 @@ function FormVentas({
       articulos_vendidos: productosVendidos.map((p) => {
         const precioUnitario = p.cantidad ? p.precioBase / p.cantidad : 0;
         return {
-          id_articulo: p.id ?? "0",
+          id_articulo: Number(p.id),
           nombre: p.tipo,
           cantidad: p.cantidad,
           precio_unitario: precioUnitario,
@@ -949,18 +987,35 @@ function FormVentas({
           tasa_iva: 21.0,
         };
       }),
+      ...(usarPagosMultiples
+        ? {
+            pagos_multiples: pagosMultiples.map((p) => ({
+              metodo_pago: p.metodo_pago,
+              monto: p.monto,
+            })),
+          }
+        : {
+            metodo_pago: metodoPago.toUpperCase(),
+            paga_con: montoPagado,
+          }),
     };
 
-    // Agregar información de pago (simple o múltiple)
-    if (usarPagosMultiples) {
-      ventaPayload.pagos_multiples = pagosMultiples.map((p) => ({
-        metodo_pago: p.metodo_pago,
-        monto: p.monto,
-      }));
-    } else {
-      ventaPayload.metodo_pago = metodoPago.toUpperCase();
-      ventaPayload.paga_con = montoPagado;
-    }
+    const pendientePayload: VentaPendientePayload = {
+      venta: ventaBody,
+      meta: {
+        tipo_comprobante: tipo,
+        observaciones: observaciones || "",
+        total_final: totalVentaFinal,
+        descuento_nominal_total: descuentoNominalTotal || 0,
+        descuento_sobre_total: descuentoSobreTotal || 0,
+        cliente_nombre:
+          tipoClienteSeleccionado.id === "0"
+            ? "Consumidor Final"
+            : clienteSeleccionado?.nombre_razon_social ?? "N/A",
+        cuit_receptor: String(cuitReceptor),
+        empresa_nombre: empresa?.nombre_negocio,
+      },
+    };
 
     try {
       if (!empresa || !empresa.id_empresa) {
@@ -968,68 +1023,63 @@ function FormVentas({
         setIsLoading(false);
         return;
       }
-
-      const response = await fetch(`${API_CONFIG.BASE_URL}/caja/ventas/registrar`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(ventaPayload)
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        toast.error(`❌ Error al registrar venta: ${error.detail || response.statusText}`);
+      if (!token) {
+        toast.error("No se encontró el token de sesión.");
         setIsLoading(false);
         return;
       }
 
-      const data = await response.json();
-      const afip = data?.data?.facturacion_afip;
-      if (tipo === "factura" && afip?.estado === "FALLIDO") {
-        toast.error(`❌ Venta registrada pero AFIP falló: ${afip.error || "Error desconocido"}`);
-      } else {
-        toast.success(`✅ Venta registrada: ${data.message}`);
-      }
-
-      // Actualizamos el Store
-      await refrescarProductos();
-
-      // Preparar datos para impresión
-      const itemsBase = productosVendidos.map((p): ItemComprobante => {
-        const precioUnitario = p.cantidad ? p.precioBase / p.cantidad : 0;
-        const item: ItemComprobante = {
-          descripcion: p.tipo,
-          cantidad: p.cantidad,
-          precio_unitario: precioUnitario,
-          subtotal: p.precioTotal,
-          tasa_iva: 21,
-        };
-        if (tipo !== "factura") {
-          item.descuento_especifico = p.descuentoNominal || 0;
-          item.descuento_especifico_por = p.porcentajeDescuento || 0;
-        }
-        return item;
+      const resultado = await intentarRegistrarVenta({
+        token,
+        idEmpresa: empresa.id_empresa,
+        offlineHabilitado,
+        idSesionCaja: idSesion,
+        payload: pendientePayload,
+        tipoComprobante: tipo,
       });
 
-      // Imprimir
-      await imprimirComprobante(
-        tipo,
-        itemsBase,
-        totalVentaFinal,
-        descuentoNominalTotal || 0,
-        descuentoSobreTotal || 0,
-        observaciones || ""
-      );
+      if (resultado.mode === "online") {
+        toast.success(`✅ Venta registrada: ${resultado.message}`);
+        await refrescarProductos();
 
-      // Reset
+        const itemsBase = productosVendidos.map((p): ItemComprobante => {
+          const precioUnitario = p.cantidad ? p.precioBase / p.cantidad : 0;
+          const item: ItemComprobante = {
+            descripcion: p.tipo,
+            cantidad: p.cantidad,
+            precio_unitario: precioUnitario,
+            subtotal: p.precioTotal,
+            tasa_iva: 21,
+          };
+          if (tipo !== "factura") {
+            item.descuento_especifico = p.descuentoNominal || 0;
+            item.descuento_especifico_por = p.porcentajeDescuento || 0;
+          }
+          return item;
+        });
+
+        await imprimirComprobante(
+          tipo,
+          itemsBase,
+          totalVentaFinal,
+          descuentoNominalTotal || 0,
+          descuentoSobreTotal || 0,
+          observaciones || "",
+        );
+      } else {
+        toast.success(resultado.message);
+        setCatalogoResetTick((tick) => tick + 1);
+      }
+
       resetFormularioVenta();
       window.scrollTo({ top: 0, behavior: "smooth" });
-
     } catch (error) {
       console.error("Detalles del error de registro:", error);
-      toast.error("❌ Error de red al registrar la venta.");
+      toast.error(
+        error instanceof Error
+          ? `❌ ${error.message}`
+          : "❌ Error de red al registrar la venta.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -1056,7 +1106,10 @@ function FormVentas({
     imprimirComprobante,
     resetFormularioVenta,
     pagosMultiples,
-    usarPagosMultiples
+    usarPagosMultiples,
+    offlineHabilitado,
+    idSesion,
+    idEmpresa,
   ]);
 
   const handleF5 = useCallback(() => {
@@ -1281,6 +1334,8 @@ function FormVentas({
             onRefrescarProductos={refrescarProductos}
             catalogoResetTick={catalogoResetTick}
             onProductoConfirmado={focusCantidad}
+            offlineHabilitado={offlineHabilitado}
+            idEmpresa={idEmpresa}
           />
 
           {/* Sección de Cantidad */}

@@ -23,6 +23,7 @@ PLANTILLA_MODO_ESPECIAL_POS = PerfilOperativoEmpresa(
     panel_estadisticas_caja=True,
     mesas_habilitado=False,
     bloquear_descuentos_cajero=True,
+    cache_degradado=True,
     empresas_transferencia_ids=[35, 36],
 )
 
@@ -35,6 +36,7 @@ PLANTILLA_MODO_ESPECIAL_DEMO = PerfilOperativoEmpresa(
     panel_estadisticas_caja=True,
     mesas_habilitado=False,
     bloquear_descuentos_cajero=True,
+    cache_degradado=True,
     empresas_transferencia_ids=[37, 38],
 )
 
