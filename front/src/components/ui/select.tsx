@@ -54,6 +54,7 @@ function SelectContent({
   className,
   children,
   position = "popper",
+  collisionPadding = 12,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Content>) {
   return (
@@ -67,6 +68,7 @@ function SelectContent({
           className
         )}
         position={position}
+        collisionPadding={collisionPadding}
         {...props}
       >
         <SelectScrollUpButton />
@@ -74,7 +76,7 @@ function SelectContent({
           className={cn(
             "p-1",
             position === "popper" &&
-              "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)] scroll-my-1"
+              "w-full min-w-[var(--radix-select-trigger-width)] max-h-[min(18rem,var(--radix-select-content-available-height))] scroll-my-1"
           )}
         >
           {children}

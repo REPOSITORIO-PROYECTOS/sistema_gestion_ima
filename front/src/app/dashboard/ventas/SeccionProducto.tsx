@@ -1,6 +1,7 @@
 "use client"
 
-import { LegacyRef, useCallback, useEffect, useRef, useState } from "react"
+import { LegacyRef, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ChevronsDown, RefreshCw, Lock } from "lucide-react"
@@ -12,6 +13,21 @@ import { isBrowserOnline } from "@/lib/offline/connectivity"
 
 const LIMITE_BUSQUEDA = 40
 const LIMITE_LISTADO = 100
+const DROPDOWN_GAP = 4
+const DROPDOWN_MAX_HEIGHT_PX = 384
+
+type DropdownPosition = {
+  top: number
+  left: number
+  width: number
+  maxHeight: number
+  placement: "bottom" | "top"
+}
+
+function getDropdownMaxHeight(): number {
+  if (typeof window === "undefined") return DROPDOWN_MAX_HEIGHT_PX
+  return Math.min(DROPDOWN_MAX_HEIGHT_PX, window.innerHeight * 0.5)
+}
 
 type Producto = {
   id: string;
@@ -88,9 +104,49 @@ export function SeccionProducto(props: SeccionProductoProps) {
   const [loading, setLoading] = useState(false);
   const [justSelected, setJustSelected] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(-1);
+  const [dropdownPosition, setDropdownPosition] = useState<DropdownPosition | null>(null);
   const debounceRef = useRef<number | undefined>(undefined);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const localInputRef = useRef<HTMLInputElement | null>(null);
+
+  const setInputRefs = useCallback(
+    (node: HTMLInputElement | null) => {
+      localInputRef.current = node;
+      if (typeof inputRef === "function") {
+        inputRef(node);
+      } else if (inputRef && typeof inputRef === "object") {
+        (inputRef as React.MutableRefObject<HTMLInputElement | null>).current = node;
+      }
+    },
+    [inputRef],
+  );
+
+  const updateDropdownPosition = useCallback(() => {
+    const input = localInputRef.current;
+    if (!input) return;
+
+    const rect = input.getBoundingClientRect();
+    const maxHeight = getDropdownMaxHeight();
+    const spaceBelow = window.innerHeight - rect.bottom - DROPDOWN_GAP;
+    const spaceAbove = rect.top - DROPDOWN_GAP;
+    const placement =
+      spaceBelow >= Math.min(maxHeight, 160) || spaceBelow >= spaceAbove ? "bottom" : "top";
+    const availableSpace = placement === "bottom" ? spaceBelow : spaceAbove;
+    const height = Math.min(maxHeight, Math.max(availableSpace, 120));
+    const top =
+      placement === "bottom"
+        ? rect.bottom + DROPDOWN_GAP
+        : Math.max(DROPDOWN_GAP, rect.top - height - DROPDOWN_GAP);
+
+    setDropdownPosition({
+      top,
+      left: rect.left,
+      width: rect.width,
+      maxHeight: height,
+      placement,
+    });
+  }, []);
 
   const mapBusqueda = (data: MinimalArticulo[]): Producto[] =>
     data.map((a) => ({
@@ -186,22 +242,37 @@ export function SeccionProducto(props: SeccionProductoProps) {
     item?.scrollIntoView({ block: "nearest" });
   }, [highlightIndex]);
 
+  useLayoutEffect(() => {
+    if (!popoverOpen) {
+      setDropdownPosition(null);
+      return;
+    }
+
+    updateDropdownPosition();
+    window.addEventListener("scroll", updateDropdownPosition, true);
+    window.addEventListener("resize", updateDropdownPosition);
+
+    return () => {
+      window.removeEventListener("scroll", updateDropdownPosition, true);
+      window.removeEventListener("resize", updateDropdownPosition);
+    };
+  }, [popoverOpen, matches.length, updateDropdownPosition]);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        const inputElement = inputRef && "current" in inputRef ? inputRef.current : null;
-        if (inputElement && !inputElement.contains(event.target as Node)) {
-          setPopoverOpen(false);
-          setHighlightIndex(-1);
-        }
+      const target = event.target as Node;
+      if (dropdownRef.current?.contains(target) || localInputRef.current?.contains(target)) {
+        return;
       }
+      setPopoverOpen(false);
+      setHighlightIndex(-1);
     };
 
     if (popoverOpen) {
       document.addEventListener("mousedown", handleClickOutside);
     }
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [popoverOpen, inputRef, setPopoverOpen]);
+  }, [popoverOpen, setPopoverOpen]);
 
   useEffect(() => {
     const q = (codigo || "").trim();
@@ -282,6 +353,98 @@ export function SeccionProducto(props: SeccionProductoProps) {
   const precioMostrar = (prod: Producto) =>
     props.tipoClienteSeleccionadoId === "0" ? prod.precio_venta : prod.venta_negocio;
 
+  const dropdown =
+    popoverOpen && dropdownPosition && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            ref={dropdownRef}
+            style={{
+              position: "fixed",
+              top: dropdownPosition.top,
+              left: dropdownPosition.left,
+              width: dropdownPosition.width,
+              maxHeight: dropdownPosition.maxHeight,
+              zIndex: 200,
+            }}
+            className="bg-white border-2 border-green-600 rounded-lg shadow-xl flex flex-col"
+            onWheel={(e) => e.stopPropagation()}
+          >
+            {productoSeleccionado && (
+              <div className="px-3 py-2 text-sm flex items-center justify-between border-b bg-green-50 shrink-0 rounded-t-lg">
+                <span className="font-semibold text-green-900 text-xs truncate pr-2">
+                  Seleccionado: {productoSeleccionado.nombre}
+                </span>
+                <span className="text-green-700 font-bold text-xs shrink-0">
+                  ${productoSeleccionado.precio_venta.toFixed(2)}
+                </span>
+              </div>
+            )}
+
+            <div className="px-3 py-1.5 text-xs text-gray-500 border-b bg-gray-50 shrink-0 flex justify-between gap-2">
+              <span>
+                {loading
+                  ? "Buscando..."
+                  : matches.length > 0
+                    ? `${matches.length} resultado${matches.length === 1 ? "" : "s"} — ↑↓ para moverte, scroll para ver más`
+                    : codigo.trim()
+                      ? "Sin coincidencias"
+                      : "Listado inicial"}
+              </span>
+            </div>
+
+            <ul
+              ref={listRef}
+              className="overflow-y-auto overflow-x-hidden flex-1 overscroll-contain py-1"
+              role="listbox"
+              aria-label="Resultados de búsqueda"
+            >
+              {!loading && matches.length === 0 && (
+                <li className="py-6 text-center text-sm text-gray-500 px-3">
+                  {codigo.trim()
+                    ? `No se encontró "${codigo}". Probá con menos letras o el código de barras.`
+                    : "Escribí para buscar o usá ↓ para ver productos."}
+                </li>
+              )}
+
+              {matches.map((prod, index) => {
+                const activo = index === highlightIndex;
+                return (
+                  <li key={prod.id} role="option" aria-selected={activo}>
+                    <button
+                      type="button"
+                      data-result-index={index}
+                      onMouseEnter={() => setHighlightIndex(index)}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => seleccionarProducto(prod)}
+                      className={`w-full text-left px-3 py-2.5 flex items-center justify-between gap-3 border-b border-gray-100 last:border-b-0 transition-colors ${
+                        activo
+                          ? "bg-green-100 text-green-950"
+                          : "hover:bg-green-50 text-gray-900"
+                      }`}
+                    >
+                      <span className="font-medium text-sm leading-snug flex-1 min-w-0 break-words">
+                        {prod.nombre}
+                      </span>
+                      <span className="flex items-center gap-2 shrink-0 text-sm">
+                        <span className="font-semibold text-green-800">
+                          ${precioMostrar(prod).toFixed(0)}
+                        </span>
+                        {prod.stock_actual > 0 && (
+                          <span className="text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-medium">
+                            stk {prod.stock_actual}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>,
+          document.body,
+        )
+      : null;
+
   return (
     <div className="flex flex-col gap-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 items-start">
@@ -296,7 +459,7 @@ export function SeccionProducto(props: SeccionProductoProps) {
             <div className="relative w-full">
               <Input
                 id="codigo-barras"
-                ref={inputRef}
+                ref={setInputRefs}
                 type="text"
                 value={codigo}
                 onChange={(e) => {
@@ -319,86 +482,7 @@ export function SeccionProducto(props: SeccionProductoProps) {
                 placeholder="Escribí nombre o escaneá código de barras"
                 autoComplete="off"
               />
-
-              {popoverOpen && (
-                <div
-                  ref={dropdownRef}
-                  className="absolute z-50 w-full mt-1 bg-white border-2 border-green-600 rounded-lg shadow-xl flex flex-col max-h-[min(24rem,55vh)]"
-                  onWheel={(e) => e.stopPropagation()}
-                >
-                  {productoSeleccionado && (
-                    <div className="px-3 py-2 text-sm flex items-center justify-between border-b bg-green-50 shrink-0 rounded-t-lg">
-                      <span className="font-semibold text-green-900 text-xs truncate pr-2">
-                        Seleccionado: {productoSeleccionado.nombre}
-                      </span>
-                      <span className="text-green-700 font-bold text-xs shrink-0">
-                        ${productoSeleccionado.precio_venta.toFixed(2)}
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="px-3 py-1.5 text-xs text-gray-500 border-b bg-gray-50 shrink-0 flex justify-between gap-2">
-                    <span>
-                      {loading
-                        ? "Buscando..."
-                        : matches.length > 0
-                          ? `${matches.length} resultado${matches.length === 1 ? "" : "s"} — ↑↓ para moverte, scroll para ver más`
-                          : codigo.trim()
-                            ? "Sin coincidencias"
-                            : "Listado inicial"}
-                    </span>
-                  </div>
-
-                  <ul
-                    ref={listRef}
-                    className="overflow-y-auto overflow-x-hidden flex-1 overscroll-contain py-1"
-                    role="listbox"
-                    aria-label="Resultados de búsqueda"
-                  >
-                    {!loading && matches.length === 0 && (
-                      <li className="py-6 text-center text-sm text-gray-500 px-3">
-                        {codigo.trim()
-                          ? `No se encontró "${codigo}". Probá con menos letras o el código de barras.`
-                          : "Escribí para buscar o usá ↓ para ver productos."}
-                      </li>
-                    )}
-
-                    {matches.map((prod, index) => {
-                      const activo = index === highlightIndex;
-                      return (
-                        <li key={prod.id} role="option" aria-selected={activo}>
-                          <button
-                            type="button"
-                            data-result-index={index}
-                            onMouseEnter={() => setHighlightIndex(index)}
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => seleccionarProducto(prod)}
-                            className={`w-full text-left px-3 py-2.5 flex items-center justify-between gap-3 border-b border-gray-100 last:border-b-0 transition-colors ${
-                              activo
-                                ? "bg-green-100 text-green-950"
-                                : "hover:bg-green-50 text-gray-900"
-                            }`}
-                          >
-                            <span className="font-medium text-sm leading-snug flex-1 min-w-0 break-words">
-                              {prod.nombre}
-                            </span>
-                            <span className="flex items-center gap-2 shrink-0 text-sm">
-                              <span className="font-semibold text-green-800">
-                                ${precioMostrar(prod).toFixed(0)}
-                              </span>
-                              {prod.stock_actual > 0 && (
-                                <span className="text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-medium">
-                                  stk {prod.stock_actual}
-                                </span>
-                              )}
-                            </span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              )}
+              {dropdown}
             </div>
 
             <Button

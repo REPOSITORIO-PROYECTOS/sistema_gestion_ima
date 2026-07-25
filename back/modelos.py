@@ -29,7 +29,10 @@ class Usuario(SQLModel, table=True):
     rol: Rol = Relationship(back_populates="usuarios")
     sesiones_abiertas: List["CajaSesion"] = Relationship(back_populates="usuario_apertura", sa_relationship_kwargs={'foreign_keys': '[CajaSesion.id_usuario_apertura]'})
     sesiones_cerradas: List["CajaSesion"] = Relationship(back_populates="usuario_cierre", sa_relationship_kwargs={'foreign_keys': '[CajaSesion.id_usuario_cierre]'})
-    movimientos_de_caja: List["CajaMovimiento"] = Relationship(back_populates="usuario")
+    movimientos_de_caja: List["CajaMovimiento"] = Relationship(
+        back_populates="usuario",
+        sa_relationship_kwargs={"foreign_keys": "[CajaMovimiento.id_usuario]"},
+    )
     movimientos_de_stock: List["StockMovimiento"] = Relationship(back_populates="usuario")
     compras_registradas: List["Compra"] = Relationship(back_populates="usuario")
     ventas_realizadas: List["Venta"] = Relationship(back_populates="usuario")
@@ -234,7 +237,10 @@ class CajaMovimiento(SQLModel, table=True):
     fecha_anulacion: Optional[datetime] = None
     motivo_anulacion: Optional[str] = None
     caja_sesion: CajaSesion = Relationship(back_populates="movimientos")
-    usuario: Usuario = Relationship(back_populates="movimientos_de_caja")
+    usuario: Usuario = Relationship(
+        back_populates="movimientos_de_caja",
+        sa_relationship_kwargs={"foreign_keys": "[CajaMovimiento.id_usuario]"},
+    )
     venta: Optional["Venta"] = Relationship(back_populates="movimientos_de_caja")
 
 

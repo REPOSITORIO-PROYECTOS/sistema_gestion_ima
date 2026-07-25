@@ -104,10 +104,15 @@ export function SeccionCliente({
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </button>
                 </PopoverTrigger>
-                <PopoverContent side="bottom" align="start" className="w-full md:max-w-[98%] p-0 max-h-64 overflow-y-auto z-50" sideOffset={8}>
-                  {/* === MODIFICACIÓN CLAVE AQUÍ === */}
-                  <Command id="clientes-lista"> 
-                  {/* === FIN DE LA MODIFICACIÓN === */}
+                <PopoverContent
+                  side="bottom"
+                  align="start"
+                  collisionPadding={12}
+                  avoidCollisions
+                  className="w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-1.5rem)] p-0 max-h-[min(16rem,50vh)] overflow-y-auto z-50"
+                  sideOffset={8}
+                >
+                  <Command id="clientes-lista">
                     <CommandInput placeholder="Buscar cliente por nombre o CUIT..." value={busquedaCliente} onValueChange={setBusquedaCliente} />
                     <CommandEmpty>No se encontró ningún cliente.</CommandEmpty>
                     <CommandGroup>

@@ -19,16 +19,16 @@ export function OfflineStatusBadge({
   const status = useOfflineStatus({ enabled, token, idEmpresa });
 
   if (!enabled) return null;
-
-  const classByStatus =
-    status.status === "online"
-      ? "border-green-200 bg-green-50 text-green-800"
-      : "border-amber-300 bg-amber-50 text-amber-900";
+  // Solo mostrar cuando hay problema de conexión (no el membrete "Conectado").
+  if (status.status === "online") return null;
 
   const pendientes = status.pendingCount > 0 ? ` · ${status.pendingCount} pendientes` : "";
 
   return (
-    <Badge variant="outline" className={`${classByStatus} ${className ?? ""}`}>
+    <Badge
+      variant="outline"
+      className={`border-amber-300 bg-amber-50 text-amber-900 ${className ?? ""}`}
+    >
       {status.label}
       {pendientes}
     </Badge>

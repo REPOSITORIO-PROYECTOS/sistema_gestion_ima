@@ -254,6 +254,28 @@ function DashboardVenta() {
     });
   }, []);
 
+  const handleUpdateProductCantidad = useCallback((index: number, nuevaCantidad: number) => {
+    if (!Number.isFinite(nuevaCantidad) || nuevaCantidad <= 0) return;
+
+    setProductos((prev) => {
+      const newProductos = [...prev];
+      const prod = { ...newProductos[index] };
+      const precioUnitario = prod.cantidad > 0 ? prod.precioBase / prod.cantidad : 0;
+
+      prod.cantidad = nuevaCantidad;
+      prod.precioBase = Math.round(precioUnitario * nuevaCantidad * 100) / 100;
+
+      const descPorc = prod.porcentajeDescuento || 0;
+      const descNom = prod.descuentoNominal || 0;
+      const subtotal = prod.precioBase * (1 - descPorc / 100);
+      prod.precioTotal = Math.max(0, Math.round((subtotal - descNom) * 100) / 100);
+      prod.descuentoAplicado = descPorc > 0 || descNom > 0;
+
+      newProductos[index] = prod;
+      return newProductos;
+    });
+  }, []);
+
   const handleEliminarProducto = useCallback((index: number) => {
     setProductos((prev) => prev.filter((_, i) => i !== index));
   }, []);
@@ -367,9 +389,27 @@ function DashboardVenta() {
                   className="flex flex-col md:flex-row w-full justify-between items-start md:items-center px-6 py-4 bg-emerald-100 rounded-lg text-green-950 font-semibold border-3 border-green-800 text-xl shadow-lg"
                 >
                   <div className="flex flex-col w-full gap-2">
-                    <span>{prod.tipo} - x{prod.cantidad} U. - {formatearMoneda(prod.precioTotal)}</span>
+                    <span>{prod.tipo} — {formatearMoneda(prod.precioTotal)}</span>
 
-                    <div className="flex flex-row gap-4 items-center mt-1">
+                    <div className="flex flex-row flex-wrap gap-4 items-center mt-1">
+                      <div className="flex flex-col w-24">
+                        <label className="text-xs font-normal text-green-800">Cantidad</label>
+                        <Input
+                          type="number"
+                          inputMode="decimal"
+                          min={0.001}
+                          step="any"
+                          value={prod.cantidad}
+                          onChange={(e) => {
+                            const parsed = parseFloat(e.target.value);
+                            if (!Number.isFinite(parsed) || parsed <= 0) return;
+                            handleUpdateProductCantidad(index, parsed);
+                          }}
+                          className="h-8 text-sm bg-white"
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Cantidad de ${prod.tipo}`}
+                        />
+                      </div>
                       {puedeDescuentos && (
                         <>
                           <div className="flex flex-col w-24">
