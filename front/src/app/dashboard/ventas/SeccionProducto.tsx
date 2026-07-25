@@ -139,10 +139,22 @@ export function SeccionProducto(props: SeccionProductoProps) {
         ? rect.bottom + DROPDOWN_GAP
         : Math.max(DROPDOWN_GAP, rect.top - height - DROPDOWN_GAP);
 
+    // En pantallas chicas el input queda muy angosto (botones al lado) y
+    // el listado heredaba ese ancho → el nombre se partía letra por letra.
+    const viewportPadding = 8;
+    const maxViewportWidth = Math.max(0, window.innerWidth - viewportPadding * 2);
+    const minReadableWidth = Math.min(280, maxViewportWidth);
+    const width = Math.min(maxViewportWidth, Math.max(rect.width, minReadableWidth));
+    let left = rect.left;
+    if (left + width > window.innerWidth - viewportPadding) {
+      left = window.innerWidth - viewportPadding - width;
+    }
+    left = Math.max(viewportPadding, left);
+
     setDropdownPosition({
       top,
-      left: rect.left,
-      width: rect.width,
+      left,
+      width,
       maxHeight: height,
       placement,
     });
@@ -416,16 +428,16 @@ export function SeccionProducto(props: SeccionProductoProps) {
                       onMouseEnter={() => setHighlightIndex(index)}
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => seleccionarProducto(prod)}
-                      className={`w-full text-left px-3 py-2.5 flex items-center justify-between gap-3 border-b border-gray-100 last:border-b-0 transition-colors ${
+                      className={`w-full text-left px-3 py-2.5 flex flex-col gap-1 border-b border-gray-100 last:border-b-0 transition-colors ${
                         activo
                           ? "bg-green-100 text-green-950"
                           : "hover:bg-green-50 text-gray-900"
                       }`}
                     >
-                      <span className="font-medium text-sm leading-snug flex-1 min-w-0 break-words">
+                      <span className="font-medium text-sm leading-snug whitespace-normal break-normal">
                         {prod.nombre}
                       </span>
-                      <span className="flex items-center gap-2 shrink-0 text-sm">
+                      <span className="flex items-center gap-2 text-sm">
                         <span className="font-semibold text-green-800">
                           ${precioMostrar(prod).toFixed(0)}
                         </span>
@@ -455,8 +467,8 @@ export function SeccionProducto(props: SeccionProductoProps) {
           Escáner / Código
         </Label>
         <div className="md:col-span-2">
-          <div className="flex gap-2">
-            <div className="relative w-full">
+          <div className="flex flex-wrap gap-2">
+            <div className="relative min-w-0 flex-1 basis-[min(100%,12rem)]">
               <Input
                 id="codigo-barras"
                 ref={setInputRefs}
