@@ -13,9 +13,79 @@ from back import config
 from back.cliente_boveda import ClienteBoveda
 from back.schemas.comprobante_schemas import TransaccionData, ReceptorData, EmisorData
 from typing import Dict, Any
-from back.modelos import Venta
+from back.modelos import Venta, VentaDetalle
 
 TASA_IVA_21 = 0.21
+TASA_IVA_105 = 0.105
+
+
+def _normalizar_tasa_linea(raw: Any) -> float:
+    try:
+        tasa = float(raw)
+    except (TypeError, ValueError):
+        return TASA_IVA_21
+    if tasa > 1:
+        tasa = tasa / 100.0
+    tasa = round(tasa, 3)
+    if abs(tasa - TASA_IVA_105) < 0.001:
+        return TASA_IVA_105
+    return TASA_IVA_21
+
+
+def calcular_desglose_iva_desde_items(
+    items: list[VentaDetalle] | None,
+    total: float,
+    *,
+    es_responsable_inscripto: bool,
+) -> Dict[str, float]:
+    """
+    Precios con IVA incluido. Agrupa 21% y 10,5%.
+    Si no hay items o no es RI, cae al desglose clásico 21% sobre el total.
+    """
+    if not es_responsable_inscripto:
+        return {
+            "neto": float(total),
+            "iva": 0.0,
+            "neto105": 0.0,
+            "iva105": 0.0,
+        }
+
+    if not items:
+        neto = round(total / (1 + TASA_IVA_21), 2)
+        iva = round(total - neto, 2)
+        return {"neto": neto, "iva": iva, "neto105": 0.0, "iva105": 0.0}
+
+    sub21 = 0.0
+    sub105 = 0.0
+    for item in items:
+        subtotal = float(item.precio_unitario or 0) * float(item.cantidad or 0)
+        tasa = _normalizar_tasa_linea(getattr(item, "tasa_iva", TASA_IVA_21))
+        if tasa == TASA_IVA_105:
+            sub105 += subtotal
+        else:
+            sub21 += subtotal
+
+    neto21 = round(sub21 / (1 + TASA_IVA_21), 2) if sub21 else 0.0
+    iva21 = round(sub21 - neto21, 2) if sub21 else 0.0
+    neto105 = round(sub105 / (1 + TASA_IVA_105), 2) if sub105 else 0.0
+    iva105 = round(sub105 - neto105, 2) if sub105 else 0.0
+
+    # Ajuste de centavos: el total AFIP debe coincidir con el total de venta
+    suma = neto21 + iva21 + neto105 + iva105
+    diff = round(float(total) - suma, 2)
+    if abs(diff) >= 0.01:
+        if sub21 > 0:
+            iva21 = round(iva21 + diff, 2)
+        elif sub105 > 0:
+            iva105 = round(iva105 + diff, 2)
+
+    return {
+        "neto": neto21,
+        "iva": iva21,
+        "neto105": neto105,
+        "iva105": iva105,
+    }
+
 
 # Configuración para la Bóveda de Secretos
 BOVEDA_URL = config.URL_BOVEDA
@@ -236,6 +306,32 @@ def generar_factura_para_venta(
     )
     print(f"Lógica determinada: {logica_factura}")
 
+    items_venta = list(getattr(venta_a_facturar, "items", None) or [])
+    if not items_venta and getattr(venta_a_facturar, "id", None):
+        from sqlmodel import select
+        items_venta = list(
+            db.exec(
+                select(VentaDetalle).where(VentaDetalle.id_venta == venta_a_facturar.id)
+            ).all()
+        )
+
+    desglose = calcular_desglose_iva_desde_items(
+        items_venta,
+        total,
+        es_responsable_inscripto=(condicion_emisor == CondicionIVA.RESPONSABLE_INSCRIPTO),
+    )
+    # Factura C / monotributo: respetar logica (iva 0). RI: usar desglose mixto.
+    if condicion_emisor == CondicionIVA.RESPONSABLE_INSCRIPTO:
+        neto_final = desglose["neto"]
+        iva_final = desglose["iva"]
+        neto105 = desglose["neto105"]
+        iva105 = desglose["iva105"]
+    else:
+        neto_final = logica_factura.get("neto", total)
+        iva_final = logica_factura.get("iva", 0.0)
+        neto105 = 0.0
+        iva105 = 0.0
+
     # Estructuramos datos_factura según guía del microservicio (objeto, no lista)
     datos_factura = {
         "tipo_afip": logica_factura["tipo_afip"],
@@ -243,8 +339,10 @@ def generar_factura_para_venta(
         "tipo_documento": tipo_documento_receptor.value,
         "documento": str(documento),
         "total": total,
-        "neto": logica_factura.get("neto", total),
-        "iva": logica_factura.get("iva", 0.0),
+        "neto": neto_final,
+        "iva": iva_final,
+        "neto105": neto105,
+        "iva105": iva105,
         "id_condicion_iva": getattr(condicion_receptor, "value", None)
     }
 
@@ -523,8 +621,18 @@ def generar_nota_credito_para_venta(
         condicion_receptor=condicion_receptor,
     )
     
-    # La lógica de neto/iva es la misma que para una factura
-    neto, iva = (round(total / (1 + TASA_IVA_21), 2), round(total - (total / (1 + TASA_IVA_21)), 2)) if condicion_emisor == CondicionIVA.RESPONSABLE_INSCRIPTO else (total, 0.0)
+    # La lógica de neto/iva: preferir desglose mixto si el emisor es RI
+    if condicion_emisor == CondicionIVA.RESPONSABLE_INSCRIPTO:
+        desglose_nc = calcular_desglose_iva_desde_items(
+            None,
+            total,
+            es_responsable_inscripto=True,
+        )
+        neto, iva = desglose_nc["neto"], desglose_nc["iva"]
+        neto105, iva105 = desglose_nc["neto105"], desglose_nc["iva105"]
+    else:
+        neto, iva = total, 0.0
+        neto105, iva105 = 0.0, 0.0
 
     datos_nota_credito = {
         "tipo_afip": tipo_nota_credito,
@@ -534,6 +642,8 @@ def generar_nota_credito_para_venta(
         "total": total,
         "neto": neto,
         "iva": iva,
+        "neto105": neto105,
+        "iva105": iva105,
         # --- CAMBIO CLAVE 2: Añadir la referencia a la factura original ---
         "comprobantes_asociados": [
             {

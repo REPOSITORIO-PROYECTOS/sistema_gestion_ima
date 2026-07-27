@@ -227,6 +227,9 @@ def _asignar_barcodes(
 
 def _articulo_a_response(articulo: Articulo) -> Dict[str, Any]:
     categorias = _leer_categorias_articulo(articulo)
+    tasa = getattr(articulo, "tasa_iva", None)
+    if tasa is None:
+        tasa = 0.21
     return {
         "id": articulo.id,
         "codigo_interno": articulo.codigo_interno or "",
@@ -242,6 +245,7 @@ def _articulo_a_response(articulo: Articulo) -> Dict[str, Any]:
         "cantidad_envase": _parse_cantidad_envase(articulo.ubicacion),
         "ubicacion": articulo.ubicacion,
         "activo": articulo.activo,
+        "tasa_iva": float(tasa),
     }
 
 
@@ -270,6 +274,7 @@ def crear_producto(
         precio_venta=data.precio_venta,
         venta_negocio=data.precio_venta,
         precio_costo=data.precio_costo or 0.0,
+        tasa_iva=data.tasa_iva if data.tasa_iva is not None else 0.21,
         auto_actualizar_precio=False,
         stock_actual=data.stock if data.stock is not None else 0.0,
         stock_minimo=data.stock_minimo,
@@ -311,6 +316,8 @@ def actualizar_producto(
         articulo.venta_negocio = update["precio_venta"]
     if "precio_costo" in update and update["precio_costo"] is not None:
         articulo.precio_costo = update["precio_costo"]
+    if "tasa_iva" in update and update["tasa_iva"] is not None:
+        articulo.tasa_iva = update["tasa_iva"]
     if "stock" in update and update["stock"] is not None:
         articulo.stock_actual = update["stock"]
     if "stock_minimo" in update:

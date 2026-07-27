@@ -48,7 +48,14 @@ export const formVacio = (): ProductoFormData => ({
   unidad: "unidad",
   cantidad_envase: "",
   ubicacion: "",
+  tasa_iva: "0.21",
 });
+
+function tasaIvaAForm(tasa?: number | null): "0.21" | "0.105" {
+  if (tasa == null) return "0.21";
+  const n = tasa > 1 ? tasa / 100 : tasa;
+  return Math.abs(n - 0.105) < 0.001 ? "0.105" : "0.21";
+}
 
 export function productoAForm(p: ProductoModoEspecial): ProductoFormData {
   return {
@@ -63,6 +70,7 @@ export function productoAForm(p: ProductoModoEspecial): ProductoFormData {
     unidad: (p.unidad as UnidadMedida) || "unidad",
     cantidad_envase: p.cantidad_envase != null ? String(p.cantidad_envase) : "",
     ubicacion: p.ubicacion || "",
+    tasa_iva: tasaIvaAForm(p.tasa_iva),
   };
 }
 
@@ -429,6 +437,26 @@ export function ProductoWizardModal({
                   )}
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label>IVA al facturar</Label>
+                <Select
+                  value={form.tasa_iva}
+                  onValueChange={(v) =>
+                    onFormChange({ ...form, tasa_iva: v as "0.21" | "0.105" })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Alícuota IVA" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0.21">21% (general)</SelectItem>
+                    <SelectItem value="0.105">10,5% (carnes)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  El precio de venta es el final (con IVA). Esta alícuota solo cambia el desglose fiscal.
+                </p>
+              </div>
             </div>
           )}
 
@@ -497,6 +525,10 @@ export function ProductoWizardModal({
                   <dd className="text-foreground">{form.categorias || "—"}</dd>
                   <dt>Precio</dt>
                   <dd className="text-foreground">{formatMoneyPreview(form.precio_venta)}</dd>
+                  <dt>IVA</dt>
+                  <dd className="text-foreground">
+                    {form.tasa_iva === "0.105" ? "10,5% (carnes)" : "21%"}
+                  </dd>
                   <dt>Stock</dt>
                   <dd className="text-foreground">{form.stock || "0"} {form.unidad}</dd>
                 </dl>

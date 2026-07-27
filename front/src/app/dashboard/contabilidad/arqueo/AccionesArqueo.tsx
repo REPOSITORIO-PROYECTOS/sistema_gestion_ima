@@ -12,7 +12,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Lock, Pencil } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Loader2, Lock, Pencil, CheckCircle2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthStore } from "@/lib/authStore";
 import { API_CONFIG } from "@/lib/api-config";
@@ -23,6 +24,8 @@ interface AccionesArqueoProps {
   onActionComplete?: () => void;
 }
 
+const ROLES_SUPERVISOR = new Set(["Admin", "Gerente", "Encargada", "Soporte"]);
+
 const aNumero = (valor: string): number => {
   const n = parseFloat(valor);
   return Number.isFinite(n) ? n : 0;
@@ -30,11 +33,15 @@ const aNumero = (valor: string): number => {
 
 export function AccionesArqueo({ arqueo, onActionComplete }: AccionesArqueoProps) {
   const token = useAuthStore((state) => state.token);
-  const rol = useAuthStore((state) => state.usuario?.rol?.nombre);
-  const esAdmin = rol === "Admin";
+  const rol =
+    useAuthStore((state) => state.usuario?.rol?.nombre) ??
+    useAuthStore((state) => state.role?.nombre);
+  const esAdmin = rol === "Admin" || rol === "Soporte";
+  const esSupervisor = Boolean(rol && ROLES_SUPERVISOR.has(rol));
 
   const [modalCerrar, setModalCerrar] = useState(false);
   const [modalEditar, setModalEditar] = useState(false);
+  const [modalRevisar, setModalRevisar] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   // Estado modal Cerrar
@@ -57,7 +64,9 @@ export function AccionesArqueo({ arqueo, onActionComplete }: AccionesArqueoProps
     arqueo.saldo_final_declarado != null ? String(arqueo.saldo_final_declarado) : "",
   );
 
-  if (!esAdmin) return null;
+  const [notaRevision, setNotaRevision] = useState(arqueo.nota_revision ?? "");
+
+  if (!esSupervisor) return null;
 
   const handleCerrarCaja = async () => {
     if (!token) {
@@ -106,7 +115,6 @@ export function AccionesArqueo({ arqueo, onActionComplete }: AccionesArqueoProps
       toast.error("No se encontró el token.");
       return;
     }
-    // Construimos el payload solo con los campos completados.
     const payload: Record<string, number> = {};
     if (editSaldoInicial.trim() !== "") payload.saldo_inicial = aNumero(editSaldoInicial);
     if (editDeclarado.trim() !== "") payload.saldo_final_declarado = aNumero(editDeclarado);
@@ -147,9 +155,49 @@ export function AccionesArqueo({ arqueo, onActionComplete }: AccionesArqueoProps
     }
   };
 
+  const handleRevisar = async (marcar: boolean) => {
+    if (!token) {
+      toast.error("No se encontró el token.");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const res = await fetch(
+        `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.CAJA_REVISAR_SESION(arqueo.id_sesion)}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            revisado: marcar,
+            nota_revision: marcar ? notaRevision.trim() || null : null,
+          }),
+        },
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "No se pudo actualizar la revisión");
+      }
+      toast.success(
+        marcar
+          ? "Arqueo marcado como revisado. Diferencia tenida en cuenta."
+          : "Revisión desmarcada. El arqueo vuelve a pendiente.",
+      );
+      setModalRevisar(false);
+      onActionComplete?.();
+    } catch (error) {
+      if (error instanceof Error) toast.error(error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <div className="flex gap-2">
-      {arqueo.estado === "ABIERTA" && (
+    <div className="flex flex-wrap gap-2">
+      {esAdmin && arqueo.estado === "ABIERTA" && (
         <Button
           variant="outline"
           size="sm"
@@ -162,16 +210,52 @@ export function AccionesArqueo({ arqueo, onActionComplete }: AccionesArqueoProps
         </Button>
       )}
 
-      <Button
-        variant="outline"
-        size="sm"
-        className="cursor-pointer"
-        onClick={() => setModalEditar(true)}
-        title="Editar saldos (Admin)"
-      >
-        <Pencil className="h-4 w-4 mr-1" />
-        Editar
-      </Button>
+      {esAdmin && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="cursor-pointer"
+          onClick={() => setModalEditar(true)}
+          title="Editar saldos (Admin)"
+        >
+          <Pencil className="h-4 w-4 mr-1" />
+          Editar
+        </Button>
+      )}
+
+      {arqueo.estado === "CERRADA" && !arqueo.revisado && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="cursor-pointer border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+          onClick={() => {
+            setNotaRevision(arqueo.nota_revision ?? "");
+            setModalRevisar(true);
+          }}
+          title="Marcar arqueo como revisado"
+        >
+          <CheckCircle2 className="h-4 w-4 mr-1" />
+          Revisar
+        </Button>
+      )}
+
+      {arqueo.estado === "CERRADA" && arqueo.revisado && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="cursor-pointer text-gray-600"
+          onClick={() => void handleRevisar(false)}
+          disabled={isLoading}
+          title="Quitar marca de revisado"
+        >
+          {isLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin mr-1" />
+          ) : (
+            <RotateCcw className="h-4 w-4 mr-1" />
+          )}
+          Quitar revisión
+        </Button>
+      )}
 
       {/* Modal Cerrar Caja */}
       <Dialog open={modalCerrar} onOpenChange={setModalCerrar}>
@@ -227,7 +311,8 @@ export function AccionesArqueo({ arqueo, onActionComplete }: AccionesArqueoProps
             <DialogTitle>Editar saldos (Sesión #{arqueo.id_sesion})</DialogTitle>
             <DialogDescription>
               Modifique los saldos. El saldo calculado y la diferencia se recalculan
-              automáticamente en el servidor.
+              automáticamente en el servidor. Si el arqueo estaba revisado, la revisión
+              se anula.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
@@ -277,6 +362,59 @@ export function AccionesArqueo({ arqueo, onActionComplete }: AccionesArqueoProps
             <Button onClick={handleEditarSaldos} disabled={isLoading}>
               {isLoading && <Loader2 className="animate-spin mr-2 h-4 w-4" />}
               Guardar cambios
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Revisar */}
+      <Dialog open={modalRevisar} onOpenChange={setModalRevisar}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Revisar arqueo (Sesión #{arqueo.id_sesion})</DialogTitle>
+            <DialogDescription>
+              Confirme que revisó este cierre y tuvo en cuenta la diferencia.
+              No se modifican los saldos.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 py-2 text-sm">
+            <div className="flex justify-between gap-4">
+              <span className="text-gray-500">Diferencia</span>
+              <span
+                className={
+                  arqueo.diferencia === 0 || arqueo.diferencia == null
+                    ? "font-semibold text-green-700"
+                    : "font-semibold text-red-700"
+                }
+              >
+                {arqueo.diferencia == null
+                  ? "—"
+                  : new Intl.NumberFormat("es-AR", {
+                      style: "currency",
+                      currency: "ARS",
+                    }).format(arqueo.diferencia)}
+              </span>
+            </div>
+            <div className="grid gap-1">
+              <Label htmlFor="nota-revision">Nota (opcional)</Label>
+              <Textarea
+                id="nota-revision"
+                value={notaRevision}
+                onChange={(e) => setNotaRevision(e.target.value)}
+                placeholder="Ej: diferencia por vuelto mal registrado, ya conversado con cajero"
+                rows={3}
+                maxLength={500}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              className="bg-emerald-700 hover:bg-emerald-800"
+              onClick={() => void handleRevisar(true)}
+              disabled={isLoading}
+            >
+              {isLoading && <Loader2 className="animate-spin mr-2 h-4 w-4" />}
+              Marcar revisado
             </Button>
           </DialogFooter>
         </DialogContent>

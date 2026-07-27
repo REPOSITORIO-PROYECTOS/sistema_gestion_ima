@@ -18,6 +18,28 @@ from back.gestion.sync_nube_queue_manager import (
 
 #ACA TENGO QUE REGISTRAR CUANDO ENTRA Y CUANDO SALE PLATA, MODIFICA LA TABLA MOVIMIENTOS
 
+TASA_IVA_DEFAULT = 0.21
+TASA_IVA_105 = 0.105
+
+
+def _resolver_tasa_iva_articulo(articulo: Articulo | None) -> float:
+    """Snapshot de alícuota al vender. Solo 21% o 10,5%; resto cae a 21%."""
+    if articulo is None:
+        return TASA_IVA_DEFAULT
+    raw = getattr(articulo, "tasa_iva", None)
+    if raw is None:
+        return TASA_IVA_DEFAULT
+    try:
+        tasa = float(raw)
+    except (TypeError, ValueError):
+        return TASA_IVA_DEFAULT
+    if tasa > 1:
+        tasa = tasa / 100.0
+    tasa = round(tasa, 3)
+    if abs(tasa - TASA_IVA_105) < 0.001:
+        return TASA_IVA_105
+    return TASA_IVA_DEFAULT
+
 
 def _agregar_evento_sync_nube(
     db: Session,
@@ -376,7 +398,8 @@ def registrar_venta_y_movimiento_caja(
             id_articulo=item.id_articulo,
             cantidad=item.cantidad,
             precio_unitario=precio_unitario_final, # <-- Precio final pagado (con descuentos y recargos)
-            descuento_aplicado=descuento_item_total # <-- Para auditoría
+            descuento_aplicado=descuento_item_total, # <-- Para auditoría
+            tasa_iva=_resolver_tasa_iva_articulo(articulo_a_actualizar),
         )
         db.add(detalle)
         if afectar_stock:

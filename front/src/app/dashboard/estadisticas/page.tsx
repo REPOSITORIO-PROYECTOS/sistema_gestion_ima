@@ -2,6 +2,7 @@
 
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PanelEstadisticasCaja from "@/components/PanelEstadisticasCaja";
+import PanelEstadisticasGenerales from "@/components/PanelEstadisticasGenerales";
 import { empresaTienePanelEstadisticas } from "@/lib/permisos";
 import { usePerfilEmpresa } from "@/hooks/usePerfilEmpresa";
 
@@ -20,7 +21,10 @@ export default function EstadisticasPage() {
 
   return (
     <ProtectedRoute allowedRoles={["Admin", "Gerente", "Encargada", "Soporte"]}>
-      <PanelEstadisticasCaja />
+      <div className="w-full max-w-6xl mx-auto space-y-8">
+        <PanelEstadisticasCaja />
+        <PanelEstadisticasGenerales />
+      </div>
     </ProtectedRoute>
   );
 }

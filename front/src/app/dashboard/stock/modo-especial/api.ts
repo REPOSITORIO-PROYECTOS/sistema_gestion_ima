@@ -22,6 +22,7 @@ export interface ProductoModoEspecial {
   cantidad_envase?: number | null;
   ubicacion?: string | null;
   activo: boolean;
+  tasa_iva?: number;
 }
 
 export interface ProductoFormData {
@@ -36,6 +37,7 @@ export interface ProductoFormData {
   unidad: UnidadMedida;
   cantidad_envase: string;
   ubicacion: string;
+  tasa_iva: "0.21" | "0.105";
 }
 
 const headers = (token: string) => ({
@@ -98,6 +100,7 @@ function parsePayload(form: ProductoFormData) {
     unidad: form.unidad,
     cantidad_envase: form.cantidad_envase ? parseFloat(form.cantidad_envase) : undefined,
     ubicacion: form.ubicacion.trim() || undefined,
+    tasa_iva: parseFloat(form.tasa_iva || "0.21"),
   };
 }
 
@@ -134,6 +137,7 @@ export async function actualizarProductoModoEspecial(
   if (form.descripcion) payload.descripcion = form.descripcion.trim();
   if (form.precio_venta) payload.precio_venta = parseFloat(form.precio_venta);
   if (form.precio_costo) payload.precio_costo = parseFloat(form.precio_costo);
+  if (form.tasa_iva) payload.tasa_iva = parseFloat(form.tasa_iva);
   if (form.categorias) {
     payload.categorias = form.categorias.split(/[,;|]/).map((c) => c.trim()).filter(Boolean);
   }

@@ -2,6 +2,7 @@
 # VERSIÓN CORREGIDA Y UNIFICADA
 
 import logging
+from datetime import datetime
 from sqlmodel import Session, select
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import aliased, selectinload
@@ -31,13 +32,20 @@ def obtener_arqueos_de_caja(db: Session, usuario_actual: Usuario) -> Dict[str, L
         UsuarioCierre = aliased(Usuario, name="usuario_cierre")
 
         # --- CONSULTA 1: ARQUEOS DE CAJAS CERRADAS ---
+        UsuarioRevision = aliased(Usuario, name="usuario_revision")
         consulta_cerradas = (
-            select(CajaSesion, UsuarioApertura.nombre_usuario, UsuarioCierre.nombre_usuario)
+            select(
+                CajaSesion,
+                UsuarioApertura.nombre_usuario,
+                UsuarioCierre.nombre_usuario,
+                UsuarioRevision.nombre_usuario,
+            )
             # ¡CAMBIO 1: JOIN de Apertura!
             .join(UsuarioApertura, CajaSesion.id_usuario_apertura == UsuarioApertura.id)
             # ¡CAMBIO 2: JOIN de Cierre ahora es un LEFT JOIN (isouter=True) para ser más seguro!
             # Esto evita errores si una caja cerrada no tiene un usuario de cierre asignado.
             .join(UsuarioCierre, CajaSesion.id_usuario_cierre == UsuarioCierre.id, isouter=True)
+            .join(UsuarioRevision, CajaSesion.id_usuario_revision == UsuarioRevision.id, isouter=True)
             # ¡CAMBIO 3: FILTRO DE SEGURIDAD MULTI-EMPRESA!
             # Nos unimos a la tabla de usuarios de apertura para filtrar por empresa.
             .where(UsuarioApertura.id_empresa == usuario_actual.id_empresa)
@@ -46,7 +54,7 @@ def obtener_arqueos_de_caja(db: Session, usuario_actual: Usuario) -> Dict[str, L
         )
         resultados_cerradas = db.exec(consulta_cerradas).all()
         
-        for sesion, nombre_apertura, nombre_cierre in resultados_cerradas:
+        for sesion, nombre_apertura, nombre_cierre, nombre_revision in resultados_cerradas:
             informe_final["arqueos_cerrados"].append({
                 "id_sesion": sesion.id,
                 "fecha_apertura": sesion.fecha_apertura,
@@ -62,7 +70,10 @@ def obtener_arqueos_de_caja(db: Session, usuario_actual: Usuario) -> Dict[str, L
                 "saldo_final_transferencias": sesion.saldo_final_transferencias,
                 "saldo_final_bancario": sesion.saldo_final_bancario,
                 "saldo_final_efectivo": sesion.saldo_final_efectivo,
-
+                "revisado": bool(sesion.revisado),
+                "fecha_revision": sesion.fecha_revision,
+                "usuario_revision": nombre_revision,
+                "nota_revision": sesion.nota_revision,
             })
 
         # --- CONSULTA 2: CAJAS ACTUALMENTE ABIERTAS ---
@@ -153,6 +164,148 @@ def obtener_panel_estadisticas_cajas(db: Session, usuario_actual: Usuario) -> Di
             "total_ventas": sum(c["total_ventas"] for c in cajas_abiertas),
             "total_movimientos": sum(c["cantidad_movimientos"] for c in cajas_abiertas),
         },
+    }
+
+
+def _ids_empresas_para_estadisticas(db: Session, id_empresa: int) -> List[int]:
+    """Empresa actual; si participa en grupo de transferencia, incluye el grupo."""
+    from back.gestion.perfil_operativo_manager import obtener_perfil_resuelto
+
+    perfil = obtener_perfil_resuelto(db, id_empresa)
+    ids = [int(x) for x in (perfil.empresas_transferencia_ids or []) if x is not None]
+    if ids and id_empresa in ids:
+        return sorted(set(ids))
+    return [id_empresa]
+
+
+def obtener_estadisticas_generales(db: Session, usuario_actual: Usuario) -> Dict[str, Any]:
+    """
+    KPIs del mes en curso: ventas, ticket promedio, top productos, stock bajo
+    y desglose por establecimiento (grupo de transferencia si aplica).
+    """
+    from back.modelos import Empresa, ConfiguracionEmpresa
+
+    ahora = datetime.utcnow()
+    desde = datetime(ahora.year, ahora.month, 1)
+    ids_empresas = _ids_empresas_para_estadisticas(db, usuario_actual.id_empresa)
+
+    empresas = db.exec(select(Empresa).where(Empresa.id.in_(ids_empresas))).all()
+    configs = {
+        c.id_empresa: c
+        for c in db.exec(
+            select(ConfiguracionEmpresa).where(ConfiguracionEmpresa.id_empresa.in_(ids_empresas))
+        ).all()
+    }
+
+    def _nombre_empresa(eid: int) -> str:
+        cfg = configs.get(eid)
+        if cfg and cfg.nombre_negocio:
+            return cfg.nombre_negocio
+        emp = next((e for e in empresas if e.id == eid), None)
+        if not emp:
+            return f"Empresa {eid}"
+        return emp.nombre_fantasia or emp.nombre_legal or f"Empresa {eid}"
+
+    nombres = {eid: _nombre_empresa(eid) for eid in ids_empresas}
+
+    ventas_mes = db.exec(
+        select(Venta)
+        .where(Venta.id_empresa.in_(ids_empresas))
+        .where(Venta.timestamp >= desde)
+        .where(Venta.timestamp <= ahora)
+        .where(func.upper(Venta.estado) != "ANULADA")
+        .where(Venta.id_venta_lote_padre.is_(None))
+    ).all()
+
+    por_empresa: Dict[int, Dict[str, float]] = {
+        eid: {"cantidad": 0, "total": 0.0} for eid in ids_empresas
+    }
+    for v in ventas_mes:
+        bucket = por_empresa.setdefault(v.id_empresa, {"cantidad": 0, "total": 0.0})
+        bucket["cantidad"] += 1
+        bucket["total"] += float(v.total or 0.0)
+
+    cantidad_ventas = sum(int(b["cantidad"]) for b in por_empresa.values())
+    total_ventas = sum(float(b["total"]) for b in por_empresa.values())
+    ticket_promedio = round(total_ventas / cantidad_ventas, 2) if cantidad_ventas else 0.0
+
+    por_establecimiento = []
+    for eid in ids_empresas:
+        cant = int(por_empresa[eid]["cantidad"])
+        tot = float(por_empresa[eid]["total"])
+        por_establecimiento.append({
+            "id_empresa": eid,
+            "nombre": nombres.get(eid, f"Empresa {eid}"),
+            "cantidad_ventas": cant,
+            "total_ventas": round(tot, 2),
+            "ticket_promedio": round(tot / cant, 2) if cant else 0.0,
+        })
+
+    monto_linea = (
+        VentaDetalle.cantidad * VentaDetalle.precio_unitario
+        - func.coalesce(VentaDetalle.descuento_aplicado, 0.0)
+    )
+    top_rows = db.exec(
+        select(
+            Articulo.id,
+            Articulo.descripcion,
+            func.coalesce(func.sum(VentaDetalle.cantidad), 0.0).label("cantidad_vendida"),
+            func.coalesce(func.sum(monto_linea), 0.0).label("monto_total"),
+        )
+        .join(VentaDetalle, VentaDetalle.id_articulo == Articulo.id)
+        .join(Venta, Venta.id == VentaDetalle.id_venta)
+        .where(Venta.id_empresa.in_(ids_empresas))
+        .where(Venta.timestamp >= desde)
+        .where(Venta.timestamp <= ahora)
+        .where(func.upper(Venta.estado) != "ANULADA")
+        .where(Venta.id_venta_lote_padre.is_(None))
+        .group_by(Articulo.id, Articulo.descripcion)
+        .order_by(func.sum(monto_linea).desc())
+        .limit(10)
+    ).all()
+
+    top_productos = [
+        {
+            "id_articulo": int(row[0]),
+            "descripcion": row[1],
+            "cantidad_vendida": float(row[2] or 0.0),
+            "monto_total": round(float(row[3] or 0.0), 2),
+        }
+        for row in top_rows
+    ]
+
+    stock_rows = db.exec(
+        select(Articulo)
+        .where(Articulo.id_empresa.in_(ids_empresas))
+        .where(Articulo.activo == True)  # noqa: E712
+        .where(Articulo.stock_minimo.is_not(None))
+        .where(Articulo.stock_actual < Articulo.stock_minimo)
+        .order_by((Articulo.stock_actual - Articulo.stock_minimo).asc())
+        .limit(15)
+    ).all()
+
+    stock_bajo = [
+        {
+            "id_articulo": articulo.id,
+            "descripcion": articulo.descripcion,
+            "stock_actual": float(articulo.stock_actual or 0.0),
+            "stock_minimo": float(articulo.stock_minimo or 0.0),
+            "id_empresa": articulo.id_empresa,
+            "nombre_empresa": nombres.get(articulo.id_empresa, f"Empresa {articulo.id_empresa}"),
+        }
+        for articulo in stock_rows
+    ]
+
+    return {
+        "periodo": f"{desde.year}-{desde.month:02d}",
+        "desde": desde,
+        "hasta": ahora,
+        "cantidad_ventas": cantidad_ventas,
+        "total_ventas": round(total_ventas, 2),
+        "ticket_promedio": ticket_promedio,
+        "por_establecimiento": por_establecimiento,
+        "top_productos": top_productos,
+        "stock_bajo": stock_bajo,
     }
 
 

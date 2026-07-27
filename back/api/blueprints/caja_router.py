@@ -26,6 +26,7 @@ from back.schemas.caja_schemas import (
     RegistrarVentaRequest, InformeCajasResponse, RespuestaGenerica,
     MovimientoSimpleRequest, TipoMovimiento, MovimientoContableResponse,
     PanelEstadisticasCajaResponse, EditarSesionCajaRequest, AnularMovimientoRequest,
+    RevisarSesionCajaRequest, EstadisticasGeneralesResponse,
 )
 from back.schemas.comprobante_schemas import EmisorData, ReceptorData, tercero_a_receptor_data
 
@@ -396,6 +397,32 @@ def get_panel_estadisticas_cajas(
         return consultas_caja.obtener_panel_estadisticas_cajas(db=db, usuario_actual=current_user)
     except Exception:
         raise HTTPException(status_code=500, detail="Ocurrió un error al generar el panel de estadísticas.")
+
+
+@router.get(
+    "/estadisticas-generales",
+    response_model=EstadisticasGeneralesResponse,
+    tags=["Caja - Supervisión"],
+    dependencies=[Depends(es_supervisor_caja)],
+)
+def get_estadisticas_generales(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(obtener_usuario_actual),
+):
+    """
+    KPIs del mes: ventas, ticket promedio, top productos, stock bajo y desglose por establecimiento.
+    Solo para empresas con panel de estadísticas (modo especial).
+    """
+    if not empresa_tiene_panel_estadisticas_caja(current_user.id_empresa, db):
+        raise HTTPException(
+            status_code=403,
+            detail="Las estadísticas generales no están habilitadas para esta empresa.",
+        )
+    try:
+        return consultas_caja.obtener_estadisticas_generales(db=db, usuario_actual=current_user)
+    except Exception:
+        logger.exception("Error generando estadísticas generales")
+        raise HTTPException(status_code=500, detail="Ocurrió un error al generar las estadísticas generales.")
     
 
 @router.get(
@@ -547,6 +574,45 @@ def api_editar_sesion_caja(
     except Exception as e:
         logger.exception("Error editando sesión de caja")
         raise HTTPException(status_code=500, detail=f"Error interno al editar la sesión: {e}")
+
+
+@router.post("/admin/sesion/{id_sesion}/revisar", response_model=RespuestaGenerica)
+def api_revisar_sesion_caja(
+    id_sesion: int,
+    req: RevisarSesionCajaRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(es_supervisor_caja),
+):
+    """
+    [Admin/Gerente/Encargada] Marca o desmarca un arqueo cerrado como revisado.
+    Asienta que se tuvo en cuenta la diferencia; no modifica saldos.
+    """
+    try:
+        sesion = apertura_cierre.marcar_sesion_revisada(
+            db=db,
+            id_sesion=id_sesion,
+            usuario_supervisor=current_user,
+            revisado=req.revisado,
+            nota_revision=req.nota_revision,
+        )
+        accion = "marcado como revisado" if sesion.revisado else "desmarcado de revisión"
+        return RespuestaGenerica(
+            status="success",
+            message=f"Arqueo (Sesión ID: {sesion.id}) {accion}.",
+            data={
+                "id_sesion": sesion.id,
+                "revisado": sesion.revisado,
+                "fecha_revision": sesion.fecha_revision.isoformat() if sesion.fecha_revision else None,
+                "nota_revision": sesion.nota_revision,
+            },
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception("Error revisando sesión de caja")
+        raise HTTPException(status_code=500, detail=f"Error interno al revisar la sesión: {e}")
 
 
 @router.post("/admin/movimientos/{id_movimiento}/anular", response_model=RespuestaGenerica)

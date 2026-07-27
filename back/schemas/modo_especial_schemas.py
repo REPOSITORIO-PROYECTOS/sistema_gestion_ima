@@ -13,6 +13,20 @@ class UnidadMedidaEnum(str, Enum):
     mililitros = "mililitros"
 
 
+TASAS_IVA_PERMITIDAS = (0.21, 0.105)
+
+
+def _normalizar_tasa_iva(v: float) -> float:
+    """Acepta 0.21 / 0.105 o porcentajes 21 / 10.5."""
+    tasa = float(v)
+    if tasa > 1:
+        tasa = tasa / 100.0
+    tasa = round(tasa, 3)
+    if tasa not in TASAS_IVA_PERMITIDAS:
+        raise ValueError("tasa_iva debe ser 0.21 (21%) o 0.105 (10,5%).")
+    return tasa
+
+
 class ProductoModoEspecialBase(BaseModel):
     codigo_interno: str = Field(min_length=1)
     descripcion: str = Field(min_length=1)
@@ -25,6 +39,7 @@ class ProductoModoEspecialBase(BaseModel):
     unidad: UnidadMedidaEnum = UnidadMedidaEnum.unidad
     cantidad_envase: Optional[float] = Field(default=None, ge=0)
     ubicacion: Optional[str] = None
+    tasa_iva: float = Field(default=0.21, description="Alícuota IVA: 0.21 o 0.105 (carnes).")
 
     @field_validator("categorias")
     @classmethod
@@ -49,6 +64,13 @@ class ProductoModoEspecialBase(BaseModel):
             vistos.add(codigo)
         return limpios
 
+    @field_validator("tasa_iva", mode="before")
+    @classmethod
+    def validar_tasa_iva(cls, v) -> float:
+        if v is None or v == "":
+            return 0.21
+        return _normalizar_tasa_iva(v)
+
 
 class ProductoModoEspecialCreate(ProductoModoEspecialBase):
     pass
@@ -66,6 +88,7 @@ class ProductoModoEspecialUpdate(BaseModel):
     cantidad_envase: Optional[float] = Field(default=None, ge=0)
     ubicacion: Optional[str] = None
     activo: Optional[bool] = None
+    tasa_iva: Optional[float] = Field(default=None, description="Alícuota IVA: 0.21 o 0.105 (carnes).")
 
     @field_validator("barcodes")
     @classmethod
@@ -81,6 +104,13 @@ class ProductoModoEspecialUpdate(BaseModel):
                 raise ValueError(f"El código de barras '{codigo}' está repetido en la lista ingresada.")
             vistos.add(codigo)
         return limpios
+
+    @field_validator("tasa_iva", mode="before")
+    @classmethod
+    def validar_tasa_iva(cls, v):
+        if v is None or v == "":
+            return None
+        return _normalizar_tasa_iva(v)
 
 
 class ProductoModoEspecialResponse(BaseModel):
@@ -98,6 +128,7 @@ class ProductoModoEspecialResponse(BaseModel):
     cantidad_envase: Optional[float]
     ubicacion: Optional[str]
     activo: bool
+    tasa_iva: float = 0.21
 
     class Config:
         from_attributes = True

@@ -215,6 +215,10 @@ class CajaSesion(SQLModel, table=True):
     id_usuario_cierre: Optional[int] = Field(default=None, foreign_key="usuarios.id")
     id_usuario_ultima_edicion: Optional[int] = Field(default=None, foreign_key="usuarios.id")
     fecha_ultima_edicion: Optional[datetime] = None
+    revisado: bool = Field(default=False)
+    id_usuario_revision: Optional[int] = Field(default=None, foreign_key="usuarios.id")
+    fecha_revision: Optional[datetime] = None
+    nota_revision: Optional[str] = Field(default=None, max_length=500)
     id_empresa: int = Field(foreign_key="empresas.id")
     usuario_apertura: Usuario = Relationship(back_populates="sesiones_abiertas", sa_relationship_kwargs={'foreign_keys': '[CajaSesion.id_usuario_apertura]'})
     usuario_cierre: Optional[Usuario] = Relationship(back_populates="sesiones_cerradas", sa_relationship_kwargs={'foreign_keys': '[CajaSesion.id_usuario_cierre]'})
@@ -362,6 +366,7 @@ class VentaDetalle(SQLModel, table=True):
     cantidad: float
     precio_unitario: float
     descuento_aplicado: float = Field(default=0.0)
+    tasa_iva: float = Field(default=0.21)
     id_venta: int = Field(foreign_key="ventas.id")
     id_articulo: int = Field(foreign_key="articulos.id")
     venta: Venta = Relationship(back_populates="items")

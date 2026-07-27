@@ -270,9 +270,57 @@ def editar_sesion_caja(
         if sesion.saldo_final_declarado is not None:
             sesion.diferencia = round(sesion.saldo_final_declarado - saldo_final_calculado, 2)
 
+    # Editar saldos invalida una revision previa: hay que volver a revisar.
+    sesion.revisado = False
+    sesion.id_usuario_revision = None
+    sesion.fecha_revision = None
+    sesion.nota_revision = None
+
     # 4. Trazabilidad de la edicion
     sesion.id_usuario_ultima_edicion = usuario_admin.id
     sesion.fecha_ultima_edicion = datetime.utcnow()
+
+    try:
+        db.add(sesion)
+        db.commit()
+        db.refresh(sesion)
+    except Exception:
+        db.rollback()
+        raise
+
+    return sesion
+
+
+def marcar_sesion_revisada(
+    db: Session,
+    id_sesion: int,
+    usuario_supervisor: Usuario,
+    revisado: bool = True,
+    nota_revision: Optional[str] = None,
+) -> CajaSesion:
+    """
+    [Supervisor] Marca o desmarca un arqueo cerrado como revisado.
+    No altera saldos ni diferencia; solo asienta la supervision.
+    """
+    sesion = db.get(CajaSesion, id_sesion)
+    if not sesion:
+        raise ValueError(f"No se encontró ninguna sesión de caja con el ID {id_sesion}.")
+    if sesion.id_empresa != usuario_supervisor.id_empresa:
+        raise PermissionError("Permiso denegado. No puede revisar una caja de otra empresa.")
+    if sesion.estado != "CERRADA":
+        raise ValueError("Solo se pueden revisar arqueos de cajas cerradas.")
+
+    if revisado:
+        sesion.revisado = True
+        sesion.id_usuario_revision = usuario_supervisor.id
+        sesion.fecha_revision = datetime.utcnow()
+        nota = (nota_revision or "").strip()
+        sesion.nota_revision = nota[:500] if nota else None
+    else:
+        sesion.revisado = False
+        sesion.id_usuario_revision = None
+        sesion.fecha_revision = None
+        sesion.nota_revision = None
 
     try:
         db.add(sesion)

@@ -93,6 +93,12 @@ class AnularMovimientoRequest(BaseModel):
     motivo: str = Field(..., min_length=1)
 
 
+class RevisarSesionCajaRequest(BaseModel):
+    """[Supervisor] Marca o desmarca un arqueo cerrado como revisado."""
+    revisado: bool = True
+    nota_revision: Optional[str] = Field(default=None, max_length=500)
+
+
 class EstadoCajaResponse(BaseModel):
     caja_abierta: bool
     id_sesion: Optional[int] = None
@@ -146,6 +152,10 @@ class ArqueoCerradoResponse(BaseModel):
     saldo_final_transferencias: Optional[float] = None
     saldo_final_bancario: Optional[float] = None
     saldo_final_efectivo: Optional[float] = None
+    revisado: bool = False
+    fecha_revision: Optional[datetime] = None
+    usuario_revision: Optional[str] = None
+    nota_revision: Optional[str] = None
 
 
 class InformeCajasResponse(BaseModel):
@@ -291,3 +301,39 @@ class PanelEstadisticasResumen(BaseModel):
 class PanelEstadisticasCajaResponse(BaseModel):
     cajas_abiertas: List[CajaAbiertaPanelItem]
     resumen: PanelEstadisticasResumen
+
+
+class EstadisticaEstablecimientoItem(BaseModel):
+    id_empresa: int
+    nombre: str
+    cantidad_ventas: int
+    total_ventas: float
+    ticket_promedio: float
+
+
+class ProductoTopItem(BaseModel):
+    id_articulo: int
+    descripcion: str
+    cantidad_vendida: float
+    monto_total: float
+
+
+class StockBajoItem(BaseModel):
+    id_articulo: int
+    descripcion: str
+    stock_actual: float
+    stock_minimo: float
+    id_empresa: int
+    nombre_empresa: str
+
+
+class EstadisticasGeneralesResponse(BaseModel):
+    periodo: str
+    desde: datetime
+    hasta: datetime
+    cantidad_ventas: int
+    total_ventas: float
+    ticket_promedio: float
+    por_establecimiento: List[EstadisticaEstablecimientoItem]
+    top_productos: List[ProductoTopItem]
+    stock_bajo: List[StockBajoItem]

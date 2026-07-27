@@ -33,6 +33,10 @@ export type ArqueoCaja = {
   saldo_final_efectivo: number | null;
   saldo_final_transferencias: number | null;
   saldo_final_bancario: number | null;
+  revisado?: boolean;
+  fecha_revision?: string | null;
+  usuario_revision?: string | null;
+  nota_revision?: string | null;
 };
 
 function ImprimirArqueoButton({ idSesion }: { idSesion: number }) {
@@ -171,6 +175,42 @@ export const columns: ColumnDef<ArqueoCaja>[] = [
         <span className={valor === 0 ? "text-green-600" : "text-red-600"}>
           {valor! > 0 ? "+" : ""}
           {formato}
+        </span>
+      );
+    },
+  },
+  {
+    id: "revision",
+    header: "Revisión",
+    accessorFn: (row) => (row.revisado ? "revisado" : "pendiente"),
+    cell: ({ row }) => {
+      if (row.original.estado !== "CERRADA") {
+        return <span className="text-gray-400">—</span>;
+      }
+      if (row.original.revisado) {
+        const quien = row.original.usuario_revision;
+        const cuando = row.original.fecha_revision
+          ? formatDateArgentina(row.original.fecha_revision)
+          : null;
+        const titulo = [
+          quien ? `Por ${quien}` : null,
+          cuando ? `el ${cuando}` : null,
+          row.original.nota_revision || null,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+        return (
+          <span
+            className="inline-flex items-center rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800"
+            title={titulo || "Revisado"}
+          >
+            Revisado
+          </span>
+        );
+      }
+      return (
+        <span className="inline-flex items-center rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
+          Pendiente
         </span>
       );
     },

@@ -5,6 +5,7 @@ import { useAuthStore } from "@/lib/authStore";
 import { puedeVerPanelEstadisticas, empresaTienePanelEstadisticas } from "@/lib/permisos";
 import { usePerfilEmpresa } from "@/hooks/usePerfilEmpresa";
 import PanelEstadisticasCaja from "@/components/PanelEstadisticasCaja";
+import PanelEstadisticasGenerales from "@/components/PanelEstadisticasGenerales";
 
 export default function Inicio() {
   const empresa = useEmpresaStore((state) => state.empresa);
@@ -22,9 +23,14 @@ export default function Inicio() {
       </h1>
 
       {mostrarPanel && (
-        <div className="w-full">
-          <PanelEstadisticasCaja compact />
-        </div>
+        <>
+          <div className="w-full">
+            <PanelEstadisticasCaja compact />
+          </div>
+          <div className="w-full">
+            <PanelEstadisticasGenerales compact />
+          </div>
+        </>
       )}
     </div>
   );
