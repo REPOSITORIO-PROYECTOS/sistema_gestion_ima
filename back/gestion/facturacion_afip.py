@@ -135,8 +135,10 @@ def determinar_logica_comprobante(
     else:
         formato_norm = str(formato)
 
-    # Si es formato ticket, siempre es código 83 (Ticket Fiscal)
+    # Ticket fiscal (83) solo aplica a RI. Monotributo/Exento → Factura C (11).
     if formato_norm == "ticket":
+        if condicion_emisor in [CondicionIVA.MONOTRIBUTO, CondicionIVA.EXENTO]:
+            return {"tipo_afip": 11, "neto": total, "iva": 0.0}
         neto = round(total / (1 + TASA_IVA_21), 2)
         iva = round(total - neto, 2)
         return {"tipo_afip": 83, "neto": neto, "iva": iva}
@@ -498,8 +500,17 @@ def generar_factura_para_venta(
                     # intentamos hacer un fallback a un tipo de factura compatible (B o A) una sola vez.
                     if not fallback_intentado and formato_norm == "ticket":
                         print("AFIP indicó que el tipo de comprobante no está habilitado. Intentando fallback a tipo distinto (no-ticket)...")
-                        # Decidir fallback: si receptor tiene CUIT -> A (1), si no -> B (6)
-                        fallback_tipo = 1 if receptor_tiene_cuit and condicion_emisor == CondicionIVA.RESPONSABLE_INSCRIPTO else 6
+                        # Monotributo/Exento → C (11). RI: CUIT → A (1), CF → B (6).
+                        if condicion_emisor in [CondicionIVA.MONOTRIBUTO, CondicionIVA.EXENTO]:
+                            fallback_tipo = 11
+                            datos_factura["neto"] = total
+                            datos_factura["iva"] = 0.0
+                            datos_factura["neto105"] = 0.0
+                            datos_factura["iva105"] = 0.0
+                        elif receptor_tiene_cuit and condicion_emisor == CondicionIVA.RESPONSABLE_INSCRIPTO:
+                            fallback_tipo = 1
+                        else:
+                            fallback_tipo = 6
                         datos_factura['tipo_afip'] = fallback_tipo
                         payload['datos_factura'] = datos_factura
                         fallback_intentado = True
