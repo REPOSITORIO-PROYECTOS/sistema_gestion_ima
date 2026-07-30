@@ -87,9 +87,9 @@
         <pre class="linea linea-descuento">{{ desc_gral | ticket_line('- $' ~ ("%.2f"|format(transaccion.descuento_general)), ancho) }}</pre>
         {% endif %}
 
-        {% if afip and afip.neto is not none and afip.iva is not none %}
+        {% if afip and afip.neto is defined and afip.neto is not none and afip.iva is defined and afip.iva is not none and afip.iva > 0 %}
         <pre class="linea">{{ 'Neto Gravado' | ticket_line('$' ~ ("%.2f"|format(afip.neto)), ancho) }}</pre>
-        <pre class="linea">{{ 'IVA (21%)' | ticket_line('$' ~ ("%.2f"|format(afip.iva)), ancho) }}</pre>
+        <pre class="linea">{{ 'IVA' | ticket_line('$' ~ ("%.2f"|format(afip.iva)), ancho) }}</pre>
         {% endif %}
 
         <pre class="total-final">{{ 'TOTAL' | ticket_line('$' ~ ("%.2f"|format(transaccion.total)), ancho) }}</pre>

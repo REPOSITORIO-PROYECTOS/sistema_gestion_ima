@@ -72,19 +72,30 @@ def _afip_build_or_enrich(transaccion, qr_base64: Optional[str]) -> Optional[Any
     if qr_base64 and not _get_attr_or_key(afip_obj, 'qr_base64', None):
         _set_attr_or_key(afip_obj, 'qr_base64', qr_base64)
 
-    # Neto / IVA: si faltan pero tenemos total y quizá alícuota implícita 21%
+    # Neto / IVA: si faltan, calcular solo para comprobantes con IVA (no C / monotributo).
     neto = _get_attr_or_key(afip_obj, 'neto', None)
     iva = _get_attr_or_key(afip_obj, 'iva', None)
     total = _get_attr_or_key(afip_obj, 'total', None) or _get_attr_or_key(transaccion, 'total', None)
+    tipo_comp = (
+        _get_attr_or_key(afip_obj, 'tipo_afip', None)
+        or _get_attr_or_key(afip_obj, 'tipo_comprobante', None)
+        or _get_attr_or_key(afip_obj, 'tipo_comprobante_afip', None)
+    )
+    es_sin_iva = isinstance(tipo_comp, int) and tipo_comp in (11, 12, 13)  # C / ND C / NC C
     if (neto is None or iva is None) and total is not None:
         try:
-            # Intento de cálculo simple para facturas con IVA 21%
-            calculado_neto = round(total / 1.21, 2)
-            calculado_iva = round(total - calculado_neto, 2)
-            if neto is None:
-                _set_attr_or_key(afip_obj, 'neto', calculado_neto)
-            if iva is None:
-                _set_attr_or_key(afip_obj, 'iva', calculado_iva)
+            if es_sin_iva:
+                if neto is None:
+                    _set_attr_or_key(afip_obj, 'neto', float(total))
+                if iva is None:
+                    _set_attr_or_key(afip_obj, 'iva', 0.0)
+            else:
+                calculado_neto = round(total / 1.21, 2)
+                calculado_iva = round(total - calculado_neto, 2)
+                if neto is None:
+                    _set_attr_or_key(afip_obj, 'neto', calculado_neto)
+                if iva is None:
+                    _set_attr_or_key(afip_obj, 'iva', calculado_iva)
         except Exception:
             pass
 
@@ -274,7 +285,10 @@ def generar_comprobante_stateless(data: GenerarComprobanteRequest) -> bytes:
         return texto_bytes
 
     # --- PASO 1: Generar Código QR ---
+    from back.gestion.reportes.qr_generator import construir_url_qr_afip
+
     qr_base64_string = generar_qr_para_comprobante(data)
+    qr_url_string = construir_url_qr_afip(data)
     if qr_base64_string:
         print("-> Código QR de AFIP generado con éxito.")
 
@@ -304,6 +318,8 @@ def generar_comprobante_stateless(data: GenerarComprobanteRequest) -> bytes:
 
     # Construir / enriquecer AFIP
     afip_context = _afip_build_or_enrich(transaccion_para_renderizar, qr_base64_string)
+    if afip_context is not None and qr_url_string and not _get_attr_or_key(afip_context, "qr_url", None):
+        _set_attr_or_key(afip_context, "qr_url", qr_url_string)
 
     contexto = {
         "emisor": data.emisor,

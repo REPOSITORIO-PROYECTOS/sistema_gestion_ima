@@ -21,6 +21,12 @@ class AfipData(BaseModel):
     cae: str
     fecha_vencimiento_cae: Optional[str] = None
     qr_base64: Optional[str] = None
+    # URL AFIP (RG 4892) para regenerar QR en driver texto / ESC-POS.
+    qr_url: Optional[str] = None
+    # Desglose para plantillas ticket/PDF (Factura C: neto=total, iva=0).
+    total: Optional[float] = None
+    neto: Optional[float] = None
+    iva: Optional[float] = None
 
 class EmisorData(BaseModel):
     """

@@ -70,9 +70,10 @@ def _enriquecer_emisor_desde_config(db: Session, id_empresa: int, emisor: Emisor
         200: {
             "content": {
                 "application/pdf": {},
+                "text/html": {},
                 "text/plain": {},
             },
-            "description": "Comprobante en PDF o texto plano para impresora térmica.",
+            "description": "PDF (Ticket/PDF) o HTML monospace+QR (formato Texto) para térmica.",
         },
         404: {"description": "Plantilla no encontrada."},
         503: {"description": "Servicio de AFIP no disponible."}
@@ -163,7 +164,10 @@ def api_generar_comprobante(
                     codigo_tipo_doc_receptor=resultado_afip.get("tipo_doc_receptor") or 99,
                     cae=resultado_afip.get("cae") or "SIN_CAE",
                     fecha_vencimiento_cae=resultado_afip.get("vencimiento_cae"),
-                    qr_base64=resultado_afip.get("qr_base64")
+                    qr_base64=resultado_afip.get("qr_base64"),
+                    total=resultado_afip.get("total") or resultado_afip.get("importe_total"),
+                    neto=resultado_afip.get("neto"),
+                    iva=resultado_afip.get("iva"),
                 )
                 print(f"Procesamiento real por AFIP completado. CAE: {resultado_afip.get('cae')}")
                 
@@ -176,8 +180,8 @@ def api_generar_comprobante(
         contenido = generar_comprobante_stateless(req)
         print("salimos de genrerar comprobantes stateless")
 
-        extension = "txt" if es_formato_texto_plano(req.formato) else "pdf"
-        media_type = "text/plain; charset=utf-8" if extension == "txt" else "application/pdf"
+        extension = "html" if es_formato_texto_plano(req.formato) else "pdf"
+        media_type = "text/html; charset=utf-8" if extension == "html" else "application/pdf"
         filename = f"{req.tipo}_{req.emisor.punto_venta}_{req.receptor.cuit_o_dni or 'consumidor'}.{extension}"
         print("estamos por hacer la response")
         return Response(

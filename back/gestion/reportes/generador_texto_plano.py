@@ -3,7 +3,11 @@
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
-from back.gestion.reportes.qr_generator import construir_url_qr_afip, qr_url_a_lineas_ascii
+from back.gestion.reportes.qr_generator import (
+    construir_url_qr_afip,
+    envolver_ticket_texto_html,
+    qr_url_a_lineas_ascii,
+)
 from back.schemas.comprobante_schemas import GenerarComprobanteRequest
 from back.gestion.reportes.generador_comprobantes import (
     TIPOS_TICKET_TERMICO,
@@ -12,6 +16,7 @@ from back.gestion.reportes.generador_comprobantes import (
     _estilos_impresora_termica,
     _get_attr_or_key,
     _resolver_ancho_impresora,
+    _set_attr_or_key,
     _ticket_line,
     _wrap_ticket_text,
     format_datetime,
@@ -275,7 +280,10 @@ def generar_factura_texto_plano(
     if cae:
         ticket.centrado(f"CAE N: {cae}")
         ticket.centrado(f"Vto. CAE: {_vencimiento_cae(afip)}")
-        ticket.qr_ascii(qr_url)
+        if qr_url:
+            ticket.qr_ascii(qr_url)
+        else:
+            ticket.centrado("[ QR AFIP ]")
         ticket.centrado("Comprobante Autorizado")
     else:
         ticket.centrado("Documento no valido como factura")
@@ -326,7 +334,12 @@ def _generar_ticket_cambio_texto_plano(
 
 
 def generar_comprobante_texto_plano(data: GenerarComprobanteRequest) -> bytes:
-    """Genera recibo/factura/comprobante como texto plano UTF-8 para impresoras RAW."""
+    """
+    Genera ticket de ancho fijo + QR AFIP como HTML imprimible.
+
+    El cuerpo es texto monospace (comandera / driver de texto). El QR fiscal
+    AFIP no entra en ASCII de 58/80mm; se embebe PNG escaneable al emitir.
+    """
     from back.gestion.reportes.qr_generator import generar_qr_para_comprobante
 
     aclaraciones = data.emisor.aclaraciones_legales or {}
@@ -334,6 +347,8 @@ def generar_comprobante_texto_plano(data: GenerarComprobanteRequest) -> bytes:
 
     qr_base64 = generar_qr_para_comprobante(data)
     qr_url = construir_url_qr_afip(data)
+    # Con PNG embebido no hace falta ASCII (nunca entra el payload AFIP).
+    qr_url_para_ascii = None if qr_base64 else qr_url
 
     observaciones_usuario = data.transaccion.observaciones or ""
     texto_legal = aclaraciones.get(data.tipo)
@@ -349,6 +364,8 @@ def generar_comprobante_texto_plano(data: GenerarComprobanteRequest) -> bytes:
     transaccion.observaciones = observaciones_finales
     transaccion = _enrich_transaccion(transaccion)
     afip = _afip_build_or_enrich(transaccion, qr_base64)
+    if afip is not None and qr_url and not _get_attr_or_key(afip, "qr_url", None):
+        _set_attr_or_key(afip, "qr_url", qr_url)
     fecha_emision = datetime.now()
 
     tipo = data.tipo.lower()
@@ -358,7 +375,13 @@ def generar_comprobante_texto_plano(data: GenerarComprobanteRequest) -> bytes:
         )
     elif tipo in {"factura", "comprobante"}:
         contenido = generar_factura_texto_plano(
-            data.emisor, data.receptor, transaccion, fecha_emision, afip, ancho, qr_url
+            data.emisor,
+            data.receptor,
+            transaccion,
+            fecha_emision,
+            afip,
+            ancho,
+            qr_url_para_ascii,
         )
     else:
         raise ValueError(
@@ -385,4 +408,5 @@ def generar_comprobante_texto_plano(data: GenerarComprobanteRequest) -> bytes:
             ancho,
         )
 
-    return contenido.encode("utf-8")
+    html = envolver_ticket_texto_html(contenido, qr_base64)
+    return html.encode("utf-8")
