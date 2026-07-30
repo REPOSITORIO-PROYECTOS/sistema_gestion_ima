@@ -1,7 +1,7 @@
 # back/schemas/perfil_operativo_schemas.py
 
 from enum import Enum
-from typing import Any, Optional
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -9,6 +9,24 @@ from pydantic import BaseModel, Field
 class TipoEsquemaEmpresa(str, Enum):
     ESTANDAR = "estandar"
     ESPECIAL = "especial"
+
+
+class PanelEstadisticasSecciones(BaseModel):
+    """Checklist de bloques visibles en el panel de estadísticas."""
+
+    kpis_periodo: bool = True
+    cajas_abiertas: bool = True
+    alertas_stock: bool = True
+    alertas_diferencias_caja: bool = True
+    top_productos: bool = True
+    top_categorias: bool = True
+    ranking_vendedores: bool = True
+    medios_pago: bool = True
+    por_establecimiento: bool = True
+
+
+def secciones_estadisticas_todas_on() -> PanelEstadisticasSecciones:
+    return PanelEstadisticasSecciones()
 
 
 class PerfilOperativoEmpresa(BaseModel):
@@ -19,7 +37,12 @@ class PerfilOperativoEmpresa(BaseModel):
     caja_solo_comprobante: bool = False
     caja_permitir_remito_presupuesto: bool = False
     factura_auto_mercado_pago: bool = False
+    # Si True: ventas pagadas con transferencia o POS (bancario) se facturan por AFIP automáticamente.
+    factura_auto_transferencia_pos: bool = False
     panel_estadisticas_caja: bool = False
+    panel_estadisticas_secciones: PanelEstadisticasSecciones = Field(
+        default_factory=secciones_estadisticas_todas_on
+    )
     mesas_habilitado: bool = False
     bloquear_descuentos_cajero: bool = False
     balanza_auto_agregar: bool = False
@@ -43,7 +66,9 @@ class PerfilOperativoUpdate(BaseModel):
     caja_solo_comprobante: Optional[bool] = None
     caja_permitir_remito_presupuesto: Optional[bool] = None
     factura_auto_mercado_pago: Optional[bool] = None
+    factura_auto_transferencia_pos: Optional[bool] = None
     panel_estadisticas_caja: Optional[bool] = None
+    panel_estadisticas_secciones: Optional[PanelEstadisticasSecciones] = None
     mesas_habilitado: Optional[bool] = None
     bloquear_descuentos_cajero: Optional[bool] = None
     balanza_auto_agregar: Optional[bool] = None

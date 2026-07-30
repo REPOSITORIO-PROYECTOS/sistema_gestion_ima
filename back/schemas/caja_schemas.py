@@ -327,6 +327,53 @@ class StockBajoItem(BaseModel):
     nombre_empresa: str
 
 
+class KpisPeriodoEstadisticas(BaseModel):
+    venta_hoy: float
+    venta_ayer: float
+    venta_mes: float
+    venta_mes_anterior: float
+    pct_vs_mes_anterior: Optional[float] = None
+    tickets_hoy: int
+    tickets_mes: int
+    ticket_promedio_hoy: float
+    ticket_promedio_mes: float
+
+
+class AlertasStockEstadisticas(BaseModel):
+    sin_stock: List[StockBajoItem]
+    stock_bajo: List[StockBajoItem]
+    cantidad_sin_stock: int
+    cantidad_stock_bajo: int
+
+
+class DiferenciaCajaItem(BaseModel):
+    id_sesion: int
+    fecha_cierre: Optional[datetime] = None
+    usuario_cierre: Optional[str] = None
+    diferencia: float
+    id_empresa: int
+    nombre_empresa: str
+
+
+class CategoriaTopItem(BaseModel):
+    categoria: str
+    cantidad_vendida: float
+    monto_total: float
+
+
+class VendedorRankingItem(BaseModel):
+    id_usuario: int
+    nombre_usuario: str
+    cantidad_ventas: int
+    total_ventas: float
+
+
+class MedioPagoItem(BaseModel):
+    metodo_pago: str
+    cantidad: int
+    monto_total: float
+
+
 class EstadisticasGeneralesResponse(BaseModel):
     periodo: str
     desde: datetime
@@ -337,3 +384,9 @@ class EstadisticasGeneralesResponse(BaseModel):
     por_establecimiento: List[EstadisticaEstablecimientoItem]
     top_productos: List[ProductoTopItem]
     stock_bajo: List[StockBajoItem]
+    kpis: Optional[KpisPeriodoEstadisticas] = None
+    alertas_stock: Optional[AlertasStockEstadisticas] = None
+    alertas_diferencias_caja: List[DiferenciaCajaItem] = []
+    top_categorias: List[CategoriaTopItem] = []
+    ranking_vendedores: List[VendedorRankingItem] = []
+    medios_pago: List[MedioPagoItem] = []

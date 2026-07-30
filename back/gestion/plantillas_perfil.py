@@ -1,6 +1,12 @@
 # back/gestion/plantillas_perfil.py
 
-from back.schemas.perfil_operativo_schemas import PerfilOperativoEmpresa
+from back.schemas.perfil_operativo_schemas import (
+    PanelEstadisticasSecciones,
+    PerfilOperativoEmpresa,
+    secciones_estadisticas_todas_on,
+)
+
+_SECCIONES_PANEL_ON = secciones_estadisticas_todas_on()
 
 PLANTILLA_RETAIL_ESTANDAR = PerfilOperativoEmpresa(
     plantilla_origen="retail_estandar",
@@ -9,6 +15,7 @@ PLANTILLA_RETAIL_ESTANDAR = PerfilOperativoEmpresa(
     caja_solo_comprobante=False,
     caja_permitir_remito_presupuesto=False,
     panel_estadisticas_caja=False,
+    panel_estadisticas_secciones=PanelEstadisticasSecciones(),
     mesas_habilitado=False,
     bloquear_descuentos_cajero=False,
     empresas_transferencia_ids=[],
@@ -21,6 +28,7 @@ PLANTILLA_MODO_ESPECIAL_POS = PerfilOperativoEmpresa(
     caja_solo_comprobante=True,
     caja_permitir_remito_presupuesto=False,
     panel_estadisticas_caja=True,
+    panel_estadisticas_secciones=_SECCIONES_PANEL_ON.model_copy(deep=True),
     mesas_habilitado=False,
     bloquear_descuentos_cajero=True,
     cache_degradado=True,
@@ -33,7 +41,9 @@ PLANTILLA_MODO_ESPECIAL_DEMO = PerfilOperativoEmpresa(
     sincronizar_google_sheets=False,
     caja_solo_comprobante=False,
     caja_permitir_remito_presupuesto=False,
+    factura_auto_transferencia_pos=True,
     panel_estadisticas_caja=True,
+    panel_estadisticas_secciones=_SECCIONES_PANEL_ON.model_copy(deep=True),
     mesas_habilitado=False,
     bloquear_descuentos_cajero=True,
     cache_degradado=True,
@@ -57,6 +67,6 @@ DESCRIPCIONES_PLANTILLAS: dict[str, tuple[str, str]] = {
     ),
     "modo_especial_demo": (
         "Modo especial demo",
-        "Demos de-campo / La Esquina 2: catálogo manual, factura AFIP en caja si bóveda OK, transferencias demo.",
+        "de-campo / La Esquina 2: catálogo manual, factura AFIP; auto-factura en transferencia/POS.",
     ),
 }

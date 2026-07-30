@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuthStore } from "@/lib/authStore";
 import { API_CONFIG } from "@/lib/api-config";
 import { formatDateArgentina } from "@/utils/formatDate";
+import { usePerfilEmpresa } from "@/hooks/usePerfilEmpresa";
+import { seccionEstadisticasVisible } from "@/lib/permisos";
 import {
   Card,
   CardContent,
@@ -52,6 +54,8 @@ export default function PanelEstadisticasCaja({
   refreshIntervalMs = 30000,
 }: PanelEstadisticasCajaProps) {
   const token = useAuthStore((state) => state.token);
+  const { perfil } = usePerfilEmpresa();
+  const mostrarCajas = seccionEstadisticasVisible(perfil, "cajas_abiertas");
   const [data, setData] = useState<PanelEstadisticasData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -60,7 +64,7 @@ export default function PanelEstadisticasCaja({
 
   const fetchPanel = useCallback(
     async (silent = false) => {
-      if (!token) return;
+      if (!token || !mostrarCajas) return;
       if (!silent) setLoading(true);
       else setRefreshing(true);
 
@@ -90,14 +94,21 @@ export default function PanelEstadisticasCaja({
         setRefreshing(false);
       }
     },
-    [token],
+    [token, mostrarCajas],
   );
 
   useEffect(() => {
+    if (!mostrarCajas) {
+      setLoading(false);
+      setData(null);
+      return;
+    }
     void fetchPanel();
     const interval = setInterval(() => void fetchPanel(true), refreshIntervalMs);
     return () => clearInterval(interval);
-  }, [fetchPanel, refreshIntervalMs]);
+  }, [fetchPanel, refreshIntervalMs, mostrarCajas]);
+
+  if (!mostrarCajas) return null;
 
   if (loading) {
     return (

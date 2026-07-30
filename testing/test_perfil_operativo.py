@@ -36,6 +36,9 @@ def test_plantilla_modo_especial_pos():
     assert perfil.modo_especial is True
     assert perfil.caja_solo_comprobante is True
     assert perfil.cache_degradado is True
+    assert perfil.panel_estadisticas_caja is True
+    assert perfil.panel_estadisticas_secciones.alertas_diferencias_caja is True
+    assert perfil.panel_estadisticas_secciones.kpis_periodo is True
     assert perfil.empresas_transferencia_ids == [35, 36]
 
 
@@ -94,6 +97,88 @@ def test_plantilla_demo_transferencias_y_factura():
     perfil = PLANTILLAS["modo_especial_demo"]
     assert perfil.empresas_transferencia_ids == [37, 38]
     assert perfil.caja_solo_comprobante is False
+    assert perfil.factura_auto_transferencia_pos is True
+    assert perfil.panel_estadisticas_caja is True
+    assert perfil.panel_estadisticas_secciones.top_categorias is True
+    assert perfil.panel_estadisticas_secciones.ranking_vendedores is True
+
+
+def test_cargar_perfil_sin_secciones_rellena_defaults_si_panel_on():
+    config = _config(
+        perfil_operativo={
+            "plantilla_origen": "modo_especial_demo",
+            "modo_especial": True,
+            "panel_estadisticas_caja": True,
+        }
+    )
+    perfil = cargar_perfil_desde_json(config)
+    assert perfil.panel_estadisticas_secciones.alertas_stock is True
+    assert perfil.panel_estadisticas_secciones.medios_pago is True
+
+
+def test_autofactura_transferencia_pos_fuerza_factura_b():
+    from back.gestion.perfil_operativo_manager import (
+        aplicar_autofactura_transferencia_pos_a_request,
+    )
+    from back.schemas.perfil_operativo_schemas import PerfilOperativoResuelto
+
+    perfil = PerfilOperativoResuelto(
+        factura_auto_transferencia_pos=True,
+        caja_puede_facturar=True,
+        facturacion_afip_habilitada=True,
+    )
+    quiere, tipo = aplicar_autofactura_transferencia_pos_a_request(
+        perfil,
+        quiere_factura=False,
+        tipo_comprobante_solicitado="recibo",
+        metodo_pago="TRANSFERENCIA",
+        pagos_multiples=None,
+        cuit_receptor="0",
+    )
+    assert quiere is True
+    assert tipo == "factura_b"
+
+
+def test_autofactura_transferencia_pos_no_pisa_remito():
+    from back.gestion.perfil_operativo_manager import (
+        aplicar_autofactura_transferencia_pos_a_request,
+    )
+    from back.schemas.perfil_operativo_schemas import PerfilOperativoResuelto
+
+    perfil = PerfilOperativoResuelto(
+        factura_auto_transferencia_pos=True,
+        caja_puede_facturar=True,
+    )
+    quiere, tipo = aplicar_autofactura_transferencia_pos_a_request(
+        perfil,
+        quiere_factura=False,
+        tipo_comprobante_solicitado="remito",
+        metodo_pago="bancario",
+        pagos_multiples=None,
+    )
+    assert quiere is False
+    assert tipo == "remito"
+
+
+def test_autofactura_efectivo_no_dispara():
+    from back.gestion.perfil_operativo_manager import (
+        aplicar_autofactura_transferencia_pos_a_request,
+    )
+    from back.schemas.perfil_operativo_schemas import PerfilOperativoResuelto
+
+    perfil = PerfilOperativoResuelto(
+        factura_auto_transferencia_pos=True,
+        caja_puede_facturar=True,
+    )
+    quiere, tipo = aplicar_autofactura_transferencia_pos_a_request(
+        perfil,
+        quiere_factura=False,
+        tipo_comprobante_solicitado="recibo",
+        metodo_pago="EFECTIVO",
+        pagos_multiples=None,
+    )
+    assert quiere is False
+    assert tipo == "recibo"
 
 
 def test_cargar_perfil_backfill_cache_degradado_desde_plantilla():

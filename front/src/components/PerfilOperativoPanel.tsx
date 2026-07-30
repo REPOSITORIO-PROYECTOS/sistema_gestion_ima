@@ -4,6 +4,7 @@ import * as React from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -12,7 +13,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuthStore } from "@/lib/authStore";
-import type { PerfilOperativoResuelto, TipoEsquemaEmpresa } from "@/types/perfilOperativo";
+import { seccionesEstadisticasResueltas } from "@/lib/permisos";
+import type {
+  PanelEstadisticasSecciones,
+  PerfilOperativoResuelto,
+  SeccionEstadisticasKey,
+  TipoEsquemaEmpresa,
+} from "@/types/perfilOperativo";
+import {
+  SECCIONES_ESTADISTICAS_DEFAULT,
+  SECCIONES_ESTADISTICAS_LABELS,
+} from "@/types/perfilOperativo";
 
 type Plantilla = {
   id: string;
@@ -30,6 +41,8 @@ type PerfilAdminResponse = {
 
 const API_BASE = "https://sistema-ima.sistemataup.online/api";
 
+const SECCION_KEYS = Object.keys(SECCIONES_ESTADISTICAS_DEFAULT) as SeccionEstadisticasKey[];
+
 type Props = {
   empresaId: number;
 };
@@ -37,10 +50,14 @@ type Props = {
 export function PerfilOperativoPanel({ empresaId }: Props) {
   const { token } = useAuthStore();
   const [loading, setLoading] = React.useState(true);
+  const [savingSecciones, setSavingSecciones] = React.useState(false);
   const [perfilAdmin, setPerfilAdmin] = React.useState<PerfilAdminResponse | null>(null);
   const [plantillas, setPlantillas] = React.useState<Plantilla[]>([]);
   const [tipoEsquema, setTipoEsquema] = React.useState<TipoEsquemaEmpresa>("estandar");
   const [plantillaId, setPlantillaId] = React.useState("modo_especial_pos");
+  const [seccionesDraft, setSeccionesDraft] = React.useState<PanelEstadisticasSecciones>(
+    SECCIONES_ESTADISTICAS_DEFAULT,
+  );
 
   const headers = React.useMemo(
     () => ({
@@ -65,6 +82,7 @@ export function PerfilOperativoPanel({ empresaId }: Props) {
       setPerfilAdmin(perfilData);
       setTipoEsquema(perfilData.tipo_esquema);
       setPlantillas(plantillasData);
+      setSeccionesDraft(seccionesEstadisticasResueltas(perfilData.perfil_operativo_resuelto));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al cargar perfil");
     } finally {
@@ -99,11 +117,38 @@ export function PerfilOperativoPanel({ empresaId }: Props) {
     }
   };
 
+  const guardarSecciones = async () => {
+    if (!token) return;
+    setSavingSecciones(true);
+    try {
+      const res = await fetch(`${API_BASE}/empresas/admin/${empresaId}/perfil-operativo`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ panel_estadisticas_secciones: seccionesDraft }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(
+          typeof err.detail === "string" ? err.detail : "No se pudieron guardar las secciones",
+        );
+      }
+      toast.success("Secciones del panel actualizadas");
+      await cargar();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al guardar secciones");
+    } finally {
+      setSavingSecciones(false);
+    }
+  };
+
   if (loading) {
     return <p className="text-sm text-muted-foreground">Cargando perfil operativo...</p>;
   }
 
   const resuelto = perfilAdmin?.perfil_operativo_resuelto;
+  const panelOn = Boolean(resuelto?.panel_estadisticas_caja);
+  const puedeEditarSecciones =
+    panelOn && perfilAdmin?.tipo_esquema === "especial";
 
   return (
     <div className="space-y-4">
@@ -128,6 +173,43 @@ export function PerfilOperativoPanel({ empresaId }: Props) {
           <li>Solo comprobante: {resuelto.caja_solo_comprobante ? "Sí" : "No"}</li>
           <li>Panel estadísticas: {resuelto.panel_estadisticas_caja ? "Sí" : "No"}</li>
         </ul>
+      )}
+
+      {puedeEditarSecciones && (
+        <div className="space-y-3 rounded-md border border-slate-200 p-4">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">
+              Secciones del panel de estadísticas
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Checklist de bloques visibles para dueños / encargadas.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {SECCION_KEYS.map((key) => (
+              <label key={key} className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={seccionesDraft[key]}
+                  onCheckedChange={(checked) =>
+                    setSeccionesDraft((prev) => ({
+                      ...prev,
+                      [key]: checked === true,
+                    }))
+                  }
+                />
+                <span>{SECCIONES_ESTADISTICAS_LABELS[key]}</span>
+              </label>
+            ))}
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => void guardarSecciones()}
+            disabled={savingSecciones}
+          >
+            {savingSecciones ? "Guardando..." : "Guardar secciones"}
+          </Button>
+        </div>
       )}
 
       <div className="grid gap-3 sm:grid-cols-2">

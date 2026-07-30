@@ -14,12 +14,14 @@ from back.schemas.configuracion_resuelta_schemas import (
 )
 from back.schemas.perfil_operativo_schemas import (
     MigrarEsquemaRequest,
+    PanelEstadisticasSecciones,
     PerfilOperativoAdminResponse,
     PerfilOperativoEmpresa,
     PerfilOperativoResuelto,
     PerfilOperativoUpdate,
     PlantillaPerfilResponse,
     TipoEsquemaEmpresa,
+    secciones_estadisticas_todas_on,
 )
 
 logger = logging.getLogger(__name__)
@@ -52,13 +54,23 @@ def _backfill_perfil_desde_plantilla(
 ) -> PerfilOperativoEmpresa:
     """Completa flags nuevos ausentes en JSON persistido (p. ej. cache_degradado)."""
     plantilla_id = data.get("plantilla_origen")
-    if not plantilla_id or plantilla_id not in PLANTILLAS:
-        return perfil
+    plantilla = PLANTILLAS.get(plantilla_id) if plantilla_id else None
 
     updates: dict[str, Any] = {}
-    plantilla = PLANTILLAS[plantilla_id]
-    if "cache_degradado" not in data:
-        updates["cache_degradado"] = plantilla.cache_degradado
+    if plantilla is not None:
+        if "cache_degradado" not in data:
+            updates["cache_degradado"] = plantilla.cache_degradado
+        if "factura_auto_transferencia_pos" not in data:
+            updates["factura_auto_transferencia_pos"] = plantilla.factura_auto_transferencia_pos
+
+    if "panel_estadisticas_secciones" not in data:
+        if plantilla is not None and plantilla.panel_estadisticas_caja:
+            updates["panel_estadisticas_secciones"] = plantilla.panel_estadisticas_secciones.model_copy(
+                deep=True
+            )
+        elif perfil.panel_estadisticas_caja:
+            updates["panel_estadisticas_secciones"] = secciones_estadisticas_todas_on()
+
     if not updates:
         return perfil
     return perfil.model_copy(update=updates)
@@ -278,6 +290,10 @@ def actualizar_perfil_operativo(
 
     perfil = aplicar_fallback_legacy(config, cargar_perfil_desde_json(config))
     patch = data.model_dump(exclude_unset=True)
+    if "panel_estadisticas_secciones" in patch and patch["panel_estadisticas_secciones"] is not None:
+        patch["panel_estadisticas_secciones"] = PanelEstadisticasSecciones.model_validate(
+            patch["panel_estadisticas_secciones"]
+        )
     perfil = perfil.model_copy(update=patch)
     _guardar_perfil_en_config(config, perfil, TipoEsquemaEmpresa.ESPECIAL)
 
@@ -329,6 +345,60 @@ def obtener_perfil_admin(db: Session, id_empresa: int) -> PerfilOperativoAdminRe
 
 def obtener_perfil_resuelto(db: Session, id_empresa: int) -> PerfilOperativoResuelto:
     return resolver_configuracion_empresa(db, id_empresa).perfil_operativo
+
+
+METODOS_AUTOFACTURA_TRANSFERENCIA_POS = frozenset({"transferencia", "bancario", "pos"})
+
+
+def normalizar_metodo_pago(metodo: str | None) -> str:
+    return (metodo or "").strip().lower()
+
+
+def metodos_disparan_autofactura_transferencia_pos(metodos: list[str]) -> bool:
+    """True si algún medio es transferencia o POS/bancario."""
+    return any(normalizar_metodo_pago(m) in METODOS_AUTOFACTURA_TRANSFERENCIA_POS for m in metodos)
+
+
+def aplicar_autofactura_transferencia_pos_a_request(
+    perfil: PerfilOperativoResuelto,
+    *,
+    quiere_factura: bool,
+    tipo_comprobante_solicitado: Optional[str],
+    metodo_pago: Optional[str],
+    pagos_multiples: Optional[list[Any]],
+    cuit_receptor: Optional[str] = None,
+) -> tuple[bool, Optional[str]]:
+    """
+    Si el perfil lo pide y el pago es transferencia/POS, fuerza factura AFIP.
+    No pisa remito/presupuesto. Devuelve (quiere_factura, tipo_comprobante).
+    """
+    tipo = (tipo_comprobante_solicitado or "").strip().lower()
+    if tipo in {"remito", "presupuesto"}:
+        return quiere_factura, tipo_comprobante_solicitado
+
+    if quiere_factura:
+        return True, tipo_comprobante_solicitado
+
+    if not perfil.factura_auto_transferencia_pos or not perfil.caja_puede_facturar:
+        return False, tipo_comprobante_solicitado
+
+    metodos: list[str] = []
+    if pagos_multiples:
+        for pago in pagos_multiples:
+            metodo = getattr(pago, "metodo_pago", None)
+            if metodo is None and isinstance(pago, dict):
+                metodo = pago.get("metodo_pago")
+            if metodo:
+                metodos.append(str(metodo))
+    elif metodo_pago:
+        metodos.append(metodo_pago)
+
+    if not metodos_disparan_autofactura_transferencia_pos(metodos):
+        return False, tipo_comprobante_solicitado
+
+    cuit = "".join(ch for ch in str(cuit_receptor or "") if ch.isdigit())
+    tipo_factura = "factura_a" if len(cuit) == 11 else "factura_b"
+    return True, tipo_factura
 
 
 def es_modo_especial_empresa(db: Session, id_empresa: int) -> bool:
