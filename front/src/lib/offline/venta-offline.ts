@@ -289,16 +289,8 @@ export async function intentarRegistrarVenta(params: {
   payload: VentaPendientePayload;
   tipoComprobante: string;
 }): Promise<RegistrarVentaResult> {
-  if (
-    params.offlineHabilitado &&
-    esFacturaOfflineNoPermitida(
-      params.tipoComprobante,
-      params.payload.venta.quiere_factura,
-    )
-  ) {
-    throw new Error("La factura electrónica requiere conexión con el servidor.");
-  }
-
+  // Siempre intentar online primero. El flag offlineHabilitado (cache degradado)
+  // no debe bloquear facturas cuando hay servidor; solo impide el fallback offline.
   try {
     const result = await registrarVentaEnServidor(params.token, params.payload.venta);
     if (result.ok) {
@@ -309,6 +301,15 @@ export async function intentarRegistrarVenta(params: {
     if (!params.offlineHabilitado || !esErrorDeRed(error)) {
       if (error instanceof Error) throw error;
       throw new Error("No se pudo registrar la venta.");
+    }
+
+    if (
+      esFacturaOfflineNoPermitida(
+        params.tipoComprobante,
+        params.payload.venta.quiere_factura,
+      )
+    ) {
+      throw new Error("La factura electrónica requiere conexión con el servidor.");
     }
 
     const idSesion = await resolverIdSesionCajaLocal(

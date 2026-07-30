@@ -38,7 +38,7 @@ const payloadBase: VentaPendientePayload = {
 };
 
 describe("venta-offline", () => {
-  it("bloquea factura offline", () => {
+  it("marca factura como no permitida en modo offline local", () => {
     expect(esFacturaOfflineNoPermitida("factura", true)).toBe(true);
     expect(esFacturaOfflineNoPermitida("recibo", false)).toBe(false);
     expect(esFacturaOfflineNoPermitida("factura_b", false)).toBe(true);

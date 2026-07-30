@@ -25,7 +25,7 @@ import { useAuthStore } from "@/lib/authStore"
 import { useEmpresaStore } from '@/lib/empresaStore';
 import { useProductoStore, type Producto } from "@/lib/productoStore";
 import { API_CONFIG } from "@/lib/api-config";
-import { downloadPlainText, printPlainText } from "@/lib/printerService";
+import { downloadPlainText, printHtml, printPlainText } from "@/lib/printerService";
 import { fetchArticuloPorId, mapArticulosToStore } from "@/lib/articulos-api";
 import { actualizarProductosEnCache } from "@/lib/catalogo-sync";
 import { attachAutoScaleBridge } from "@/lib/scaleSerial";
@@ -37,7 +37,7 @@ import {
   esTipoComprobanteRecibo,
   type TipoComprobanteRapido,
 } from "@/lib/ventas-form-flow";
-import { empresaSoloComprobanteCaja } from "@/lib/permisos";
+import { empresaAutofacturaTransferenciaPos, empresaSoloComprobanteCaja, pagosDisparanAutofacturaTransferenciaPos } from "@/lib/permisos";
 import { usePerfilEmpresa } from "@/hooks/usePerfilEmpresa";
 import { buscarPorCodigoLocal } from "@/lib/offline/catalogo-search";
 import { useCajaStore } from "@/lib/cajaStore";
@@ -195,6 +195,7 @@ function FormVentas({
   const empresa = useEmpresaStore((state) => state.empresa);
   const { perfil } = usePerfilEmpresa();
   const soloComprobante = empresaSoloComprobanteCaja(perfil);
+  const autofacturaTransferenciaPos = empresaAutofacturaTransferenciaPos(perfil);
   const [checkoutVisible, setCheckoutVisible] = useState(false);
   const checkoutSectionRef = useRef<HTMLDivElement>(null);
   const [autoSubmitFlag, setAutoSubmitFlag] = useState(false);
@@ -815,14 +816,21 @@ function FormVentas({
 
       const contentType = respComp.headers.get("content-type") || "";
       const esTextoPlano = contentType.includes("text/plain");
-      const nombreArchivo = `Comprobante_${tipo}_${Date.now()}.${esTextoPlano ? "txt" : "pdf"}`;
+      const esHtmlTicket = contentType.includes("text/html");
+      const nombreArchivo = `Comprobante_${tipo}_${Date.now()}.${esHtmlTicket ? "html" : esTextoPlano ? "txt" : "pdf"}`;
 
-      if (esTextoPlano) {
-        const texto = await respComp.text();
-        downloadPlainText(nombreArchivo, texto);
-        printPlainText(`Comprobante ${tipo}`, texto);
-        toast.success("✅ Comprobante en texto plano enviado a impresión.");
-        console.log(`[${new Date().toISOString()}] Impresión texto plano enviada correctamente.`);
+      if (esTextoPlano || esHtmlTicket) {
+        const cuerpo = await respComp.text();
+        if (esHtmlTicket) {
+          downloadPlainText(nombreArchivo, cuerpo);
+          printHtml(cuerpo);
+          toast.success("✅ Comprobante (texto + QR) enviado a impresión.");
+        } else {
+          downloadPlainText(nombreArchivo, cuerpo);
+          printPlainText(`Comprobante ${tipo}`, cuerpo);
+          toast.success("✅ Comprobante en texto plano enviado a impresión.");
+        }
+        console.log(`[${new Date().toISOString()}] Impresión texto enviada correctamente.`);
         return;
       }
 
@@ -930,15 +938,31 @@ function FormVentas({
       }
     }
 
+    // Perfil: transferencia/POS → factura AFIP (no pisa remito/presupuesto).
+    let tipoEfectivo = tipo;
+    const disparaAuto = pagosDisparanAutofacturaTransferenciaPos(
+      usarPagosMultiples ? null : metodoPago,
+      usarPagosMultiples ? pagosMultiples : null,
+    );
+    if (
+      autofacturaTransferenciaPos &&
+      disparaAuto &&
+      tipo !== "remito" &&
+      tipo !== "presupuesto"
+    ) {
+      tipoEfectivo = "factura";
+      setTipoFacturacion("factura");
+    }
+
     setIsLoading(true);
 
     // Determinar un tipo_comprobante_solicitado más específico
-    let tipoSolicitadoPayload = tipo.toLowerCase();
-    if (esTipoComprobanteRecibo(tipo)) {
+    let tipoSolicitadoPayload = tipoEfectivo.toLowerCase();
+    if (esTipoComprobanteRecibo(tipoEfectivo)) {
       tipoSolicitadoPayload = "recibo";
     }
     const cuitReceptor = tipoClienteSeleccionado.id === "0" ? (cuitManual || "0") : (clienteSeleccionado?.cuit || clienteSeleccionado?.identificacion_fiscal || "0");
-    if (tipo === "factura") {
+    if (tipoEfectivo === "factura") {
       if (cuitReceptor && cuitReceptor.toString().length === 11) {
         tipoSolicitadoPayload = "factura_a";
       } else {
@@ -975,7 +999,7 @@ function FormVentas({
       pago_separado: pagoDividido,
       detalles_pago_separado: detallePagoDividido,
       tipo_comprobante_solicitado: tipoSolicitadoPayload,
-      quiere_factura: tipo === "factura",
+      quiere_factura: tipoEfectivo === "factura",
       articulos_vendidos: productosVendidos.map((p) => {
         const precioUnitario = p.cantidad ? p.precioBase / p.cantidad : 0;
         return {
@@ -1003,7 +1027,7 @@ function FormVentas({
     const pendientePayload: VentaPendientePayload = {
       venta: ventaBody,
       meta: {
-        tipo_comprobante: tipo,
+        tipo_comprobante: tipoEfectivo,
         observaciones: observaciones || "",
         total_final: totalVentaFinal,
         descuento_nominal_total: descuentoNominalTotal || 0,
@@ -1035,7 +1059,7 @@ function FormVentas({
         offlineHabilitado,
         idSesionCaja: idSesion,
         payload: pendientePayload,
-        tipoComprobante: tipo,
+        tipoComprobante: tipoEfectivo,
       });
 
       if (resultado.mode === "online") {
@@ -1051,7 +1075,7 @@ function FormVentas({
             subtotal: p.precioTotal,
             tasa_iva: 21,
           };
-          if (tipo !== "factura") {
+          if (tipoEfectivo !== "factura") {
             item.descuento_especifico = p.descuentoNominal || 0;
             item.descuento_especifico_por = p.porcentajeDescuento || 0;
           }
@@ -1059,7 +1083,7 @@ function FormVentas({
         });
 
         await imprimirComprobante(
-          tipo,
+          tipoEfectivo,
           itemsBase,
           totalVentaFinal,
           descuentoNominalTotal || 0,
@@ -1110,6 +1134,7 @@ function FormVentas({
     offlineHabilitado,
     idSesion,
     idEmpresa,
+    autofacturaTransferenciaPos,
   ]);
 
   const handleF5 = useCallback(() => {
@@ -1140,17 +1165,27 @@ function FormVentas({
     setMetodoPago('transferencia');
     setMontoPagado(totalVentaFinal);
     setCheckoutVisible(true);
-    setTipoFacturacion('recibo');
-    toast.info("✅ Pago TRANSFERENCIA listo - Click en 'Registrar Venta'");
-  }, [totalVentaFinal, setMetodoPago, setMontoPagado]);
+    if (autofacturaTransferenciaPos) {
+      setTipoFacturacion('factura');
+      toast.info("✅ Transferencia → factura automática - Click en 'Registrar Venta'");
+    } else {
+      setTipoFacturacion('recibo');
+      toast.info("✅ Pago TRANSFERENCIA listo - Click en 'Registrar Venta'");
+    }
+  }, [totalVentaFinal, setMetodoPago, setMontoPagado, autofacturaTransferenciaPos]);
 
   const handleF10 = useCallback(() => {
     setMetodoPago('bancario');
     setMontoPagado(totalVentaFinal);
     setCheckoutVisible(true);
-    setTipoFacturacion('recibo');
-    toast.info("✅ Pago POS listo - Click en 'Registrar Venta'");
-  }, [totalVentaFinal, setMetodoPago, setMontoPagado]);
+    if (autofacturaTransferenciaPos) {
+      setTipoFacturacion('factura');
+      toast.info("✅ POS → factura automática - Click en 'Registrar Venta'");
+    } else {
+      setTipoFacturacion('recibo');
+      toast.info("✅ Pago POS listo - Click en 'Registrar Venta'");
+    }
+  }, [totalVentaFinal, setMetodoPago, setMontoPagado, autofacturaTransferenciaPos]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -1192,6 +1227,24 @@ function FormVentas({
       setTipoFacturacion("recibo");
     }
   }, [soloComprobante, tipoFacturacion]);
+
+  useEffect(() => {
+    if (!autofacturaTransferenciaPos || soloComprobante) return;
+    const dispara = pagosDisparanAutofacturaTransferenciaPos(
+      usarPagosMultiples ? null : metodoPago,
+      usarPagosMultiples ? pagosMultiples : null,
+    );
+    if (dispara && tipoFacturacion !== "factura") {
+      setTipoFacturacion("factura");
+    }
+  }, [
+    autofacturaTransferenciaPos,
+    soloComprobante,
+    metodoPago,
+    pagosMultiples,
+    usarPagosMultiples,
+    tipoFacturacion,
+  ]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1412,6 +1465,11 @@ function FormVentas({
                         <SelectItem value="bancario">POS</SelectItem>
                       </SelectContent>
                     </Select>
+                    {autofacturaTransferenciaPos && (
+                      <p className="text-xs text-blue-800 w-full mt-1">
+                        Transferencia y POS se facturan automáticamente por AFIP.
+                      </p>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
