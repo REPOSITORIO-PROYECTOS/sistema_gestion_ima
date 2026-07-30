@@ -393,6 +393,7 @@ def obtener_estadisticas_generales(db: Session, usuario_actual: Usuario) -> Dict
                 func.coalesce(func.sum(VentaDetalle.cantidad), 0.0).label("cantidad_vendida"),
                 func.coalesce(func.sum(monto_linea), 0.0).label("monto_total"),
             )
+            .select_from(Articulo)
             .join(VentaDetalle, VentaDetalle.id_articulo == Articulo.id)
             .join(Venta, Venta.id == VentaDetalle.id_venta)
             .outerjoin(Categoria, Categoria.id == Articulo.id_categoria)
