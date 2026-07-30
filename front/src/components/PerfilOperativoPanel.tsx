@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuthStore } from "@/lib/authStore";
-import { seccionesEstadisticasResueltas } from "@/lib/permisos";
+import { seccionesEstadisticasResueltas, empresaTieneMultiSucursal } from "@/lib/permisos";
 import type {
   PanelEstadisticasSecciones,
   PerfilOperativoResuelto,
@@ -149,6 +149,10 @@ export function PerfilOperativoPanel({ empresaId }: Props) {
   const panelOn = Boolean(resuelto?.panel_estadisticas_caja);
   const puedeEditarSecciones =
     panelOn && perfilAdmin?.tipo_esquema === "especial";
+  const multiSucursal = empresaTieneMultiSucursal(resuelto);
+  const seccionKeysVisibles = SECCION_KEYS.filter(
+    (key) => key !== "por_establecimiento" || multiSucursal,
+  );
 
   return (
     <div className="space-y-4">
@@ -186,7 +190,7 @@ export function PerfilOperativoPanel({ empresaId }: Props) {
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            {SECCION_KEYS.map((key) => (
+            {seccionKeysVisibles.map((key) => (
               <label key={key} className="flex items-center gap-2 text-sm">
                 <Checkbox
                   checked={seccionesDraft[key]}

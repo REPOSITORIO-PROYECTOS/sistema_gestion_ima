@@ -116,6 +116,17 @@ def test_cargar_perfil_sin_secciones_rellena_defaults_si_panel_on():
     assert perfil.panel_estadisticas_secciones.medios_pago is True
 
 
+def test_secciones_por_establecimiento_segun_sucursales():
+    from back.gestion.perfil_operativo_manager import _secciones_para_empresa
+    from back.schemas.perfil_operativo_schemas import PerfilOperativoEmpresa
+
+    una = PerfilOperativoEmpresa(empresas_transferencia_ids=[39])
+    assert _secciones_para_empresa(una).por_establecimiento is False
+
+    multi = PerfilOperativoEmpresa(empresas_transferencia_ids=[35, 36])
+    assert _secciones_para_empresa(multi).por_establecimiento is True
+
+
 def test_autofactura_transferencia_pos_fuerza_factura_b():
     from back.gestion.perfil_operativo_manager import (
         aplicar_autofactura_transferencia_pos_a_request,

@@ -303,7 +303,8 @@ def obtener_estadisticas_generales(db: Session, usuario_actual: Usuario) -> Dict
     ticket_promedio_mes = round(total_mes / tickets_mes, 2) if tickets_mes else 0.0
 
     por_establecimiento: List[Dict[str, Any]] = []
-    if secciones.por_establecimiento:
+    tiene_multi_sucursal = len(ids_empresas) > 1
+    if secciones.por_establecimiento and tiene_multi_sucursal:
         ventas_mes = db.exec(
             _filtro_ventas_validas(select(Venta), ids_empresas, desde_mes, hasta_ahora_utc)
         ).all()
@@ -562,7 +563,7 @@ def obtener_estadisticas_generales(db: Session, usuario_actual: Usuario) -> Dict
         "cantidad_ventas": tickets_mes,
         "total_ventas": total_mes,
         "ticket_promedio": ticket_promedio_mes,
-        "por_establecimiento": por_establecimiento if secciones.por_establecimiento else [],
+        "por_establecimiento": por_establecimiento if (secciones.por_establecimiento and tiene_multi_sucursal) else [],
         "top_productos": top_productos,
         "stock_bajo": stock_bajo_legado,
         "kpis": kpis,

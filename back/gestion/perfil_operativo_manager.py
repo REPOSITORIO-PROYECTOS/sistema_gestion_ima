@@ -413,6 +413,53 @@ def empresa_tiene_panel_estadisticas_caja(db: Session, id_empresa: int) -> bool:
     return obtener_perfil_resuelto(db, id_empresa).panel_estadisticas_caja
 
 
+def _secciones_para_empresa(perfil: PerfilOperativoEmpresa) -> PanelEstadisticasSecciones:
+    """Checklist completo; por_establecimiento solo si hay grupo multi-sucursal."""
+    ids = [int(x) for x in (perfil.empresas_transferencia_ids or []) if x is not None]
+    multi = len(set(ids)) > 1
+    base = secciones_estadisticas_todas_on()
+    return base.model_copy(update={"por_establecimiento": multi})
+
+
+def habilitar_panel_estadisticas_modo_especial(db: Session) -> dict[str, object]:
+    """
+    Enciende panel_estadisticas_caja + secciones en todas las empresas
+    con esquema especial o modo_especial activo.
+    por_establecimiento solo si empresas_transferencia_ids tiene más de una.
+    """
+    configs = db.exec(select(ConfiguracionEmpresa)).all()
+    actualizadas: list[int] = []
+    omitidas: list[int] = []
+
+    for config in configs:
+        eid = int(config.id_empresa)
+        tipo = _parse_tipo_esquema(config)
+        perfil = aplicar_fallback_legacy(config, cargar_perfil_desde_json(config))
+        es_especial = (
+            tipo == TipoEsquemaEmpresa.ESPECIAL
+            or bool(perfil.modo_especial)
+            or bool(getattr(config, "modo_especial_habilitado", False))
+        )
+        if not es_especial:
+            omitidas.append(eid)
+            continue
+
+        perfil.panel_estadisticas_caja = True
+        perfil.panel_estadisticas_secciones = _secciones_para_empresa(perfil)
+        _guardar_perfil_en_config(config, perfil, TipoEsquemaEmpresa.ESPECIAL)
+        db.add(config)
+        actualizadas.append(eid)
+
+    if actualizadas:
+        db.commit()
+
+    return {
+        "actualizadas": actualizadas,
+        "omitidas_estandar": omitidas,
+        "total_actualizadas": len(actualizadas),
+    }
+
+
 def empresa_caja_solo_comprobante(db: Session, id_empresa: int) -> bool:
     return obtener_perfil_resuelto(db, id_empresa).caja_solo_comprobante
 
@@ -536,7 +583,14 @@ def seed_empresas_especiales_prod(db: Session) -> dict[str, int]:
             resultados[f"resync_{id_empresa}"] = id_empresa
             continue
         if ya_especial:
-            resultados[f"ok_{id_empresa}"] = id_empresa
+            # POS 35/36 ya especial: asegurar panel estadísticas sin pisar el resto.
+            perfil = aplicar_fallback_legacy(config, cargar_perfil_desde_json(config))
+            perfil.panel_estadisticas_caja = True
+            perfil.panel_estadisticas_secciones = _secciones_para_empresa(perfil)
+            _guardar_perfil_en_config(config, perfil, TipoEsquemaEmpresa.ESPECIAL)
+            db.add(config)
+            db.commit()
+            resultados[f"panel_{id_empresa}"] = id_empresa
             continue
         migrar_empresa_a_esquema_especial(db, id_empresa, plantilla_id)
         resultados[f"seed_{id_empresa}"] = id_empresa

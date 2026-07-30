@@ -144,7 +144,9 @@ export default function PanelEstadisticasGenerales({
   const showCategorias = seccionEstadisticasVisible(perfil, "top_categorias");
   const showRanking = seccionEstadisticasVisible(perfil, "ranking_vendedores");
   const showMedios = seccionEstadisticasVisible(perfil, "medios_pago");
-  const showEstablecimientos = seccionEstadisticasVisible(perfil, "por_establecimiento");
+  const tieneMultiSucursal = (perfil.empresas_transferencia_ids?.length ?? 0) > 1;
+  const showEstablecimientos =
+    seccionEstadisticasVisible(perfil, "por_establecimiento") && tieneMultiSucursal;
 
   const fetchStats = useCallback(
     async (silent = false) => {

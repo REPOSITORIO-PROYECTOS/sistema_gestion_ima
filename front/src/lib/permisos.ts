@@ -22,11 +22,18 @@ export function seccionesEstadisticasResueltas(
   };
 }
 
+export function empresaTieneMultiSucursal(
+  perfil?: PerfilOperativoResuelto | null,
+): boolean {
+  return (perfil?.empresas_transferencia_ids?.length ?? 0) > 1;
+}
+
 export function seccionEstadisticasVisible(
   perfil: PerfilOperativoResuelto | null | undefined,
   key: SeccionEstadisticasKey,
 ): boolean {
   if (!empresaTienePanelEstadisticas(perfil)) return false;
+  if (key === "por_establecimiento" && !empresaTieneMultiSucursal(perfil)) return false;
   return Boolean(seccionesEstadisticasResueltas(perfil)[key]);
 }
 
