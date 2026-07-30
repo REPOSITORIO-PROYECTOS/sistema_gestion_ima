@@ -18,6 +18,7 @@ from back.gestion.caja import apertura_cierre, registro_caja, consultas_caja
 from back.gestion.facturacion_afip import generar_factura_para_venta
 from back.gestion.reportes import generador_comprobantes
 from back.gestion.sync_nube_queue_manager import procesar_cola_sync_nube_en_background
+from back.gestion import perfil_operativo_manager
 from back.utils.permisos_empresa import validar_descuentos_permitidos, empresa_tiene_panel_estadisticas_caja
 
 # Schemas necesarios para este router
@@ -108,6 +109,35 @@ def api_registrar_venta(
         )
     except ValueError as e:
         raise HTTPException(status_code=403, detail=str(e))
+
+    # Auto-factura transferencia/POS según perfil operativo (de-campo / Esquina 2).
+    if current_user.id_empresa:
+        perfil = perfil_operativo_manager.obtener_perfil_resuelto(db, current_user.id_empresa)
+        cuit_receptor: Optional[str] = None
+        if req.id_cliente:
+            cliente_previo = db.get(Tercero, req.id_cliente)
+            if cliente_previo is not None:
+                cuit_receptor = getattr(cliente_previo, "cuit", None) or getattr(
+                    cliente_previo, "identificacion_fiscal", None
+                )
+        quiere_auto, tipo_auto = perfil_operativo_manager.aplicar_autofactura_transferencia_pos_a_request(
+            perfil,
+            quiere_factura=req.quiere_factura,
+            tipo_comprobante_solicitado=req.tipo_comprobante_solicitado,
+            metodo_pago=req.metodo_pago,
+            pagos_multiples=req.pagos_multiples,
+            cuit_receptor=cuit_receptor,
+        )
+        if quiere_auto and not req.quiere_factura:
+            logger.info(
+                "Autofactura transferencia/POS empresa=%s metodos=%s tipo=%s",
+                current_user.id_empresa,
+                req.pagos_multiples or req.metodo_pago,
+                tipo_auto,
+            )
+        req.quiere_factura = quiere_auto
+        if tipo_auto is not None:
+            req.tipo_comprobante_solicitado = tipo_auto
     
     # --- PASO 1: TRANSACCIÓN CRÍTICA CON LA BASE DE DATOS ---
     try:

@@ -25,6 +25,7 @@ from sqlmodel import Session, select
 from back.database import engine
 import back.gestion.configuracion_manager as configuracion_manager
 import back.gestion.empresa_manager as empresa_manager
+from back.gestion import perfil_operativo_manager as perfil_operativo_manager
 from back.modelos import ConfiguracionEmpresa, Empresa, Usuario
 from back.schemas.configuracion_schemas import ConfiguracionUpdate
 from back.schemas.empresa_schemas import EmpresaCreate
@@ -126,12 +127,16 @@ def main() -> int:
                 nombre_negocio=NOMBRE_FANTASIA,
             ),
         )
-        db.commit()
+        # Kioscos = modo especial POS (catálogo manual, solo comprobante, sin Sheets)
+        perfil_operativo_manager.migrar_empresa_a_esquema_especial(
+            db, id_empresa, "modo_especial_pos"
+        )
 
         config = db.get(ConfiguracionEmpresa, id_empresa)
         admin = db.exec(
             select(Usuario).where(Usuario.nombre_usuario == ADMIN_USERNAME)
         ).first()
+        perfil = perfil_operativo_manager.obtener_perfil_resuelto(db, id_empresa)
 
         print("\n=== Resumen ===")
         print(f"  Empresa ID: {id_empresa}")
@@ -139,6 +144,7 @@ def main() -> int:
         print(f"  CUIT: {empresa.cuit}")
         print(f"  Color: {config.color_principal if config else '?'}")
         print(f"  Nombre negocio: {config.nombre_negocio if config else '?'}")
+        print(f"  Modo especial: {perfil.modo_especial} ({perfil.plantilla_origen})")
         print(f"  Admin user ID: {admin.id if admin else '?'}")
         print(f"  Login: {ADMIN_USERNAME}")
         print(f"  Password: {password_mostrada}")
