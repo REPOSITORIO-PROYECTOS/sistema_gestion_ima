@@ -37,12 +37,22 @@ class ConfiguracionUpdate(BaseModel):
     link_visual_1: Optional[str] = None
     link_visual_2: Optional[str] = None
     link_visual_3: Optional[str] = None
-    cuit: Optional[int] = None
+    # String: coincide con DB (configuracion_empresa.cuit / empresas.cuit).
+    # Antes era int y el front manda "20434852529" → 422/500 al guardar.
+    cuit: Optional[str] = None
     formato_comprobante_predeterminado: Optional[FormatoComprobanteEnum] = None
     aclaraciones_legales: Optional[Dict[str, Optional[str]]] = None
     ingresos_brutos: Optional[str] = None
     inicio_actividades: Optional[str] = None
     modo_especial_habilitado: Optional[bool] = None
+
+    @field_validator("cuit", mode="before")
+    @classmethod
+    def normalizar_cuit(cls, v):
+        if v is None or v == "":
+            return None
+        digitos = "".join(ch for ch in str(v) if ch.isdigit())
+        return digitos or None
 
 class ConfiguracionResponse(BaseModel):
     """Schema completo para devolver la configuración de una empresa."""

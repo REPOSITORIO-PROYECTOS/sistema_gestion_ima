@@ -71,18 +71,25 @@ def actualizar_configuracion_parcial(db: Session, id_empresa: int, data: Configu
     """
     config_db = obtener_configuracion_por_id_empresa(db, id_empresa)
     
-    campos_empresa = {'nombre_legal', 'nombre_fantasia'}
+    # nombre_legal/fantasia viven solo en empresas. CUIT vive en ambas:
+    # el form edita config.cuit, pero AFIP/bóveda/listado usan empresas.cuit.
+    campos_solo_empresa = {'nombre_legal', 'nombre_fantasia'}
     update_data = data.model_dump(exclude_unset=True)
     
-    campos_a_actualizar_empresa = {k: v for k, v in update_data.items() if k in campos_empresa}
+    campos_a_actualizar_empresa = {
+        k: v for k, v in update_data.items()
+        if k in campos_solo_empresa or k == "cuit"
+    }
     if campos_a_actualizar_empresa:
         empresa = db.get(Empresa, id_empresa)
         if empresa:
             for key, value in campos_a_actualizar_empresa.items():
+                if key == "cuit" and not value:
+                    continue
                 setattr(empresa, key, value)
             db.add(empresa)
     
-    campos_config = {k: v for k, v in update_data.items() if k not in campos_empresa}
+    campos_config = {k: v for k, v in update_data.items() if k not in campos_solo_empresa}
     for key, value in campos_config.items():
         setattr(config_db, key, value)
     

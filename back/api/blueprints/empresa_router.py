@@ -114,8 +114,10 @@ def api_obtener_configuracion_de_empresa(
             'link_visual_1': config.link_visual_1,
             'link_visual_2': config.link_visual_2,
             'link_visual_3': config.link_visual_3,
-            'cuit': config.cuit,
+            'cuit': str(config.cuit) if config.cuit is not None else None,
             'aclaraciones_legales': config.aclaraciones_legales or {},
+            'ingresos_brutos': getattr(config, 'ingresos_brutos', None),
+            'inicio_actividades': getattr(config, 'inicio_actividades', None),
             'modo_especial_habilitado': bool(getattr(config, 'modo_especial_habilitado', False)),
             'facturacion_afip_habilitada': configuracion_manager.empresa_tiene_facturacion_afip_habilitada(
                 db, id_empresa
@@ -171,8 +173,10 @@ def api_actualizar_configuracion_de_empresa(
             'link_visual_1': config_actualizada.link_visual_1,
             'link_visual_2': config_actualizada.link_visual_2,
             'link_visual_3': config_actualizada.link_visual_3,
-            'cuit': config_actualizada.cuit,
+            'cuit': str(config_actualizada.cuit) if config_actualizada.cuit is not None else None,
             'aclaraciones_legales': config_actualizada.aclaraciones_legales or {},
+            'ingresos_brutos': getattr(config_actualizada, 'ingresos_brutos', None),
+            'inicio_actividades': getattr(config_actualizada, 'inicio_actividades', None),
             'modo_especial_habilitado': bool(getattr(config_actualizada, 'modo_especial_habilitado', False)),
             'facturacion_afip_habilitada': configuracion_manager.empresa_tiene_facturacion_afip_habilitada(
                 db, id_empresa
@@ -182,6 +186,9 @@ def api_actualizar_configuracion_de_empresa(
         return SchemaConfigResponse.model_validate(config_dict)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        # Unique nombre_legal / errores de DB → mensaje usable en UI
+        raise HTTPException(status_code=400, detail=f"No se pudo guardar la configuración: {e}")
 
 @router.patch("/admin/{id_empresa}/nombre-legal", response_model=dict)
 def api_actualizar_nombre_legal(

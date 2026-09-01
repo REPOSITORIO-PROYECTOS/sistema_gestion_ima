@@ -182,7 +182,10 @@ export default function GestionEmpresasPage() {
                       <ConfiguracionForm
                         empresaId={selectedEmpresaId}
                         sections={{ general: true, afip: true, balanza: false, modoEspecial: true }}
-                        onSave={() => setConfigSavedAt(new Date().toLocaleTimeString())}
+                        onSave={() => {
+                          setConfigSavedAt(new Date().toLocaleTimeString());
+                          void fetchEmpresas();
+                        }}
                       />
                     </div>
                     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
@@ -193,6 +196,7 @@ export default function GestionEmpresasPage() {
                         </span>
                       </div>
                       <AfipToolsPanel
+                        key={`${selectedEmpresaId}-${empresaSeleccionada?.cuit || ""}`}
                         empresaId={selectedEmpresaId}
                         onSuccess={(message) => setAfipToolsStatus(`${message} ${new Date().toLocaleTimeString()}`)}
                       />
