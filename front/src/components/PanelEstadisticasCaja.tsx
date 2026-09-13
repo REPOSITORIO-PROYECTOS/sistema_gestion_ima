@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuthStore } from "@/lib/authStore";
 import { API_CONFIG } from "@/lib/api-config";
 import { formatDateArgentina } from "@/utils/formatDate";
@@ -14,8 +14,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, RefreshCw, Wallet, Receipt, Activity } from "lucide-react";
+import { Loader2, RefreshCw, Wallet, Receipt, Activity, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+export interface DesgloseMediosCaja {
+  efectivo: number;
+  transferencia: number;
+  pos: number;
+  otros: number;
+}
 
 export interface CajaAbiertaPanelItem {
   id_sesion: number;
@@ -25,6 +32,7 @@ export interface CajaAbiertaPanelItem {
   cantidad_movimientos: number;
   cantidad_ventas: number;
   total_ventas: number;
+  desglose_medios?: DesgloseMediosCaja;
 }
 
 interface PanelEstadisticasData {
@@ -33,6 +41,7 @@ interface PanelEstadisticasData {
     total_cajas_abiertas: number;
     total_ventas: number;
     total_movimientos: number;
+    desglose_medios?: DesgloseMediosCaja;
   };
 }
 
@@ -49,6 +58,33 @@ function formatearMoneda(valor: number): string {
   });
 }
 
+function DesgloseMediosBlock({ desglose }: { desglose: DesgloseMediosCaja }) {
+  return (
+    <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 rounded-md border border-emerald-100 bg-emerald-50/60 p-3 text-sm">
+      <dt className="text-gray-600">Efectivo</dt>
+      <dd className="text-right font-semibold text-emerald-900">
+        {formatearMoneda(desglose.efectivo)}
+      </dd>
+      <dt className="text-gray-600">Transferencia</dt>
+      <dd className="text-right font-semibold text-blue-900">
+        {formatearMoneda(desglose.transferencia)}
+      </dd>
+      <dt className="text-gray-600">POS</dt>
+      <dd className="text-right font-semibold text-indigo-900">
+        {formatearMoneda(desglose.pos)}
+      </dd>
+      {(desglose.otros ?? 0) > 0 && (
+        <>
+          <dt className="text-gray-600">Otros</dt>
+          <dd className="text-right font-semibold text-gray-800">
+            {formatearMoneda(desglose.otros)}
+          </dd>
+        </>
+      )}
+    </dl>
+  );
+}
+
 export default function PanelEstadisticasCaja({
   compact = false,
   refreshIntervalMs = 30000,
@@ -61,6 +97,8 @@ export default function PanelEstadisticasCaja({
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [sesionDesglose, setSesionDesglose] = useState<number | null>(null);
+  const [mostrarResumenDesglose, setMostrarResumenDesglose] = useState(false);
 
   const fetchPanel = useCallback(
     async (silent = false) => {
@@ -107,6 +145,11 @@ export default function PanelEstadisticasCaja({
     const interval = setInterval(() => void fetchPanel(true), refreshIntervalMs);
     return () => clearInterval(interval);
   }, [fetchPanel, refreshIntervalMs, mostrarCajas]);
+
+  const desgloseResumen = useMemo(
+    () => data?.resumen.desglose_medios ?? { efectivo: 0, transferencia: 0, pos: 0, otros: 0 },
+    [data],
+  );
 
   if (!mostrarCajas) return null;
 
@@ -157,7 +200,6 @@ export default function PanelEstadisticasCaja({
         </Button>
       </div>
 
-      {/* Resumen general */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="bg-emerald-50 border-emerald-200">
           <CardHeader className="pb-2">
@@ -194,7 +236,41 @@ export default function PanelEstadisticasCaja({
         </Card>
       </div>
 
-      {/* Detalle por caja */}
+      {resumen.total_cajas_abiertas > 0 && (
+        <Card className="border-emerald-200">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <CardTitle className="text-base text-green-950">Desglose total de cajas</CardTitle>
+                <CardDescription>Efectivo, transferencia y POS de todas las abiertas</CardDescription>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1"
+                onClick={() => setMostrarResumenDesglose((v) => !v)}
+              >
+                {mostrarResumenDesglose ? (
+                  <>
+                    Ocultar <ChevronUp className="h-4 w-4" />
+                  </>
+                ) : (
+                  <>
+                    Ver desglose <ChevronDown className="h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardHeader>
+          {mostrarResumenDesglose && (
+            <CardContent>
+              <DesgloseMediosBlock desglose={desgloseResumen} />
+            </CardContent>
+          )}
+        </Card>
+      )}
+
       {cajas_abiertas.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-gray-600">
@@ -203,39 +279,69 @@ export default function PanelEstadisticasCaja({
         </Card>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {cajas_abiertas.map((caja) => (
-            <Card key={caja.id_sesion} className="border-green-200">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <CardTitle className="text-lg text-green-950">
-                      {caja.usuario_apertura}
-                    </CardTitle>
-                    <CardDescription>
-                      Sesión #{caja.id_sesion} · Apertura {formatDateArgentina(caja.fecha_apertura)}
-                    </CardDescription>
+          {cajas_abiertas.map((caja) => {
+            const abierto = sesionDesglose === caja.id_sesion;
+            const desglose = caja.desglose_medios ?? {
+              efectivo: 0,
+              transferencia: 0,
+              pos: 0,
+              otros: 0,
+            };
+            return (
+              <Card key={caja.id_sesion} className="border-green-200">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <CardTitle className="text-lg text-green-950">
+                        {caja.usuario_apertura}
+                      </CardTitle>
+                      <CardDescription>
+                        Sesión #{caja.id_sesion} · Apertura {formatDateArgentina(caja.fecha_apertura)}
+                      </CardDescription>
+                    </div>
+                    <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
+                      Abierta
+                    </Badge>
                   </div>
-                  <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
-                    Abierta
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                  <dt className="text-gray-500">Saldo inicial</dt>
-                  <dd className="font-semibold text-right">{formatearMoneda(caja.saldo_inicial)}</dd>
-                  <dt className="text-gray-500">Ventas registradas</dt>
-                  <dd className="font-semibold text-right">{caja.cantidad_ventas}</dd>
-                  <dt className="text-gray-500">Total vendido</dt>
-                  <dd className="font-semibold text-right text-emerald-700">
-                    {formatearMoneda(caja.total_ventas)}
-                  </dd>
-                  <dt className="text-gray-500">Movimientos</dt>
-                  <dd className="font-semibold text-right">{caja.cantidad_movimientos}</dd>
-                </dl>
-              </CardContent>
-            </Card>
-          ))}
+                </CardHeader>
+                <CardContent>
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <dt className="text-gray-500">Saldo inicial</dt>
+                    <dd className="font-semibold text-right">{formatearMoneda(caja.saldo_inicial)}</dd>
+                    <dt className="text-gray-500">Ventas registradas</dt>
+                    <dd className="font-semibold text-right">{caja.cantidad_ventas}</dd>
+                    <dt className="text-gray-500">Total vendido</dt>
+                    <dd className="font-semibold text-right text-emerald-700">
+                      {formatearMoneda(caja.total_ventas)}
+                    </dd>
+                    <dt className="text-gray-500">Movimientos</dt>
+                    <dd className="font-semibold text-right">{caja.cantidad_movimientos}</dd>
+                  </dl>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-3 w-full gap-1"
+                    onClick={() =>
+                      setSesionDesglose((prev) => (prev === caja.id_sesion ? null : caja.id_sesion))
+                    }
+                  >
+                    {abierto ? (
+                      <>
+                        Ocultar desglose <ChevronUp className="h-4 w-4" />
+                      </>
+                    ) : (
+                      <>
+                        Ver desglose (efectivo / transferencia / POS){" "}
+                        <ChevronDown className="h-4 w-4" />
+                      </>
+                    )}
+                  </Button>
+                  {abierto && <DesgloseMediosBlock desglose={desglose} />}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

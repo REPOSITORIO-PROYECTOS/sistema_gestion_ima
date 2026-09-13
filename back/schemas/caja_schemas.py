@@ -282,6 +282,13 @@ class InformeArqueosResponse(BaseModel):
     arqueos_cerrados: List[ArqueoCerradoInfo]
 
 
+class DesgloseMediosCaja(BaseModel):
+    efectivo: float = 0.0
+    transferencia: float = 0.0
+    pos: float = 0.0
+    otros: float = 0.0
+
+
 class CajaAbiertaPanelItem(BaseModel):
     id_sesion: int
     fecha_apertura: datetime
@@ -290,12 +297,14 @@ class CajaAbiertaPanelItem(BaseModel):
     cantidad_movimientos: int
     cantidad_ventas: int
     total_ventas: float
+    desglose_medios: DesgloseMediosCaja = DesgloseMediosCaja()
 
 
 class PanelEstadisticasResumen(BaseModel):
     total_cajas_abiertas: int
     total_ventas: float
     total_movimientos: int
+    desglose_medios: DesgloseMediosCaja = DesgloseMediosCaja()
 
 
 class PanelEstadisticasCajaResponse(BaseModel):
@@ -337,6 +346,7 @@ class KpisPeriodoEstadisticas(BaseModel):
     tickets_mes: int
     ticket_promedio_hoy: float
     ticket_promedio_mes: float
+    modo: Optional[str] = None
 
 
 class AlertasStockEstadisticas(BaseModel):
@@ -376,6 +386,7 @@ class MedioPagoItem(BaseModel):
 
 class EstadisticasGeneralesResponse(BaseModel):
     periodo: str
+    modo: str = "mes"
     desde: datetime
     hasta: datetime
     cantidad_ventas: int

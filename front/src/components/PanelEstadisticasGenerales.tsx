@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuthStore } from "@/lib/authStore";
 import { API_CONFIG } from "@/lib/api-config";
 import { usePerfilEmpresa } from "@/hooks/usePerfilEmpresa";
@@ -13,6 +13,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Loader2,
   RefreshCw,
@@ -24,7 +26,11 @@ import {
   Users,
   CreditCard,
   Tags,
+  Download,
 } from "lucide-react";
+import { toast } from "sonner";
+
+type ModoPeriodo = "dia" | "semana" | "mes";
 
 interface EstablecimientoStat {
   id_empresa: number;
@@ -60,6 +66,7 @@ interface KpisPeriodo {
   tickets_mes: number;
   ticket_promedio_hoy: number;
   ticket_promedio_mes: number;
+  modo?: ModoPeriodo | string | null;
 }
 
 interface AlertasStock {
@@ -99,6 +106,7 @@ interface MedioPago {
 
 interface EstadisticasGeneralesData {
   periodo: string;
+  modo?: ModoPeriodo | string;
   desde: string;
   hasta: string;
   cantidad_ventas: number;
@@ -123,6 +131,45 @@ function formatearMoneda(valor: number): string {
   });
 }
 
+function hoyISO(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function mesActualISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function etiquetasKpi(modo: ModoPeriodo): {
+  primario: string;
+  secundario: string;
+  mes: string;
+} {
+  if (modo === "dia") {
+    return {
+      primario: "Día seleccionado",
+      secundario: "Día anterior",
+      mes: "Mes del día",
+    };
+  }
+  if (modo === "semana") {
+    return {
+      primario: "Semana seleccionada",
+      secundario: "Semana anterior",
+      mes: "Mes de la semana",
+    };
+  }
+  return {
+    primario: "Venta hoy",
+    secundario: "Venta ayer",
+    mes: "Venta del mes",
+  };
+}
+
 interface PanelEstadisticasGeneralesProps {
   compact?: boolean;
 }
@@ -136,6 +183,10 @@ export default function PanelEstadisticasGenerales({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [modo, setModo] = useState<ModoPeriodo>("mes");
+  const [fecha, setFecha] = useState<string>(hoyISO());
+  const [mesExport, setMesExport] = useState<string>(mesActualISO());
+  const [exportando, setExportando] = useState(false);
 
   const showKpis = seccionEstadisticasVisible(perfil, "kpis_periodo");
   const showStock = seccionEstadisticasVisible(perfil, "alertas_stock");
@@ -155,8 +206,9 @@ export default function PanelEstadisticasGenerales({
       else setRefreshing(true);
 
       try {
+        const params = new URLSearchParams({ modo, fecha });
         const res = await fetch(
-          `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.CAJA_ESTADISTICAS_GENERALES}`,
+          `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.CAJA_ESTADISTICAS_GENERALES}?${params.toString()}`,
           {
             headers: { Authorization: `Bearer ${token}` },
             cache: "no-store",
@@ -181,18 +233,73 @@ export default function PanelEstadisticasGenerales({
         setRefreshing(false);
       }
     },
-    [token],
+    [token, modo, fecha],
   );
 
   useEffect(() => {
     void fetchStats();
   }, [fetchStats]);
 
+  const descargarExcelMes = useCallback(async () => {
+    if (!token) return;
+    const [anioStr, mesStr] = mesExport.split("-");
+    const anio = Number(anioStr);
+    const mesNum = Number(mesStr);
+    if (!anio || !mesNum) {
+      toast.error("Elegí un mes válido para exportar.");
+      return;
+    }
+    setExportando(true);
+    try {
+      const params = new URLSearchParams({ anio: String(anio), mes: String(mesNum) });
+      const res = await fetch(
+        `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.CAJA_EXPORTAR_MES}?${params.toString()}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        },
+      );
+      if (res.status === 403) {
+        toast.error("Exportación solo disponible en modo especial.");
+        return;
+      }
+      if (!res.ok) throw new Error("Error al exportar");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `caja_${anio}-${String(mesNum).padStart(2, "0")}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Excel descargado (cierres + movimientos).");
+    } catch (err) {
+      console.error(err);
+      toast.error("No se pudo descargar el Excel del mes.");
+    } finally {
+      setExportando(false);
+    }
+  }, [token, mesExport]);
+
+  const tituloPeriodo = useMemo(() => {
+    if (compact) {
+      if (modo === "dia") return "Resumen del día";
+      if (modo === "semana") return "Resumen de la semana";
+      return "Resumen del mes";
+    }
+    if (modo === "dia") return "Estadísticas generales — Día";
+    if (modo === "semana") return "Estadísticas generales — Semana";
+    return "Estadísticas generales — Mes";
+  }, [compact, modo]);
+
+  const labels = etiquetasKpi(modo);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center gap-2 py-6 text-gray-600">
         <Loader2 className="h-5 w-5 animate-spin" />
-        <span>Cargando estadísticas del mes...</span>
+        <span>Cargando estadísticas...</span>
       </div>
     );
   }
@@ -218,11 +325,9 @@ export default function PanelEstadisticasGenerales({
 
   return (
     <div className="w-full space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-green-950">
-            {compact ? "Resumen del mes" : "Estadísticas generales — Mes en curso"}
-          </h2>
+          <h2 className="text-xl font-bold text-green-950">{tituloPeriodo}</h2>
           <p className="text-sm text-gray-500">Período {data.periodo}</p>
         </div>
         <Button
@@ -238,11 +343,94 @@ export default function PanelEstadisticasGenerales({
         </Button>
       </div>
 
+      {!compact && (
+        <Card className="border-green-100">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base text-green-950">Calendario de período</CardTitle>
+            <CardDescription>
+              Elegí día, semana o mes para ver las estadísticas (modo especial).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap items-end gap-4">
+            <div className="space-y-1">
+              <Label htmlFor="modo-periodo">Ver</Label>
+              <select
+                id="modo-periodo"
+                className="flex h-9 w-40 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
+                value={modo}
+                onChange={(e) => setModo(e.target.value as ModoPeriodo)}
+              >
+                <option value="dia">Un día</option>
+                <option value="semana">Una semana</option>
+                <option value="mes">Un mes</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="fecha-periodo">
+                {modo === "mes" ? "Mes (elegí cualquier día)" : "Fecha"}
+              </Label>
+              <Input
+                id="fecha-periodo"
+                type="date"
+                className="w-44"
+                value={fecha}
+                onChange={(e) => setFecha(e.target.value)}
+              />
+            </div>
+            <p className="text-xs text-gray-500 max-w-xs">
+              {modo === "semana"
+                ? "La semana es lunes a domingo de la fecha elegida."
+                : modo === "mes"
+                  ? "Se toma el mes calendario de la fecha."
+                  : "Se muestran las ventas de ese día."}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {!compact && (
+        <Card className="border-slate-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base text-green-950">
+              Excel — cierres de caja y movimientos
+            </CardTitle>
+            <CardDescription>
+              Descargá el mes completo: hoja de cierres + hoja de movimientos.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="mes-export">Mes</Label>
+              <Input
+                id="mes-export"
+                type="month"
+                className="w-44"
+                value={mesExport}
+                onChange={(e) => setMesExport(e.target.value)}
+              />
+            </div>
+            <Button
+              type="button"
+              onClick={() => void descargarExcelMes()}
+              disabled={exportando}
+              className="gap-2"
+            >
+              {exportando ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              Descargar Excel
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {showKpis && kpis && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="bg-emerald-50 border-emerald-200">
             <CardHeader className="pb-2">
-              <CardDescription className="text-emerald-800">Venta hoy</CardDescription>
+              <CardDescription className="text-emerald-800">{labels.primario}</CardDescription>
               <CardTitle className="text-2xl text-emerald-950">
                 {formatearMoneda(kpis.venta_hoy)}
               </CardTitle>
@@ -251,7 +439,7 @@ export default function PanelEstadisticasGenerales({
           </Card>
           <Card className="bg-slate-50 border-slate-200">
             <CardHeader className="pb-2">
-              <CardDescription className="text-slate-700">Venta ayer</CardDescription>
+              <CardDescription className="text-slate-700">{labels.secundario}</CardDescription>
               <CardTitle className="text-2xl text-slate-950">
                 {formatearMoneda(kpis.venta_ayer)}
               </CardTitle>
@@ -261,7 +449,7 @@ export default function PanelEstadisticasGenerales({
             <CardHeader className="pb-2">
               <CardDescription className="flex items-center gap-2 text-indigo-800">
                 <ShoppingCart className="h-4 w-4" />
-                Venta del mes
+                {labels.mes}
               </CardDescription>
               <CardTitle className="text-2xl text-indigo-950">
                 {formatearMoneda(kpis.venta_mes)}
@@ -289,7 +477,7 @@ export default function PanelEstadisticasGenerales({
             <CardHeader className="pb-2">
               <CardDescription className="text-blue-800">Ticket promedio</CardDescription>
               <CardTitle className="text-2xl text-blue-950">
-                Hoy {formatearMoneda(kpis.ticket_promedio_hoy)} · Mes{" "}
+                Período {formatearMoneda(kpis.ticket_promedio_hoy)} · Mes{" "}
                 {formatearMoneda(kpis.ticket_promedio_mes)}
               </CardTitle>
             </CardHeader>
@@ -303,7 +491,7 @@ export default function PanelEstadisticasGenerales({
             <CardHeader className="pb-2">
               <CardDescription className="flex items-center gap-2 text-slate-700">
                 <ShoppingCart className="h-4 w-4" />
-                Ventas del mes
+                Ventas del período
               </CardDescription>
               <CardTitle className="text-2xl text-slate-950">
                 {formatearMoneda(data.total_ventas)}
@@ -480,7 +668,7 @@ export default function PanelEstadisticasGenerales({
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Productos más vendidos</CardTitle>
-              <CardDescription>Top 10 del mes por monto</CardDescription>
+              <CardDescription>Top 10 del período por monto</CardDescription>
             </CardHeader>
             <CardContent>
               {data.top_productos.length === 0 ? (
@@ -517,7 +705,7 @@ export default function PanelEstadisticasGenerales({
                 <Tags className="h-4 w-4" />
                 Categorías más vendidas
               </CardTitle>
-              <CardDescription>Top del mes por monto</CardDescription>
+              <CardDescription>Top del período por monto</CardDescription>
             </CardHeader>
             <CardContent>
               {topCategorias.length === 0 ? (
@@ -549,7 +737,7 @@ export default function PanelEstadisticasGenerales({
                 <Users className="h-4 w-4" />
                 Ranking vendedoras
               </CardTitle>
-              <CardDescription>Ventas del mes</CardDescription>
+              <CardDescription>Ventas del período</CardDescription>
             </CardHeader>
             <CardContent>
               {ranking.length === 0 ? (
@@ -584,7 +772,7 @@ export default function PanelEstadisticasGenerales({
                 <CreditCard className="h-4 w-4" />
                 Medios de pago
               </CardTitle>
-              <CardDescription>Mes en curso</CardDescription>
+              <CardDescription>Período seleccionado</CardDescription>
             </CardHeader>
             <CardContent>
               {medios.length === 0 ? (

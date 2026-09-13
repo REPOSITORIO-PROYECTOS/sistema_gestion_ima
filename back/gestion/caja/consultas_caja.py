@@ -55,6 +55,62 @@ def _rango_mes_ar_utc_naive(year: int, month: int) -> Tuple[datetime, datetime]:
     )
 
 
+def _rango_semana_ar_utc_naive(dia: date) -> Tuple[date, date, datetime, datetime]:
+    """Semana lunes–domingo AR. Devuelve (lunes, domingo, desde_utc, hasta_utc exclusive)."""
+    lunes = dia - timedelta(days=dia.weekday())
+    domingo = lunes + timedelta(days=6)
+    desde, _ = _rango_dia_ar_utc_naive(lunes)
+    _, hasta = _rango_dia_ar_utc_naive(domingo)
+    return lunes, domingo, desde, hasta
+
+
+def _resolver_periodo_estadisticas(
+    modo: str,
+    fecha_ref: Optional[date],
+) -> Tuple[str, date, datetime, datetime, str]:
+    """
+    Resuelve rango UTC naive para estadísticas.
+    modo: dia | semana | mes. fecha_ref ancla el período (default: hoy AR).
+    """
+    ahora = _ahora_ar()
+    hoy = ahora.date()
+    ancla = fecha_ref or hoy
+    modo_n = (modo or "mes").strip().lower()
+    if modo_n not in ("dia", "semana", "mes"):
+        modo_n = "mes"
+
+    if modo_n == "dia":
+        desde, hasta = _rango_dia_ar_utc_naive(ancla)
+        label = ancla.isoformat()
+    elif modo_n == "semana":
+        lunes, domingo, desde, hasta = _rango_semana_ar_utc_naive(ancla)
+        label = f"{lunes.isoformat()}_a_{domingo.isoformat()}"
+    else:
+        desde, hasta_fin = _rango_mes_ar_utc_naive(ancla.year, ancla.month)
+        if ancla.year == hoy.year and ancla.month == hoy.month:
+            hasta = ahora.astimezone(timezone.utc).replace(tzinfo=None)
+        else:
+            hasta = hasta_fin
+        label = f"{ancla.year}-{ancla.month:02d}"
+    return modo_n, ancla, desde, hasta, label
+
+
+def _bucket_metodo_pago(metodo: Optional[str]) -> str:
+    """Normaliza a efectivo | transferencia | pos | otros."""
+    m = (metodo or "").strip().upper()
+    if m in ("EFECTIVO", "CASH"):
+        return "efectivo"
+    if m in ("TRANSFERENCIA", "TRANSFER", "TRANSFERENCIAS"):
+        return "transferencia"
+    if m in ("BANCARIO", "POS", "TARJETA", "DEBITO", "CRÉDITO", "CREDITO"):
+        return "pos"
+    return "otros"
+
+
+def _desglose_medios_vacio() -> Dict[str, float]:
+    return {"efectivo": 0.0, "transferencia": 0.0, "pos": 0.0, "otros": 0.0}
+
+
 def _filtro_ventas_validas(query, ids_empresas: List[int], desde: datetime, hasta: datetime):
     return (
         query.where(Venta.id_empresa.in_(ids_empresas))
@@ -178,7 +234,7 @@ def obtener_arqueos_de_caja(db: Session, usuario_actual: Usuario) -> Dict[str, L
 def obtener_panel_estadisticas_cajas(db: Session, usuario_actual: Usuario) -> Dict[str, Any]:
     """
     Panel de supervisión: cajas abiertas de la empresa con totales de ventas y movimientos.
-    Pensado para gerentes/administradores en tiendas con múltiples cajeros (modo especial).
+    Incluye desglose por medio (efectivo / transferencia / POS) por sesión.
     """
     UsuarioApertura = aliased(Usuario, name="usuario_apertura_panel")
 
@@ -215,9 +271,38 @@ def obtener_panel_estadisticas_cajas(db: Session, usuario_actual: Usuario) -> Di
     )
 
     resultados = db.exec(consulta).all()
+    ids_sesiones = [sesion.id for sesion, *_ in resultados]
+
+    desglose_por_sesion: Dict[int, Dict[str, float]] = {
+        sid: _desglose_medios_vacio() for sid in ids_sesiones
+    }
+    if ids_sesiones:
+        filas_medio = db.exec(
+            select(
+                CajaMovimiento.id_caja_sesion,
+                CajaMovimiento.metodo_pago,
+                func.coalesce(func.sum(CajaMovimiento.monto), 0.0),
+            )
+            .where(CajaMovimiento.id_caja_sesion.in_(ids_sesiones))
+            .where(CajaMovimiento.tipo == "VENTA")
+            .where(func.upper(func.coalesce(CajaMovimiento.estado, "ACTIVO")) != "ANULADO")
+            .group_by(CajaMovimiento.id_caja_sesion, CajaMovimiento.metodo_pago)
+        ).all()
+        for id_sesion, metodo, monto in filas_medio:
+            bucket = _bucket_metodo_pago(metodo)
+            desglose_por_sesion.setdefault(int(id_sesion), _desglose_medios_vacio())
+            desglose_por_sesion[int(id_sesion)][bucket] = round(
+                float(desglose_por_sesion[int(id_sesion)][bucket]) + float(monto or 0.0),
+                2,
+            )
+
     cajas_abiertas: List[Dict[str, Any]] = []
+    resumen_desglose = _desglose_medios_vacio()
 
     for sesion, nombre_apertura, cant_mov, total_ventas, cant_ventas in resultados:
+        desglose = desglose_por_sesion.get(sesion.id, _desglose_medios_vacio())
+        for key in resumen_desglose:
+            resumen_desglose[key] = round(resumen_desglose[key] + desglose[key], 2)
         cajas_abiertas.append({
             "id_sesion": sesion.id,
             "fecha_apertura": sesion.fecha_apertura,
@@ -226,6 +311,7 @@ def obtener_panel_estadisticas_cajas(db: Session, usuario_actual: Usuario) -> Di
             "cantidad_movimientos": int(cant_mov or 0),
             "cantidad_ventas": int(cant_ventas or 0),
             "total_ventas": float(total_ventas or 0.0),
+            "desglose_medios": desglose,
         })
 
     return {
@@ -234,6 +320,7 @@ def obtener_panel_estadisticas_cajas(db: Session, usuario_actual: Usuario) -> Di
             "total_cajas_abiertas": len(cajas_abiertas),
             "total_ventas": sum(c["total_ventas"] for c in cajas_abiertas),
             "total_movimientos": sum(c["cantidad_movimientos"] for c in cajas_abiertas),
+            "desglose_medios": resumen_desglose,
         },
     }
 
@@ -249,10 +336,16 @@ def _ids_empresas_para_estadisticas(db: Session, id_empresa: int) -> List[int]:
     return [id_empresa]
 
 
-def obtener_estadisticas_generales(db: Session, usuario_actual: Usuario) -> Dict[str, Any]:
+def obtener_estadisticas_generales(
+    db: Session,
+    usuario_actual: Usuario,
+    modo: str = "mes",
+    fecha: Optional[date] = None,
+) -> Dict[str, Any]:
     """
-    KPIs del mes/día, top productos/categorías, ranking vendedoras, medios de pago,
-    alertas de stock y diferencias de caja. Respeta checklist de secciones del perfil.
+    KPIs del período (día / semana / mes), top productos/categorías, ranking vendedoras,
+    medios de pago, alertas de stock y diferencias de caja.
+    Respeta checklist de secciones del perfil.
     """
     from back.gestion.perfil_operativo_manager import obtener_perfil_resuelto
     from back.modelos import Empresa, ConfiguracionEmpresa
@@ -264,19 +357,21 @@ def obtener_estadisticas_generales(db: Session, usuario_actual: Usuario) -> Dict
         else secciones_estadisticas_todas_on()
     )
 
+    modo_n, ancla, desde_periodo, hasta_periodo, periodo_label = _resolver_periodo_estadisticas(
+        modo, fecha
+    )
+
     ahora_ar = _ahora_ar()
     hoy = ahora_ar.date()
-    ayer = hoy - timedelta(days=1)
     desde_hoy, hasta_hoy = _rango_dia_ar_utc_naive(hoy)
-    desde_ayer, hasta_ayer = _rango_dia_ar_utc_naive(ayer)
-    desde_mes, _hasta_mes = _rango_mes_ar_utc_naive(hoy.year, hoy.month)
-    if hoy.month == 1:
-        desde_mes_ant, hasta_mes_ant = _rango_mes_ar_utc_naive(hoy.year - 1, 12)
+    desde_ayer, hasta_ayer = _rango_dia_ar_utc_naive(hoy - timedelta(days=1))
+    desde_mes_ancla, hasta_mes_ancla = _rango_mes_ar_utc_naive(ancla.year, ancla.month)
+    if ancla.year == hoy.year and ancla.month == hoy.month:
+        hasta_mes_ancla = ahora_ar.astimezone(timezone.utc).replace(tzinfo=None)
+    if ancla.month == 1:
+        desde_mes_ant, hasta_mes_ant = _rango_mes_ar_utc_naive(ancla.year - 1, 12)
     else:
-        desde_mes_ant, hasta_mes_ant = _rango_mes_ar_utc_naive(hoy.year, hoy.month - 1)
-
-    # Tope superior del mes en curso: ahora (no fin de mes)
-    hasta_ahora_utc = ahora_ar.astimezone(timezone.utc).replace(tzinfo=None)
+        desde_mes_ant, hasta_mes_ant = _rango_mes_ar_utc_naive(ancla.year, ancla.month - 1)
 
     ids_empresas = _ids_empresas_para_estadisticas(db, usuario_actual.id_empresa)
 
@@ -299,19 +394,21 @@ def obtener_estadisticas_generales(db: Session, usuario_actual: Usuario) -> Dict
 
     nombres = {eid: _nombre_empresa(eid) for eid in ids_empresas}
 
-    tickets_mes, total_mes = _agregar_ventas_periodo(db, ids_empresas, desde_mes, hasta_ahora_utc)
-    ticket_promedio_mes = round(total_mes / tickets_mes, 2) if tickets_mes else 0.0
+    tickets_periodo, total_periodo = _agregar_ventas_periodo(
+        db, ids_empresas, desde_periodo, hasta_periodo
+    )
+    ticket_promedio = round(total_periodo / tickets_periodo, 2) if tickets_periodo else 0.0
 
     por_establecimiento: List[Dict[str, Any]] = []
     tiene_multi_sucursal = len(ids_empresas) > 1
     if secciones.por_establecimiento and tiene_multi_sucursal:
-        ventas_mes = db.exec(
-            _filtro_ventas_validas(select(Venta), ids_empresas, desde_mes, hasta_ahora_utc)
+        ventas_periodo = db.exec(
+            _filtro_ventas_validas(select(Venta), ids_empresas, desde_periodo, hasta_periodo)
         ).all()
         por_empresa: Dict[int, Dict[str, float]] = {
             eid: {"cantidad": 0, "total": 0.0} for eid in ids_empresas
         }
-        for v in ventas_mes:
+        for v in ventas_periodo:
             bucket = por_empresa.setdefault(v.id_empresa, {"cantidad": 0, "total": 0.0})
             bucket["cantidad"] += 1
             bucket["total"] += float(v.total or 0.0)
@@ -329,24 +426,54 @@ def obtener_estadisticas_generales(db: Session, usuario_actual: Usuario) -> Dict
 
     kpis = None
     if secciones.kpis_periodo:
-        tickets_hoy, venta_hoy = _agregar_ventas_periodo(db, ids_empresas, desde_hoy, hasta_hoy)
-        _, venta_ayer = _agregar_ventas_periodo(db, ids_empresas, desde_ayer, hasta_ayer)
-        _, venta_mes_ant = _agregar_ventas_periodo(db, ids_empresas, desde_mes_ant, hasta_mes_ant)
+        if modo_n == "dia":
+            tickets_sel, venta_sel = tickets_periodo, total_periodo
+            prev = ancla - timedelta(days=1)
+            desde_prev, hasta_prev = _rango_dia_ar_utc_naive(prev)
+            _, venta_prev = _agregar_ventas_periodo(db, ids_empresas, desde_prev, hasta_prev)
+            tickets_mes, venta_mes = _agregar_ventas_periodo(
+                db, ids_empresas, desde_mes_ancla, hasta_mes_ancla
+            )
+            _, venta_mes_ant = _agregar_ventas_periodo(
+                db, ids_empresas, desde_mes_ant, hasta_mes_ant
+            )
+        elif modo_n == "semana":
+            tickets_sel, venta_sel = tickets_periodo, total_periodo
+            lunes, _, _, _ = _rango_semana_ar_utc_naive(ancla)
+            _, _, desde_prev, hasta_prev = _rango_semana_ar_utc_naive(lunes - timedelta(days=1))
+            _, venta_prev = _agregar_ventas_periodo(db, ids_empresas, desde_prev, hasta_prev)
+            tickets_mes, venta_mes = _agregar_ventas_periodo(
+                db, ids_empresas, desde_mes_ancla, hasta_mes_ancla
+            )
+            _, venta_mes_ant = _agregar_ventas_periodo(
+                db, ids_empresas, desde_mes_ant, hasta_mes_ant
+            )
+        else:
+            tickets_sel, venta_sel = _agregar_ventas_periodo(
+                db, ids_empresas, desde_hoy, hasta_hoy
+            )
+            _, venta_prev = _agregar_ventas_periodo(db, ids_empresas, desde_ayer, hasta_ayer)
+            tickets_mes, venta_mes = tickets_periodo, total_periodo
+            _, venta_mes_ant = _agregar_ventas_periodo(
+                db, ids_empresas, desde_mes_ant, hasta_mes_ant
+            )
+
         pct: Optional[float] = None
         if venta_mes_ant > 0:
-            pct = round(((total_mes - venta_mes_ant) / venta_mes_ant) * 100.0, 2)
-        elif total_mes > 0:
+            pct = round(((venta_mes - venta_mes_ant) / venta_mes_ant) * 100.0, 2)
+        elif venta_mes > 0:
             pct = 100.0
         kpis = {
-            "venta_hoy": venta_hoy,
-            "venta_ayer": venta_ayer,
-            "venta_mes": total_mes,
+            "venta_hoy": venta_sel,
+            "venta_ayer": venta_prev,
+            "venta_mes": venta_mes,
             "venta_mes_anterior": venta_mes_ant,
             "pct_vs_mes_anterior": pct,
-            "tickets_hoy": tickets_hoy,
+            "tickets_hoy": tickets_sel,
             "tickets_mes": tickets_mes,
-            "ticket_promedio_hoy": round(venta_hoy / tickets_hoy, 2) if tickets_hoy else 0.0,
-            "ticket_promedio_mes": ticket_promedio_mes,
+            "ticket_promedio_hoy": round(venta_sel / tickets_sel, 2) if tickets_sel else 0.0,
+            "ticket_promedio_mes": round(venta_mes / tickets_mes, 2) if tickets_mes else 0.0,
+            "modo": modo_n,
         }
 
     monto_linea = (
@@ -366,8 +493,8 @@ def obtener_estadisticas_generales(db: Session, usuario_actual: Usuario) -> Dict
             .join(VentaDetalle, VentaDetalle.id_articulo == Articulo.id)
             .join(Venta, Venta.id == VentaDetalle.id_venta)
             .where(Venta.id_empresa.in_(ids_empresas))
-            .where(Venta.timestamp >= desde_mes)
-            .where(Venta.timestamp < hasta_ahora_utc)
+            .where(Venta.timestamp >= desde_periodo)
+            .where(Venta.timestamp < hasta_periodo)
             .where(func.upper(Venta.estado) != "ANULADA")
             .where(Venta.id_venta_lote_padre.is_(None))
             .group_by(Articulo.id, Articulo.descripcion)
@@ -398,8 +525,8 @@ def obtener_estadisticas_generales(db: Session, usuario_actual: Usuario) -> Dict
             .join(Venta, Venta.id == VentaDetalle.id_venta)
             .outerjoin(Categoria, Categoria.id == Articulo.id_categoria)
             .where(Venta.id_empresa.in_(ids_empresas))
-            .where(Venta.timestamp >= desde_mes)
-            .where(Venta.timestamp < hasta_ahora_utc)
+            .where(Venta.timestamp >= desde_periodo)
+            .where(Venta.timestamp < hasta_periodo)
             .where(func.upper(Venta.estado) != "ANULADA")
             .where(Venta.id_venta_lote_padre.is_(None))
             .group_by(nombre_cat)
@@ -426,8 +553,8 @@ def obtener_estadisticas_generales(db: Session, usuario_actual: Usuario) -> Dict
             )
             .join(Venta, Venta.id_usuario == Usuario.id)
             .where(Venta.id_empresa.in_(ids_empresas))
-            .where(Venta.timestamp >= desde_mes)
-            .where(Venta.timestamp < hasta_ahora_utc)
+            .where(Venta.timestamp >= desde_periodo)
+            .where(Venta.timestamp < hasta_periodo)
             .where(func.upper(Venta.estado) != "ANULADA")
             .where(Venta.id_venta_lote_padre.is_(None))
             .group_by(Usuario.id, Usuario.nombre_usuario)
@@ -456,8 +583,8 @@ def obtener_estadisticas_generales(db: Session, usuario_actual: Usuario) -> Dict
             .where(CajaSesion.id_empresa.in_(ids_empresas))
             .where(CajaMovimiento.tipo == "VENTA")
             .where(func.upper(CajaMovimiento.estado) != "ANULADO")
-            .where(CajaMovimiento.timestamp >= desde_mes)
-            .where(CajaMovimiento.timestamp < hasta_ahora_utc)
+            .where(CajaMovimiento.timestamp >= desde_periodo)
+            .where(CajaMovimiento.timestamp < hasta_periodo)
             .group_by(CajaMovimiento.metodo_pago)
             .order_by(func.sum(CajaMovimiento.monto).desc())
         ).all()
@@ -478,10 +605,10 @@ def obtener_estadisticas_generales(db: Session, usuario_actual: Usuario) -> Dict
             select(Articulo)
             .where(Articulo.id_empresa.in_(ids_empresas))
             .where(Articulo.activo == True)  # noqa: E712
-            .where(Articulo.stock_minimo.is_not(None))
-            .where(Articulo.stock_actual < Articulo.stock_minimo)
+            .where(Articulo.stock_minimo > 0)
             .where(Articulo.stock_actual > 0)
-            .order_by((Articulo.stock_actual - Articulo.stock_minimo).asc())
+            .where(Articulo.stock_actual <= Articulo.stock_minimo)
+            .order_by(Articulo.stock_actual.asc())
             .limit(15)
         ).all()
         stock_bajo = [
@@ -495,7 +622,6 @@ def obtener_estadisticas_generales(db: Session, usuario_actual: Usuario) -> Dict
             }
             for articulo in stock_bajo_rows
         ]
-
         sin_stock_rows = db.exec(
             select(Articulo)
             .where(Articulo.id_empresa.in_(ids_empresas))
@@ -521,11 +647,7 @@ def obtener_estadisticas_generales(db: Session, usuario_actual: Usuario) -> Dict
             "cantidad_sin_stock": len(sin_stock),
             "cantidad_stock_bajo": len(stock_bajo),
         }
-    else:
-        # Compat: lista stock_bajo vacía si sección off
-        pass
 
-    # Compat legado: stock_bajo flat list (bajo mínimo o sin stock si no hay mínimos)
     if not stock_bajo and sin_stock:
         stock_bajo_legado = sin_stock
     else:
@@ -558,12 +680,13 @@ def obtener_estadisticas_generales(db: Session, usuario_actual: Usuario) -> Dict
             })
 
     return {
-        "periodo": f"{hoy.year}-{hoy.month:02d}",
-        "desde": desde_mes,
-        "hasta": hasta_ahora_utc,
-        "cantidad_ventas": tickets_mes,
-        "total_ventas": total_mes,
-        "ticket_promedio": ticket_promedio_mes,
+        "periodo": periodo_label,
+        "modo": modo_n,
+        "desde": desde_periodo,
+        "hasta": hasta_periodo,
+        "cantidad_ventas": tickets_periodo,
+        "total_ventas": total_periodo,
+        "ticket_promedio": ticket_promedio,
         "por_establecimiento": por_establecimiento if (secciones.por_establecimiento and tiene_multi_sucursal) else [],
         "top_productos": top_productos,
         "stock_bajo": stock_bajo_legado,
@@ -574,6 +697,224 @@ def obtener_estadisticas_generales(db: Session, usuario_actual: Usuario) -> Dict
         "ranking_vendedores": ranking_vendedores,
         "medios_pago": medios_pago,
     }
+
+
+def _xlsx_col(n: int) -> str:
+    s = ""
+    while n:
+        n, r = divmod(n - 1, 26)
+        s = chr(65 + r) + s
+    return s
+
+
+def _xlsx_sheet_xml(rows: List[List[Any]]) -> str:
+    from xml.sax.saxutils import escape
+
+    parts = [
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">',
+        "<sheetData>",
+    ]
+    for r_idx, row in enumerate(rows, 1):
+        parts.append(f'<row r="{r_idx}">')
+        for c_idx, val in enumerate(row, 1):
+            ref = f"{_xlsx_col(c_idx)}{r_idx}"
+            if isinstance(val, bool):
+                text = "1" if val else "0"
+                parts.append(f'<c r="{ref}" t="inlineStr"><is><t>{text}</t></is></c>')
+            elif isinstance(val, (int, float)) and not isinstance(val, bool):
+                parts.append(f'<c r="{ref}" t="n"><v>{val}</v></c>')
+            else:
+                text = escape("" if val is None else str(val))
+                parts.append(f'<c r="{ref}" t="inlineStr"><is><t>{text}</t></is></c>')
+        parts.append("</row>")
+    parts.append("</sheetData></worksheet>")
+    return "".join(parts)
+
+
+def _build_xlsx(sheets: Dict[str, List[List[Any]]]) -> bytes:
+    """XLSX mínimo (stdlib) con una o más hojas."""
+    import zipfile
+    from io import BytesIO
+
+    names = list(sheets.keys())
+    buf = BytesIO()
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(
+            "[Content_Types].xml",
+            (
+                '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+                '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+                '<Default Extension="xml" ContentType="application/xml"/>'
+                '<Override PartName="/xl/workbook.xml" '
+                'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+                + "".join(
+                    f'<Override PartName="/xl/worksheets/sheet{i}.xml" '
+                    'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+                    for i in range(1, len(names) + 1)
+                )
+                + "</Types>"
+            ),
+        )
+        zf.writestr(
+            "_rels/.rels",
+            (
+                '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+                'Target="xl/workbook.xml"/>'
+                "</Relationships>"
+            ),
+        )
+        workbook_sheets = "".join(
+            f'<sheet name="{name[:31]}" sheetId="{i}" r:id="rId{i}"/>'
+            for i, name in enumerate(names, 1)
+        )
+        zf.writestr(
+            "xl/workbook.xml",
+            (
+                '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+                'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+                f"<sheets>{workbook_sheets}</sheets></workbook>"
+            ),
+        )
+        rels = "".join(
+            f'<Relationship Id="rId{i}" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" '
+            f'Target="worksheets/sheet{i}.xml"/>'
+            for i in range(1, len(names) + 1)
+        )
+        zf.writestr(
+            "xl/_rels/workbook.xml.rels",
+            (
+                '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                f"{rels}</Relationships>"
+            ),
+        )
+        for i, name in enumerate(names, 1):
+            zf.writestr(f"xl/worksheets/sheet{i}.xml", _xlsx_sheet_xml(sheets[name]))
+    return buf.getvalue()
+
+
+def _fmt_dt(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, datetime):
+        return value.astimezone(TZ_AR).strftime("%Y-%m-%d %H:%M:%S") if value.tzinfo else value.strftime("%Y-%m-%d %H:%M:%S")
+    return str(value)
+
+
+def exportar_cierres_y_movimientos_mes_xlsx(
+    db: Session,
+    usuario_actual: Usuario,
+    anio: int,
+    mes: int,
+) -> bytes:
+    """
+    Excel con 2 hojas: cierres de caja del mes y movimientos del mes.
+    Solo empresa del usuario (modo especial / panel estadísticas).
+    """
+    if mes < 1 or mes > 12:
+        raise ValueError("Mes inválido")
+    if anio < 2000 or anio > 2100:
+        raise ValueError("Año inválido")
+
+    desde, hasta = _rango_mes_ar_utc_naive(anio, mes)
+    id_empresa = usuario_actual.id_empresa
+
+    UsuarioApertura = aliased(Usuario, name="usuario_apertura_export")
+    UsuarioCierre = aliased(Usuario, name="usuario_cierre_export")
+
+    filas_cierres = db.exec(
+        select(
+            CajaSesion,
+            UsuarioApertura.nombre_usuario,
+            UsuarioCierre.nombre_usuario,
+        )
+        .join(UsuarioApertura, CajaSesion.id_usuario_apertura == UsuarioApertura.id)
+        .outerjoin(UsuarioCierre, CajaSesion.id_usuario_cierre == UsuarioCierre.id)
+        .where(CajaSesion.id_empresa == id_empresa)
+        .where(CajaSesion.estado == "CERRADA")
+        .where(CajaSesion.fecha_cierre >= desde)
+        .where(CajaSesion.fecha_cierre < hasta)
+        .order_by(CajaSesion.fecha_cierre.asc())
+    ).all()
+
+    hoja_cierres: List[List[Any]] = [[
+        "id_sesion",
+        "fecha_apertura",
+        "fecha_cierre",
+        "usuario_apertura",
+        "usuario_cierre",
+        "saldo_inicial",
+        "saldo_final_efectivo",
+        "saldo_final_transferencias",
+        "saldo_final_pos",
+        "saldo_final_declarado",
+        "saldo_final_calculado",
+        "diferencia",
+        "revisado",
+    ]]
+    for sesion, nom_ap, nom_ci in filas_cierres:
+        hoja_cierres.append([
+            sesion.id,
+            _fmt_dt(sesion.fecha_apertura),
+            _fmt_dt(sesion.fecha_cierre),
+            nom_ap or "",
+            nom_ci or "",
+            float(sesion.saldo_inicial or 0.0),
+            float(sesion.saldo_final_efectivo or 0.0),
+            float(sesion.saldo_final_transferencias or 0.0),
+            float(sesion.saldo_final_bancario or 0.0),
+            float(sesion.saldo_final_declarado or 0.0) if sesion.saldo_final_declarado is not None else "",
+            float(sesion.saldo_final_calculado or 0.0) if sesion.saldo_final_calculado is not None else "",
+            float(sesion.diferencia or 0.0) if sesion.diferencia is not None else "",
+            "SI" if sesion.revisado else "NO",
+        ])
+
+    filas_mov = db.exec(
+        select(CajaMovimiento, Usuario.nombre_usuario)
+        .join(CajaSesion, CajaSesion.id == CajaMovimiento.id_caja_sesion)
+        .outerjoin(Usuario, Usuario.id == CajaMovimiento.id_usuario)
+        .where(CajaSesion.id_empresa == id_empresa)
+        .where(CajaMovimiento.timestamp >= desde)
+        .where(CajaMovimiento.timestamp < hasta)
+        .order_by(CajaMovimiento.timestamp.asc())
+    ).all()
+
+    hoja_mov: List[List[Any]] = [[
+        "id_movimiento",
+        "id_sesion",
+        "timestamp",
+        "tipo",
+        "concepto",
+        "monto",
+        "metodo_pago",
+        "estado",
+        "usuario",
+        "id_venta",
+    ]]
+    for mov, nom_usu in filas_mov:
+        hoja_mov.append([
+            mov.id,
+            mov.id_caja_sesion,
+            _fmt_dt(mov.timestamp),
+            mov.tipo or "",
+            mov.concepto or "",
+            float(mov.monto or 0.0),
+            (mov.metodo_pago or "").upper(),
+            (mov.estado or "").upper(),
+            nom_usu or "",
+            mov.id_venta or "",
+        ])
+
+    return _build_xlsx({
+        "Cierres de caja": hoja_cierres,
+        "Movimientos": hoja_mov,
+    })
 
 
 def obtener_todos_los_movimientos_de_caja(db: Session, usuario_actual: Usuario) -> List[CajaMovimiento]:

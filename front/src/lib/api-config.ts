@@ -69,6 +69,7 @@ export const API_CONFIG = {
     ARTICULOS_VERSION: '/articulos/version',
     CAJA_PANEL_ESTADISTICAS: '/caja/panel-estadisticas',
     CAJA_ESTADISTICAS_GENERALES: '/caja/estadisticas-generales',
+    CAJA_EXPORTAR_MES: '/caja/exportar-mes',
     CAJA_REVISAR_SESION: (idSesion: number) => `/caja/admin/sesion/${idSesion}/revisar`,
     CAJA_TICKET_CIERRE: (idSesion: number) =>
       `/caja/sesion/${idSesion}/ticket-cierre-detallado`,

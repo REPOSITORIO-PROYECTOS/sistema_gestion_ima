@@ -2,10 +2,10 @@
 
 from sqlite3.dbapi2 import Timestamp
 import logging
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from sqlmodel import Session, select
-from typing import List, Dict, Any, Optional
-from datetime import datetime, timezone
+from typing import List, Dict, Any, Optional, Literal
+from datetime import date, datetime, timezone
 from starlette.responses import Response
 
 # --- Módulos del Proyecto ---
@@ -436,12 +436,17 @@ def get_panel_estadisticas_cajas(
     dependencies=[Depends(es_supervisor_caja)],
 )
 def get_estadisticas_generales(
+    modo: Literal["dia", "semana", "mes"] = Query("mes"),
+    fecha: Optional[date] = Query(
+        None,
+        description="Fecha ancla (YYYY-MM-DD). Día = ese día; semana = lunes-domingo; mes = ese mes.",
+    ),
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(obtener_usuario_actual),
 ):
     """
-    KPIs del mes: ventas, ticket promedio, top productos, stock bajo y desglose por establecimiento.
-    Solo para empresas con panel de estadísticas (modo especial).
+    KPIs del período (día/semana/mes): ventas, ticket promedio, tops y desgloses.
+    Solo empresas con panel de estadísticas (modo especial).
     """
     if not empresa_tiene_panel_estadisticas_caja(current_user.id_empresa, db):
         raise HTTPException(
@@ -449,11 +454,56 @@ def get_estadisticas_generales(
             detail="Las estadísticas generales no están habilitadas para esta empresa.",
         )
     try:
-        return consultas_caja.obtener_estadisticas_generales(db=db, usuario_actual=current_user)
+        return consultas_caja.obtener_estadisticas_generales(
+            db=db,
+            usuario_actual=current_user,
+            modo=modo,
+            fecha=fecha,
+        )
     except Exception:
         logger.exception("Error generando estadísticas generales")
         raise HTTPException(status_code=500, detail="Ocurrió un error al generar las estadísticas generales.")
-    
+
+
+@router.get(
+    "/exportar-mes",
+    tags=["Caja - Supervisión"],
+    dependencies=[Depends(es_supervisor_caja)],
+)
+def exportar_cierres_y_movimientos_mes(
+    anio: int = Query(..., ge=2000, le=2100),
+    mes: int = Query(..., ge=1, le=12),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(obtener_usuario_actual),
+):
+    """
+    Descarga Excel (.xlsx) con cierres de caja y movimientos del mes.
+    Solo empresas con panel de estadísticas (modo especial).
+    """
+    if not empresa_tiene_panel_estadisticas_caja(current_user.id_empresa, db):
+        raise HTTPException(
+            status_code=403,
+            detail="La exportación no está habilitada para esta empresa.",
+        )
+    try:
+        contenido = consultas_caja.exportar_cierres_y_movimientos_mes_xlsx(
+            db=db,
+            usuario_actual=current_user,
+            anio=anio,
+            mes=mes,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception:
+        logger.exception("Error exportando cierres/movimientos del mes")
+        raise HTTPException(status_code=500, detail="No se pudo generar el Excel del mes.")
+
+    filename = f"caja_{current_user.id_empresa}_{anio}-{mes:02d}.xlsx"
+    return Response(
+        content=contenido,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )    
 
 @router.get(
     "/movimientos/todos", # Una ruta clara
