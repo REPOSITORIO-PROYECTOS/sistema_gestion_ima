@@ -42,6 +42,7 @@ import { usePerfilEmpresa } from "@/hooks/usePerfilEmpresa";
 import { buscarPorCodigoLocal } from "@/lib/offline/catalogo-search";
 import { useCajaStore } from "@/lib/cajaStore";
 import {
+  esFacturaAfipFallida,
   intentarRegistrarVenta,
   type VentaPendientePayload,
 } from "@/lib/offline/venta-offline";
@@ -1063,7 +1064,23 @@ function FormVentas({
       });
 
       if (resultado.mode === "online") {
-        toast.success(`✅ Venta registrada: ${resultado.message}`);
+        const afipFallo = esFacturaAfipFallida(tipoEfectivo, resultado.facturacion_afip);
+        // Si pidieron factura y AFIP no dio CAE, la venta queda No facturada en Contabilidad.
+        const tipoImpresion = afipFallo ? "recibo" : tipoEfectivo;
+
+        if (afipFallo) {
+          const detalleAfip =
+            typeof resultado.facturacion_afip?.error === "string"
+              ? resultado.facturacion_afip.error
+              : resultado.message;
+          toast.error("❌ Venta guardada sin factura AFIP", {
+            description:
+              `${detalleAfip}. En Contabilidad figura como No facturada; podés reintentar con Facturar Lote.`,
+            duration: 12000,
+          });
+        } else {
+          toast.success(`✅ Venta registrada: ${resultado.message}`);
+        }
         await refrescarProductos();
 
         const itemsBase = productosVendidos.map((p): ItemComprobante => {
@@ -1075,7 +1092,7 @@ function FormVentas({
             subtotal: p.precioTotal,
             tasa_iva: 21,
           };
-          if (tipoEfectivo !== "factura") {
+          if (tipoImpresion !== "factura") {
             item.descuento_especifico = p.descuentoNominal || 0;
             item.descuento_especifico_por = p.porcentajeDescuento || 0;
           }
@@ -1083,7 +1100,7 @@ function FormVentas({
         });
 
         await imprimirComprobante(
-          tipoEfectivo,
+          tipoImpresion,
           itemsBase,
           totalVentaFinal,
           descuentoNominalTotal || 0,

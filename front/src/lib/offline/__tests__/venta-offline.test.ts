@@ -1,5 +1,6 @@
 import {
   buildComprobanteOfflineTexto,
+  esFacturaAfipFallida,
   esFacturaOfflineNoPermitida,
 } from "@/lib/offline/venta-offline";
 import type { VentaPendientePayload } from "@/lib/offline/venta-offline";
@@ -42,6 +43,13 @@ describe("venta-offline", () => {
     expect(esFacturaOfflineNoPermitida("factura", true)).toBe(true);
     expect(esFacturaOfflineNoPermitida("recibo", false)).toBe(false);
     expect(esFacturaOfflineNoPermitida("factura_b", false)).toBe(true);
+  });
+
+  it("detecta factura AFIP fallida sin CAE", () => {
+    expect(esFacturaAfipFallida("factura", { estado: "FALLIDO", error: "timeout" })).toBe(true);
+    expect(esFacturaAfipFallida("factura_b", { estado: "EXITOSO" })).toBe(true);
+    expect(esFacturaAfipFallida("factura", { estado: "EXITOSO", cae: "123" })).toBe(false);
+    expect(esFacturaAfipFallida("recibo", { estado: "FALLIDO" })).toBe(false);
   });
 
   it("arma comprobante offline con items y referencia local", () => {

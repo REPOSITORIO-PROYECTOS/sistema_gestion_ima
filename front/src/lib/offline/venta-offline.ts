@@ -49,18 +49,47 @@ export type VentaPendientePayload = {
   meta: VentaPendienteMeta;
 };
 
+export type FacturacionAfipResultado = {
+  estado?: string;
+  error?: string;
+  cae?: string | null;
+  [key: string]: unknown;
+};
+
 export type RegistrarVentaResult =
-  | { mode: "online"; message: string }
+  | {
+      mode: "online";
+      message: string;
+      id_venta?: number;
+      facturacion_afip?: FacturacionAfipResultado | null;
+    }
   | { mode: "offline"; id_local: string; message: string };
 
 type RegistrarVentaServidorResult =
-  | { ok: true; message: string }
+  | {
+      ok: true;
+      message: string;
+      id_venta?: number;
+      facturacion_afip?: FacturacionAfipResultado | null;
+    }
   | { ok: false; status: number; detail: string };
 
 const ESTADOS_REINTENTABLES: VentaPendienteEstado[] = ["pendiente", "error"];
 
 function newIdLocal(): string {
   return `venta_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+export function esFacturaAfipFallida(
+  tipoComprobante: string,
+  facturacion?: FacturacionAfipResultado | null,
+): boolean {
+  const tipo = (tipoComprobante || "").toLowerCase();
+  const esFactura = tipo === "factura" || tipo.startsWith("factura_");
+  if (!esFactura) return false;
+  const estado = String(facturacion?.estado || "").toUpperCase();
+  if (estado === "FALLIDO") return true;
+  return !Boolean(facturacion?.cae);
 }
 
 export function esFacturaOfflineNoPermitida(
@@ -183,7 +212,14 @@ export async function registrarVentaEnServidor(
     body: JSON.stringify(venta),
   });
 
-  const data = (await res.json()) as { message?: string; detail?: string };
+  const data = (await res.json()) as {
+    message?: string;
+    detail?: string;
+    data?: {
+      id_venta?: number;
+      facturacion_afip?: FacturacionAfipResultado | null;
+    };
+  };
   if (!res.ok) {
     return {
       ok: false,
@@ -195,6 +231,8 @@ export async function registrarVentaEnServidor(
   return {
     ok: true,
     message: data.message || "Venta registrada correctamente.",
+    id_venta: data.data?.id_venta,
+    facturacion_afip: data.data?.facturacion_afip ?? null,
   };
 }
 
@@ -294,7 +332,12 @@ export async function intentarRegistrarVenta(params: {
   try {
     const result = await registrarVentaEnServidor(params.token, params.payload.venta);
     if (result.ok) {
-      return { mode: "online", message: result.message };
+      return {
+        mode: "online",
+        message: result.message,
+        id_venta: result.id_venta,
+        facturacion_afip: result.facturacion_afip,
+      };
     }
     throw new Error(result.detail);
   } catch (error) {

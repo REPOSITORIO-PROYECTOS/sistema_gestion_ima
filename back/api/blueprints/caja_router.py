@@ -276,13 +276,23 @@ def api_registrar_venta(
             logger.exception("Error inesperado durante facturación AFIP", exc_info=e)
             resultado_afip = {"estado": "FALLIDO", "error": f"Error inesperado AFIP: {str(e)}"}
 
-    # --- RESPUESTA FINAL (sin cambios) ---
+    # --- RESPUESTA FINAL ---
     protocolo_sync = db.info.get("protocolo_sync_nube", [])
     sync_pendiente = any(ev.get("estado") in {"fallido", "pendiente"} for ev in protocolo_sync)
 
+    afip_estado = str((resultado_afip or {}).get("estado") or "").upper()
+    afip_fallo = bool(req.quiere_factura) and afip_estado == "FALLIDO"
+    mensaje = "Venta registrada."
+    if afip_fallo:
+        detalle_afip = (resultado_afip or {}).get("error") or "AFIP no otorgó CAE."
+        mensaje = (
+            "Venta registrada, pero la facturación AFIP falló. "
+            f"En Contabilidad figura como No facturada. Detalle: {detalle_afip}"
+        )
+
     return RespuestaGenerica(
         status="success",
-        message="Venta registrada.",
+        message=mensaje,
         data={
             "id_venta": venta_creada.id,
             "vuelto": vuelto,
