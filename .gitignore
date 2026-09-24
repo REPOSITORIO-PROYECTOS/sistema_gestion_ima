@@ -126,6 +126,10 @@ tsconfig.jest.json
 jest.config.js
 node_modules/
 
+# Dumps de producción (extractor S1)
+exports_s1*/
+exports_s1_agosto_2026/
+
 # Ignorar archivos de imagen
 *.png
 *.jpg
