@@ -314,6 +314,9 @@ def crear_movimiento_stock_consumo(db: Session, detalle: ConsumoMesaDetalle, id_
     
     # Actualizar stock del artículo
     articulo.stock_actual = nuevo_stock
+    from back.gestion.stock.espejo_stock import espejar_stock_articulo
+
+    espejar_stock_articulo(db, articulo)
     db.commit()
     db.refresh(movimiento)
     

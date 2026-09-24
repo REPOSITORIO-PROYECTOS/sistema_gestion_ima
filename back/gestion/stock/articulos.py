@@ -185,6 +185,10 @@ def crear_articulo(id_empresa: int, db: Session, articulo_data: ArticuloCreate) 
     db_articulo = Articulo.from_orm(articulo_data, {"id_empresa": id_empresa})
     _recalcular_precio_venta(db_articulo)
     db.add(db_articulo)
+    db.flush()
+    from back.gestion.stock.espejo_stock import espejar_stock_articulo
+
+    espejar_stock_articulo(db, db_articulo)
     db.commit()
     db.refresh(db_articulo)
     return db_articulo
@@ -202,6 +206,10 @@ def actualizar_articulo(id_empresa: int, db: Session, articulo_id: int, articulo
         setattr(db_articulo, key, value)
     _recalcular_precio_venta(db_articulo)
     db.add(db_articulo)
+    if "stock_actual" in update_data:
+        from back.gestion.stock.espejo_stock import espejar_stock_articulo
+
+        espejar_stock_articulo(db, db_articulo)
     db.commit()
     db.refresh(db_articulo)
     return db_articulo

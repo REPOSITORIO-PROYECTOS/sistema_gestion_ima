@@ -280,6 +280,9 @@ def crear_nota_credito_para_anular(
                 )
                 db.add(mov_stock)
                 db.add(articulo)
+                from back.gestion.stock.espejo_stock import espejar_stock_articulo
+
+                espejar_stock_articulo(db, articulo)
 
     # El commit se hará en el router que llama a esta función.
     return resultado_afip_nc
@@ -354,6 +357,9 @@ def anular_comprobante_no_fiscal(
                 )
                 db.add(mov_stock)
                 db.add(articulo)
+                from back.gestion.stock.espejo_stock import espejar_stock_articulo
+
+                espejar_stock_articulo(db, articulo)
 
     ticket_html = _render_ticket_anulacion_no_fiscal(
         db=db,

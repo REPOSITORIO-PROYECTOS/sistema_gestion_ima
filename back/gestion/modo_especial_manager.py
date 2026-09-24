@@ -288,6 +288,9 @@ def crear_producto(
     db.add(articulo)
     db.flush()
     _asignar_barcodes(db, articulo, data.barcodes, omitir_conflictos=omitir_conflictos_barcode)
+    from back.gestion.stock.espejo_stock import espejar_stock_articulo
+
+    espejar_stock_articulo(db, articulo)
     _incrementar_catalogo_version(db, id_empresa)
     if commit:
         db.commit()
@@ -339,6 +342,10 @@ def actualizar_producto(
         _asignar_barcodes(db, articulo, update["barcodes"], omitir_conflictos=omitir_conflictos_barcode)
 
     db.add(articulo)
+    if "stock" in update and update["stock"] is not None:
+        from back.gestion.stock.espejo_stock import espejar_stock_articulo
+
+        espejar_stock_articulo(db, articulo)
     _incrementar_catalogo_version(db, id_empresa)
     if commit:
         db.commit()
@@ -447,6 +454,9 @@ def ingresar_stock(db: Session, id_empresa: int, id_usuario: int, req: IngresoSt
         )
         db.add(articulo)
         db.add(movimiento)
+        from back.gestion.stock.espejo_stock import espejar_stock_articulo
+
+        espejar_stock_articulo(db, articulo)
         procesados.append({
             "codigo_interno": articulo.codigo_interno,
             "descripcion": articulo.descripcion,
@@ -764,6 +774,13 @@ def crear_transferencia_stock(
     _verificar_empresa_transferencia(db, req.id_empresa_destino)
     if _grupo_transferencia(db, id_empresa_origen) != _grupo_transferencia(db, req.id_empresa_destino):
         raise ValueError("No puede transferir stock entre empresas de distintos grupos.")
+    from back.gestion.stock.espejo_stock import empresas_en_mismo_espejo
+
+    if empresas_en_mismo_espejo(id_empresa_origen, req.id_empresa_destino):
+        raise ValueError(
+            "Stock espejado entre de-campo y La Esquina 2: no hace falta transferir. "
+            "Cargá o ajustá stock en cualquiera; se replica en la otra."
+        )
 
     transferencia = TransferenciaStock(
         estado="PENDIENTE",

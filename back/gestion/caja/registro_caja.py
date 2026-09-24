@@ -408,6 +408,9 @@ def registrar_venta_y_movimiento_caja(
                 print(f"      -> Descontando {item.cantidad} de stock para '{articulo_a_actualizar.descripcion}'")
                 articulo_a_actualizar.stock_actual -= item.cantidad
                 db.add(articulo_a_actualizar)
+                from back.gestion.stock.espejo_stock import espejar_stock_articulo
+
+                espejar_stock_articulo(db, articulo_a_actualizar)
 
     movimiento_principal = None # Inicializamos como None
     
