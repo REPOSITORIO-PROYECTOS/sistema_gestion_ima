@@ -122,13 +122,26 @@ export function DataTable<TData extends MovimientoAPI, TValue>({
                 toast.error("Selección inválida", { description: "No se pueden incluir movimientos que ya han sido facturados." });
                 return;
             }
-            const tipoActual = row.original.venta?.tipo_comprobante_solicitado?.toLowerCase();
+            const tipoActual = row.original.venta?.tipo_comprobante_solicitado?.toLowerCase() ?? "";
             if (accion === 'agrupar' && (tipoActual !== 'presupuesto' && tipoActual !== 'remito')) {
                 toast.error("Selección inválida para agrupar", { description: "Solo se pueden agrupar 'Presupuestos' o 'Remitos'." });
                 return;
             }
-            if (accion === 'facturar' && tipoActual !== 'recibo') {
-                toast.error("Selección inválida para facturar", { description: "Solo se pueden facturar 'Recibos'." });
+            // Alineado con facturacion_lotes_manager: cualquier venta no facturada
+            // (recibo/ticket/comprobante o factura_a/b/c pedida a AFIP que falló sin CAE).
+            const tiposFacturablesLote = new Set([
+                "recibo",
+                "ticket",
+                "comprobante",
+                "factura",
+                "factura_a",
+                "factura_b",
+                "factura_c",
+            ]);
+            if (accion === 'facturar' && !tiposFacturablesLote.has(tipoActual)) {
+                toast.error("Selección inválida para facturar", {
+                    description: "Solo se pueden facturar recibos/comprobantes o facturas pendientes (sin CAE). No remitos ni presupuestos.",
+                });
                 return;
             }
         }
