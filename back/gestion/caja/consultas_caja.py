@@ -144,9 +144,14 @@ def _agregar_ventas_periodo(
 def obtener_arqueos_de_caja(db: Session, usuario_actual: Usuario) -> Dict[str, List[Dict[str, Any]]]:
     """
     Obtiene un informe de cajas abiertas y cerradas, filtrando por la empresa
-    del usuario actual y usando JOINs seguros.
+    del usuario actual (y el grupo de transferencia si aplica).
     """
-    logging.info(f"Solicitando informe de cajas para la Empresa ID: {usuario_actual.id_empresa}.")
+    ids_empresas = _ids_empresas_para_estadisticas(db, usuario_actual.id_empresa)
+    logging.info(
+        "Solicitando informe de cajas para empresas %s (usuario emp=%s).",
+        ids_empresas,
+        usuario_actual.id_empresa,
+    )
     
     informe_final = {
         "cajas_abiertas": [],
@@ -173,9 +178,8 @@ def obtener_arqueos_de_caja(db: Session, usuario_actual: Usuario) -> Dict[str, L
             # Esto evita errores si una caja cerrada no tiene un usuario de cierre asignado.
             .join(UsuarioCierre, CajaSesion.id_usuario_cierre == UsuarioCierre.id, isouter=True)
             .join(UsuarioRevision, CajaSesion.id_usuario_revision == UsuarioRevision.id, isouter=True)
-            # ¡CAMBIO 3: FILTRO DE SEGURIDAD MULTI-EMPRESA!
-            # Nos unimos a la tabla de usuarios de apertura para filtrar por empresa.
-            .where(UsuarioApertura.id_empresa == usuario_actual.id_empresa)
+            # Multi-empresa: misma empresa o grupo de transferencia (modo especial).
+            .where(CajaSesion.id_empresa.in_(ids_empresas))
             .where(CajaSesion.estado == "CERRADA")
             .order_by(CajaSesion.fecha_cierre.desc())
         )
@@ -207,8 +211,7 @@ def obtener_arqueos_de_caja(db: Session, usuario_actual: Usuario) -> Dict[str, L
         consulta_abiertas = (
             select(CajaSesion, UsuarioApertura.nombre_usuario)
             .join(UsuarioApertura, CajaSesion.id_usuario_apertura == UsuarioApertura.id)
-            # ¡CAMBIO 3 (REPETIDO): FILTRO DE SEGURIDAD MULTI-EMPRESA!
-            .where(UsuarioApertura.id_empresa == usuario_actual.id_empresa)
+            .where(CajaSesion.id_empresa.in_(ids_empresas))
             .where(CajaSesion.estado == "ABIERTA")
             .order_by(CajaSesion.fecha_apertura.asc())
         )
@@ -233,9 +236,10 @@ def obtener_arqueos_de_caja(db: Session, usuario_actual: Usuario) -> Dict[str, L
 
 def obtener_panel_estadisticas_cajas(db: Session, usuario_actual: Usuario) -> Dict[str, Any]:
     """
-    Panel de supervisión: cajas abiertas de la empresa con totales de ventas y movimientos.
-    Incluye desglose por medio (efectivo / transferencia / POS) por sesión.
+    Panel de supervisión: cajas abiertas de la empresa (y grupo de transferencia)
+    con totales de ventas y movimientos. Incluye desglose por medio por sesión.
     """
+    ids_empresas = _ids_empresas_para_estadisticas(db, usuario_actual.id_empresa)
     UsuarioApertura = aliased(Usuario, name="usuario_apertura_panel")
 
     mov_stats = (
@@ -265,7 +269,7 @@ def obtener_panel_estadisticas_cajas(db: Session, usuario_actual: Usuario) -> Di
         )
         .join(UsuarioApertura, CajaSesion.id_usuario_apertura == UsuarioApertura.id)
         .outerjoin(mov_stats, mov_stats.c.id_caja_sesion == CajaSesion.id)
-        .where(CajaSesion.id_empresa == usuario_actual.id_empresa)
+        .where(CajaSesion.id_empresa.in_(ids_empresas))
         .where(CajaSesion.estado == "ABIERTA")
         .order_by(CajaSesion.fecha_apertura.asc())
     )
