@@ -1,23 +1,69 @@
-{# Estilos compartidos para tickets térmicos (recibo, factura, etc.) #}
+{# Estilos compartidos para tickets térmicos POS (58mm / 80mm). #}
 <style>
+    @page {
+        size: {{ estilos.page_size }};
+        margin: {{ estilos.page_margin }};
+    }
+
     html, body {
         margin: 0;
         padding: 0;
-        width: {{ estilos.page_width }};
+        width: 100%;
         font-family: 'Courier New', Courier, monospace;
         font-size: {{ estilos.font_size }};
+        line-height: 1.25;
         color: #000;
         background: #fff;
     }
 
-    .ticket-termico {
-        width: {{ estilos.page_width }};
-        max-width: 100%;
+    * {
         margin: 0;
         padding: 0;
         box-sizing: border-box;
     }
 
+    .ticket-termico {
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
+        padding: 0;
+    }
+
+    .header,
+    .pie {
+        text-align: center;
+    }
+
+    .header p,
+    .pie p,
+    .cliente p,
+    .totales p {
+        margin: 0;
+        padding: 0;
+        line-height: 1.25;
+    }
+
+    .header .titulo {
+        font-size: {{ estilos.font_size_header }};
+        font-weight: bold;
+    }
+
+    .header .subtitulo {
+        font-weight: bold;
+    }
+
+    .separador {
+        border: none;
+        border-top: 1px dashed #000;
+        margin: 5px 0;
+        padding: 0;
+        height: 0;
+        width: 100%;
+        font-size: 0;
+        line-height: 0;
+    }
+
+    /* Compat recibo.html (pre + flex) */
     .bloque-centrado {
         margin: 0;
         padding: 0;
@@ -37,19 +83,10 @@
         font-weight: bold;
     }
 
-    .separador {
-        margin: 4px 0;
-        padding: 0;
-        border: none;
-        border-top: 1px dashed #000;
-        width: 100%;
-    }
-
     .linea {
-        margin: 2px 0;
+        margin: 0;
         padding: 0;
         width: 100%;
-        max-width: {{ estilos.chars_per_line }}ch;
         white-space: pre-wrap;
         word-break: break-word;
         font-family: inherit;
@@ -63,7 +100,7 @@
         align-items: flex-start;
         gap: 4px;
         width: 100%;
-        margin: 2px 0;
+        margin: 0;
     }
 
     .linea-item .desc {
@@ -80,7 +117,7 @@
     }
 
     .linea-detalle {
-        margin: 0 0 2px 0;
+        margin: 0;
         padding-left: 2ch;
         color: #444;
         font-size: 0.92em;
@@ -90,30 +127,113 @@
         color: #a33;
     }
 
+    .aviso {
+        margin-top: 6px;
+        font-weight: bold;
+        text-align: center;
+    }
+
+    .cliente {
+        text-align: left;
+    }
+
+    .item-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        margin: 0;
+        padding: 0;
+    }
+
+    .item-table th,
+    .item-table td {
+        margin: 0;
+        padding: 1px 0;
+        vertical-align: top;
+        font-weight: normal;
+        line-height: 1.25;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+
+    .item-table th {
+        font-weight: bold;
+        border-bottom: none;
+    }
+
+    .col-cant {
+        width: {{ estilos.col_cant }};
+        text-align: left;
+        padding-right: 2px;
+    }
+
+    .col-desc {
+        width: {{ estilos.col_desc }};
+        text-align: left;
+        padding-right: 2px;
+    }
+
+    .col-pu {
+        width: {{ estilos.col_pu }};
+        text-align: right;
+        white-space: nowrap;
+        padding-left: 3px;
+    }
+
+    .col-tot {
+        width: {{ estilos.col_tot }};
+        text-align: right;
+        white-space: nowrap;
+        padding-left: 3px;
+    }
+
+    .totales {
+        width: 100%;
+    }
+
+    .totales .fila {
+        width: 100%;
+        display: table;
+        table-layout: fixed;
+        margin: 0;
+        padding: 0;
+        line-height: 1.25;
+    }
+
+    .totales .fila span {
+        display: table-cell;
+    }
+
+    .totales .etiqueta {
+        text-align: left;
+    }
+
+    .totales .monto {
+        text-align: right;
+        white-space: nowrap;
+    }
+
+    .totales .total-final {
+        font-size: {{ estilos.font_size_total }};
+        font-weight: bold;
+    }
+
     .total-final {
-        margin: 6px 0 0 0;
-        padding: 4px 0 0 0;
-        border-top: 1px solid #000;
+        margin: 4px 0 0 0;
+        padding: 0;
         font-size: {{ estilos.font_size_total }};
         font-weight: bold;
         text-align: right;
     }
 
-    .pie {
-        margin-top: 10px;
-        text-align: center;
-    }
-
-    .aviso {
-        margin-top: 8px;
-        font-weight: bold;
-        text-align: center;
+    .descuento {
+        color: #a33;
     }
 
     .anulado {
         display: inline-block;
-        margin: 4px 0;
-        padding: 2px 6px;
+        margin: 2px 0;
+        padding: 1px 4px;
         border: 1px solid #d9534f;
         color: #d9534f;
         font-weight: bold;
@@ -121,15 +241,15 @@
 
     .qr-afip {
         display: block;
-        margin: 6px auto 0;
+        margin: 4px auto 0;
         max-width: {{ estilos.qr_max_width }};
         height: auto;
     }
 
     .logo-emisor {
         display: block;
-        margin: 0 auto 4px;
-        max-width: 60%;
+        margin: 0 auto 3px;
+        max-width: 55%;
         height: auto;
     }
 </style>

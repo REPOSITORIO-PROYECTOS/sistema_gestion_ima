@@ -139,35 +139,45 @@ def _resolver_ancho_impresora(aclaraciones: Optional[Dict[str, str]] = None) -> 
     return ancho if ancho in ANCHOS_IMPRESORA_VALIDOS else "80mm"
 
 def _estilos_impresora_termica(ancho: str = "80mm") -> Dict[str, str]:
-    """Estilos coherentes para PDF térmico sin depender de media queries."""
+    """Estilos por ancho de rollo térmico (58mm o 80mm). Tamaño de página fijo (no A4)."""
     if ancho == "58mm":
         return {
-            "chars_per_line": "32",
-            "font_size": "9px",
-            "font_size_header": "12px",
-            "font_size_total": "11px",
+            "ancho": "58mm",
+            "chars_per_line": "28",
+            "font_size": "7.5pt",
+            "font_size_header": "8.5pt",
+            "font_size_total": "8.5pt",
             "max_width": "58mm",
             "padding": "0",
-            "page_size": "58mm auto",
-            "page_margin": "0",
+            "page_size": "58mm 135mm",
+            "page_margin": "2mm",
             "page_width": "58mm",
             "print_width": "100%",
-            "qr_max_width": "65px",
+            "qr_max_width": "48px",
             "ticket_width": "100%",
+            "col_cant": "14%",
+            "col_desc": "38%",
+            "col_pu": "24%",
+            "col_tot": "24%",
         }
     return {
-        "chars_per_line": "40",
-        "font_size": "10px",
-        "font_size_header": "14px",
-        "font_size_total": "13px",
+        "ancho": "80mm",
+        "chars_per_line": "42",
+        "font_size": "8.5pt",
+        "font_size_header": "9.5pt",
+        "font_size_total": "9.5pt",
         "max_width": "80mm",
         "padding": "0",
-        "page_size": "80mm auto",
-        "page_margin": "0",
+        "page_size": "80mm 135mm",
+        "page_margin": "4mm",
         "page_width": "80mm",
         "print_width": "100%",
-        "qr_max_width": "90px",
+        "qr_max_width": "70px",
         "ticket_width": "100%",
+        "col_cant": "14%",
+        "col_desc": "42%",
+        "col_pu": "22%",
+        "col_tot": "22%",
     }
 
 def _wrap_ticket_text(texto: str, ancho: int) -> list[str]:
@@ -218,22 +228,23 @@ def _css_ticket_termico(estilos: Dict[str, str]) -> str:
     """
 
 def _css_comprobante_termico(estilos: Dict[str, str]) -> str:
-    """CSS estricto para comprobantes en rollo continuo (recibo, factura)."""
+    """CSS de página para comprobantes POS (58mm o 80mm)."""
     return f"""
     @page {{
         size: {estilos['page_size']};
-        margin: 0;
+        margin: {estilos['page_margin']};
     }}
     html, body {{
         margin: 0;
         padding: 0;
-        width: {estilos['page_width']};
+        width: 100%;
         font-family: 'Courier New', Courier, monospace;
         font-size: {estilos['font_size']};
+        line-height: 1.25;
         color: #000;
     }}
     .ticket-termico, .ticket-recibo {{
-        width: {estilos['page_width']};
+        width: 100%;
         max-width: 100%;
         margin: 0;
         padding: 0;

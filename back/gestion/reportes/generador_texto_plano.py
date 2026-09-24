@@ -276,9 +276,21 @@ def generar_factura_texto_plano(
         ticket.linea(str(observaciones))
 
     ticket.separador()
+
+    neto = _get_attr_or_key(afip, "neto") if afip else None
+    iva = _get_attr_or_key(afip, "iva") if afip else None
+    if neto is not None or iva is not None:
+        ticket.centrado("Regimen de Transparencia Fiscal")
+        ticket.centrado("al Consumidor (Ley 27.743)")
+        if iva is not None:
+            ticket.par("IVA Contenido:", f"${iva:.2f}")
+        if neto is not None:
+            ticket.par("Valor sin Impuestos:", f"${neto:.2f}")
+        ticket.separador()
+
     cae = _get_attr_or_key(afip, "cae") if afip else None
     if cae:
-        ticket.centrado(f"CAE N: {cae}")
+        ticket.centrado(f"CAE: {cae}")
         ticket.centrado(f"Vto. CAE: {_vencimiento_cae(afip)}")
         if qr_url:
             ticket.qr_ascii(qr_url)
@@ -290,8 +302,6 @@ def generar_factura_texto_plano(
 
     ticket.centrado("Defensa del Consumidor")
     ticket.centrado("0800-333-6634")
-    ticket.centrado("Regimen de Transparencia Fiscal")
-    ticket.centrado("Ley 27.743")
 
     return ticket.build()
 

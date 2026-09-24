@@ -3,143 +3,200 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Factura</title>
+    <title>Comprobante POS</title>
     {% include 'ticket/_estilos_ticket_termico.html' %}
 </head>
 <body>
-    {% set ancho = estilos.chars_per_line | int %}
     {% set tipo_nombre = (afip.tipo_comprobante_nombre if afip else none) or 'FACTURA' %}
     {% set tipo_letra = (afip.tipo_comprobante_letra if afip else none) or 'B' %}
     {% set numero = (afip.numero_comprobante if afip else none) or 0 %}
+    {% set tipo_afip = (afip.tipo_afip if afip else none) or (afip.tipo_comprobante_afip if afip else none) or (afip.tipo_comprobante if afip else none) %}
     {% set cod_afip = '083' %}
-    {% if afip and afip.tipo_afip == 1 %}
+    {% if tipo_afip == 1 or tipo_afip == 3 %}
     {% set cod_afip = '001' %}
-    {% elif afip and afip.tipo_afip == 6 %}
+    {% elif tipo_afip == 6 or tipo_afip == 8 %}
     {% set cod_afip = '006' %}
+    {% elif tipo_afip == 11 or tipo_afip == 13 %}
+    {% set cod_afip = '011' %}
+    {% elif tipo_afip == 83 %}
+    {% set cod_afip = '083' %}
     {% endif %}
+    {% set subtotal_calc = transaccion.subtotal if transaccion.subtotal is not none else (transaccion.total + (transaccion.descuento_general or 0)) %}
 
     <div class="ticket-termico">
-        {% if emisor.logo_url %}
-        <img src="{{ emisor.logo_url }}" alt="Logo" class="logo-emisor">
-        {% endif %}
-
-        <pre class="bloque-centrado titulo">{{ emisor.razon_social }}</pre>
-        {% if emisor.domicilio %}
-        {% for linea in emisor.domicilio | wrap_ticket(ancho) %}
-        <pre class="bloque-centrado">{{ linea }}</pre>
-        {% endfor %}
-        {% endif %}
-        <pre class="bloque-centrado">CUIT: {{ emisor.cuit }}</pre>
-        {% if emisor.ingresos_brutos %}
-        <pre class="bloque-centrado">IIBB: {{ emisor.ingresos_brutos }}</pre>
-        {% endif %}
-        {% if emisor.inicio_actividades %}
-        <pre class="bloque-centrado">Inicio Act.: {{ emisor.inicio_actividades }}</pre>
-        {% endif %}
-        {% if emisor.condicion_iva %}
-        <pre class="bloque-centrado">IVA: {{ emisor.condicion_iva }}</pre>
-        {% endif %}
-
-        <hr class="separador">
-
-        {% if afip and afip.tipo_comprobante_nombre and afip.tipo_comprobante_nombre|upper == 'ANULACION' %}
-        <pre class="bloque-centrado"><span class="anulado">ANULADO</span></pre>
-        {% endif %}
-
-        <pre class="linea">{{ tipo_nombre | ticket_line(tipo_letra, ancho) }}</pre>
-        <pre class="bloque-centrado">Cod. {{ cod_afip }}</pre>
-        <pre class="bloque-centrado">P.Venta: {{ '%05d'|format(emisor.punto_venta) }} - N: {{ '%08d'|format(numero) }}</pre>
-        <pre class="bloque-centrado">Fecha: {{ fecha_emision | date }}</pre>
-
-        <hr class="separador">
-
-        {% for linea in ('Cliente: ' ~ (receptor.nombre_razon_social or 'Consumidor Final')) | wrap_ticket(ancho) %}
-        <pre class="linea">{{ linea }}</pre>
-        {% endfor %}
-        <pre class="linea">CUIT/DNI: {{ receptor.cuit_o_dni or 'S/D' }}</pre>
-        <pre class="linea">IVA: {{ receptor.condicion_iva or 'Consumidor Final' }}</pre>
-        {% if receptor.domicilio %}
-        {% for linea in ('Domicilio: ' ~ receptor.domicilio) | wrap_ticket(ancho) %}
-        <pre class="linea">{{ linea }}</pre>
-        {% endfor %}
-        {% endif %}
-
-        <hr class="separador">
-
-        {% for item in transaccion.items %}
-        <div class="linea-item">
-            <span class="desc">{{ item.cantidad }}x {{ item.descripcion }}</span>
-            <span class="precio">${{ "%.2f"|format(item.cantidad * item.precio_unitario) }}</span>
+        {# --- ENCABEZADO (centrado) --- #}
+        <div class="header">
+            {% if emisor.logo_url %}
+            <img src="{{ emisor.logo_url }}" alt="Logo" class="logo-emisor">
+            {% endif %}
+            <p class="titulo">{{ emisor.razon_social }}</p>
+            {% if emisor.domicilio %}
+            <p>{{ emisor.domicilio }}</p>
+            {% endif %}
+            <p>CUIT: {{ emisor.cuit }}{% if emisor.ingresos_brutos %} &bull; IIBB: {{ emisor.ingresos_brutos }}{% endif %}</p>
+            {% if emisor.inicio_actividades %}
+            <p>Inicio Act.: {{ emisor.inicio_actividades }}</p>
+            {% endif %}
+            {% if emisor.condicion_iva %}
+            <p>IVA: {{ emisor.condicion_iva }}</p>
+            {% endif %}
+            {% if afip and afip.tipo_comprobante_nombre and afip.tipo_comprobante_nombre|upper == 'ANULACION' %}
+            <p><span class="anulado">ANULADO</span></p>
+            {% endif %}
+            <p class="subtitulo">{{ tipo_nombre }} {{ tipo_letra }} &bull; COD. {{ cod_afip }}</p>
+            <p>P.Venta: {{ '%05d'|format(emisor.punto_venta) }}&nbsp;&nbsp;Nro: {{ '%08d'|format(numero) }}</p>
+            <p>Fecha: {{ fecha_emision | date('%d/%m/%Y') }}&nbsp;&nbsp;Hora: {{ fecha_emision | date('%H:%M') }}</p>
         </div>
-        <pre class="linea linea-detalle">P/U: ${{ "%.2f"|format(item.precio_unitario) }}</pre>
-        {% if item.descuento_especifico and item.descuento_especifico > 0 %}
-        {% set desc_item = 'Desc.' ~ (' (' ~ ("%.0f"|format(item.descuento_especifico_por)) ~ '%)' if item.descuento_especifico_por and item.descuento_especifico_por > 0 else '') %}
-        <pre class="linea linea-detalle linea-descuento">{{ desc_item | ticket_line('- $' ~ ("%.2f"|format(item.descuento_especifico)), ancho) }}</pre>
-        {% endif %}
-        {% endfor %}
 
-        <hr class="separador">
+        <div class="separador"></div>
 
-        <pre class="linea">{{ 'Subtotal' | ticket_line('$' ~ ("%.2f"|format(transaccion.subtotal or (transaccion.total + (transaccion.descuento_general or 0)))), ancho) }}</pre>
+        {# --- CLIENTE --- #}
+        <div class="cliente">
+            <p>Cliente: {{ receptor.nombre_razon_social or 'Consumidor Final' }}</p>
+            <p>CUIT/DNI: {{ receptor.cuit_o_dni or '0' }} &bull; IVA: {{ receptor.condicion_iva or 'Consumidor Final' }}</p>
+            <p>Domicilio: {{ receptor.domicilio or 'Sin especificar' }}</p>
+        </div>
 
-        {% if transaccion.descuento_general and transaccion.descuento_general > 0 %}
-        {% set desc_gral = 'Desc. Gral.' ~ (' (' ~ ("%.0f"|format(transaccion.descuento_general_por)) ~ '%)' if transaccion.descuento_general_por and transaccion.descuento_general_por > 0 else '') %}
-        <pre class="linea linea-descuento">{{ desc_gral | ticket_line('- $' ~ ("%.2f"|format(transaccion.descuento_general)), ancho) }}</pre>
-        {% endif %}
+        <div class="separador"></div>
 
-        {% if afip and afip.neto is defined and afip.neto is not none and afip.iva is defined and afip.iva is not none and afip.iva > 0 %}
-        <pre class="linea">{{ 'Neto Gravado' | ticket_line('$' ~ ("%.2f"|format(afip.neto)), ancho) }}</pre>
-        <pre class="linea">{{ 'IVA' | ticket_line('$' ~ ("%.2f"|format(afip.iva)), ancho) }}</pre>
-        {% endif %}
+        {# --- ÍTEMS --- #}
+        <table class="item-table">
+            <thead>
+                <tr>
+                    <th class="col-cant">CANT</th>
+                    <th class="col-desc">DESCRIPCI&Oacute;N</th>
+                    <th class="col-pu">P.UNIT&nbsp;</th>
+                    <th class="col-tot">TOTAL</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in transaccion.items %}
+                <tr>
+                    <td class="col-cant">{{ "%.1f"|format(item.cantidad) }}</td>
+                    <td class="col-desc">{{ item.descripcion }}</td>
+                    <td class="col-pu">{{ "%.2f"|format(item.precio_unitario) }}</td>
+                    <td class="col-tot">{{ "%.2f"|format(item.cantidad * item.precio_unitario) }}</td>
+                </tr>
+                {% if item.descuento_especifico and item.descuento_especifico > 0 %}
+                <tr>
+                    <td class="col-cant"></td>
+                    <td class="col-desc descuento">Desc.{% if item.descuento_especifico_por and item.descuento_especifico_por > 0 %} ({{ "%.0f"|format(item.descuento_especifico_por) }}%){% endif %}</td>
+                    <td class="col-pu"></td>
+                    <td class="col-tot descuento">-{{ "%.2f"|format(item.descuento_especifico) }}</td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
 
-        <pre class="total-final">{{ 'TOTAL' | ticket_line('$' ~ ("%.2f"|format(transaccion.total)), ancho) }}</pre>
+        <div class="separador"></div>
 
-        {% if transaccion.pagos %}
-        <hr class="separador">
-        <pre class="linea">Forma de Pago:</pre>
-        {% for pago in transaccion.pagos %}
-        <pre class="linea">{{ pago.forma_pago | ticket_line('$' ~ ("%.2f"|format(pago.monto)), ancho) }}</pre>
-        {% endfor %}
-        {% endif %}
+        {# --- TOTALES --- #}
+        <div class="totales">
+            <p class="fila">
+                <span class="etiqueta">Subtotal:</span>
+                <span class="monto">${{ "%.2f"|format(subtotal_calc) }}</span>
+            </p>
+            {% if transaccion.descuento_general and transaccion.descuento_general > 0 %}
+            <p class="fila descuento">
+                <span class="etiqueta">Desc. Gral.{% if transaccion.descuento_general_por and transaccion.descuento_general_por > 0 %} ({{ "%.0f"|format(transaccion.descuento_general_por) }}%){% endif %}:</span>
+                <span class="monto">-${{ "%.2f"|format(transaccion.descuento_general) }}</span>
+            </p>
+            {% endif %}
+            {% if afip and afip.neto is defined and afip.neto is not none and afip.iva is defined and afip.iva is not none and afip.iva > 0 %}
+            <p class="fila">
+                <span class="etiqueta">Neto Gravado:</span>
+                <span class="monto">${{ "%.2f"|format(afip.neto) }}</span>
+            </p>
+            <p class="fila">
+                <span class="etiqueta">IVA:</span>
+                <span class="monto">${{ "%.2f"|format(afip.iva) }}</span>
+            </p>
+            {% endif %}
+            <p class="fila total-final">
+                <span class="etiqueta">TOTAL:</span>
+                <span class="monto">${{ "%.2f"|format(transaccion.total) }}</span>
+            </p>
+            {% if transaccion.pagos %}
+            <p>Forma de Pago:</p>
+            {% for pago in transaccion.pagos %}
+            <p class="fila">
+                <span class="etiqueta">{{ pago.forma_pago }}</span>
+                <span class="monto">${{ "%.2f"|format(pago.monto) }}</span>
+            </p>
+            {% endfor %}
+            {% endif %}
+        </div>
 
         {% if transaccion.observaciones and '---' in transaccion.observaciones %}
         {% set partes = transaccion.observaciones.split('---', 1) %}
         {% set membrete = partes[0] | trim %}
         {% set notas_venta = partes[1] | trim %}
-        <hr class="separador">
-        {% for linea in membrete | wrap_ticket(ancho) %}
-        <pre class="bloque-centrado">{{ linea }}</pre>
-        {% endfor %}
+        {% if membrete %}
+        <div class="separador"></div>
+        <div class="header">
+            {% for linea in membrete.splitlines() %}
+            {% if linea | trim %}
+            <p>{{ linea | trim }}</p>
+            {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
         {% set observaciones_para_mostrar = notas_venta %}
         {% else %}
         {% set observaciones_para_mostrar = transaccion.observaciones %}
         {% endif %}
 
         {% if observaciones_para_mostrar %}
-        <hr class="separador">
-        {% for linea in observaciones_para_mostrar | wrap_ticket(ancho) %}
-        <pre class="linea">{{ linea }}</pre>
-        {% endfor %}
+        <div class="separador"></div>
+        <div class="cliente">
+            {% for linea in observaciones_para_mostrar.splitlines() %}
+            {% if linea | trim %}
+            <p>{{ linea | trim }}</p>
+            {% endif %}
+            {% endfor %}
+        </div>
         {% endif %}
 
-        <hr class="separador">
-
-        {% if afip and afip.cae %}
-        <pre class="bloque-centrado">CAE N: {{ afip.cae }}</pre>
-        <pre class="bloque-centrado">Vto. CAE: {{ afip.vencimiento_cae or afip.fecha_vencimiento_cae or 'S/D' }}</pre>
-        {% if afip.qr_base64 %}
-        <img src="data:image/png;base64,{{ afip.qr_base64 }}" alt="QR AFIP" class="qr-afip">
+        {# --- Transparencia Fiscal (Ley 27.743) — ANTES del QR --- #}
+        {% if afip and ((afip.neto is defined and afip.neto is not none) or (afip.iva is defined and afip.iva is not none)) %}
+        <div class="separador"></div>
+        <div class="cliente">
+            <p>R&eacute;gimen de Transparencia Fiscal</p>
+            <p>al Consumidor (Ley 27.743)</p>
+        </div>
+        <div class="totales">
+            {% if afip.iva is defined and afip.iva is not none %}
+            <p class="fila">
+                <span class="etiqueta">IVA Contenido:</span>
+                <span class="monto">${{ "%.2f"|format(afip.iva) }}</span>
+            </p>
+            {% endif %}
+            {% if afip.neto is defined and afip.neto is not none %}
+            <p class="fila">
+                <span class="etiqueta">Valor sin Impuestos:</span>
+                <span class="monto">${{ "%.2f"|format(afip.neto) }}</span>
+            </p>
+            {% endif %}
+        </div>
         {% endif %}
-        <pre class="bloque-centrado">Comprobante Autorizado</pre>
-        {% else %}
-        <pre class="bloque-centrado">Documento no valido como factura</pre>
-        {% endif %}
 
-        <pre class="aviso">Defensa del Consumidor
-0800-333-6634
-Regimen de Transparencia
-Fiscal al Consumidor
-Ley 27.743</pre>
+        <div class="separador"></div>
+
+        {# --- CAE / QR / PIE (centrado) --- #}
+        <div class="pie">
+            {% if afip and afip.cae %}
+            <p>CAE: {{ afip.cae }}</p>
+            <p>Vto. CAE: {{ afip.vencimiento_cae or afip.fecha_vencimiento_cae or 'S/D' }}</p>
+            {% if afip.qr_base64 %}
+            <img src="data:image/png;base64,{{ afip.qr_base64 }}" alt="QR AFIP" class="qr-afip">
+            {% endif %}
+            <p>Comprobante Autorizado</p>
+            {% else %}
+            <p>Documento no valido como factura</p>
+            {% endif %}
+            <p>Defensa del Consumidor: 0800-333-6634</p>
+        </div>
     </div>
 </body>
 </html>
