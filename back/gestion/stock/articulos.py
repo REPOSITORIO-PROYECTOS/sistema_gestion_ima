@@ -186,9 +186,11 @@ def crear_articulo(id_empresa: int, db: Session, articulo_data: ArticuloCreate) 
     _recalcular_precio_venta(db_articulo)
     db.add(db_articulo)
     db.flush()
+    from back.gestion.espejo_catalogo import espejar_catalogo_articulo
     from back.gestion.stock.espejo_stock import espejar_stock_articulo
 
     espejar_stock_articulo(db, db_articulo)
+    espejar_catalogo_articulo(db, db_articulo)
     db.commit()
     db.refresh(db_articulo)
     return db_articulo
@@ -210,6 +212,9 @@ def actualizar_articulo(id_empresa: int, db: Session, articulo_id: int, articulo
         from back.gestion.stock.espejo_stock import espejar_stock_articulo
 
         espejar_stock_articulo(db, db_articulo)
+    from back.gestion.espejo_catalogo import espejar_catalogo_articulo
+
+    espejar_catalogo_articulo(db, db_articulo)
     db.commit()
     db.refresh(db_articulo)
     return db_articulo
@@ -223,6 +228,9 @@ def eliminar_articulo(db: Session, id_empresa_actual: int, articulo_id: int) -> 
         return None
     db_articulo.activo = False
     db.add(db_articulo)
+    from back.gestion.espejo_catalogo import espejar_catalogo_articulo
+
+    espejar_catalogo_articulo(db, db_articulo)
     db.commit()
     db.refresh(db_articulo)
     return db_articulo
@@ -244,6 +252,11 @@ def anadir_codigo_a_articulo(db: Session, articulo_id: int, nuevo_codigo: str) -
 
     nuevo_codigo_obj = ArticuloCodigo(codigo=nuevo_codigo, id_articulo=articulo_id)
     db.add(nuevo_codigo_obj)
+    db.flush()
+    db.refresh(articulo)
+    from back.gestion.espejo_catalogo import espejar_catalogo_articulo
+
+    espejar_catalogo_articulo(db, articulo)
     db.commit()
     db.refresh(nuevo_codigo_obj)
     
@@ -259,7 +272,14 @@ def eliminar_codigo_de_articulo(
         codigo_obj = obtener_codigo_barras_articulo(db, codigo_a_borrar, id_articulo)
         if not codigo_obj:
             return False
+        articulo = db.get(Articulo, id_articulo)
         db.delete(codigo_obj)
+        db.flush()
+        if articulo is not None:
+            db.refresh(articulo)
+            from back.gestion.espejo_catalogo import espejar_catalogo_articulo
+
+            espejar_catalogo_articulo(db, articulo)
         db.commit()
         return True
 

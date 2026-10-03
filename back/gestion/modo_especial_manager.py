@@ -288,9 +288,11 @@ def crear_producto(
     db.add(articulo)
     db.flush()
     _asignar_barcodes(db, articulo, data.barcodes, omitir_conflictos=omitir_conflictos_barcode)
+    from back.gestion.espejo_catalogo import espejar_catalogo_articulo
     from back.gestion.stock.espejo_stock import espejar_stock_articulo
 
     espejar_stock_articulo(db, articulo)
+    espejar_catalogo_articulo(db, articulo)
     _incrementar_catalogo_version(db, id_empresa)
     if commit:
         db.commit()
@@ -346,6 +348,9 @@ def actualizar_producto(
         from back.gestion.stock.espejo_stock import espejar_stock_articulo
 
         espejar_stock_articulo(db, articulo)
+    from back.gestion.espejo_catalogo import espejar_catalogo_articulo
+
+    espejar_catalogo_articulo(db, articulo)
     _incrementar_catalogo_version(db, id_empresa)
     if commit:
         db.commit()
@@ -457,6 +462,10 @@ def ingresar_stock(db: Session, id_empresa: int, id_usuario: int, req: IngresoSt
         from back.gestion.stock.espejo_stock import espejar_stock_articulo
 
         espejar_stock_articulo(db, articulo)
+        if item.precio_venta is not None or item.precio_costo is not None:
+            from back.gestion.espejo_catalogo import espejar_catalogo_articulo
+
+            espejar_catalogo_articulo(db, articulo)
         procesados.append({
             "codigo_interno": articulo.codigo_interno,
             "descripcion": articulo.descripcion,
@@ -473,6 +482,8 @@ def ingresar_stock(db: Session, id_empresa: int, id_usuario: int, req: IngresoSt
 
 
 def subir_precios(db: Session, id_empresa: int, req: SubaPreciosRequest) -> Dict[str, Any]:
+    from back.gestion.espejo_catalogo import espejar_catalogo_articulo
+
     actualizados = 0
     if req.productos:
         for item in req.productos:
@@ -482,6 +493,7 @@ def subir_precios(db: Session, id_empresa: int, req: SubaPreciosRequest) -> Dict
             articulo.precio_venta = item.precio_venta
             articulo.venta_negocio = item.precio_venta
             db.add(articulo)
+            espejar_catalogo_articulo(db, articulo)
             actualizados += 1
     else:
         articulos = db.exec(
@@ -502,6 +514,7 @@ def subir_precios(db: Session, id_empresa: int, req: SubaPreciosRequest) -> Dict
             articulo.precio_venta = round(articulo.precio_venta * factor, 2)
             articulo.venta_negocio = articulo.precio_venta
             db.add(articulo)
+            espejar_catalogo_articulo(db, articulo)
             actualizados += 1
 
     _incrementar_catalogo_version(db, id_empresa)

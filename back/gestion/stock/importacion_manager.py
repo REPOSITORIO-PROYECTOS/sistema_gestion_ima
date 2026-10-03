@@ -142,8 +142,12 @@ def aplicar_actualizacion_de_precios(
         if articulo_db:
             articulo_db.precio_costo = item_actualizar.costo_nuevo
             articulo_db.precio_venta = item_actualizar.precio_venta_nuevo
-            db.add(articulo_db) # SQLModel se encarga de marcarlo para UPDATE
-    
+            articulo_db.venta_negocio = item_actualizar.precio_venta_nuevo
+            db.add(articulo_db)
+            from back.gestion.espejo_catalogo import espejar_catalogo_articulo
+
+            espejar_catalogo_articulo(db, articulo_db)
+
     db.commit()
     
     return {"status": "ok", "message": f"Se actualizaron {len(articulos_map)} artículos correctamente."}
