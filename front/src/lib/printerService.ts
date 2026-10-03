@@ -117,11 +117,16 @@ export const printHtml = (html: string) => {
   }
 };
 
-export const buildPlainTextPrintHtml = (titulo: string, contenido: string): string => {
+export const buildPlainTextPrintHtml = (
+  titulo: string,
+  contenido: string,
+  anchoPagina: '58mm' | '80mm' = '80mm',
+): string => {
   const seguro = contenido
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+  const pagina = anchoPagina === '58mm' ? '58mm' : '80mm';
 
   return `<!doctype html>
   <html>
@@ -129,20 +134,27 @@ export const buildPlainTextPrintHtml = (titulo: string, contenido: string): stri
       <meta charset="utf-8" />
       <title>${titulo}</title>
       <style>
-        @page { margin: 0; }
-        body {
+        @page {
+          size: ${pagina} auto;
+          margin: 0;
+        }
+        html, body {
           margin: 0;
           padding: 0;
+          width: ${pagina};
+          height: auto;
           background: #fff;
         }
         pre {
+          box-sizing: border-box;
+          width: ${pagina};
           font-family: 'Courier New', Courier, monospace;
           font-size: 12px;
-          line-height: 1.25;
+          line-height: 1.15;
           white-space: pre-wrap;
           word-break: break-word;
           margin: 0;
-          padding: 0;
+          padding: 1mm 2mm;
         }
       </style>
     </head>
@@ -152,8 +164,12 @@ export const buildPlainTextPrintHtml = (titulo: string, contenido: string): stri
   </html>`;
 };
 
-export const printPlainText = (titulo: string, contenido: string): void => {
-  printHtml(buildPlainTextPrintHtml(titulo, contenido));
+export const printPlainText = (
+  titulo: string,
+  contenido: string,
+  anchoPagina: '58mm' | '80mm' = '80mm',
+): void => {
+  printHtml(buildPlainTextPrintHtml(titulo, contenido, anchoPagina));
 };
 
 export const downloadPlainText = (nombreArchivo: string, contenido: string): void => {

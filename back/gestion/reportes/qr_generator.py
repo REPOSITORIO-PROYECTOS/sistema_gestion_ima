@@ -97,12 +97,22 @@ def qr_url_a_lineas_ascii(url: str, ancho: int) -> list[str]:
     return resultado
 
 
-def envolver_ticket_texto_html(texto: str, qr_base64: Optional[str] = None) -> str:
+_ANCHOS_ROLLO = frozenset({"58mm", "80mm"})
+
+
+def envolver_ticket_texto_html(
+    texto: str,
+    qr_base64: Optional[str] = None,
+    ancho_pagina: str = "80mm",
+) -> str:
     """
     Ticket monospace + QR PNG embebido.
-    Pensado para formato Texto: el driver gráfico imprime el QR escaneable;
-    el cuerpo sigue siendo texto de ancho fijo (comandera).
+
+    La página es el ancho del rollo y el alto del contenido (`80mm auto`).
+    Sin alto `auto`, el navegador pagina en A4 y la térmica avanza el resto
+    del rollo en blanco aunque el texto haya salido bien.
     """
+    pagina = ancho_pagina if ancho_pagina in _ANCHOS_ROLLO else "80mm"
     seguro = html.escape(texto)
     bloque_qr = ""
     if qr_base64:
@@ -118,18 +128,30 @@ def envolver_ticket_texto_html(texto: str, qr_base64: Optional[str] = None) -> s
   <meta charset="utf-8" />
   <title>Comprobante</title>
   <style>
-    @page {{ margin: 0; }}
-    body {{ margin: 0; padding: 2mm; background: #fff; }}
+    @page {{
+      size: {pagina} auto;
+      margin: 0;
+    }}
+    html, body {{
+      margin: 0;
+      padding: 0;
+      width: {pagina};
+      height: auto;
+      background: #fff;
+    }}
     pre {{
+      box-sizing: border-box;
+      width: {pagina};
       font-family: 'Courier New', Courier, monospace;
       font-size: 12px;
-      line-height: 1.2;
+      line-height: 1.15;
       white-space: pre-wrap;
       word-break: break-word;
       margin: 0;
+      padding: 1mm 2mm;
     }}
-    .qr-wrap {{ text-align: center; margin: 4px 0; }}
-    .qr-afip {{ width: 32mm; height: 32mm; image-rendering: pixelated; }}
+    .qr-wrap {{ text-align: center; margin: 0; padding: 1mm 0 2mm; }}
+    .qr-afip {{ width: 28mm; height: 28mm; image-rendering: pixelated; }}
   </style>
 </head>
 <body onload="window.print()">

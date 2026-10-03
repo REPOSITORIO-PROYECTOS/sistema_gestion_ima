@@ -353,7 +353,8 @@ def generar_comprobante_texto_plano(data: GenerarComprobanteRequest) -> bytes:
     from back.gestion.reportes.qr_generator import generar_qr_para_comprobante
 
     aclaraciones = data.emisor.aclaraciones_legales or {}
-    ancho = int(_estilos_impresora_termica(_resolver_ancho_impresora(aclaraciones))["chars_per_line"])
+    ancho_pagina = _resolver_ancho_impresora(aclaraciones)
+    ancho = int(_estilos_impresora_termica(ancho_pagina)["chars_per_line"])
 
     qr_base64 = generar_qr_para_comprobante(data)
     qr_url = construir_url_qr_afip(data)
@@ -418,5 +419,5 @@ def generar_comprobante_texto_plano(data: GenerarComprobanteRequest) -> bytes:
             ancho,
         )
 
-    html = envolver_ticket_texto_html(contenido, qr_base64)
+    html = envolver_ticket_texto_html(contenido, qr_base64, ancho_pagina)
     return html.encode("utf-8")
