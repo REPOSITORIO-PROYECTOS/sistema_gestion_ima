@@ -296,7 +296,12 @@ function DashboardVenta() {
 
   const leerPrecioArticulo = useCallback(async (id: string): Promise<ArticuloPrecio | null> => {
     if (token && isBrowserOnline()) {
-      const data = await fetchArticuloPorId(token, id);
+      const data = await Promise.race([
+        fetchArticuloPorId(token, id),
+        new Promise<null>((resolve) => {
+          window.setTimeout(() => resolve(null), 8000);
+        }),
+      ]);
       if (data) {
         return {
           precio_venta: data.precio_venta,
@@ -317,7 +322,11 @@ function DashboardVenta() {
   }, [idEmpresa, offlineHabilitado, token]);
 
   const actualizarPreciosCaja = useCallback(async () => {
-    if (productos.length === 0 || actualizandoPrecios) return;
+    if (actualizandoPrecios) return;
+    if (productos.length === 0) {
+      toast.info("Agregá un producto al resumen y después actualizá los precios.");
+      return;
+    }
 
     setActualizandoPrecios(true);
     try {
@@ -480,8 +489,8 @@ function DashboardVenta() {
                   type="button"
                   variant="outline"
                   onClick={() => { void actualizarPreciosCaja(); }}
-                  disabled={actualizandoPrecios || productos.length === 0}
-                  className="bg-white text-green-900 hover:bg-green-50"
+                  disabled={actualizandoPrecios}
+                  className="bg-white font-semibold text-green-900 hover:bg-green-50 disabled:opacity-80"
                 >
                   {actualizandoPrecios ? "Actualizando…" : "Actualizar precios"}
                 </Button>
