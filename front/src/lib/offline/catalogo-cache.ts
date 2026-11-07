@@ -1,8 +1,11 @@
 import {
-  fetchAllArticulos,
+  fetchCatalogoCompleto,
   fetchCatalogoVersion,
   type ArticuloCatalogoAPI,
+  type CatalogoDescarga,
+  type FetchCatalogoOptions,
 } from "@/lib/articulos-api";
+import { publicarCatalogoVigente } from "@/lib/offline/catalogo-vigente";
 import {
   clearOfflineEmpresa,
   getOfflineMeta,
@@ -17,7 +20,14 @@ export type RefreshCatalogoResult = {
   catalogo_version: number;
   articulos_count: number;
   codigos_count: number;
+  articulos?: ArticuloCatalogoAPI[];
 };
+
+export type RefreshCatalogoOptions = FetchCatalogoOptions & {
+  force?: boolean;
+};
+
+let descargaEnCurso: Promise<RefreshCatalogoResult> | null = null;
 
 function mapArticuloOffline(
   item: ArticuloCatalogoAPI,
@@ -67,37 +77,16 @@ function mapCodigosBarras(
   return rows;
 }
 
-/** Full refresh de catálogo + stock snapshot en IndexedDB (abrir/cerrar caja). */
-export async function refreshCatalogoCache(
-  token: string,
+async function persistirCatalogoCompleto(
   idEmpresa: number,
-  options?: { force?: boolean },
-): Promise<RefreshCatalogoResult> {
-  if (!token || !idEmpresa) {
-    throw new Error("Token e id_empresa son requeridos para refrescar caché.");
+  descarga: CatalogoDescarga,
+): Promise<void> {
+  if (descarga.articulos.length !== descarga.total) {
+    throw new Error("Catálogo incompleto: no se reemplaza la caché.");
   }
 
-  const remoteVersion = await fetchCatalogoVersion(token);
-  const meta = await getOfflineMeta(idEmpresa);
-
-  if (
-    !options?.force &&
-    meta &&
-    meta.catalogo_version === remoteVersion &&
-    meta.catalogo_synced_at
-  ) {
-    const count = await offlineDb.articulos.where("id_empresa").equals(idEmpresa).count();
-    return {
-      refreshed: false,
-      catalogo_version: remoteVersion,
-      articulos_count: count,
-      codigos_count: await offlineDb.codigos_barras.where("id_empresa").equals(idEmpresa).count(),
-    };
-  }
-
-  const articulos = await fetchAllArticulos(token);
-  const offlineArticulos = articulos.map((item) => mapArticuloOffline(item, idEmpresa));
-  const codigos = mapCodigosBarras(articulos, idEmpresa);
+  const offlineArticulos = descarga.articulos.map((item) => mapArticuloOffline(item, idEmpresa));
+  const codigos = mapCodigosBarras(descarga.articulos, idEmpresa);
   const syncedAt = new Date().toISOString();
 
   await offlineDb.transaction(
@@ -115,19 +104,73 @@ export async function refreshCatalogoCache(
         await offlineDb.codigos_barras.bulkPut(codigos);
       }
       await upsertOfflineMeta(idEmpresa, {
-        catalogo_version: remoteVersion,
+        catalogo_version: descarga.version,
         catalogo_synced_at: syncedAt,
         stock_snapshot_at: syncedAt,
       });
     },
   );
+}
 
+async function descargarYPersistir(
+  token: string,
+  idEmpresa: number,
+  options?: FetchCatalogoOptions,
+): Promise<RefreshCatalogoResult> {
+  const descarga = await fetchCatalogoCompleto(token, options);
+  await persistirCatalogoCompleto(idEmpresa, descarga);
+  publicarCatalogoVigente(idEmpresa, descarga.articulos);
   return {
     refreshed: true,
-    catalogo_version: remoteVersion,
-    articulos_count: offlineArticulos.length,
-    codigos_count: codigos.length,
+    catalogo_version: descarga.version,
+    articulos_count: descarga.articulos.length,
+    codigos_count: mapCodigosBarras(descarga.articulos, idEmpresa).length,
+    articulos: descarga.articulos,
   };
+}
+
+/** Full refresh de catálogo + stock snapshot en IndexedDB (abrir/cerrar caja y refresco periódico). */
+export async function refreshCatalogoCache(
+  token: string,
+  idEmpresa: number,
+  options?: RefreshCatalogoOptions,
+): Promise<RefreshCatalogoResult> {
+  if (!token || !idEmpresa) {
+    throw new Error("Token e id_empresa son requeridos para refrescar caché.");
+  }
+
+  if (!options?.force) {
+    const remoteVersion = await fetchCatalogoVersion(token);
+    const meta = await getOfflineMeta(idEmpresa);
+    if (meta && meta.catalogo_version === remoteVersion && meta.catalogo_synced_at) {
+      const count = await offlineDb.articulos.where("id_empresa").equals(idEmpresa).count();
+      return {
+        refreshed: false,
+        catalogo_version: remoteVersion,
+        articulos_count: count,
+        codigos_count: await offlineDb.codigos_barras.where("id_empresa").equals(idEmpresa).count(),
+      };
+    }
+  }
+
+  if (descargaEnCurso) return descargaEnCurso;
+
+  let resolveTrabajo: (resultado: RefreshCatalogoResult) => void = () => undefined;
+  let rejectTrabajo: (error: unknown) => void = () => undefined;
+  const trabajo = new Promise<RefreshCatalogoResult>((resolve, reject) => {
+    resolveTrabajo = resolve;
+    rejectTrabajo = reject;
+  });
+  descargaEnCurso = trabajo;
+
+  void descargarYPersistir(token, idEmpresa, options).then(
+    (resultado) => resolveTrabajo(resultado),
+    (error: unknown) => rejectTrabajo(error),
+  ).finally(() => {
+    if (descargaEnCurso === trabajo) descargaEnCurso = null;
+  });
+
+  return trabajo;
 }
 
 export async function ensureOfflineEmpresa(

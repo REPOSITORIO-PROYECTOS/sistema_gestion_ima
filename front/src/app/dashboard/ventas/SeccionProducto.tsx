@@ -1,6 +1,7 @@
 "use client"
 
 import { LegacyRef, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
+import { aplicarPreciosVigentesABusqueda, precioVigenteDe } from "@/lib/offline/catalogo-vigente"
 import { createPortal } from "react-dom"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -98,6 +99,7 @@ export function SeccionProducto(props: SeccionProductoProps) {
     onProductoConfirmado,
     offlineHabilitado = false,
     idEmpresa,
+    catalogoResetTick = 0,
   } = props;
 
   const [matches, setMatches] = useState<Producto[]>([]);
@@ -109,6 +111,18 @@ export function SeccionProducto(props: SeccionProductoProps) {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const localInputRef = useRef<HTMLInputElement | null>(null);
+  const productoSeleccionadoRef = useRef(productoSeleccionado);
+  const codigoRef = useRef(codigo);
+  const popoverAbiertoRef = useRef(popoverOpen);
+  productoSeleccionadoRef.current = productoSeleccionado;
+  codigoRef.current = codigo;
+  popoverAbiertoRef.current = popoverOpen;
+
+  const conPreciosVigentes = useCallback(
+    (lista: Producto[]) =>
+      idEmpresa ? aplicarPreciosVigentesABusqueda(idEmpresa, lista) : lista,
+    [idEmpresa],
+  );
 
   const setInputRefs = useCallback(
     (node: HTMLInputElement | null) => {
@@ -196,7 +210,7 @@ export function SeccionProducto(props: SeccionProductoProps) {
         const sinRed = puedeUsarLocal && !isBrowserOnline();
 
         if (sinRed) {
-          const mapped = await buscarArticulosLocal(idEmpresa!, termino, limit);
+          const mapped = conPreciosVigentes(await buscarArticulosLocal(idEmpresa!, termino, limit));
           setMatches(mapped);
           setHighlightIndex(mapped.length > 0 ? 0 : -1);
           if (mapped.length > 0) {
@@ -213,7 +227,7 @@ export function SeccionProducto(props: SeccionProductoProps) {
           throw new Error(resp.error || "No se pudo buscar en servidor");
         }
         const data = (resp.success ? (resp.data as MinimalArticulo[]) : []) || [];
-        const mapped = mapBusqueda(data);
+        const mapped = conPreciosVigentes(mapBusqueda(data));
         setMatches(mapped);
         setHighlightIndex(mapped.length > 0 ? 0 : -1);
         if (mapped.length > 0) {
@@ -227,7 +241,7 @@ export function SeccionProducto(props: SeccionProductoProps) {
           return;
         }
 
-        const mapped = await buscarArticulosLocal(idEmpresa, termino, limit);
+        const mapped = conPreciosVigentes(await buscarArticulosLocal(idEmpresa, termino, limit));
         setMatches(mapped);
         setHighlightIndex(mapped.length > 0 ? 0 : -1);
         if (mapped.length > 0) {
@@ -243,15 +257,36 @@ export function SeccionProducto(props: SeccionProductoProps) {
         setLoading(false);
       }
     },
-    [idEmpresa, offlineHabilitado, setPopoverOpen],
+    [conPreciosVigentes, idEmpresa, offlineHabilitado, setPopoverOpen],
   );
+
+  useEffect(() => {
+    if (!catalogoResetTick) return;
+
+    const actual = productoSeleccionadoRef.current;
+    if (actual && idEmpresa && !actual.precio_manual) {
+      const vigente = precioVigenteDe(idEmpresa, actual.id);
+      if (vigente) {
+        setProductoSeleccionado({
+          ...actual,
+          precio_venta: vigente.precio_venta,
+          venta_negocio: vigente.venta_negocio ?? actual.venta_negocio,
+          precio_manual: vigente.precio_manual,
+        });
+      }
+    }
+
+    const consulta = codigoRef.current.trim();
+    if (!consulta && !popoverAbiertoRef.current) return;
+    void buscarProductos(consulta, consulta ? LIMITE_BUSQUEDA : LIMITE_LISTADO);
+  }, [buscarProductos, catalogoResetTick, idEmpresa, setProductoSeleccionado]);
 
   useEffect(() => {
     if (highlightIndex < 0 || !listRef.current) return;
     const item = listRef.current.querySelector<HTMLElement>(
       `[data-result-index="${highlightIndex}"]`,
     );
-    item?.scrollIntoView({ block: "nearest" });
+    item?.scrollIntoView?.({ block: "nearest" });
   }, [highlightIndex]);
 
   useLayoutEffect(() => {

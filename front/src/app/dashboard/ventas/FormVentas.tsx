@@ -24,6 +24,7 @@ import { useFacturacionStore } from "@/lib/facturacionStore";
 import { useAuthStore } from "@/lib/authStore"
 import { useEmpresaStore } from '@/lib/empresaStore';
 import { useProductoStore, type Producto } from "@/lib/productoStore";
+import { precioVigenteDe } from "@/lib/offline/catalogo-vigente";
 import { API_CONFIG } from "@/lib/api-config";
 import { downloadPlainText, printHtml, printPlainText } from "@/lib/printerService";
 import { fetchArticuloPorId, mapArticulosToStore } from "@/lib/articulos-api";
@@ -220,16 +221,33 @@ function FormVentas({
   const resolverProductoPorId = useCallback(
     async (id: string): Promise<Producto | null> => {
       const enCache = getProductoById(id);
-      if (enCache) return enCache;
+      const vigente = idEmpresa ? precioVigenteDe(idEmpresa, id) : undefined;
+      if (enCache) {
+        if (!vigente) return enCache;
+        return {
+          ...enCache,
+          precio_venta: vigente.precio_venta,
+          venta_negocio: vigente.venta_negocio ?? enCache.venta_negocio,
+          precio_manual: vigente.precio_manual,
+        };
+      }
 
       const data = await fetchArticuloPorId(token ?? "", id);
       if (!data) return null;
 
       const [adaptado] = mapArticulosToStore([data]);
-      upsertProductos([adaptado]);
-      return adaptado;
+      const conVigente = vigente
+        ? {
+            ...adaptado,
+            precio_venta: vigente.precio_venta,
+            venta_negocio: vigente.venta_negocio ?? adaptado.venta_negocio,
+            precio_manual: vigente.precio_manual,
+          }
+        : adaptado;
+      upsertProductos([conVigente]);
+      return conVigente;
     },
-    [getProductoById, token, upsertProductos],
+    [getProductoById, idEmpresa, token, upsertProductos],
   );
 
   // Estados para Auto-Sincronización de Catálogo

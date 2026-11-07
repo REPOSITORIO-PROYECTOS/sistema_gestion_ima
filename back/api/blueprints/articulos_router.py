@@ -81,16 +81,21 @@ def api_get_all_articulos(
     current_user: Usuario = Depends(obtener_usuario_actual),
     db: Session = Depends(get_db),
     pagina: int = Query(1, ge=1), 
-    limite: int = Query(100, ge=1, le=200)
+    limite: int = Query(100, ge=1, le=200),
+    orden: str = Query("descripcion"),
 ):
     """Obtiene una lista paginada de todos los artículos de la empresa del usuario."""
     skip = (pagina - 1) * limite
-    lista_articulos = articulos_manager.obtener_todos_los_articulos(
-        db=db, 
-        id_empresa_actual=current_user.id_empresa, 
-        skip=skip, 
-        limit=limite
-    )
+    try:
+        lista_articulos = articulos_manager.obtener_todos_los_articulos(
+            db=db,
+            id_empresa_actual=current_user.id_empresa,
+            skip=skip,
+            limit=limite,
+            orden=orden,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     # Convertir manualmente cada artículo al schema de respuesta
     # para evitar problemas de relaciones no cargadas
@@ -268,4 +273,8 @@ def api_catalogo_version(
     db: Session = Depends(get_db)
 ):
     cfg = db.get(ConfiguracionEmpresa, current_user.id_empresa)
-    return {"version": (cfg.catalogo_version if cfg and hasattr(cfg, "catalogo_version") else 0)}
+    total = articulos_manager.contar_articulos_activos(db, current_user.id_empresa)
+    return {
+        "version": (cfg.catalogo_version if cfg and hasattr(cfg, "catalogo_version") else 0),
+        "total": total,
+    }
