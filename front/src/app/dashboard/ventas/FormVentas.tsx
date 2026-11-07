@@ -141,6 +141,7 @@ interface FormVentasProps {
   setMontoPagado: (value: number) => void;
   idEmpresa?: number;
   offlineHabilitado?: boolean;
+  onTipoClienteChange?: (tipoClienteId: string) => void;
 }
 
 
@@ -162,6 +163,7 @@ function FormVentas({
   setMontoPagado,
   idEmpresa,
   offlineHabilitado = false,
+  onTipoClienteChange,
 }: FormVentasProps) {
 
   /* Estados */
@@ -202,6 +204,10 @@ function FormVentas({
   const [autoSubmitFlag, setAutoSubmitFlag] = useState(false);
   const [balanzaRetry, setBalanzaRetry] = useState(0);
   const [catalogoResetTick, setCatalogoResetTick] = useState(0);
+
+  useEffect(() => {
+    onTipoClienteChange?.(tipoClienteSeleccionado.id);
+  }, [onTipoClienteChange, tipoClienteSeleccionado.id]);
 
   const resolverProductoPorId = useCallback(
     async (id: string): Promise<Producto | null> => {
