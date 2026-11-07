@@ -142,6 +142,7 @@ interface FormVentasProps {
   idEmpresa?: number;
   offlineHabilitado?: boolean;
   onTipoClienteChange?: (tipoClienteId: string) => void;
+  catalogoResetTickExterno?: number;
 }
 
 
@@ -164,6 +165,7 @@ function FormVentas({
   idEmpresa,
   offlineHabilitado = false,
   onTipoClienteChange,
+  catalogoResetTickExterno = 0,
 }: FormVentasProps) {
 
   /* Estados */
@@ -208,6 +210,12 @@ function FormVentas({
   useEffect(() => {
     onTipoClienteChange?.(tipoClienteSeleccionado.id);
   }, [onTipoClienteChange, tipoClienteSeleccionado.id]);
+
+  useEffect(() => {
+    if (catalogoResetTickExterno > 0) {
+      setCatalogoResetTick(catalogoResetTickExterno);
+    }
+  }, [catalogoResetTickExterno]);
 
   const resolverProductoPorId = useCallback(
     async (id: string): Promise<Producto | null> => {
