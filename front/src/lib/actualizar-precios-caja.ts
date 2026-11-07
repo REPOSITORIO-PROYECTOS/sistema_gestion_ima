@@ -15,6 +15,11 @@ export type ArticuloPrecio = {
   precio_manual?: boolean;
 };
 
+export type AplicarPrecioOptions = {
+  /** Al tocar «Actualizar precios», también pisa líneas de precio manual. */
+  forzarManual?: boolean;
+};
+
 function redondear(valor: number): number {
   return Math.round(valor * 100) / 100;
 }
@@ -34,13 +39,15 @@ export function precioSegunCliente(
   return Number.isFinite(negocio) ? negocio : ventaOk;
 }
 
-/** Reescribe base y total de la línea. No toca cantidad ni descuentos cargados. */
+/** Reescribe base y total de la línea. Conserva cantidad y descuentos cargados. */
 export function aplicarPrecioVigente(
   linea: LineaCaja,
   articulo: ArticuloPrecio | null,
   tipoClienteId: string,
+  options: AplicarPrecioOptions = {},
 ): LineaCaja {
-  if (!articulo || articulo.precio_manual) return linea;
+  if (!articulo) return linea;
+  if (articulo.precio_manual && !options.forzarManual) return linea;
 
   const unitario = precioSegunCliente(articulo, tipoClienteId);
   const precioBase = redondear(unitario * linea.cantidad);
@@ -55,4 +62,38 @@ export function aplicarPrecioVigente(
     precioTotal,
     descuentoAplicado: descPorc > 0 || descNom > 0,
   };
+}
+
+/** Aplica el precio vigente a todas las líneas posibles del resumen. */
+export function actualizarTodasLasLineas(
+  lineas: LineaCaja[],
+  preciosPorId: Map<string, ArticuloPrecio>,
+  tipoClienteId: string,
+): { lineas: LineaCaja[]; actualizadas: number; sinPrecio: number } {
+  let actualizadas = 0;
+  let sinPrecio = 0;
+
+  const siguientes = lineas.map((linea) => {
+    if (!linea.id) {
+      sinPrecio += 1;
+      return linea;
+    }
+    const articulo = preciosPorId.get(linea.id);
+    if (!articulo) {
+      sinPrecio += 1;
+      return linea;
+    }
+    const recalculada = aplicarPrecioVigente(linea, articulo, tipoClienteId, {
+      forzarManual: true,
+    });
+    if (
+      recalculada.precioBase !== linea.precioBase
+      || recalculada.precioTotal !== linea.precioTotal
+    ) {
+      actualizadas += 1;
+    }
+    return recalculada;
+  });
+
+  return { lineas: siguientes, actualizadas, sinPrecio };
 }

@@ -20,6 +20,7 @@ import { useFacturacionStore } from "@/lib/facturacionStore"; // Importar
 import EgresoForm from "./EgresoForm";
 import { API_CONFIG } from "@/lib/api-config";
 import { useEmpresaStore } from "@/lib/empresaStore";
+import { useProductoStore, type Producto } from "@/lib/productoStore";
 import { puedeAplicarDescuentos } from "@/lib/permisos";
 import { usePerfilEmpresa } from "@/hooks/usePerfilEmpresa";
 import { useOfflineMeta } from "@/hooks/useOfflineMeta";
@@ -30,11 +31,13 @@ import { mensajeSnapshotDesactualizado } from "@/lib/offline/offline-meta-format
 import { fetchArticuloPorId } from "@/lib/articulos-api";
 import { offlineDb } from "@/lib/offline/db";
 import { isBrowserOnline } from "@/lib/offline/connectivity";
+import { refreshCatalogoCache } from "@/lib/offline/catalogo-cache";
 import {
-  aplicarPrecioVigente,
+  actualizarTodasLasLineas,
   type ArticuloPrecio,
 } from "@/lib/actualizar-precios-caja";
 import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 
 interface ProductoVendido {
   id?: string;
@@ -52,6 +55,7 @@ function DashboardVenta() {
   /* Estados de la Caja de Ventas */
   const verificarEstadoCaja = useCajaStore(state => state.verificarEstadoCaja);
   const token = useAuthStore((state) => state.token);
+  const upsertProductos = useProductoStore((state) => state.upsertProductos);
   const [productos, setProductos] = useState<ProductoVendido[]>([]);
   const [tipoClienteId, setTipoClienteId] = useState("0");
   const [actualizandoPrecios, setActualizandoPrecios] = useState(false);
@@ -330,60 +334,66 @@ function DashboardVenta() {
 
     setActualizandoPrecios(true);
     try {
+      if (token && isBrowserOnline() && offlineHabilitado && idEmpresa) {
+        await refreshCatalogoCache(token, idEmpresa, { force: true });
+      }
+
       const ids = [...new Set(productos.map((linea) => linea.id).filter((id): id is string => Boolean(id)))];
       const precios = new Map<string, ArticuloPrecio>();
+      const articulosParaCache: Producto[] = [];
+
       await Promise.all(ids.map(async (id) => {
         const articulo = await leerPrecioArticulo(id);
-        if (articulo) precios.set(id, articulo);
+        if (!articulo) return;
+        precios.set(id, articulo);
+        articulosParaCache.push({
+          id,
+          nombre: productos.find((linea) => linea.id === id)?.tipo ?? "",
+          precio_venta: articulo.precio_venta,
+          venta_negocio: articulo.venta_negocio ?? articulo.precio_venta,
+          stock_actual: 0,
+          unidad_venta: "unidad",
+          precio_manual: articulo.precio_manual ?? false,
+        });
       }));
 
-      let actualizadas = 0;
-      let manuales = 0;
-      let sinPrecio = 0;
-      const siguientes = productos.map((linea) => {
-        if (!linea.id) {
-          sinPrecio += 1;
-          return linea;
-        }
-        const articulo = precios.get(linea.id) ?? null;
-        if (!articulo) {
-          sinPrecio += 1;
-          return linea;
-        }
-        if (articulo.precio_manual) {
-          manuales += 1;
-          return linea;
-        }
-        const recalculada = aplicarPrecioVigente(linea, articulo, tipoClienteId);
-        if (
-          recalculada.precioBase !== linea.precioBase
-          || recalculada.precioTotal !== linea.precioTotal
-        ) {
-          actualizadas += 1;
-        }
-        return recalculada;
-      });
+      if (articulosParaCache.length > 0) {
+        upsertProductos(articulosParaCache);
+      }
 
-      setProductos(siguientes);
+      const { lineas, actualizadas, sinPrecio } = actualizarTodasLasLineas(
+        productos,
+        precios,
+        tipoClienteId,
+      );
+      setProductos(lineas);
+
       if (actualizadas > 0) {
         toast.success(
           actualizadas === 1
-            ? "Actualicé 1 producto con el precio vigente."
-            : `Actualicé ${actualizadas} productos con el precio vigente.`,
+            ? "Actualicé todos los precios: 1 producto cambió."
+            : `Actualicé todos los precios: ${actualizadas} productos cambiaron.`,
         );
       } else if (sinPrecio === productos.length) {
         toast.error("No pude leer los precios. Probá de nuevo con conexión.");
-      } else if (manuales === productos.length) {
-        toast.info("Los de precio manual quedaron como los cargaste.");
       } else {
-        toast.success("La caja ya tiene los precios vigentes.");
+        toast.success("Todos los precios del resumen ya estaban vigentes.");
       }
     } catch {
       toast.error("No pude actualizar los precios de la caja.");
     } finally {
       setActualizandoPrecios(false);
     }
-  }, [actualizandoPrecios, leerPrecioArticulo, productos, tipoClienteId]);
+  }, [
+    actualizandoPrecios,
+    idEmpresa,
+    leerPrecioArticulo,
+    offlineHabilitado,
+    productos,
+    tipoClienteId,
+    token,
+    upsertProductos,
+  ]);
 
   const limpiarResumen = useCallback(() => {
     setProductos([]);
@@ -492,10 +502,24 @@ function DashboardVenta() {
                   disabled={actualizandoPrecios}
                   className="bg-white font-semibold text-green-900 hover:bg-green-50 disabled:opacity-80"
                 >
-                  {actualizandoPrecios ? "Actualizando…" : "Actualizar precios"}
+                  {actualizandoPrecios ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Actualizando…
+                    </>
+                  ) : (
+                    "Actualizar precios"
+                  )}
                 </Button>
               )}
             </div>
+
+            {actualizandoPrecios && (
+              <div className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-amber-50 border-b border-amber-200 text-amber-900 text-sm font-semibold">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Actualizando todos los precios del resumen…
+              </div>
+            )}
 
             {/* Render de los Productos */}
             <ul className="flex flex-col items-center w-full p-6 gap-5 overflow-y-auto max-h-[50vh]">
