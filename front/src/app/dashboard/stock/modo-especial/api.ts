@@ -172,6 +172,7 @@ export async function ingresarStockModoEspecial(
     observacion?: string;
     precio_venta?: number;
     precio_costo?: number;
+    barcodes?: string[];
   }[],
 ) {
   const res = await fetch(`${API_CONFIG.BASE_URL}/modo-especial/ingreso-stock`, {

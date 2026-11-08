@@ -185,6 +185,14 @@ def _asignar_categorias_articulo(
         _obtener_o_crear_categoria(db, id_empresa, nombre)
 
 
+def precio_distinto(actual: Optional[float], nuevo: float) -> bool:
+    """True si el precio nuevo cambia el vigente. Igualdad no es un cambio."""
+    try:
+        return abs(float(actual or 0) - float(nuevo)) >= 0.001
+    except (TypeError, ValueError):
+        return True
+
+
 def _incrementar_catalogo_version(db: Session, id_empresa: int) -> None:
     config = db.get(ConfiguracionEmpresa, id_empresa)
     if config:
@@ -443,11 +451,19 @@ def ingresar_stock(db: Session, id_empresa: int, id_usuario: int, req: IngresoSt
         stock_anterior = articulo.stock_actual or 0.0
         stock_nuevo = stock_anterior + item.cantidad
         articulo.stock_actual = stock_nuevo
-        if item.precio_venta is not None:
+        cambio_catalogo = False
+        if item.precio_venta is not None and precio_distinto(articulo.precio_venta, item.precio_venta):
             articulo.precio_venta = item.precio_venta
             articulo.venta_negocio = item.precio_venta
-        if item.precio_costo is not None:
+            cambio_catalogo = True
+        if item.precio_costo is not None and precio_distinto(articulo.precio_costo, item.precio_costo):
             articulo.precio_costo = item.precio_costo
+            cambio_catalogo = True
+        if item.barcodes is not None:
+            if articulo.codigos is None:
+                articulo.codigos = []
+            _asignar_barcodes(db, articulo, item.barcodes)
+            cambio_catalogo = True
         movimiento = StockMovimiento(
             tipo="INGRESO",
             cantidad=item.cantidad,
@@ -462,7 +478,7 @@ def ingresar_stock(db: Session, id_empresa: int, id_usuario: int, req: IngresoSt
         from back.gestion.stock.espejo_stock import espejar_stock_articulo
 
         espejar_stock_articulo(db, articulo)
-        if item.precio_venta is not None or item.precio_costo is not None:
+        if cambio_catalogo:
             from back.gestion.espejo_catalogo import espejar_catalogo_articulo
 
             espejar_catalogo_articulo(db, articulo)

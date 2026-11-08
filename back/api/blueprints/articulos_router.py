@@ -32,7 +32,7 @@ router = APIRouter(
 # === ENDPOINTS DE LECTURA (GET) - Rutas mantenidas
 # ===================================================================
 
-@router.get("/buscar", response_model=List[ArticuloRead], summary="Buscar artículos por término aproximado")
+@router.get("/buscar", response_model=List[ArticuloReadConCodigos], summary="Buscar artículos por término aproximado")
 def api_buscar_articulos(
     termino: str = Query(default=""),
     skip: int = Query(default=0, ge=0),
@@ -68,8 +68,9 @@ def api_buscar_articulos(
                 'costo_ultimo': getattr(articulo, 'costo_ultimo', 0.0),
                 'categoria': getattr(articulo, 'categoria', None),
                 'precio_manual': getattr(articulo, 'precio_manual', False),
+                'codigos': [{'codigo': c.codigo} for c in (getattr(articulo, 'codigos', None) or [])],
             }
-            articuloread_list.append(ArticuloRead.model_validate(articulo_dict))
+            articuloread_list.append(ArticuloReadConCodigos.model_validate(articulo_dict))
         except Exception as e:
             print(f"Error procesando artículo {articulo.id}: {e}")
             continue

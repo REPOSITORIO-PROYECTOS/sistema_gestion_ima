@@ -55,6 +55,15 @@ import {
 } from "./api";
 import { BusquedaProductoInput } from "./BusquedaProductoInput";
 import {
+  barrasCambiaron,
+  parseBarras,
+  precioVentaParaEnviar,
+  precioVentaVisible,
+  textoBarras,
+  textoStock,
+  type ArticuloIngreso,
+} from "./ingreso-linea";
+import {
   formVacio,
   productoAForm,
   ProductoWizardModal,
@@ -76,7 +85,11 @@ interface IngresoLinea {
   descripcion: string;
   cantidad: string;
   precio_venta: string;
+  precio_original: string | null;
   precio_costo: string;
+  stock_actual: number | null;
+  barcode: string;
+  barcode_original: string;
 }
 
 interface TransferenciaLinea {
@@ -93,8 +106,27 @@ const nuevaLineaIngreso = (): IngresoLinea => ({
   descripcion: "",
   cantidad: "",
   precio_venta: "",
+  precio_original: null,
   precio_costo: "",
+  stock_actual: null,
+  barcode: "",
+  barcode_original: "",
 });
+
+function aplicarProductoEnLinea(linea: IngresoLinea, producto: ArticuloIngreso): IngresoLinea {
+  const precio = precioVentaVisible(producto);
+  const barras = textoBarras(producto.barcodes);
+  return {
+    ...linea,
+    codigo_interno: producto.codigo_interno,
+    descripcion: producto.descripcion,
+    precio_venta: precio,
+    precio_original: precio,
+    stock_actual: Number(producto.stock_actual ?? 0),
+    barcode: barras,
+    barcode_original: barras,
+  };
+}
 
 const nuevaLineaTransferencia = (): TransferenciaLinea => ({
   id: crypto.randomUUID(),
@@ -129,6 +161,7 @@ export function ModoEspecialView() {
   const [porcentajeSuba, setPorcentajeSuba] = useState("");
   const [categoriaSuba, setCategoriaSuba] = useState("");
   const [guardando, setGuardando] = useState(false);
+  const [lineaAltaId, setLineaAltaId] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
     if (!token) return;
@@ -154,8 +187,22 @@ export function ModoEspecialView() {
   }, [cargar]);
 
   const abrirCrear = () => {
+    setLineaAltaId(null);
     setEditando(null);
     setForm(formVacio());
+    setModalProducto(true);
+  };
+
+  const abrirAltaDesdeBusqueda = (lineaId: string, textoBuscado: string) => {
+    const consulta = textoBuscado.trim();
+    const esBarra = /^\d{8,}$/.test(consulta);
+    setLineaAltaId(lineaId);
+    setEditando(null);
+    setForm({
+      ...formVacio(),
+      descripcion: esBarra ? "" : consulta,
+      barcodes: esBarra ? consulta : "",
+    });
     setModalProducto(true);
   };
 
@@ -177,7 +224,23 @@ export function ModoEspecialView() {
         await actualizarProductoModoEspecial(token, editando.codigo_interno, form);
         toast.success("Producto actualizado.");
       } else {
-        await crearProductoModoEspecial(token, form);
+        const creado = await crearProductoModoEspecial(token, form) as ProductoModoEspecial;
+        if (lineaAltaId) {
+          const lineaId = lineaAltaId;
+          setLineasIngreso((prev) => prev.map((linea) => (
+            linea.id === lineaId
+              ? aplicarProductoEnLinea(linea, {
+                id: creado.id,
+                codigo_interno: creado.codigo_interno,
+                descripcion: creado.descripcion,
+                stock_actual: creado.stock_actual,
+                precio_venta: creado.precio_venta,
+                barcodes: creado.barcodes,
+              })
+              : linea
+          )));
+          setLineaAltaId(null);
+        }
         toast.success("Producto creado.");
       }
       setModalProducto(false);
@@ -202,10 +265,15 @@ export function ModoEspecialView() {
           observacion?: string;
           precio_venta?: number;
           precio_costo?: number;
+          barcodes?: string[];
         } = { codigo_interno: codigo, cantidad };
         if (ingresoObs.trim()) item.observacion = ingresoObs.trim();
-        if (linea.precio_venta.trim()) item.precio_venta = parseFloat(linea.precio_venta);
+        const precio = precioVentaParaEnviar(linea.precio_original, linea.precio_venta);
+        if (precio !== undefined) item.precio_venta = precio;
         if (linea.precio_costo.trim()) item.precio_costo = parseFloat(linea.precio_costo);
+        if (barrasCambiaron(linea.barcode_original, linea.barcode)) {
+          item.barcodes = parseBarras(linea.barcode);
+        }
         return item;
       })
       .filter((item): item is NonNullable<typeof item> => item !== null);
@@ -532,13 +600,15 @@ export function ModoEspecialView() {
           </DialogHeader>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4 space-y-4">
             <p className="text-sm text-muted-foreground">
-              Cargá varios productos a la vez. Los precios son opcionales; si los dejás en blanco no se modifican.
+              Cargá varios productos a la vez. El precio de venta se completa con el vigente y solo se guarda si lo cambiás. El stock en cero también aparece.
             </p>
             <div className="rounded-md border overflow-visible">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="min-w-[16rem]">Producto *</TableHead>
+                    <TableHead>Stock</TableHead>
+                    <TableHead>Código de barras</TableHead>
                     <TableHead>Cantidad *</TableHead>
                     <TableHead>Precio venta</TableHead>
                     <TableHead>Precio costo</TableHead>
@@ -552,8 +622,50 @@ export function ModoEspecialView() {
                         <BusquedaProductoInput
                           codigoInterno={linea.codigo_interno}
                           descripcion={linea.descripcion}
+                          onCrearProducto={(textoBuscado) => abrirAltaDesdeBusqueda(linea.id, textoBuscado)}
                           onChange={(codigoInterno, descripcion) => setLineasIngreso((prev) =>
-                            prev.map((l) => l.id === linea.id ? { ...l, codigo_interno: codigoInterno, descripcion } : l)
+                            prev.map((l) => l.id === linea.id ? {
+                              ...l,
+                              codigo_interno: codigoInterno,
+                              descripcion,
+                              ...(codigoInterno ? {} : {
+                                precio_venta: "",
+                                precio_original: null,
+                                stock_actual: null,
+                                barcode: "",
+                                barcode_original: "",
+                              }),
+                            } : l)
+                          )}
+                          onSeleccionar={(producto) => setLineasIngreso((prev) =>
+                            prev.map((l) => {
+                              if (l.id !== linea.id) return l;
+                              if (!producto) {
+                                return {
+                                  ...l,
+                                  precio_venta: "",
+                                  precio_original: null,
+                                  stock_actual: null,
+                                  barcode: "",
+                                  barcode_original: "",
+                                };
+                              }
+                              return aplicarProductoEnLinea(l, producto);
+                            })
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell className="align-top text-sm text-muted-foreground whitespace-nowrap">
+                        {linea.stock_actual === null ? "—" : textoStock(linea.stock_actual)}
+                      </TableCell>
+                      <TableCell className="align-top">
+                        <Input
+                          aria-label="Código de barras"
+                          placeholder="Barras"
+                          className="w-36 font-mono text-xs"
+                          value={linea.barcode}
+                          onChange={(e) => setLineasIngreso((prev) =>
+                            prev.map((l) => l.id === linea.id ? { ...l, barcode: e.target.value } : l)
                           )}
                         />
                       </TableCell>
