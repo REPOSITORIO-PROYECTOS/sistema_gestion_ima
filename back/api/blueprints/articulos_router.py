@@ -17,11 +17,13 @@ from back.schemas.articulo_schemas import (
     ArticuloCreate, 
     ArticuloUpdate, 
     ArticuloResponse, # Lo mantenemos si alguna parte antigua aún lo usa
-    ArticuloReadConCodigos, 
+    ArticuloReadConCodigos,
+    ArticuloCodigoRead,
     CodigoBarrasCreate
 )
 from back.schemas.articulo_schemas import ArticuloRead
 from back.schemas.caja_schemas import RespuestaGenerica
+from back.utils.articulo_helpers import listar_codigos_ordenados
 
 router = APIRouter(
     prefix="/articulos", 
@@ -68,7 +70,7 @@ def api_buscar_articulos(
                 'costo_ultimo': getattr(articulo, 'costo_ultimo', 0.0),
                 'categoria': getattr(articulo, 'categoria', None),
                 'precio_manual': getattr(articulo, 'precio_manual', False),
-                'codigos': [{'codigo': c.codigo} for c in (getattr(articulo, 'codigos', None) or [])],
+                'codigos': [{'codigo': c.codigo} for c in listar_codigos_ordenados(getattr(articulo, 'codigos', None))],
             }
             articuloread_list.append(ArticuloReadConCodigos.model_validate(articulo_dict))
         except Exception as e:
@@ -112,7 +114,7 @@ def api_get_all_articulos(
                 'activo': articulo.activo,
                 'unidad_venta': articulo.unidad_venta,
                 'precio_manual': getattr(articulo, 'precio_manual', False),
-                'codigos': [{'codigo': c.codigo} for c in (articulo.codigos or [])]
+                'codigos': [{'codigo': c.codigo} for c in listar_codigos_ordenados(articulo.codigos)]
             }
             resultado.append(ArticuloReadConCodigos.model_validate(articulo_dict))
         except Exception as e:
@@ -261,7 +263,12 @@ def api_buscar_articulo_por_codigo(
     articulo = articulos_manager.buscar_articulo_por_codigo(db,id_empresa, codigo)
     if not articulo:
         raise HTTPException(status_code=404, detail=f"Artículo con código '{codigo}' no encontrado.")
-    return articulo
+    respuesta = ArticuloReadConCodigos.model_validate(articulo, from_attributes=True)
+    respuesta.codigos = [
+        ArticuloCodigoRead(codigo=codigo_obj.codigo)
+        for codigo_obj in listar_codigos_ordenados(articulo.codigos)
+    ]
+    return respuesta
 
 @router.get("/version")
 def api_catalogo_version(

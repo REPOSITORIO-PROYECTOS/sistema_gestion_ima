@@ -61,3 +61,31 @@ export function precioVentaParaEnviar(
 export function barrasCambiaron(original: string, actual: string): boolean {
   return textoBarras(parseBarras(original)) !== textoBarras(parseBarras(actual));
 }
+
+export function codigosCambiaron(original: string[], actual: string[]): boolean {
+  return textoBarras(original) !== textoBarras(actual);
+}
+
+export type AgregarAlternativo =
+  | { ok: true; alternativos: string[] }
+  | { ok: false; motivo: "vacio" | "duplicado" };
+
+/** Enter agrega un alternativo. No repite el principal ni otro alternativo. */
+export function agregarAlternativo(
+  principal: string,
+  alternativos: string[],
+  nuevo: string,
+): AgregarAlternativo {
+  const codigo = nuevo.trim();
+  if (!codigo) return { ok: false, motivo: "vacio" };
+  const yaEsta = codigo === principal.trim() || alternativos.some((item) => item.trim() === codigo);
+  if (yaEsta) return { ok: false, motivo: "duplicado" };
+  return { ok: true, alternativos: [...alternativos, codigo] };
+}
+
+/** El primero es el principal. El resto son alternativos, sin repetir. */
+export function unirCodigos(principal: string, alternativos: string[]): string[] {
+  const cabeza = principal.trim();
+  const cola = alternativos.map((item) => item.trim()).filter((item) => item && item !== cabeza);
+  return parseBarras([cabeza, ...cola].filter(Boolean).join(", "));
+}

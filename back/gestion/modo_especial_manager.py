@@ -21,7 +21,11 @@ from back.modelos import (
     TransferenciaStock,
     TransferenciaStockDetalle,
 )
-from back.utils.articulo_helpers import articulo_con_barcode_en_empresa, mensaje_barcode_duplicado
+from back.utils.articulo_helpers import (
+    articulo_con_barcode_en_empresa,
+    listar_codigos_ordenados,
+    mensaje_barcode_duplicado,
+)
 from back.schemas.modo_especial_schemas import (
     BulkProductosRequest,
     CrearTransferenciaStockRequest,
@@ -216,21 +220,30 @@ def _asignar_barcodes(
 ) -> None:
     if barcodes is None:
         return
-    _validar_barcodes_lista(barcodes)
-    codigos_actuales = {c.codigo for c in (articulo.codigos or [])}
-    deseados = set(barcodes)
+    if articulo.codigos is None:
+        articulo.codigos = []
+    limpios = [codigo.strip() for codigo in barcodes if codigo and codigo.strip()]
+    _validar_barcodes_lista(limpios)
+    actuales = {codigo_obj.codigo: codigo_obj for codigo_obj in list(articulo.codigos or [])}
+    deseados = set(limpios)
     # Eliminar vía la relación para no dejar instancias borradas en articulo.codigos
     # (db.delete + db.add(articulo) provoca InvalidRequestError en SQLAlchemy).
     for codigo_obj in list(articulo.codigos or []):
         if codigo_obj.codigo not in deseados:
             articulo.codigos.remove(codigo_obj)
-    for codigo in deseados - codigos_actuales:
+    for indice, codigo in enumerate(limpios):
+        existente = actuales.get(codigo)
+        if existente is not None and codigo in deseados:
+            existente.orden = indice
+            continue
         otro = articulo_con_barcode_en_empresa(db, codigo, articulo.id, articulo.id_empresa)
         if otro:
             if omitir_conflictos:
                 continue
             raise ValueError(mensaje_barcode_duplicado(codigo, otro))
-        articulo.codigos.append(ArticuloCodigo(codigo=codigo, id_articulo=articulo.id))
+        articulo.codigos.append(
+            ArticuloCodigo(codigo=codigo, id_articulo=articulo.id, orden=indice)
+        )
 
 
 def _articulo_a_response(articulo: Articulo) -> Dict[str, Any]:
@@ -248,7 +261,7 @@ def _articulo_a_response(articulo: Articulo) -> Dict[str, Any]:
         "categorias": categorias,
         "stock_actual": articulo.stock_actual,
         "stock_minimo": articulo.stock_minimo,
-        "barcodes": [c.codigo for c in (articulo.codigos or [])],
+        "barcodes": [c.codigo for c in listar_codigos_ordenados(articulo.codigos)],
         "unidad": (articulo.unidad_venta or "Unidad").lower(),
         "cantidad_envase": _parse_cantidad_envase(articulo.ubicacion),
         "ubicacion": articulo.ubicacion,

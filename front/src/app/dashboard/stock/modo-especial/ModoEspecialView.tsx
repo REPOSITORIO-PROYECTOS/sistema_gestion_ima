@@ -54,12 +54,11 @@ import {
   TransferenciaStock,
 } from "./api";
 import { BusquedaProductoInput } from "./BusquedaProductoInput";
+import { EditorCodigosBarras } from "./EditorCodigosBarras";
 import {
-  barrasCambiaron,
-  parseBarras,
+  codigosCambiaron,
   precioVentaParaEnviar,
   precioVentaVisible,
-  textoBarras,
   textoStock,
   type ArticuloIngreso,
 } from "./ingreso-linea";
@@ -70,7 +69,7 @@ import {
 } from "./ProductoWizardModal";
 
 const MODAL_WIDE_CLASS =
-  "flex max-h-[92vh] w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl";
+  "flex max-h-[92vh] w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-6xl";
 
 const BTN_STOCK_OUTLINE =
   "border-amber-300 text-amber-950 hover:bg-amber-50 hover:text-amber-950";
@@ -88,8 +87,8 @@ interface IngresoLinea {
   precio_original: string | null;
   precio_costo: string;
   stock_actual: number | null;
-  barcode: string;
-  barcode_original: string;
+  barcodes: string[];
+  barcodes_original: string[];
 }
 
 interface TransferenciaLinea {
@@ -109,13 +108,13 @@ const nuevaLineaIngreso = (): IngresoLinea => ({
   precio_original: null,
   precio_costo: "",
   stock_actual: null,
-  barcode: "",
-  barcode_original: "",
+  barcodes: [],
+  barcodes_original: [],
 });
 
 function aplicarProductoEnLinea(linea: IngresoLinea, producto: ArticuloIngreso): IngresoLinea {
   const precio = precioVentaVisible(producto);
-  const barras = textoBarras(producto.barcodes);
+  const barras = (producto.barcodes ?? []).map((codigo) => codigo.trim()).filter(Boolean);
   return {
     ...linea,
     codigo_interno: producto.codigo_interno,
@@ -123,8 +122,8 @@ function aplicarProductoEnLinea(linea: IngresoLinea, producto: ArticuloIngreso):
     precio_venta: precio,
     precio_original: precio,
     stock_actual: Number(producto.stock_actual ?? 0),
-    barcode: barras,
-    barcode_original: barras,
+    barcodes: barras,
+    barcodes_original: barras,
   };
 }
 
@@ -271,8 +270,8 @@ export function ModoEspecialView() {
         const precio = precioVentaParaEnviar(linea.precio_original, linea.precio_venta);
         if (precio !== undefined) item.precio_venta = precio;
         if (linea.precio_costo.trim()) item.precio_costo = parseFloat(linea.precio_costo);
-        if (barrasCambiaron(linea.barcode_original, linea.barcode)) {
-          item.barcodes = parseBarras(linea.barcode);
+        if (codigosCambiaron(linea.barcodes_original, linea.barcodes)) {
+          item.barcodes = linea.barcodes;
         }
         return item;
       })
@@ -600,7 +599,7 @@ export function ModoEspecialView() {
           </DialogHeader>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4 space-y-4">
             <p className="text-sm text-muted-foreground">
-              Cargá varios productos a la vez. El precio de venta se completa con el vigente y solo se guarda si lo cambiás. El stock en cero también aparece.
+              Cargá varios productos a la vez. El precio de venta se completa con el vigente y solo se guarda si lo cambiás. En cada fila podés editar el código principal y sumar alternativos: escribí o escaneá y presioná Enter.
             </p>
             <div className="rounded-md border overflow-visible">
               <Table>
@@ -632,8 +631,8 @@ export function ModoEspecialView() {
                                 precio_venta: "",
                                 precio_original: null,
                                 stock_actual: null,
-                                barcode: "",
-                                barcode_original: "",
+                                barcodes: [],
+                                barcodes_original: [],
                               }),
                             } : l)
                           )}
@@ -646,8 +645,8 @@ export function ModoEspecialView() {
                                   precio_venta: "",
                                   precio_original: null,
                                   stock_actual: null,
-                                  barcode: "",
-                                  barcode_original: "",
+                                  barcodes: [],
+                                  barcodes_original: [],
                                 };
                               }
                               return aplicarProductoEnLinea(l, producto);
@@ -658,14 +657,11 @@ export function ModoEspecialView() {
                       <TableCell className="align-top text-sm text-muted-foreground whitespace-nowrap">
                         {linea.stock_actual === null ? "—" : textoStock(linea.stock_actual)}
                       </TableCell>
-                      <TableCell className="align-top">
-                        <Input
-                          aria-label="Código de barras"
-                          placeholder="Barras"
-                          className="w-36 font-mono text-xs"
-                          value={linea.barcode}
-                          onChange={(e) => setLineasIngreso((prev) =>
-                            prev.map((l) => l.id === linea.id ? { ...l, barcode: e.target.value } : l)
+                      <TableCell className="align-top min-w-[16rem]">
+                        <EditorCodigosBarras
+                          codigos={linea.barcodes}
+                          onChange={(barcodes) => setLineasIngreso((prev) =>
+                            prev.map((l) => l.id === linea.id ? { ...l, barcodes } : l)
                           )}
                         />
                       </TableCell>

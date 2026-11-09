@@ -1,8 +1,10 @@
 import {
+  agregarAlternativo,
   barrasCambiaron,
   precioVentaParaEnviar,
   precioVentaVisible,
   textoStock,
+  unirCodigos,
 } from "./ingreso-linea";
 
 describe("ingreso masivo", () => {
@@ -31,5 +33,23 @@ describe("ingreso masivo", () => {
     expect(barrasCambiaron("7790001000011", "7790001000011")).toBe(false);
     expect(barrasCambiaron("7790001000011", "7790001000099")).toBe(true);
     expect(barrasCambiaron("7790001000011", "")).toBe(true);
+  });
+
+  it("agrega alternativos con Enter y rechaza duplicados", () => {
+    const primero = agregarAlternativo("7790001000011", [], "7790001000099");
+    expect(primero).toEqual({ ok: true, alternativos: ["7790001000099"] });
+    if (!primero.ok) return;
+    const segundo = agregarAlternativo("7790001000011", primero.alternativos, "7790001000088");
+    expect(segundo).toEqual({ ok: true, alternativos: ["7790001000099", "7790001000088"] });
+    expect(agregarAlternativo("7790001000011", primero.alternativos, "7790001000011").ok).toBe(false);
+    expect(agregarAlternativo("7790001000011", primero.alternativos, "7790001000099").ok).toBe(false);
+    expect(agregarAlternativo("7790001000011", primero.alternativos, "  ").ok).toBe(false);
+  });
+
+  it("guarda el principal primero y no repite alternativos", () => {
+    expect(unirCodigos("7790001000011", ["7790001000099", "7790001000011"])).toEqual([
+      "7790001000011",
+      "7790001000099",
+    ]);
   });
 });
