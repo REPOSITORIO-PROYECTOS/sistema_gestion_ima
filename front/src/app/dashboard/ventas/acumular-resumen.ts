@@ -4,9 +4,9 @@ export type LineaResumen = {
   cantidad: number;
   precioTotal: number;
   precioBase: number;
-  descuentoAplicado: boolean;
-  porcentajeDescuento: number;
-  descuentoNominal: number;
+  descuentoAplicado?: boolean;
+  porcentajeDescuento?: number;
+  descuentoNominal?: number;
 };
 
 const TOLERANCIA_PRECIO = 0.01;
