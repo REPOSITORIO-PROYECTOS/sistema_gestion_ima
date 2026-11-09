@@ -96,9 +96,31 @@ export function esDestinoLocal(destinoId: string): boolean {
   return !destinoId || destinoId === DESTINO_ESTA_SUCURSAL;
 }
 
-export function textoDestinoIngreso(destinoNombre: string | null): string {
-  if (!destinoNombre) {
-    return "Esta sucursal: el stock se suma acá, igual que un ingreso común.";
+export type RepartoLinea =
+  | { ok: true; queda: number; enviar: number }
+  | { ok: false; motivo: string };
+
+/** La cantidad es lo que entra. enviar es la parte que sale a la otra sucursal. */
+export function repartoLinea(cantidad: number, enviarRaw: string): RepartoLinea {
+  const texto = enviarRaw.trim().replace(",", ".");
+  const enviar = texto === "" ? 0 : Number(texto);
+  if (!Number.isFinite(cantidad) || cantidad <= 0) {
+    return { ok: false, motivo: "La cantidad que entra tiene que ser mayor a cero." };
   }
-  return `Envío a ${destinoNombre}: la mercadería entra y sale de esta sucursal. Queda pendiente de recepción allá; el stock de destino suma recién cuando la reciben.`;
+  if (!Number.isFinite(enviar) || enviar < 0) {
+    return { ok: false, motivo: "La cantidad a enviar no es válida." };
+  }
+  if (enviar - cantidad > 1e-9) {
+    return { ok: false, motivo: "No podés enviar más de lo que ingresa en la línea." };
+  }
+  return { ok: true, queda: cantidad - enviar, enviar };
+}
+
+export function textoDestinoIngreso(destinoNombre: string | null): string {
+  const base =
+    "La cantidad es todo lo que entra. En Enviar poné cuánto va a la sucursal elegida; el resto queda acá. No puede superar la cantidad.";
+  if (!destinoNombre) {
+    return `${base} Si Enviar queda vacío, todo se queda en esta sucursal.`;
+  }
+  return `${base} Lo que envíes a ${destinoNombre} queda pendiente de recepción y suma allá recién cuando lo reciben.`;
 }

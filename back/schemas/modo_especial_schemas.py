@@ -2,7 +2,7 @@
 
 from enum import Enum
 from typing import List, Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class UnidadMedidaEnum(str, Enum):
@@ -142,6 +142,16 @@ class IngresoStockItem(BaseModel):
     precio_venta: Optional[float] = Field(default=None, ge=0)
     precio_costo: Optional[float] = Field(default=None, ge=0)
     barcodes: Optional[List[str]] = None
+    cantidad_enviar: Optional[float] = Field(default=0, ge=0)
+
+    @model_validator(mode="after")
+    def enviar_no_supera_lo_ingresado(self) -> "IngresoStockItem":
+        enviar = float(self.cantidad_enviar or 0)
+        if enviar - float(self.cantidad) > 1e-6:
+            raise ValueError(
+                f"No se puede enviar {enviar:g}: en la línea solo ingresan {self.cantidad:g}."
+            )
+        return self
 
     @field_validator("barcodes")
     @classmethod

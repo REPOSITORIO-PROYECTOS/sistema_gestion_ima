@@ -61,6 +61,7 @@ import {
   esDestinoLocal,
   precioVentaParaEnviar,
   precioVentaVisible,
+  repartoLinea,
   textoDestinoIngreso,
   textoStock,
   type ArticuloIngreso,
@@ -86,6 +87,7 @@ interface IngresoLinea {
   codigo_interno: string;
   descripcion: string;
   cantidad: string;
+  cantidad_enviar: string;
   precio_venta: string;
   precio_original: string | null;
   precio_costo: string;
@@ -102,11 +104,17 @@ interface TransferenciaLinea {
   precio_unitario: string;
 }
 
+function lineaEnvia(linea: IngresoLinea): boolean {
+  const reparto = repartoLinea(parseFloat(linea.cantidad), linea.cantidad_enviar);
+  return reparto.ok && reparto.enviar > 0;
+}
+
 const nuevaLineaIngreso = (): IngresoLinea => ({
   id: crypto.randomUUID(),
   codigo_interno: "",
   descripcion: "",
   cantidad: "",
+  cantidad_enviar: "",
   precio_venta: "",
   precio_original: null,
   precio_costo: "",
@@ -257,42 +265,56 @@ export function ModoEspecialView() {
 
   const registrarIngreso = async () => {
     if (!token) return;
-    const items = lineasIngreso
-      .map((linea) => {
-        const codigo = linea.codigo_interno.trim();
-        const cantidad = parseFloat(linea.cantidad);
-        if (!codigo || !cantidad || cantidad <= 0) return null;
-        const item: {
-          codigo_interno: string;
-          cantidad: number;
-          observacion?: string;
-          precio_venta?: number;
-          precio_costo?: number;
-          barcodes?: string[];
-        } = { codigo_interno: codigo, cantidad };
-        if (ingresoObs.trim()) item.observacion = ingresoObs.trim();
-        const precio = precioVentaParaEnviar(linea.precio_original, linea.precio_venta);
-        if (precio !== undefined) item.precio_venta = precio;
-        if (linea.precio_costo.trim()) item.precio_costo = parseFloat(linea.precio_costo);
-        if (codigosCambiaron(linea.barcodes_original, linea.barcodes)) {
-          item.barcodes = linea.barcodes;
-        }
-        return item;
-      })
-      .filter((item): item is NonNullable<typeof item> => item !== null);
+    const armado: Array<{
+      codigo_interno: string;
+      cantidad: number;
+      cantidad_enviar: number;
+      observacion?: string;
+      precio_venta?: number;
+      precio_costo?: number;
+      barcodes?: string[];
+    }> = [];
+    for (const linea of lineasIngreso) {
+      const codigo = linea.codigo_interno.trim();
+      const cantidad = parseFloat(linea.cantidad);
+      if (!codigo || !cantidad || cantidad <= 0) continue;
+      const reparto = repartoLinea(cantidad, linea.cantidad_enviar);
+      if (!reparto.ok) {
+        toast.error(`${codigo}: ${reparto.motivo}`);
+        return;
+      }
+      const item: (typeof armado)[number] = {
+        codigo_interno: codigo,
+        cantidad,
+        cantidad_enviar: reparto.enviar,
+      };
+      if (ingresoObs.trim()) item.observacion = ingresoObs.trim();
+      const precio = precioVentaParaEnviar(linea.precio_original, linea.precio_venta);
+      if (precio !== undefined) item.precio_venta = precio;
+      if (linea.precio_costo.trim()) item.precio_costo = parseFloat(linea.precio_costo);
+      if (codigosCambiaron(linea.barcodes_original, linea.barcodes)) {
+        item.barcodes = linea.barcodes;
+      }
+      armado.push(item);
+    }
+    const items = armado;
 
     if (items.length === 0) {
       toast.error("Agregá al menos una línea con producto y cantidad.");
       return;
     }
-    const envio = !esDestinoLocal(destinoIngresoId);
+    const hayEnvio = items.some((item) => item.cantidad_enviar > 0);
+    if (hayEnvio && esDestinoLocal(destinoIngresoId)) {
+      toast.error("Elegí la sucursal a la que se envía el reparto.");
+      return;
+    }
     const destino = empresasTransferencia.find((empresa) => String(empresa.id) === destinoIngresoId);
     setGuardando(true);
     try {
       const res = await ingresarStockModoEspecial(
         token,
         items,
-        envio
+        hayEnvio
           ? { idEmpresaDestino: Number(destinoIngresoId), observacion: ingresoObs.trim() || undefined }
           : undefined,
       );
@@ -300,7 +322,7 @@ export function ModoEspecialView() {
         const nombre = res.transferencia?.nombre_empresa_destino || destino?.nombre || "la sucursal destino";
         const faltantes = (res.codigos_sin_producto_en_destino ?? []).join(", ");
         toast.success(
-          `Envío #${res.transferencia?.id ?? ""} pendiente de recepción en ${nombre}. Esta sucursal no se queda con esa mercadería.`,
+          `Ingreso registrado. Envío #${res.transferencia?.id ?? ""} pendiente de recepción en ${nombre}. Acá queda solo lo que no enviaste.`,
         );
         if (faltantes) {
           toast.error(`En destino hay que crear estos productos antes de recibir: ${faltantes}`);
@@ -629,13 +651,13 @@ export function ModoEspecialView() {
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4 space-y-4">
             <div className="grid gap-2 sm:grid-cols-[16rem_1fr] sm:items-start">
               <div className="space-y-1">
-                <label className="text-sm font-medium" htmlFor="destino-ingreso">Destino</label>
+                <label className="text-sm font-medium" htmlFor="destino-ingreso">Sucursal del envío</label>
                 <Select value={destinoIngresoId} onValueChange={setDestinoIngresoId}>
-                  <SelectTrigger id="destino-ingreso" aria-label="Destino del ingreso">
-                    <SelectValue placeholder="Esta sucursal" />
+                  <SelectTrigger id="destino-ingreso" aria-label="Sucursal del envío">
+                    <SelectValue placeholder="Todo queda acá" />
                   </SelectTrigger>
                   <SelectContent className="z-[200]">
-                    <SelectItem value={DESTINO_ESTA_SUCURSAL}>Esta sucursal</SelectItem>
+                    <SelectItem value={DESTINO_ESTA_SUCURSAL}>Ninguna: todo queda acá</SelectItem>
                     {empresasTransferencia.map((empresa) => (
                       <SelectItem key={empresa.id} value={String(empresa.id)}>{empresa.nombre}</SelectItem>
                     ))}
@@ -659,6 +681,7 @@ export function ModoEspecialView() {
                     <TableHead>Stock</TableHead>
                     <TableHead>Código de barras</TableHead>
                     <TableHead>Cantidad *</TableHead>
+                    <TableHead>Enviar</TableHead>
                     <TableHead>Precio venta</TableHead>
                     <TableHead>Precio costo</TableHead>
                     <TableHead />
@@ -683,6 +706,7 @@ export function ModoEspecialView() {
                                 stock_actual: null,
                                 barcodes: [],
                                 barcodes_original: [],
+                                cantidad_enviar: "",
                               }),
                             } : l)
                           )}
@@ -697,6 +721,7 @@ export function ModoEspecialView() {
                                   stock_actual: null,
                                   barcodes: [],
                                   barcodes_original: [],
+                                  cantidad_enviar: "",
                                 };
                               }
                               return aplicarProductoEnLinea(l, producto);
@@ -725,6 +750,20 @@ export function ModoEspecialView() {
                           value={linea.cantidad}
                           onChange={(e) => setLineasIngreso((prev) =>
                             prev.map((l) => l.id === linea.id ? { ...l, cantidad: e.target.value } : l)
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell className="align-top">
+                        <Input
+                          type="number"
+                          min="0"
+                          step="any"
+                          placeholder="0"
+                          aria-label="Cantidad a enviar"
+                          className="w-24"
+                          value={linea.cantidad_enviar}
+                          onChange={(e) => setLineasIngreso((prev) =>
+                            prev.map((l) => l.id === linea.id ? { ...l, cantidad_enviar: e.target.value } : l)
                           )}
                         />
                       </TableCell>
@@ -777,7 +816,7 @@ export function ModoEspecialView() {
           <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
             <Button variant="ghost" onClick={() => setModalIngreso(false)}>Cancelar</Button>
             <Button onClick={registrarIngreso} disabled={guardando}>
-              {esDestinoLocal(destinoIngresoId) ? "Registrar ingreso" : "Enviar a sucursal"}
+              {lineasIngreso.some(lineaEnvia) ? "Registrar y enviar" : "Registrar ingreso"}
             </Button>
           </DialogFooter>
         </DialogContent>

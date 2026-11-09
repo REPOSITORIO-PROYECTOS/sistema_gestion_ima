@@ -173,6 +173,7 @@ export async function ingresarStockModoEspecial(
     precio_venta?: number;
     precio_costo?: number;
     barcodes?: string[];
+    cantidad_enviar?: number;
   }[],
   opciones?: { idEmpresaDestino?: number; observacion?: string },
 ) {

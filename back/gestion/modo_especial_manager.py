@@ -30,6 +30,7 @@ from back.schemas.modo_especial_schemas import (
     BulkProductosRequest,
     CrearTransferenciaStockRequest,
     ImportExportResumen,
+    IngresoStockItem,
     IngresoStockRequest,
     ProductoModoEspecialCreate,
     ProductoModoEspecialUpdate,
@@ -518,6 +519,18 @@ def ingresar_stock(
     return {"procesados": procesados, "total": len(procesados)}
 
 
+def neto_reparto(cantidad: float, cantidad_enviar: Optional[float]) -> tuple[float, float]:
+    """Devuelve (lo que queda en origen, lo que se envía). Rechaza enviar de más."""
+    enviar = float(cantidad_enviar or 0)
+    if enviar < -1e-9:
+        raise ValueError("La cantidad a enviar no puede ser negativa.")
+    if enviar - float(cantidad) > 1e-6:
+        raise ValueError(
+            f"No se puede enviar {enviar:g}: en la línea solo ingresan {cantidad:g}."
+        )
+    return float(cantidad) - enviar, enviar
+
+
 def _validar_destino_envio(db: Session, id_origen: int, id_destino: int) -> None:
     from back.gestion.stock.espejo_stock import empresas_en_mismo_espejo
 
@@ -540,17 +553,23 @@ def registrar_ingreso_masivo(
     id_usuario: int,
     req: IngresoStockRequest,
 ) -> Dict[str, Any]:
-    """Ingreso local, o ingreso + envío pendiente si el destino es otra sucursal.
+    """Suma en origen todo lo ingresado y, si hay reparto, envía solo esa parte.
 
-    Otra sucursal: primero suma en origen (la mercadería entró) y enseguida crea
-    la transferencia, que descuenta esa misma cantidad. El neto en origen no
-    cambia y no baja de cero si el stock previo ya era cero o positivo.
-    El destino suma recién al recibir.
+    Un destino por compra. Cada línea dice cuánto se envía. El neto en origen
+    es lo que queda (ingresado menos enviado). Lo enviado queda pendiente de
+    recepción. Si ninguna línea envía, es un ingreso local aunque haya destino.
     """
-    destino = req.id_empresa_destino
-    if destino is None or int(destino) == int(id_empresa):
+    envios: List[tuple[IngresoStockItem, float]] = []
+    for item in req.items:
+        _queda, enviar = neto_reparto(item.cantidad, item.cantidad_enviar)
+        if enviar > 1e-9:
+            envios.append((item, enviar))
+    if not envios:
         return ingresar_stock(db, id_empresa, id_usuario, req)
 
+    destino = req.id_empresa_destino
+    if destino is None:
+        raise ValueError("Elegí la sucursal a la que se envía el reparto.")
     _validar_destino_envio(db, id_empresa, int(destino))
     ingresar_stock(db, id_empresa, id_usuario, req, commit=False)
 
@@ -560,13 +579,13 @@ def registrar_ingreso_masivo(
     )
 
     items_envio = []
-    for item in req.items:
+    for item, enviar in envios:
         codigo = (item.codigo_interno or "").strip()
         if not codigo:
             raise ValueError("Para enviar a otra sucursal cada ítem necesita codigo_interno.")
         items_envio.append(TransferenciaStockItem(
             codigo_interno=codigo,
-            cantidad=item.cantidad,
+            cantidad=enviar,
             precio_unitario=item.precio_costo,
         ))
     transferencia = crear_transferencia_stock(
@@ -581,7 +600,7 @@ def registrar_ingreso_masivo(
     )
     faltantes = [
         item.codigo_interno.strip()
-        for item in req.items
+        for item, _enviar in envios
         if item.codigo_interno
         and _obtener_articulo_por_codigo(db, int(destino), item.codigo_interno.strip()) is None
     ]

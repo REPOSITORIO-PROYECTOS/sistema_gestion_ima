@@ -7,6 +7,7 @@ import {
   precioVentaVisible,
   textoStock,
   esDestinoLocal,
+  repartoLinea,
   textoDestinoIngreso,
   unirCodigos,
 } from "./ingreso-linea";
@@ -63,8 +64,15 @@ describe("ingreso masivo", () => {
     expect(esDestinoLocal("2")).toBe(false);
   });
 
-  it("explica que el envío queda pendiente de recepción", () => {
-    expect(textoDestinoIngreso(null)).toMatch(/Esta sucursal/);
+  it("reparte 10 en 6 que quedan y 4 que se envían", () => {
+    expect(repartoLinea(10, "4")).toEqual({ ok: true, queda: 6, enviar: 4 });
+    expect(repartoLinea(10, "")).toEqual({ ok: true, queda: 10, enviar: 0 });
+    expect(repartoLinea(10, "10")).toEqual({ ok: true, queda: 0, enviar: 10 });
+    expect(repartoLinea(10, "11").ok).toBe(false);
+  });
+
+  it("explica el reparto y que el envío queda pendiente de recepción", () => {
+    expect(textoDestinoIngreso(null)).toMatch(/todo se queda en esta sucursal/);
     expect(textoDestinoIngreso("Sucursal Norte")).toMatch(/pendiente de recepción/);
     expect(textoDestinoIngreso("Sucursal Norte")).toMatch(/Sucursal Norte/);
   });

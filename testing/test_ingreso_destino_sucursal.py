@@ -6,7 +6,7 @@ import pytest
 from sqlmodel import Session, select
 
 from back.database import engine
-from back.gestion.modo_especial_manager import recibir_transferencia_stock, registrar_ingreso_masivo
+from back.gestion.modo_especial_manager import neto_reparto, recibir_transferencia_stock, registrar_ingreso_masivo
 from back.gestion.stock.espejo_stock import ids_destino_visibles
 from back.modelos import (
     Articulo,
@@ -25,6 +25,17 @@ def test_excluye_el_par_espejo_sin_hardcodear_el_selector():
     assert ids_destino_visibles(38, [37, 38, 39]) == [39]
     assert ids_destino_visibles(35, [35, 36]) == [36]
     assert 38 not in ids_destino_visibles(37, [37, 38, 36])
+
+
+def test_reparto_10_queda_6_y_rechaza_enviar_de_mas():
+    assert neto_reparto(10, 4) == (6.0, 4.0)
+    assert neto_reparto(10, 0) == (10.0, 0.0)
+    assert neto_reparto(10, None) == (10.0, 0.0)
+    assert neto_reparto(10, 10) == (0.0, 10.0)
+    with pytest.raises(ValueError, match="solo ingresan"):
+        neto_reparto(10, 11)
+    with pytest.raises(ValueError):
+        IngresoStockItem(codigo_interno="A", cantidad=10, cantidad_enviar=11)
 
 
 def test_el_manager_no_toca_ventas_pendientes():
@@ -113,6 +124,7 @@ def test_destino_propio_suma_y_envio_queda_pendiente_hasta_la_recepcion():
         db.refresh(art_destino)
 
         transferencia_id = None
+        transferencia_total_id = None
         transferencia_faltante_id = None
         art_faltante = None
         try:
@@ -120,7 +132,10 @@ def test_destino_propio_suma_y_envio_queda_pendiente_hasta_la_recepcion():
                 db,
                 origen.id,
                 usuario.id,
-                IngresoStockRequest(items=[IngresoStockItem(codigo_interno=codigo, cantidad=2)]),
+                IngresoStockRequest(
+                    items=[IngresoStockItem(codigo_interno=codigo, cantidad=2, cantidad_enviar=0)],
+                    id_empresa_destino=destino.id,
+                ),
             )
             db.refresh(art_origen)
             assert local["total"] == 1
@@ -132,17 +147,17 @@ def test_destino_propio_suma_y_envio_queda_pendiente_hasta_la_recepcion():
                 origen.id,
                 usuario.id,
                 IngresoStockRequest(
-                    items=[IngresoStockItem(codigo_interno=codigo, cantidad=3)],
+                    items=[IngresoStockItem(codigo_interno=codigo, cantidad=10, cantidad_enviar=4)],
                     id_empresa_destino=destino.id,
-                    observacion="pytest envio",
+                    observacion="pytest reparto",
                 ),
             )
             db.refresh(art_origen)
             db.refresh(art_destino)
             assert enviado["pendiente_recepcion"] is True
             assert enviado["transferencia"]["estado"] == "PENDIENTE"
-            assert enviado["transferencia"]["id_empresa_destino"] == destino.id
-            assert art_origen.stock_actual == 12
+            assert enviado["transferencia"]["detalles"][0]["cantidad"] == 4
+            assert art_origen.stock_actual == 18
             assert art_destino.stock_actual == 4
             transferencia_id = enviado["transferencia"]["id"]
             detalle_id = enviado["transferencia"]["detalles"][0]["id"]
@@ -154,12 +169,53 @@ def test_destino_propio_suma_y_envio_queda_pendiente_hasta_la_recepcion():
                 transferencia_id,
                 RecibirTransferenciaRequest(
                     aplicar_precios=False,
-                    items=[RecibirTransferenciaItem(id_detalle=detalle_id, cantidad_recibida=3)],
+                    items=[RecibirTransferenciaItem(id_detalle=detalle_id, cantidad_recibida=4)],
                 ),
             )
             db.refresh(art_destino)
             assert recibida["estado"] == "RECIBIDA"
-            assert art_destino.stock_actual == 7
+            assert art_destino.stock_actual == 8
+
+            total = registrar_ingreso_masivo(
+                db,
+                origen.id,
+                usuario.id,
+                IngresoStockRequest(
+                    items=[IngresoStockItem(codigo_interno=codigo, cantidad=5, cantidad_enviar=5)],
+                    id_empresa_destino=destino.id,
+                ),
+            )
+            db.refresh(art_origen)
+            assert art_origen.stock_actual == 18
+            assert total["transferencia"]["detalles"][0]["cantidad"] == 5
+            transferencia_total_id = total["transferencia"]["id"]
+            detalle_total = total["transferencia"]["detalles"][0]["id"]
+            recibir_transferencia_stock(
+                db,
+                destino.id,
+                usuario.id,
+                transferencia_total_id,
+                RecibirTransferenciaRequest(
+                    aplicar_precios=False,
+                    items=[RecibirTransferenciaItem(id_detalle=detalle_total, cantidad_recibida=5)],
+                ),
+            )
+            db.refresh(art_destino)
+            assert art_destino.stock_actual == 13
+
+            with pytest.raises(ValueError, match="solo ingresan"):
+                registrar_ingreso_masivo(
+                    db,
+                    origen.id,
+                    usuario.id,
+                    IngresoStockRequest(
+                        items=[IngresoStockItem(codigo_interno=codigo, cantidad=3, cantidad_enviar=4)],
+                        id_empresa_destino=destino.id,
+                    ),
+                )
+            db.rollback()
+            db.refresh(art_origen)
+            assert art_origen.stock_actual == 18
 
             art_faltante = Articulo(
                 codigo_interno="LOC-DEST-FALTA",
@@ -178,7 +234,7 @@ def test_destino_propio_suma_y_envio_queda_pendiente_hasta_la_recepcion():
                 origen.id,
                 usuario.id,
                 IngresoStockRequest(
-                    items=[IngresoStockItem(codigo_interno="LOC-DEST-FALTA", cantidad=1)],
+                    items=[IngresoStockItem(codigo_interno="LOC-DEST-FALTA", cantidad=1, cantidad_enviar=1)],
                     id_empresa_destino=destino.id,
                 ),
             )
@@ -188,7 +244,7 @@ def test_destino_propio_suma_y_envio_queda_pendiente_hasta_la_recepcion():
             transferencia_faltante_id = aviso["transferencia"]["id"]
         finally:
             db.rollback()
-            for tid in (transferencia_id, transferencia_faltante_id):
+            for tid in (transferencia_id, transferencia_total_id, transferencia_faltante_id):
                 if tid is None:
                     continue
                 for detalle in db.exec(
