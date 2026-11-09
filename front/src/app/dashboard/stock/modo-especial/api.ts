@@ -174,11 +174,19 @@ export async function ingresarStockModoEspecial(
     precio_costo?: number;
     barcodes?: string[];
   }[],
+  opciones?: { idEmpresaDestino?: number; observacion?: string },
 ) {
+  const body: {
+    items: typeof items;
+    id_empresa_destino?: number;
+    observacion?: string;
+  } = { items };
+  if (opciones?.idEmpresaDestino) body.id_empresa_destino = opciones.idEmpresaDestino;
+  if (opciones?.observacion) body.observacion = opciones.observacion;
   const res = await fetch(`${API_CONFIG.BASE_URL}/modo-especial/ingreso-stock`, {
     method: "POST",
     headers: headers(token),
-    body: JSON.stringify({ items }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

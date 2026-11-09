@@ -159,6 +159,8 @@ class IngresoStockItem(BaseModel):
 
 class IngresoStockRequest(BaseModel):
     items: List[IngresoStockItem] = Field(min_length=1)
+    id_empresa_destino: Optional[int] = None
+    observacion: Optional[str] = None
 
 
 class SubaPrecioItem(BaseModel):

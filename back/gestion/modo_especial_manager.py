@@ -444,7 +444,14 @@ def bulk_upsert(
     return resumen
 
 
-def ingresar_stock(db: Session, id_empresa: int, id_usuario: int, req: IngresoStockRequest) -> Dict[str, Any]:
+def ingresar_stock(
+    db: Session,
+    id_empresa: int,
+    id_usuario: int,
+    req: IngresoStockRequest,
+    *,
+    commit: bool = True,
+) -> Dict[str, Any]:
     procesados = []
     for item in req.items:
         if not item.codigo_interno and not item.id_articulo:
@@ -506,8 +513,84 @@ def ingresar_stock(db: Session, id_empresa: int, id_usuario: int, req: IngresoSt
         })
 
     _incrementar_catalogo_version(db, id_empresa)
-    db.commit()
+    if commit:
+        db.commit()
     return {"procesados": procesados, "total": len(procesados)}
+
+
+def _validar_destino_envio(db: Session, id_origen: int, id_destino: int) -> None:
+    from back.gestion.stock.espejo_stock import empresas_en_mismo_espejo
+
+    if id_destino == id_origen:
+        raise ValueError("El destino es esta sucursal. Usá el ingreso local.")
+    if empresas_en_mismo_espejo(id_origen, id_destino):
+        raise ValueError(
+            "Esas sucursales comparten el mismo stock espejado. "
+            "No se transfiere entre ellas: cargá en una y se replica en la otra."
+        )
+    _verificar_empresa_transferencia(db, id_origen)
+    _verificar_empresa_transferencia(db, id_destino)
+    if _grupo_transferencia(db, id_origen) != _grupo_transferencia(db, id_destino):
+        raise ValueError("No puede transferir stock entre empresas de distintos grupos.")
+
+
+def registrar_ingreso_masivo(
+    db: Session,
+    id_empresa: int,
+    id_usuario: int,
+    req: IngresoStockRequest,
+) -> Dict[str, Any]:
+    """Ingreso local, o ingreso + envío pendiente si el destino es otra sucursal.
+
+    Otra sucursal: primero suma en origen (la mercadería entró) y enseguida crea
+    la transferencia, que descuenta esa misma cantidad. El neto en origen no
+    cambia y no baja de cero si el stock previo ya era cero o positivo.
+    El destino suma recién al recibir.
+    """
+    destino = req.id_empresa_destino
+    if destino is None or int(destino) == int(id_empresa):
+        return ingresar_stock(db, id_empresa, id_usuario, req)
+
+    _validar_destino_envio(db, id_empresa, int(destino))
+    ingresar_stock(db, id_empresa, id_usuario, req, commit=False)
+
+    from back.schemas.modo_especial_schemas import (
+        CrearTransferenciaStockRequest,
+        TransferenciaStockItem,
+    )
+
+    items_envio = []
+    for item in req.items:
+        codigo = (item.codigo_interno or "").strip()
+        if not codigo:
+            raise ValueError("Para enviar a otra sucursal cada ítem necesita codigo_interno.")
+        items_envio.append(TransferenciaStockItem(
+            codigo_interno=codigo,
+            cantidad=item.cantidad,
+            precio_unitario=item.precio_costo,
+        ))
+    transferencia = crear_transferencia_stock(
+        db,
+        id_empresa,
+        id_usuario,
+        CrearTransferenciaStockRequest(
+            id_empresa_destino=int(destino),
+            observacion=(req.observacion or "").strip() or None,
+            items=items_envio,
+        ),
+    )
+    faltantes = [
+        item.codigo_interno.strip()
+        for item in req.items
+        if item.codigo_interno
+        and _obtener_articulo_por_codigo(db, int(destino), item.codigo_interno.strip()) is None
+    ]
+    return {
+        "pendiente_recepcion": True,
+        "transferencia": transferencia,
+        "codigos_sin_producto_en_destino": faltantes,
+        "total": len(items_envio),
+    }
 
 
 def subir_precios(db: Session, id_empresa: int, req: SubaPreciosRequest) -> Dict[str, Any]:
@@ -793,9 +876,9 @@ def listar_empresas_transferencia(db: Session, id_empresa: int) -> List[Dict[str
     from back.gestion import configuracion_manager
     grupo = _grupo_transferencia(db, id_empresa)
     resultado: List[Dict[str, Any]] = []
-    for id_dest in sorted(grupo):
-        if id_dest == id_empresa:
-            continue
+    from back.gestion.stock.espejo_stock import ids_destino_visibles
+
+    for id_dest in ids_destino_visibles(id_empresa, grupo):
         if not configuracion_manager.es_modo_especial_habilitado(db, id_dest):
             continue
         empresa = db.get(Empresa, id_dest)
@@ -820,8 +903,8 @@ def crear_transferencia_stock(
 
     if empresas_en_mismo_espejo(id_empresa_origen, req.id_empresa_destino):
         raise ValueError(
-            "Stock espejado entre de-campo y La Esquina 2: no hace falta transferir. "
-            "Cargá o ajustá stock en cualquiera; se replica en la otra."
+            "Esas sucursales comparten el mismo stock espejado. "
+            "No se transfiere entre ellas: cargá en una y se replica en la otra."
         )
 
     transferencia = TransferenciaStock(
@@ -865,6 +948,9 @@ def crear_transferencia_stock(
             precio_unitario=item.precio_unitario,
             id_articulo_origen=articulo.id,
         ))
+        from back.gestion.stock.espejo_stock import espejar_stock_articulo
+
+        espejar_stock_articulo(db, articulo)
 
     _incrementar_catalogo_version(db, id_empresa_origen)
     db.commit()
@@ -961,6 +1047,9 @@ def recibir_transferencia_stock(
         detalle.cantidad_recibida = cantidad_recibida
         detalle.id_articulo_destino = articulo_dest.id
         db.add(detalle)
+        from back.gestion.stock.espejo_stock import espejar_stock_articulo
+
+        espejar_stock_articulo(db, articulo_dest)
 
     transferencia.estado = "RECIBIDA"
     transferencia.recibida_en = datetime.utcnow()

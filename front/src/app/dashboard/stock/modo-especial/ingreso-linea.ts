@@ -89,3 +89,16 @@ export function unirCodigos(principal: string, alternativos: string[]): string[]
   const cola = alternativos.map((item) => item.trim()).filter((item) => item && item !== cabeza);
   return parseBarras([cabeza, ...cola].filter(Boolean).join(", "));
 }
+
+export const DESTINO_ESTA_SUCURSAL = "local";
+
+export function esDestinoLocal(destinoId: string): boolean {
+  return !destinoId || destinoId === DESTINO_ESTA_SUCURSAL;
+}
+
+export function textoDestinoIngreso(destinoNombre: string | null): string {
+  if (!destinoNombre) {
+    return "Esta sucursal: el stock se suma acá, igual que un ingreso común.";
+  }
+  return `Envío a ${destinoNombre}: la mercadería entra y sale de esta sucursal. Queda pendiente de recepción allá; el stock de destino suma recién cuando la reciben.`;
+}

@@ -110,7 +110,7 @@ def api_ingreso_stock(
 ):
     _verificar_modo_especial(db, current_user.id_empresa)
     try:
-        return modo_especial_manager.ingresar_stock(
+        return modo_especial_manager.registrar_ingreso_masivo(
             db, current_user.id_empresa, current_user.id, req
         )
     except ValueError as e:

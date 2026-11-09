@@ -56,9 +56,12 @@ import {
 import { BusquedaProductoInput } from "./BusquedaProductoInput";
 import { EditorCodigosBarras } from "./EditorCodigosBarras";
 import {
+  DESTINO_ESTA_SUCURSAL,
   codigosCambiaron,
+  esDestinoLocal,
   precioVentaParaEnviar,
   precioVentaVisible,
+  textoDestinoIngreso,
   textoStock,
   type ArticuloIngreso,
 } from "./ingreso-linea";
@@ -149,6 +152,7 @@ export function ModoEspecialView() {
   const [form, setForm] = useState<ProductoFormData>(formVacio());
   const [lineasIngreso, setLineasIngreso] = useState<IngresoLinea[]>([nuevaLineaIngreso()]);
   const [ingresoObs, setIngresoObs] = useState("");
+  const [destinoIngresoId, setDestinoIngresoId] = useState(DESTINO_ESTA_SUCURSAL);
   const [empresasTransferencia, setEmpresasTransferencia] = useState<EmpresaTransferencia[]>([]);
   const [empresaDestinoId, setEmpresaDestinoId] = useState("");
   const [lineasTransferencia, setLineasTransferencia] = useState<TransferenciaLinea[]>([nuevaLineaTransferencia()]);
@@ -281,13 +285,33 @@ export function ModoEspecialView() {
       toast.error("Agregá al menos una línea con producto y cantidad.");
       return;
     }
+    const envio = !esDestinoLocal(destinoIngresoId);
+    const destino = empresasTransferencia.find((empresa) => String(empresa.id) === destinoIngresoId);
     setGuardando(true);
     try {
-      const res = await ingresarStockModoEspecial(token, items);
-      toast.success(`Ingreso registrado: ${res.total} artículo(s).`);
+      const res = await ingresarStockModoEspecial(
+        token,
+        items,
+        envio
+          ? { idEmpresaDestino: Number(destinoIngresoId), observacion: ingresoObs.trim() || undefined }
+          : undefined,
+      );
+      if (res.pendiente_recepcion) {
+        const nombre = res.transferencia?.nombre_empresa_destino || destino?.nombre || "la sucursal destino";
+        const faltantes = (res.codigos_sin_producto_en_destino ?? []).join(", ");
+        toast.success(
+          `Envío #${res.transferencia?.id ?? ""} pendiente de recepción en ${nombre}. Esta sucursal no se queda con esa mercadería.`,
+        );
+        if (faltantes) {
+          toast.error(`En destino hay que crear estos productos antes de recibir: ${faltantes}`);
+        }
+      } else {
+        toast.success(`Ingreso registrado: ${res.total} artículo(s).`);
+      }
       setModalIngreso(false);
       setLineasIngreso([nuevaLineaIngreso()]);
       setIngresoObs("");
+      setDestinoIngresoId(DESTINO_ESTA_SUCURSAL);
       await cargar();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error en ingreso");
@@ -481,7 +505,12 @@ export function ModoEspecialView() {
             <Button
               variant="outline"
               className={BTN_STOCK_OUTLINE}
-              onClick={() => { setLineasIngreso([nuevaLineaIngreso()]); setModalIngreso(true); }}
+              onClick={() => {
+                setLineasIngreso([nuevaLineaIngreso()]);
+                setDestinoIngresoId(DESTINO_ESTA_SUCURSAL);
+                setIngresoObs("");
+                setModalIngreso(true);
+              }}
             >
               <ArrowDownToLine className="size-4" />
               Ingreso de stock
@@ -598,9 +627,30 @@ export function ModoEspecialView() {
             <DialogTitle>Ingreso masivo de stock</DialogTitle>
           </DialogHeader>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4 space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Cargá varios productos a la vez. El precio de venta se completa con el vigente y solo se guarda si lo cambiás. En cada fila podés editar el código principal y sumar alternativos: escribí o escaneá y presioná Enter.
-            </p>
+            <div className="grid gap-2 sm:grid-cols-[16rem_1fr] sm:items-start">
+              <div className="space-y-1">
+                <label className="text-sm font-medium" htmlFor="destino-ingreso">Destino</label>
+                <Select value={destinoIngresoId} onValueChange={setDestinoIngresoId}>
+                  <SelectTrigger id="destino-ingreso" aria-label="Destino del ingreso">
+                    <SelectValue placeholder="Esta sucursal" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[200]">
+                    <SelectItem value={DESTINO_ESTA_SUCURSAL}>Esta sucursal</SelectItem>
+                    {empresasTransferencia.map((empresa) => (
+                      <SelectItem key={empresa.id} value={String(empresa.id)}>{empresa.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-sm text-muted-foreground sm:pt-6" data-testid="instructivo-destino">
+                {textoDestinoIngreso(
+                  esDestinoLocal(destinoIngresoId)
+                    ? null
+                    : empresasTransferencia.find((empresa) => String(empresa.id) === destinoIngresoId)?.nombre ?? "otra sucursal",
+                )}{" "}
+                El precio de venta se completa con el vigente y solo se guarda si lo cambiás. En cada fila podés editar el código principal y sumar alternativos: escribí o escaneá y presioná Enter.
+              </p>
+            </div>
             <div className="rounded-md border overflow-visible">
               <Table>
                 <TableHeader>
@@ -726,7 +776,9 @@ export function ModoEspecialView() {
           </div>
           <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
             <Button variant="ghost" onClick={() => setModalIngreso(false)}>Cancelar</Button>
-            <Button onClick={registrarIngreso} disabled={guardando}>Registrar ingreso</Button>
+            <Button onClick={registrarIngreso} disabled={guardando}>
+              {esDestinoLocal(destinoIngresoId) ? "Registrar ingreso" : "Enviar a sucursal"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

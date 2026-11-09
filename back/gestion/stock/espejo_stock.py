@@ -30,6 +30,20 @@ def empresas_en_mismo_espejo(id_a: int, id_b: int) -> bool:
     return False
 
 
+def ids_destino_visibles(id_origen: int, ids_grupo) -> list[int]:
+    """Sucursales a las que se puede enviar. Omite la propia y los pares de espejo."""
+    origen = int(id_origen)
+    vistos: list[int] = []
+    for raw in ids_grupo or []:
+        destino = int(raw)
+        if destino == origen or destino in vistos:
+            continue
+        if empresas_en_mismo_espejo(origen, destino):
+            continue
+        vistos.append(destino)
+    return vistos
+
+
 def espejar_stock_articulo(db: Session, articulo: Articulo) -> int:
     """Copia stock_actual del artículo a los peers del grupo por codigo_interno.
 

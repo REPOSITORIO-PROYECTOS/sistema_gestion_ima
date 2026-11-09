@@ -1,9 +1,13 @@
+import { readFileSync } from "fs";
+import { join } from "path";
 import {
   agregarAlternativo,
   barrasCambiaron,
   precioVentaParaEnviar,
   precioVentaVisible,
   textoStock,
+  esDestinoLocal,
+  textoDestinoIngreso,
   unirCodigos,
 } from "./ingreso-linea";
 
@@ -51,5 +55,29 @@ describe("ingreso masivo", () => {
       "7790001000011",
       "7790001000099",
     ]);
+  });
+
+  it("destino propio es el ingreso local", () => {
+    expect(esDestinoLocal("")).toBe(true);
+    expect(esDestinoLocal("local")).toBe(true);
+    expect(esDestinoLocal("2")).toBe(false);
+  });
+
+  it("explica que el envío queda pendiente de recepción", () => {
+    expect(textoDestinoIngreso(null)).toMatch(/Esta sucursal/);
+    expect(textoDestinoIngreso("Sucursal Norte")).toMatch(/pendiente de recepción/);
+    expect(textoDestinoIngreso("Sucursal Norte")).toMatch(/Sucursal Norte/);
+  });
+
+  it("el registro del ingreso no toca ventas_pendientes ni limpia la empresa offline", () => {
+    const src = readFileSync(join(__dirname, "ModoEspecialView.tsx"), "utf8");
+    const inicio = src.indexOf("const registrarIngreso");
+    const fin = src.indexOf("const abrirTransferencia");
+    const funcion = src.slice(inicio, fin);
+    expect(inicio).toBeGreaterThan(-1);
+    expect(funcion).toContain("ingresarStockModoEspecial");
+    expect(funcion).not.toContain("ventas_pendientes");
+    expect(funcion).not.toContain("clearOfflineEmpresa");
+    expect(src).not.toContain("clearOfflineEmpresa");
   });
 });
