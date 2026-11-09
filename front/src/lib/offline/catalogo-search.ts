@@ -58,8 +58,12 @@ export async function buscarPorCodigoLocal(
   const codigoNormalizado = codigo.trim();
   if (!codigoNormalizado) return null;
 
-  const row = await offlineDb.codigos_barras.get(codigoNormalizado);
-  if (!row || row.id_empresa !== idEmpresa) return null;
+  const coincidencias = await offlineDb.codigos_barras
+    .where("codigo")
+    .equals(codigoNormalizado)
+    .toArray();
+  const row = coincidencias.find((item) => item.id_empresa === idEmpresa);
+  if (!row) return null;
 
   const [articulo, pendientesPorArticulo] = await Promise.all([
     offlineDb.articulos.get(row.id_articulo),

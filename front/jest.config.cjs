@@ -1,5 +1,6 @@
 module.exports = {
   testEnvironment: "jsdom",
+  setupFiles: ["fake-indexeddb/auto"],
   setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
   transform: {
     "^.+\\.(ts|tsx)$": ["babel-jest", { configFile: "./babel.jest.cjs" }],

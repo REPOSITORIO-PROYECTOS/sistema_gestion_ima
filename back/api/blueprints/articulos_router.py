@@ -17,11 +17,13 @@ from back.schemas.articulo_schemas import (
     ArticuloCreate, 
     ArticuloUpdate, 
     ArticuloResponse, # Lo mantenemos si alguna parte antigua aún lo usa
-    ArticuloReadConCodigos, 
+    ArticuloReadConCodigos,
+    ArticuloCodigoRead,
     CodigoBarrasCreate
 )
 from back.schemas.articulo_schemas import ArticuloRead
 from back.schemas.caja_schemas import RespuestaGenerica
+from back.utils.articulo_helpers import listar_codigos_ordenados
 
 router = APIRouter(
     prefix="/articulos", 
@@ -32,7 +34,7 @@ router = APIRouter(
 # === ENDPOINTS DE LECTURA (GET) - Rutas mantenidas
 # ===================================================================
 
-@router.get("/buscar", response_model=List[ArticuloRead], summary="Buscar artículos por término aproximado")
+@router.get("/buscar", response_model=List[ArticuloReadConCodigos], summary="Buscar artículos por término aproximado")
 def api_buscar_articulos(
     termino: str = Query(default=""),
     skip: int = Query(default=0, ge=0),
@@ -68,8 +70,9 @@ def api_buscar_articulos(
                 'costo_ultimo': getattr(articulo, 'costo_ultimo', 0.0),
                 'categoria': getattr(articulo, 'categoria', None),
                 'precio_manual': getattr(articulo, 'precio_manual', False),
+                'codigos': [{'codigo': c.codigo} for c in listar_codigos_ordenados(getattr(articulo, 'codigos', None))],
             }
-            articuloread_list.append(ArticuloRead.model_validate(articulo_dict))
+            articuloread_list.append(ArticuloReadConCodigos.model_validate(articulo_dict))
         except Exception as e:
             print(f"Error procesando artículo {articulo.id}: {e}")
             continue
@@ -81,16 +84,21 @@ def api_get_all_articulos(
     current_user: Usuario = Depends(obtener_usuario_actual),
     db: Session = Depends(get_db),
     pagina: int = Query(1, ge=1), 
-    limite: int = Query(100, ge=1, le=200)
+    limite: int = Query(100, ge=1, le=200),
+    orden: str = Query("descripcion"),
 ):
     """Obtiene una lista paginada de todos los artículos de la empresa del usuario."""
     skip = (pagina - 1) * limite
-    lista_articulos = articulos_manager.obtener_todos_los_articulos(
-        db=db, 
-        id_empresa_actual=current_user.id_empresa, 
-        skip=skip, 
-        limit=limite
-    )
+    try:
+        lista_articulos = articulos_manager.obtener_todos_los_articulos(
+            db=db,
+            id_empresa_actual=current_user.id_empresa,
+            skip=skip,
+            limit=limite,
+            orden=orden,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     # Convertir manualmente cada artículo al schema de respuesta
     # para evitar problemas de relaciones no cargadas
@@ -111,7 +119,7 @@ def api_get_all_articulos(
                 'activo': articulo.activo,
                 'unidad_venta': articulo.unidad_venta,
                 'precio_manual': getattr(articulo, 'precio_manual', False),
-                'codigos': [{'codigo': c.codigo} for c in (articulo.codigos or [])]
+                'codigos': [{'codigo': c.codigo} for c in listar_codigos_ordenados(articulo.codigos)]
             }
             resultado.append(ArticuloReadConCodigos.model_validate(articulo_dict))
         except Exception as e:
@@ -260,7 +268,12 @@ def api_buscar_articulo_por_codigo(
     articulo = articulos_manager.buscar_articulo_por_codigo(db,id_empresa, codigo)
     if not articulo:
         raise HTTPException(status_code=404, detail=f"Artículo con código '{codigo}' no encontrado.")
-    return articulo
+    respuesta = ArticuloReadConCodigos.model_validate(articulo, from_attributes=True)
+    respuesta.codigos = [
+        ArticuloCodigoRead(codigo=codigo_obj.codigo)
+        for codigo_obj in listar_codigos_ordenados(articulo.codigos)
+    ]
+    return respuesta
 
 @router.get("/version")
 def api_catalogo_version(
@@ -268,4 +281,8 @@ def api_catalogo_version(
     db: Session = Depends(get_db)
 ):
     cfg = db.get(ConfiguracionEmpresa, current_user.id_empresa)
-    return {"version": (cfg.catalogo_version if cfg and hasattr(cfg, "catalogo_version") else 0)}
+    total = articulos_manager.contar_articulos_activos(db, current_user.id_empresa)
+    return {
+        "version": (cfg.catalogo_version if cfg and hasattr(cfg, "catalogo_version") else 0),
+        "total": total,
+    }

@@ -6,23 +6,22 @@ import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api-client";
 import { API_CONFIG } from "@/lib/api-config";
 import { useAuthStore } from "@/lib/authStore";
+import { textoStock, type ArticuloIngreso } from "./ingreso-linea";
 
 const LIMITE_BUSQUEDA = 40;
 const DROPDOWN_GAP = 4;
 const DROPDOWN_MAX_HEIGHT_PX = 384;
 
-type ProductoMatch = {
-  id: number;
-  codigo_interno: string;
-  descripcion: string;
-  stock_actual: number;
-};
+type ProductoMatch = ArticuloIngreso;
 
 type ArticuloBusqueda = {
   id: number;
   codigo_interno?: string;
   descripcion: string;
   stock_actual?: number;
+  precio_venta?: number;
+  venta_negocio?: number | null;
+  codigos?: { codigo: string }[];
 };
 
 type DropdownPosition = {
@@ -37,6 +36,8 @@ interface BusquedaProductoInputProps {
   codigoInterno: string;
   descripcion: string;
   onChange: (codigoInterno: string, descripcion: string) => void;
+  onSeleccionar?: (producto: ArticuloIngreso | null) => void;
+  onCrearProducto?: (textoBuscado: string) => void;
   placeholder?: string;
 }
 
@@ -49,6 +50,8 @@ export function BusquedaProductoInput({
   codigoInterno,
   descripcion,
   onChange,
+  onSeleccionar,
+  onCrearProducto,
   placeholder = "Nombre o código de barras",
 }: BusquedaProductoInputProps) {
   const token = useAuthStore((s) => s.token);
@@ -71,7 +74,10 @@ export function BusquedaProductoInput({
         id: a.id,
         codigo_interno: a.codigo_interno as string,
         descripcion: a.descripcion,
-        stock_actual: a.stock_actual ?? 0,
+        stock_actual: Number(a.stock_actual ?? 0),
+        precio_venta: Number(a.precio_venta ?? 0),
+        venta_negocio: a.venta_negocio,
+        barcodes: (a.codigos ?? []).map((codigo) => codigo.codigo).filter(Boolean),
       }));
 
   const updateDropdownPosition = useCallback(() => {
@@ -158,12 +164,13 @@ export function BusquedaProductoInput({
   const seleccionar = useCallback(
     (prod: ProductoMatch) => {
       onChange(prod.codigo_interno, prod.descripcion);
+      onSeleccionar?.(prod);
       setTexto(prod.descripcion);
       setJustSelected(true);
       setOpen(false);
       setHighlightIndex(-1);
     },
-    [onChange],
+    [onChange, onSeleccionar],
   );
 
   const buscarPorCodigoBarras = useCallback(
@@ -180,7 +187,10 @@ export function BusquedaProductoInput({
         id: data.id,
         codigo_interno: data.codigo_interno,
         descripcion: data.descripcion,
-        stock_actual: data.stock_actual ?? 0,
+        stock_actual: Number(data.stock_actual ?? 0),
+        precio_venta: Number(data.precio_venta ?? 0),
+        venta_negocio: data.venta_negocio,
+        barcodes: (data.codigos ?? []).map((codigo) => codigo.codigo).filter(Boolean),
       });
       return true;
     },
@@ -211,10 +221,8 @@ export function BusquedaProductoInput({
         const mapped = mapResultados(data);
         setMatches(mapped);
         setHighlightIndex(mapped.length > 0 ? 0 : -1);
-        if (mapped.length > 0) {
-          setOpen(true);
-          setJustSelected(false);
-        }
+        setOpen(true);
+        setJustSelected(false);
       } finally {
         setLoading(false);
       }
@@ -243,7 +251,7 @@ export function BusquedaProductoInput({
           const mapped = mapResultados(data);
           setMatches(mapped);
           setHighlightIndex(mapped.length > 0 ? 0 : -1);
-          if (mapped.length > 0) setOpen(true);
+          setOpen(true);
         } finally {
           setLoading(false);
         }
@@ -303,10 +311,25 @@ export function BusquedaProductoInput({
             </div>
             <ul ref={listRef} className="overflow-y-auto flex-1 py-1 overscroll-contain" role="listbox">
               {!loading && matches.length === 0 && (
-                <li className="py-3 text-center text-xs text-muted-foreground px-2">
-                  {texto.trim()
-                    ? `No se encontró "${texto}". Probá con el código de barras.`
-                    : "Escribí nombre o escaneá código."}
+                <li className="py-3 text-center text-xs text-muted-foreground px-2 space-y-2">
+                  <p>
+                    {texto.trim()
+                      ? `No se encontró "${texto}".`
+                      : "Escribí nombre o escaneá código."}
+                  </p>
+                  {texto.trim() && onCrearProducto && (
+                    <button
+                      type="button"
+                      className="rounded-md bg-amber-600 px-2 py-1 text-xs font-semibold text-white"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setOpen(false);
+                        onCrearProducto(texto.trim());
+                      }}
+                    >
+                      Crear producto
+                    </button>
+                  )}
                 </li>
               )}
               {matches.map((prod, index) => {
@@ -326,7 +349,8 @@ export function BusquedaProductoInput({
                       <span className="font-medium truncate flex-1">{prod.descripcion}</span>
                       <span className="text-xs text-muted-foreground shrink-0">
                         {prod.codigo_interno}
-                        {prod.stock_actual > 0 && ` · stk ${prod.stock_actual}`}
+                        {` · ${textoStock(prod.stock_actual)}`}
+                        {` · $${Number(prod.precio_venta).toLocaleString("es-AR")}`}
                       </span>
                     </button>
                   </li>
@@ -350,6 +374,7 @@ export function BusquedaProductoInput({
           if (codigoInterno && newValue !== descripcion) {
             setJustSelected(false);
             onChange("", "");
+            onSeleccionar?.(null);
           }
         }}
         onKeyDown={onKeyDown}
