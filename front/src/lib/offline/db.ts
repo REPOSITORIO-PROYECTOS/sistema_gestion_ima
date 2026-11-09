@@ -7,7 +7,11 @@ export type OfflineMeta = {
   catalogo_synced_at: string | null;
   stock_snapshot_at: string | null;
   id_sesion_caja: number | null;
+  codigos_schema?: number;
 };
+
+/** Sube cuando cambia la clave de codigos_barras. No afecta ventas_pendientes. */
+export const ESQUEMA_CODIGOS_BARRAS = 3;
 
 export type OfflineArticulo = {
   id: string;
@@ -64,7 +68,7 @@ const META_KEYS = {
 class OfflineDatabase extends Dexie {
   meta!: Table<OfflineMeta, string>;
   articulos!: Table<OfflineArticulo, string>;
-  codigos_barras!: Table<OfflineCodigoBarras, string>;
+  codigos_barras!: Table<OfflineCodigoBarras, [string, number]>;
   ventas_pendientes!: Table<VentaPendiente, string>;
   cierres_pendientes!: Table<CierrePendiente, string>;
 
@@ -77,6 +81,20 @@ class OfflineDatabase extends Dexie {
       ventas_pendientes: "id_local, id_empresa, estado, created_at",
       cierres_pendientes: "id_local, id_empresa, created_at",
     });
+    // La clave deja de ser solo el código: el mismo texto puede existir en otra
+    // sucursal del navegador. No se tocan ventas_pendientes ni cierres.
+    this.version(2).stores({
+      codigos_barras: null,
+    });
+    this.version(3)
+      .stores({
+        codigos_barras: "[codigo+id_empresa], codigo, id_articulo, id_empresa",
+      })
+      .upgrade(async (tx) => {
+        await tx.table("meta").toCollection().modify((row: OfflineMeta) => {
+          row.codigos_schema = 0;
+        });
+      });
   }
 }
 
@@ -109,6 +127,9 @@ export async function upsertOfflineMeta(
     id_sesion_caja: hasPatchValue("id_sesion_caja")
       ? patch.id_sesion_caja ?? null
       : existing?.id_sesion_caja ?? null,
+    codigos_schema: hasPatchValue("codigos_schema")
+      ? patch.codigos_schema ?? ESQUEMA_CODIGOS_BARRAS
+      : existing?.codigos_schema ?? 1,
   };
   await offlineDb.meta.put(next);
   return next;

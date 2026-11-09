@@ -12,7 +12,7 @@ jest.mock("@/lib/offline/db", () => ({
       get: jest.fn(),
     },
     codigos_barras: {
-      get: jest.fn(),
+      where: jest.fn(),
     },
   },
 }));
@@ -79,17 +79,38 @@ describe("catalogo-search", () => {
     expect(resultados[0]?.stock_actual).toBe(18);
   });
 
+  function mockCodigos(filas: Array<{ codigo: string; id_articulo: string; id_empresa: number }>) {
+    jest.mocked(offlineDb.codigos_barras.where).mockReturnValue({
+      equals: jest.fn().mockReturnValue({
+        toArray: jest.fn().mockResolvedValue(filas),
+      }),
+    } as never);
+  }
+
   it("busca artículos locales por código de barras", async () => {
-    jest.mocked(offlineDb.codigos_barras.get).mockResolvedValue({
+    mockCodigos([{
       codigo: "7790001000011",
       id_articulo: "1",
       id_empresa: 37,
-    });
+    }]);
     jest.mocked(offlineDb.articulos.get).mockResolvedValue(articuloYerba);
 
     const resultado = await buscarPorCodigoLocal(37, "7790001000011");
 
     expect(resultado?.id).toBe("1");
     expect(resultado?.nombre).toBe("Yerba mate 500g");
+  });
+
+  it("encuentra el producto por un código alternativo de la misma empresa", async () => {
+    mockCodigos([
+      { codigo: "7790001000099", id_articulo: "1", id_empresa: 99 },
+      { codigo: "7790001000099", id_articulo: "1", id_empresa: 37 },
+    ]);
+    jest.mocked(offlineDb.articulos.get).mockResolvedValue(articuloYerba);
+
+    const resultado = await buscarPorCodigoLocal(37, "7790001000099");
+
+    expect(resultado?.id).toBe("1");
+    expect(offlineDb.articulos.get).toHaveBeenCalledWith("1");
   });
 });

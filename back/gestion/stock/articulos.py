@@ -277,7 +277,9 @@ def anadir_codigo_a_articulo(db: Session, articulo_id: int, nuevo_codigo: str) -
     if obtener_codigo_barras_articulo(db, nuevo_codigo, articulo_id):
         raise ValueError(f"El código '{nuevo_codigo}' ya está asignado a este artículo.")
 
-    nuevo_codigo_obj = ArticuloCodigo(codigo=nuevo_codigo, id_articulo=articulo_id)
+    siguientes = list(articulo.codigos or [])
+    orden = max((int(getattr(codigo, "orden", 0) or 0) for codigo in siguientes), default=-1) + 1
+    nuevo_codigo_obj = ArticuloCodigo(codigo=nuevo_codigo, id_articulo=articulo_id, orden=orden)
     db.add(nuevo_codigo_obj)
     db.flush()
     db.refresh(articulo)

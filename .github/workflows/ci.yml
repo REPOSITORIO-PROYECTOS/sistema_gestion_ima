@@ -73,4 +73,4 @@ jobs:
           NEXT_PUBLIC_API_URL: https://sistema-ima.sistemataup.online
 
       - name: Unit tests
-        run: npm test -- --ci --testPathIgnorePatterns=login.test.tsx
+        run: npm test -- --ci
