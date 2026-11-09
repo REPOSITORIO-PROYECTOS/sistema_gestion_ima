@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import FormVentas from "./FormVentas";
+import { acumularEnResumen } from "./acumular-resumen";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuthStore } from "@/lib/authStore";
 import {
@@ -246,7 +247,7 @@ function DashboardVenta() {
       porcentajeDescuento: number;
       descuentoNominal: number;
     }
-  ) => { setProductos((prev) => [...prev, producto]); }, []);
+  ) => { setProductos((prev) => acumularEnResumen(prev, producto)); }, []);
 
   const handleUpdateProductDiscount = useCallback((index: number, type: 'porcentaje' | 'nominal', value: number) => {
     setProductos(prev => {
