@@ -63,6 +63,14 @@ def conflicto_barcode_en_empresa(
     return articulo_con_barcode_en_empresa(db, codigo, id_articulo, id_empresa) is not None
 
 
+def listar_codigos_ordenados(codigos) -> list:
+    """Principal primero (orden 0) y después los alternativos."""
+    return sorted(
+        list(codigos or []),
+        key=lambda codigo: (int(getattr(codigo, "orden", 0) or 0), getattr(codigo, "codigo", "") or ""),
+    )
+
+
 def mensaje_barcode_duplicado(codigo: str, otro: Articulo) -> str:
     ref = otro.codigo_interno or str(otro.id)
     nombre = (otro.descripcion or "").strip()

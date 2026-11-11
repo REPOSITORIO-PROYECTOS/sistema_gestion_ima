@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import FormVentas from "./FormVentas";
+import { acumularEnResumen } from "./acumular-resumen";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuthStore } from "@/lib/authStore";
 import {
@@ -26,20 +27,17 @@ import { usePerfilEmpresa } from "@/hooks/usePerfilEmpresa";
 import { useOfflineMeta } from "@/hooks/useOfflineMeta";
 import { useOfflineStatus } from "@/hooks/useOfflineStatus";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
+import { useCatalogoAutoRefresh } from "@/hooks/useCatalogoAutoRefresh";
 import { isCacheDegradadoActivo } from "@/lib/offline/gate";
 import { mensajeSnapshotDesactualizado } from "@/lib/offline/offline-meta-format";
-import {
-  fetchAllArticulos,
-  fetchArticuloPorId,
-  mapArticulosToStore,
-} from "@/lib/articulos-api";
-import { offlineDb } from "@/lib/offline/db";
+import { mapArticulosToStore } from "@/lib/articulos-api";
 import { isBrowserOnline } from "@/lib/offline/connectivity";
-import { refreshCatalogoCache } from "@/lib/offline/catalogo-cache";
 import {
-  actualizarTodasLasLineas,
-  type ArticuloPrecio,
-} from "@/lib/actualizar-precios-caja";
+  ejecutarActualizacionPrecios,
+  mensajeToastActualizacion,
+} from "@/lib/offline/actualizar-precios-flujo";
+import { actualizarTodasLasLineas } from "@/lib/actualizar-precios-caja";
+import type { ArticuloCatalogoAPI } from "@/lib/articulos-api";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
@@ -83,6 +81,44 @@ function DashboardVenta() {
     enabled: offlineHabilitado,
     token,
     idEmpresa,
+  });
+  const productosRef = useRef(productos);
+  const tipoClienteRef = useRef(tipoClienteId);
+  productosRef.current = productos;
+  tipoClienteRef.current = tipoClienteId;
+
+  const aplicarCatalogoEnPantalla = useCallback((articulos: ArticuloCatalogoAPI[]) => {
+    const precios = new Map(
+      articulos.map((articulo) => [
+        String(articulo.id),
+        {
+          precio_venta: articulo.precio_venta,
+          venta_negocio: articulo.venta_negocio,
+          precio_manual: articulo.precio_manual ?? false,
+        },
+      ]),
+    );
+    const aplicado = actualizarTodasLasLineas(
+      productosRef.current,
+      precios,
+      tipoClienteRef.current,
+    );
+    setProductos(aplicado.lineas);
+    setCatalogoResetTick((tick) => tick + 1);
+    if (aplicado.actualizadas > 0) {
+      toast.success(
+        aplicado.actualizadas === 1
+          ? "El catálogo se actualizó: 1 precio del resumen cambió."
+          : `El catálogo se actualizó: ${aplicado.actualizadas} precios del resumen cambiaron.`,
+      );
+    }
+  }, []);
+
+  useCatalogoAutoRefresh({
+    enabled: Boolean(offlineHabilitado && cajaAbierta && token && idEmpresa),
+    token,
+    idEmpresa,
+    onCatalogo: aplicarCatalogoEnPantalla,
   });
   const mensajeSnapshot = mensajeSnapshotDesactualizado(offlineMeta?.stock_snapshot_at);
   const operandoSinServidor =
@@ -246,7 +282,7 @@ function DashboardVenta() {
       porcentajeDescuento: number;
       descuentoNominal: number;
     }
-  ) => { setProductos((prev) => [...prev, producto]); }, []);
+  ) => { setProductos((prev) => acumularEnResumen(prev, producto)); }, []);
 
   const handleUpdateProductDiscount = useCallback((index: number, type: 'porcentaje' | 'nominal', value: number) => {
     setProductos(prev => {
@@ -303,137 +339,45 @@ function DashboardVenta() {
     setTipoClienteId(id);
   }, []);
 
-  const leerPrecioArticulo = useCallback(async (id: string): Promise<ArticuloPrecio | null> => {
-    if (token && isBrowserOnline()) {
-      const data = await Promise.race([
-        fetchArticuloPorId(token, id),
-        new Promise<null>((resolve) => {
-          window.setTimeout(() => resolve(null), 8000);
-        }),
-      ]);
-      if (data) {
-        return {
-          precio_venta: data.precio_venta,
-          venta_negocio: data.venta_negocio,
-          precio_manual: data.precio_manual ?? false,
-        };
-      }
-    }
-
-    if (!offlineHabilitado || !idEmpresa) return null;
-    const local = await offlineDb.articulos.get(id);
-    if (!local || local.id_empresa !== idEmpresa) return null;
-    return {
-      precio_venta: local.precio_venta,
-      venta_negocio: local.venta_negocio,
-      precio_manual: local.precio_manual,
-    };
-  }, [idEmpresa, offlineHabilitado, token]);
-
   const actualizarPreciosCaja = useCallback(async () => {
     if (actualizandoPrecios) return;
     if (!token) {
       toast.error("No hay sesión. Volvé a ingresar.");
       return;
     }
+    if (!idEmpresa) {
+      toast.error("No se encontró la empresa.");
+      return;
+    }
 
     setActualizandoPrecios(true);
     try {
-      const precios = new Map<string, ArticuloPrecio>();
-      let catalogoCount = 0;
-
-      if (isBrowserOnline()) {
-        const articulos = await fetchAllArticulos(token);
-        catalogoCount = articulos.length;
-        const adaptados = mapArticulosToStore(articulos);
-        upsertProductos(adaptados);
-        for (const art of articulos) {
-          precios.set(String(art.id), {
-            precio_venta: art.precio_venta,
-            venta_negocio: art.venta_negocio,
-            precio_manual: art.precio_manual ?? false,
-          });
-        }
-        if (idEmpresa) {
-          await refreshCatalogoCache(token, idEmpresa, { force: true }).catch(() => null);
-        }
-      } else if (offlineHabilitado && idEmpresa) {
-        const locales = await offlineDb.articulos.where("id_empresa").equals(idEmpresa).toArray();
-        catalogoCount = locales.length;
-        upsertProductos(
-          locales.map((art) => ({
-            id: art.id,
-            nombre: art.descripcion,
-            precio_venta: art.precio_venta,
-            venta_negocio: art.venta_negocio,
-            stock_actual: art.stock_actual,
-            unidad_venta: art.unidad_venta,
-            precio_manual: art.precio_manual,
-          })),
-        );
-        for (const art of locales) {
-          precios.set(art.id, {
-            precio_venta: art.precio_venta,
-            venta_negocio: art.venta_negocio,
-            precio_manual: art.precio_manual,
-          });
-        }
-      } else {
-        toast.error("Sin conexión no puedo forzar todos los precios.");
+      const resultado = await ejecutarActualizacionPrecios({
+        token,
+        idEmpresa,
+        hayConexion: () => isBrowserOnline(),
+        lineas: productos,
+        tipoClienteId,
+      });
+      const aviso = mensajeToastActualizacion(resultado);
+      if (!resultado.ok || aviso.tipo !== "success") {
+        toast.error(aviso.texto);
         return;
       }
 
+      const idsResumen = new Set(
+        productos.map((linea) => linea.id).filter((id): id is string => Boolean(id)),
+      );
+      upsertProductos(
+        mapArticulosToStore(resultado.articulos).filter((articulo) => idsResumen.has(articulo.id)),
+      );
+      setProductos(resultado.lineas);
       setCatalogoResetTick((tick) => tick + 1);
-
-      let lineasActualizadas = 0;
-      if (productos.length > 0) {
-        // Completar precios faltantes del resumen por si no vinieron en el catálogo paginado.
-        const idsResumen = [
-          ...new Set(productos.map((linea) => linea.id).filter((id): id is string => Boolean(id))),
-        ];
-        await Promise.all(idsResumen.map(async (id) => {
-          if (precios.has(id)) return;
-          const articulo = await leerPrecioArticulo(id);
-          if (articulo) precios.set(id, articulo);
-        }));
-
-        const { lineas, actualizadas } = actualizarTodasLasLineas(
-          productos,
-          precios,
-          tipoClienteId,
-        );
-        lineasActualizadas = actualizadas;
-        setProductos(lineas);
-      }
-
-      if (catalogoCount === 0) {
-        toast.error("No pude leer el catálogo. Probá de nuevo con conexión.");
-      } else if (lineasActualizadas > 0) {
-        toast.success(
-          `Forcé ${catalogoCount} precios del catálogo y actualicé ${lineasActualizadas} del resumen.`,
-        );
-      } else if (productos.length > 0) {
-        toast.success(
-          `Forcé ${catalogoCount} precios del catálogo. El resumen ya estaba al día.`,
-        );
-      } else {
-        toast.success(`Forcé ${catalogoCount} precios del catálogo para la caja.`);
-      }
-    } catch {
-      toast.error("No pude actualizar los precios de la caja.");
+      toast.success(aviso.texto);
     } finally {
       setActualizandoPrecios(false);
     }
-  }, [
-    actualizandoPrecios,
-    idEmpresa,
-    leerPrecioArticulo,
-    offlineHabilitado,
-    productos,
-    tipoClienteId,
-    token,
-    upsertProductos,
-  ]);
+  }, [actualizandoPrecios, idEmpresa, productos, tipoClienteId, token, upsertProductos]);
 
   const limpiarResumen = useCallback(() => {
     setProductos([]);
@@ -557,7 +501,7 @@ function DashboardVenta() {
             {actualizandoPrecios && (
               <div className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-amber-50 border-b border-amber-200 text-amber-900 text-sm font-semibold">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Forzando todos los precios del catálogo…
+                Actualizando precios del catálogo…
               </div>
             )}
 
