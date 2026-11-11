@@ -21,11 +21,16 @@ from back.modelos import (
     TransferenciaStock,
     TransferenciaStockDetalle,
 )
-from back.utils.articulo_helpers import articulo_con_barcode_en_empresa, mensaje_barcode_duplicado
+from back.utils.articulo_helpers import (
+    articulo_con_barcode_en_empresa,
+    listar_codigos_ordenados,
+    mensaje_barcode_duplicado,
+)
 from back.schemas.modo_especial_schemas import (
     BulkProductosRequest,
     CrearTransferenciaStockRequest,
     ImportExportResumen,
+    IngresoStockItem,
     IngresoStockRequest,
     ProductoModoEspecialCreate,
     ProductoModoEspecialUpdate,
@@ -185,6 +190,14 @@ def _asignar_categorias_articulo(
         _obtener_o_crear_categoria(db, id_empresa, nombre)
 
 
+def precio_distinto(actual: Optional[float], nuevo: float) -> bool:
+    """True si el precio nuevo cambia el vigente. Igualdad no es un cambio."""
+    try:
+        return abs(float(actual or 0) - float(nuevo)) >= 0.001
+    except (TypeError, ValueError):
+        return True
+
+
 def _incrementar_catalogo_version(db: Session, id_empresa: int) -> None:
     config = db.get(ConfiguracionEmpresa, id_empresa)
     if config:
@@ -208,21 +221,30 @@ def _asignar_barcodes(
 ) -> None:
     if barcodes is None:
         return
-    _validar_barcodes_lista(barcodes)
-    codigos_actuales = {c.codigo for c in (articulo.codigos or [])}
-    deseados = set(barcodes)
+    if articulo.codigos is None:
+        articulo.codigos = []
+    limpios = [codigo.strip() for codigo in barcodes if codigo and codigo.strip()]
+    _validar_barcodes_lista(limpios)
+    actuales = {codigo_obj.codigo: codigo_obj for codigo_obj in list(articulo.codigos or [])}
+    deseados = set(limpios)
     # Eliminar vía la relación para no dejar instancias borradas en articulo.codigos
     # (db.delete + db.add(articulo) provoca InvalidRequestError en SQLAlchemy).
     for codigo_obj in list(articulo.codigos or []):
         if codigo_obj.codigo not in deseados:
             articulo.codigos.remove(codigo_obj)
-    for codigo in deseados - codigos_actuales:
+    for indice, codigo in enumerate(limpios):
+        existente = actuales.get(codigo)
+        if existente is not None and codigo in deseados:
+            existente.orden = indice
+            continue
         otro = articulo_con_barcode_en_empresa(db, codigo, articulo.id, articulo.id_empresa)
         if otro:
             if omitir_conflictos:
                 continue
             raise ValueError(mensaje_barcode_duplicado(codigo, otro))
-        articulo.codigos.append(ArticuloCodigo(codigo=codigo, id_articulo=articulo.id))
+        articulo.codigos.append(
+            ArticuloCodigo(codigo=codigo, id_articulo=articulo.id, orden=indice)
+        )
 
 
 def _articulo_a_response(articulo: Articulo) -> Dict[str, Any]:
@@ -240,7 +262,7 @@ def _articulo_a_response(articulo: Articulo) -> Dict[str, Any]:
         "categorias": categorias,
         "stock_actual": articulo.stock_actual,
         "stock_minimo": articulo.stock_minimo,
-        "barcodes": [c.codigo for c in (articulo.codigos or [])],
+        "barcodes": [c.codigo for c in listar_codigos_ordenados(articulo.codigos)],
         "unidad": (articulo.unidad_venta or "Unidad").lower(),
         "cantidad_envase": _parse_cantidad_envase(articulo.ubicacion),
         "ubicacion": articulo.ubicacion,
@@ -423,7 +445,14 @@ def bulk_upsert(
     return resumen
 
 
-def ingresar_stock(db: Session, id_empresa: int, id_usuario: int, req: IngresoStockRequest) -> Dict[str, Any]:
+def ingresar_stock(
+    db: Session,
+    id_empresa: int,
+    id_usuario: int,
+    req: IngresoStockRequest,
+    *,
+    commit: bool = True,
+) -> Dict[str, Any]:
     procesados = []
     for item in req.items:
         if not item.codigo_interno and not item.id_articulo:
@@ -443,11 +472,19 @@ def ingresar_stock(db: Session, id_empresa: int, id_usuario: int, req: IngresoSt
         stock_anterior = articulo.stock_actual or 0.0
         stock_nuevo = stock_anterior + item.cantidad
         articulo.stock_actual = stock_nuevo
-        if item.precio_venta is not None:
+        cambio_catalogo = False
+        if item.precio_venta is not None and precio_distinto(articulo.precio_venta, item.precio_venta):
             articulo.precio_venta = item.precio_venta
             articulo.venta_negocio = item.precio_venta
-        if item.precio_costo is not None:
+            cambio_catalogo = True
+        if item.precio_costo is not None and precio_distinto(articulo.precio_costo, item.precio_costo):
             articulo.precio_costo = item.precio_costo
+            cambio_catalogo = True
+        if item.barcodes is not None:
+            if articulo.codigos is None:
+                articulo.codigos = []
+            _asignar_barcodes(db, articulo, item.barcodes)
+            cambio_catalogo = True
         movimiento = StockMovimiento(
             tipo="INGRESO",
             cantidad=item.cantidad,
@@ -462,7 +499,7 @@ def ingresar_stock(db: Session, id_empresa: int, id_usuario: int, req: IngresoSt
         from back.gestion.stock.espejo_stock import espejar_stock_articulo
 
         espejar_stock_articulo(db, articulo)
-        if item.precio_venta is not None or item.precio_costo is not None:
+        if cambio_catalogo:
             from back.gestion.espejo_catalogo import espejar_catalogo_articulo
 
             espejar_catalogo_articulo(db, articulo)
@@ -477,8 +514,102 @@ def ingresar_stock(db: Session, id_empresa: int, id_usuario: int, req: IngresoSt
         })
 
     _incrementar_catalogo_version(db, id_empresa)
-    db.commit()
+    if commit:
+        db.commit()
     return {"procesados": procesados, "total": len(procesados)}
+
+
+def neto_reparto(cantidad: float, cantidad_enviar: Optional[float]) -> tuple[float, float]:
+    """Devuelve (lo que queda en origen, lo que se envía). Rechaza enviar de más."""
+    enviar = float(cantidad_enviar or 0)
+    if enviar < -1e-9:
+        raise ValueError("La cantidad a enviar no puede ser negativa.")
+    if enviar - float(cantidad) > 1e-6:
+        raise ValueError(
+            f"No se puede enviar {enviar:g}: en la línea solo ingresan {cantidad:g}."
+        )
+    return float(cantidad) - enviar, enviar
+
+
+def _validar_destino_envio(db: Session, id_origen: int, id_destino: int) -> None:
+    from back.gestion.stock.espejo_stock import empresas_en_mismo_espejo
+
+    if id_destino == id_origen:
+        raise ValueError("El destino es esta sucursal. Usá el ingreso local.")
+    if empresas_en_mismo_espejo(id_origen, id_destino):
+        raise ValueError(
+            "Esas sucursales comparten el mismo stock espejado. "
+            "No se transfiere entre ellas: cargá en una y se replica en la otra."
+        )
+    _verificar_empresa_transferencia(db, id_origen)
+    _verificar_empresa_transferencia(db, id_destino)
+    if _grupo_transferencia(db, id_origen) != _grupo_transferencia(db, id_destino):
+        raise ValueError("No puede transferir stock entre empresas de distintos grupos.")
+
+
+def registrar_ingreso_masivo(
+    db: Session,
+    id_empresa: int,
+    id_usuario: int,
+    req: IngresoStockRequest,
+) -> Dict[str, Any]:
+    """Suma en origen todo lo ingresado y, si hay reparto, envía solo esa parte.
+
+    Un destino por compra. Cada línea dice cuánto se envía. El neto en origen
+    es lo que queda (ingresado menos enviado). Lo enviado queda pendiente de
+    recepción. Si ninguna línea envía, es un ingreso local aunque haya destino.
+    """
+    envios: List[tuple[IngresoStockItem, float]] = []
+    for item in req.items:
+        _queda, enviar = neto_reparto(item.cantidad, item.cantidad_enviar)
+        if enviar > 1e-9:
+            envios.append((item, enviar))
+    if not envios:
+        return ingresar_stock(db, id_empresa, id_usuario, req)
+
+    destino = req.id_empresa_destino
+    if destino is None:
+        raise ValueError("Elegí la sucursal a la que se envía el reparto.")
+    _validar_destino_envio(db, id_empresa, int(destino))
+    ingresar_stock(db, id_empresa, id_usuario, req, commit=False)
+
+    from back.schemas.modo_especial_schemas import (
+        CrearTransferenciaStockRequest,
+        TransferenciaStockItem,
+    )
+
+    items_envio = []
+    for item, enviar in envios:
+        codigo = (item.codigo_interno or "").strip()
+        if not codigo:
+            raise ValueError("Para enviar a otra sucursal cada ítem necesita codigo_interno.")
+        items_envio.append(TransferenciaStockItem(
+            codigo_interno=codigo,
+            cantidad=enviar,
+            precio_unitario=item.precio_costo,
+        ))
+    transferencia = crear_transferencia_stock(
+        db,
+        id_empresa,
+        id_usuario,
+        CrearTransferenciaStockRequest(
+            id_empresa_destino=int(destino),
+            observacion=(req.observacion or "").strip() or None,
+            items=items_envio,
+        ),
+    )
+    faltantes = [
+        item.codigo_interno.strip()
+        for item, _enviar in envios
+        if item.codigo_interno
+        and _obtener_articulo_por_codigo(db, int(destino), item.codigo_interno.strip()) is None
+    ]
+    return {
+        "pendiente_recepcion": True,
+        "transferencia": transferencia,
+        "codigos_sin_producto_en_destino": faltantes,
+        "total": len(items_envio),
+    }
 
 
 def subir_precios(db: Session, id_empresa: int, req: SubaPreciosRequest) -> Dict[str, Any]:
@@ -764,9 +895,9 @@ def listar_empresas_transferencia(db: Session, id_empresa: int) -> List[Dict[str
     from back.gestion import configuracion_manager
     grupo = _grupo_transferencia(db, id_empresa)
     resultado: List[Dict[str, Any]] = []
-    for id_dest in sorted(grupo):
-        if id_dest == id_empresa:
-            continue
+    from back.gestion.stock.espejo_stock import ids_destino_visibles
+
+    for id_dest in ids_destino_visibles(id_empresa, grupo):
         if not configuracion_manager.es_modo_especial_habilitado(db, id_dest):
             continue
         empresa = db.get(Empresa, id_dest)
@@ -791,8 +922,8 @@ def crear_transferencia_stock(
 
     if empresas_en_mismo_espejo(id_empresa_origen, req.id_empresa_destino):
         raise ValueError(
-            "Stock espejado entre de-campo y La Esquina 2: no hace falta transferir. "
-            "Cargá o ajustá stock en cualquiera; se replica en la otra."
+            "Esas sucursales comparten el mismo stock espejado. "
+            "No se transfiere entre ellas: cargá en una y se replica en la otra."
         )
 
     transferencia = TransferenciaStock(
@@ -836,6 +967,9 @@ def crear_transferencia_stock(
             precio_unitario=item.precio_unitario,
             id_articulo_origen=articulo.id,
         ))
+        from back.gestion.stock.espejo_stock import espejar_stock_articulo
+
+        espejar_stock_articulo(db, articulo)
 
     _incrementar_catalogo_version(db, id_empresa_origen)
     db.commit()
@@ -932,6 +1066,9 @@ def recibir_transferencia_stock(
         detalle.cantidad_recibida = cantidad_recibida
         detalle.id_articulo_destino = articulo_dest.id
         db.add(detalle)
+        from back.gestion.stock.espejo_stock import espejar_stock_articulo
+
+        espejar_stock_articulo(db, articulo_dest)
 
     transferencia.estado = "RECIBIDA"
     transferencia.recibida_en = datetime.utcnow()

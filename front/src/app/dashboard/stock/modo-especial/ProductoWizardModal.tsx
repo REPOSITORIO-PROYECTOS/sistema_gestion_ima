@@ -33,6 +33,8 @@ import {
 import { cn } from "@/lib/utils";
 import type { ProductoFormData, ProductoModoEspecial, UnidadMedida } from "./api";
 import { generarSugerenciasCodigoInterno } from "./codigoInternoSugerencias";
+import { EditorCodigosBarras } from "./EditorCodigosBarras";
+import { parseBarras, textoBarras } from "./ingreso-linea";
 
 const UNIDADES: UnidadMedida[] = ["unidad", "gramos", "kilogramos", "litros", "mililitros"];
 
@@ -75,11 +77,41 @@ export function productoAForm(p: ProductoModoEspecial): ProductoFormData {
 }
 
 const PASOS = [
-  { id: "identidad", titulo: "Producto", icon: Package, descripcion: "Nombre e identificador" },
-  { id: "clasificacion", titulo: "Clasificación", icon: Layers, descripcion: "Categorías y unidad" },
-  { id: "precios", titulo: "Precios", icon: Tag, descripcion: "Venta y costo" },
-  { id: "stock", titulo: "Stock", icon: Sparkles, descripcion: "Cantidades e ubicación" },
-  { id: "barcodes", titulo: "Códigos", icon: Barcode, descripcion: "Barras (opcional)" },
+  {
+    id: "identidad",
+    titulo: "Producto",
+    icon: Package,
+    instructivo:
+      "Escribí el nombre como querés verlo en la caja. El código interno se sugiere solo; cambialo si en el depósito ya usás otro.",
+  },
+  {
+    id: "clasificacion",
+    titulo: "Clasificación",
+    icon: Layers,
+    instructivo:
+      "Indicá al menos una categoría. Si hay varias, separalas con coma. Elegí la unidad de venta y, si aplica, cuánto trae el envase.",
+  },
+  {
+    id: "precios",
+    titulo: "Precios",
+    icon: Tag,
+    instructivo:
+      "El precio de venta es el final, con IVA. El costo es opcional y sirve para el margen. La alícuota solo cambia el desglose fiscal.",
+  },
+  {
+    id: "stock",
+    titulo: "Stock",
+    icon: Sparkles,
+    instructivo:
+      "Cargá la cantidad que hay ahora, incluso si es cero. El mínimo es opcional. La ubicación ayuda a encontrarlo en el depósito.",
+  },
+  {
+    id: "barcodes",
+    titulo: "Códigos",
+    icon: Barcode,
+    instructivo:
+      "El primer código es el principal. Los demás son alternativos: escaneá o tipea uno y presioná Enter. Queda como ficha, el campo se vacía y el foco sigue para el siguiente. Podés quitar uno. La caja encuentra el producto con cualquiera.",
+  },
 ] as const;
 
 type Props = {
@@ -283,8 +315,12 @@ export function ProductoWizardModal({
               <IconoPaso className="size-5" />
             </div>
             <div>
-              <h3 className="font-semibold text-amber-950">{pasoActual.titulo}</h3>
-              <p className="text-sm text-amber-900/70">{pasoActual.descripcion}</p>
+              <h3 className="font-semibold text-amber-950">
+                Paso {paso + 1} de {PASOS.length}: {pasoActual.titulo}
+              </h3>
+              <p className="text-sm text-amber-900/80" data-testid="wizard-instructivo">
+                {pasoActual.instructivo}
+              </p>
             </div>
           </div>
 
@@ -504,13 +540,11 @@ export function ProductoWizardModal({
           {paso === 4 && (
             <div className="space-y-4 animate-in fade-in slide-in-from-right-2 duration-200">
               <div className="space-y-2">
-                <Label htmlFor="prod-barcodes">Códigos de barra</Label>
-                <Input
-                  id="prod-barcodes"
-                  placeholder="Separados por coma (opcional)"
-                  value={form.barcodes}
+                <Label>Códigos de barra</Label>
+                <EditorCodigosBarras
+                  codigos={parseBarras(form.barcodes)}
                   autoFocus
-                  onChange={(e) => onFormChange({ ...form, barcodes: e.target.value })}
+                  onChange={(codigos) => onFormChange({ ...form, barcodes: textoBarras(codigos) })}
                 />
               </div>
 

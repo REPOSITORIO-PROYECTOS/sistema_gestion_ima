@@ -54,6 +54,18 @@ import {
   TransferenciaStock,
 } from "./api";
 import { BusquedaProductoInput } from "./BusquedaProductoInput";
+import { EditorCodigosBarras } from "./EditorCodigosBarras";
+import {
+  DESTINO_ESTA_SUCURSAL,
+  codigosCambiaron,
+  esDestinoLocal,
+  precioVentaParaEnviar,
+  precioVentaVisible,
+  repartoLinea,
+  textoDestinoIngreso,
+  textoStock,
+  type ArticuloIngreso,
+} from "./ingreso-linea";
 import {
   formVacio,
   productoAForm,
@@ -61,7 +73,7 @@ import {
 } from "./ProductoWizardModal";
 
 const MODAL_WIDE_CLASS =
-  "flex max-h-[92vh] w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl";
+  "flex max-h-[92vh] w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-6xl";
 
 const BTN_STOCK_OUTLINE =
   "border-amber-300 text-amber-950 hover:bg-amber-50 hover:text-amber-950";
@@ -75,8 +87,13 @@ interface IngresoLinea {
   codigo_interno: string;
   descripcion: string;
   cantidad: string;
+  cantidad_enviar: string;
   precio_venta: string;
+  precio_original: string | null;
   precio_costo: string;
+  stock_actual: number | null;
+  barcodes: string[];
+  barcodes_original: string[];
 }
 
 interface TransferenciaLinea {
@@ -87,14 +104,39 @@ interface TransferenciaLinea {
   precio_unitario: string;
 }
 
+function lineaEnvia(linea: IngresoLinea): boolean {
+  const reparto = repartoLinea(parseFloat(linea.cantidad), linea.cantidad_enviar);
+  return reparto.ok && reparto.enviar > 0;
+}
+
 const nuevaLineaIngreso = (): IngresoLinea => ({
   id: crypto.randomUUID(),
   codigo_interno: "",
   descripcion: "",
   cantidad: "",
+  cantidad_enviar: "",
   precio_venta: "",
+  precio_original: null,
   precio_costo: "",
+  stock_actual: null,
+  barcodes: [],
+  barcodes_original: [],
 });
+
+function aplicarProductoEnLinea(linea: IngresoLinea, producto: ArticuloIngreso): IngresoLinea {
+  const precio = precioVentaVisible(producto);
+  const barras = (producto.barcodes ?? []).map((codigo) => codigo.trim()).filter(Boolean);
+  return {
+    ...linea,
+    codigo_interno: producto.codigo_interno,
+    descripcion: producto.descripcion,
+    precio_venta: precio,
+    precio_original: precio,
+    stock_actual: Number(producto.stock_actual ?? 0),
+    barcodes: barras,
+    barcodes_original: barras,
+  };
+}
 
 const nuevaLineaTransferencia = (): TransferenciaLinea => ({
   id: crypto.randomUUID(),
@@ -118,6 +160,7 @@ export function ModoEspecialView() {
   const [form, setForm] = useState<ProductoFormData>(formVacio());
   const [lineasIngreso, setLineasIngreso] = useState<IngresoLinea[]>([nuevaLineaIngreso()]);
   const [ingresoObs, setIngresoObs] = useState("");
+  const [destinoIngresoId, setDestinoIngresoId] = useState(DESTINO_ESTA_SUCURSAL);
   const [empresasTransferencia, setEmpresasTransferencia] = useState<EmpresaTransferencia[]>([]);
   const [empresaDestinoId, setEmpresaDestinoId] = useState("");
   const [lineasTransferencia, setLineasTransferencia] = useState<TransferenciaLinea[]>([nuevaLineaTransferencia()]);
@@ -129,6 +172,7 @@ export function ModoEspecialView() {
   const [porcentajeSuba, setPorcentajeSuba] = useState("");
   const [categoriaSuba, setCategoriaSuba] = useState("");
   const [guardando, setGuardando] = useState(false);
+  const [lineaAltaId, setLineaAltaId] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
     if (!token) return;
@@ -154,8 +198,22 @@ export function ModoEspecialView() {
   }, [cargar]);
 
   const abrirCrear = () => {
+    setLineaAltaId(null);
     setEditando(null);
     setForm(formVacio());
+    setModalProducto(true);
+  };
+
+  const abrirAltaDesdeBusqueda = (lineaId: string, textoBuscado: string) => {
+    const consulta = textoBuscado.trim();
+    const esBarra = /^\d{8,}$/.test(consulta);
+    setLineaAltaId(lineaId);
+    setEditando(null);
+    setForm({
+      ...formVacio(),
+      descripcion: esBarra ? "" : consulta,
+      barcodes: esBarra ? consulta : "",
+    });
     setModalProducto(true);
   };
 
@@ -177,7 +235,23 @@ export function ModoEspecialView() {
         await actualizarProductoModoEspecial(token, editando.codigo_interno, form);
         toast.success("Producto actualizado.");
       } else {
-        await crearProductoModoEspecial(token, form);
+        const creado = await crearProductoModoEspecial(token, form) as ProductoModoEspecial;
+        if (lineaAltaId) {
+          const lineaId = lineaAltaId;
+          setLineasIngreso((prev) => prev.map((linea) => (
+            linea.id === lineaId
+              ? aplicarProductoEnLinea(linea, {
+                id: creado.id,
+                codigo_interno: creado.codigo_interno,
+                descripcion: creado.descripcion,
+                stock_actual: creado.stock_actual,
+                precio_venta: creado.precio_venta,
+                barcodes: creado.barcodes,
+              })
+              : linea
+          )));
+          setLineaAltaId(null);
+        }
         toast.success("Producto creado.");
       }
       setModalProducto(false);
@@ -191,36 +265,75 @@ export function ModoEspecialView() {
 
   const registrarIngreso = async () => {
     if (!token) return;
-    const items = lineasIngreso
-      .map((linea) => {
-        const codigo = linea.codigo_interno.trim();
-        const cantidad = parseFloat(linea.cantidad);
-        if (!codigo || !cantidad || cantidad <= 0) return null;
-        const item: {
-          codigo_interno: string;
-          cantidad: number;
-          observacion?: string;
-          precio_venta?: number;
-          precio_costo?: number;
-        } = { codigo_interno: codigo, cantidad };
-        if (ingresoObs.trim()) item.observacion = ingresoObs.trim();
-        if (linea.precio_venta.trim()) item.precio_venta = parseFloat(linea.precio_venta);
-        if (linea.precio_costo.trim()) item.precio_costo = parseFloat(linea.precio_costo);
-        return item;
-      })
-      .filter((item): item is NonNullable<typeof item> => item !== null);
+    const armado: Array<{
+      codigo_interno: string;
+      cantidad: number;
+      cantidad_enviar: number;
+      observacion?: string;
+      precio_venta?: number;
+      precio_costo?: number;
+      barcodes?: string[];
+    }> = [];
+    for (const linea of lineasIngreso) {
+      const codigo = linea.codigo_interno.trim();
+      const cantidad = parseFloat(linea.cantidad);
+      if (!codigo || !cantidad || cantidad <= 0) continue;
+      const reparto = repartoLinea(cantidad, linea.cantidad_enviar);
+      if (!reparto.ok) {
+        toast.error(`${codigo}: ${reparto.motivo}`);
+        return;
+      }
+      const item: (typeof armado)[number] = {
+        codigo_interno: codigo,
+        cantidad,
+        cantidad_enviar: reparto.enviar,
+      };
+      if (ingresoObs.trim()) item.observacion = ingresoObs.trim();
+      const precio = precioVentaParaEnviar(linea.precio_original, linea.precio_venta);
+      if (precio !== undefined) item.precio_venta = precio;
+      if (linea.precio_costo.trim()) item.precio_costo = parseFloat(linea.precio_costo);
+      if (codigosCambiaron(linea.barcodes_original, linea.barcodes)) {
+        item.barcodes = linea.barcodes;
+      }
+      armado.push(item);
+    }
+    const items = armado;
 
     if (items.length === 0) {
       toast.error("Agregá al menos una línea con producto y cantidad.");
       return;
     }
+    const hayEnvio = items.some((item) => item.cantidad_enviar > 0);
+    if (hayEnvio && esDestinoLocal(destinoIngresoId)) {
+      toast.error("Elegí la sucursal a la que se envía el reparto.");
+      return;
+    }
+    const destino = empresasTransferencia.find((empresa) => String(empresa.id) === destinoIngresoId);
     setGuardando(true);
     try {
-      const res = await ingresarStockModoEspecial(token, items);
-      toast.success(`Ingreso registrado: ${res.total} artículo(s).`);
+      const res = await ingresarStockModoEspecial(
+        token,
+        items,
+        hayEnvio
+          ? { idEmpresaDestino: Number(destinoIngresoId), observacion: ingresoObs.trim() || undefined }
+          : undefined,
+      );
+      if (res.pendiente_recepcion) {
+        const nombre = res.transferencia?.nombre_empresa_destino || destino?.nombre || "la sucursal destino";
+        const faltantes = (res.codigos_sin_producto_en_destino ?? []).join(", ");
+        toast.success(
+          `Ingreso registrado. Envío #${res.transferencia?.id ?? ""} pendiente de recepción en ${nombre}. Acá queda solo lo que no enviaste.`,
+        );
+        if (faltantes) {
+          toast.error(`En destino hay que crear estos productos antes de recibir: ${faltantes}`);
+        }
+      } else {
+        toast.success(`Ingreso registrado: ${res.total} artículo(s).`);
+      }
       setModalIngreso(false);
       setLineasIngreso([nuevaLineaIngreso()]);
       setIngresoObs("");
+      setDestinoIngresoId(DESTINO_ESTA_SUCURSAL);
       await cargar();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error en ingreso");
@@ -414,7 +527,12 @@ export function ModoEspecialView() {
             <Button
               variant="outline"
               className={BTN_STOCK_OUTLINE}
-              onClick={() => { setLineasIngreso([nuevaLineaIngreso()]); setModalIngreso(true); }}
+              onClick={() => {
+                setLineasIngreso([nuevaLineaIngreso()]);
+                setDestinoIngresoId(DESTINO_ESTA_SUCURSAL);
+                setIngresoObs("");
+                setModalIngreso(true);
+              }}
             >
               <ArrowDownToLine className="size-4" />
               Ingreso de stock
@@ -531,15 +649,39 @@ export function ModoEspecialView() {
             <DialogTitle>Ingreso masivo de stock</DialogTitle>
           </DialogHeader>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4 space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Cargá varios productos a la vez. Los precios son opcionales; si los dejás en blanco no se modifican.
-            </p>
+            <div className="grid gap-2 sm:grid-cols-[16rem_1fr] sm:items-start">
+              <div className="space-y-1">
+                <label className="text-sm font-medium" htmlFor="destino-ingreso">Sucursal del envío</label>
+                <Select value={destinoIngresoId} onValueChange={setDestinoIngresoId}>
+                  <SelectTrigger id="destino-ingreso" aria-label="Sucursal del envío">
+                    <SelectValue placeholder="Todo queda acá" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[200]">
+                    <SelectItem value={DESTINO_ESTA_SUCURSAL}>Ninguna: todo queda acá</SelectItem>
+                    {empresasTransferencia.map((empresa) => (
+                      <SelectItem key={empresa.id} value={String(empresa.id)}>{empresa.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-sm text-muted-foreground sm:pt-6" data-testid="instructivo-destino">
+                {textoDestinoIngreso(
+                  esDestinoLocal(destinoIngresoId)
+                    ? null
+                    : empresasTransferencia.find((empresa) => String(empresa.id) === destinoIngresoId)?.nombre ?? "otra sucursal",
+                )}{" "}
+                El precio de venta se completa con el vigente y solo se guarda si lo cambiás. En cada fila podés editar el código principal y sumar alternativos: escribí o escaneá y presioná Enter.
+              </p>
+            </div>
             <div className="rounded-md border overflow-visible">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="min-w-[16rem]">Producto *</TableHead>
+                    <TableHead>Stock</TableHead>
+                    <TableHead>Código de barras</TableHead>
                     <TableHead>Cantidad *</TableHead>
+                    <TableHead>Enviar</TableHead>
                     <TableHead>Precio venta</TableHead>
                     <TableHead>Precio costo</TableHead>
                     <TableHead />
@@ -552,8 +694,49 @@ export function ModoEspecialView() {
                         <BusquedaProductoInput
                           codigoInterno={linea.codigo_interno}
                           descripcion={linea.descripcion}
+                          onCrearProducto={(textoBuscado) => abrirAltaDesdeBusqueda(linea.id, textoBuscado)}
                           onChange={(codigoInterno, descripcion) => setLineasIngreso((prev) =>
-                            prev.map((l) => l.id === linea.id ? { ...l, codigo_interno: codigoInterno, descripcion } : l)
+                            prev.map((l) => l.id === linea.id ? {
+                              ...l,
+                              codigo_interno: codigoInterno,
+                              descripcion,
+                              ...(codigoInterno ? {} : {
+                                precio_venta: "",
+                                precio_original: null,
+                                stock_actual: null,
+                                barcodes: [],
+                                barcodes_original: [],
+                                cantidad_enviar: "",
+                              }),
+                            } : l)
+                          )}
+                          onSeleccionar={(producto) => setLineasIngreso((prev) =>
+                            prev.map((l) => {
+                              if (l.id !== linea.id) return l;
+                              if (!producto) {
+                                return {
+                                  ...l,
+                                  precio_venta: "",
+                                  precio_original: null,
+                                  stock_actual: null,
+                                  barcodes: [],
+                                  barcodes_original: [],
+                                  cantidad_enviar: "",
+                                };
+                              }
+                              return aplicarProductoEnLinea(l, producto);
+                            })
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell className="align-top text-sm text-muted-foreground whitespace-nowrap">
+                        {linea.stock_actual === null ? "—" : textoStock(linea.stock_actual)}
+                      </TableCell>
+                      <TableCell className="align-top min-w-[16rem]">
+                        <EditorCodigosBarras
+                          codigos={linea.barcodes}
+                          onChange={(barcodes) => setLineasIngreso((prev) =>
+                            prev.map((l) => l.id === linea.id ? { ...l, barcodes } : l)
                           )}
                         />
                       </TableCell>
@@ -567,6 +750,20 @@ export function ModoEspecialView() {
                           value={linea.cantidad}
                           onChange={(e) => setLineasIngreso((prev) =>
                             prev.map((l) => l.id === linea.id ? { ...l, cantidad: e.target.value } : l)
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell className="align-top">
+                        <Input
+                          type="number"
+                          min="0"
+                          step="any"
+                          placeholder="0"
+                          aria-label="Cantidad a enviar"
+                          className="w-24"
+                          value={linea.cantidad_enviar}
+                          onChange={(e) => setLineasIngreso((prev) =>
+                            prev.map((l) => l.id === linea.id ? { ...l, cantidad_enviar: e.target.value } : l)
                           )}
                         />
                       </TableCell>
@@ -618,7 +815,9 @@ export function ModoEspecialView() {
           </div>
           <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
             <Button variant="ghost" onClick={() => setModalIngreso(false)}>Cancelar</Button>
-            <Button onClick={registrarIngreso} disabled={guardando}>Registrar ingreso</Button>
+            <Button onClick={registrarIngreso} disabled={guardando}>
+              {lineasIngreso.some(lineaEnvia) ? "Registrar y enviar" : "Registrar ingreso"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

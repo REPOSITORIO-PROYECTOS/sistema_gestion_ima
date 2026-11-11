@@ -4,6 +4,7 @@ import {
   type ArticuloCatalogoAPI,
 } from "@/lib/articulos-api";
 import {
+  ESQUEMA_CODIGOS_BARRAS,
   clearOfflineEmpresa,
   getOfflineMeta,
   offlineDb,
@@ -44,25 +45,25 @@ function mapCodigosBarras(
   idEmpresa: number,
 ): OfflineCodigoBarras[] {
   const rows: OfflineCodigoBarras[] = [];
+  const vistos = new Set<string>();
+  const agregar = (idArticulo: string, codigo: string) => {
+    const limpio = codigo.trim();
+    if (!limpio) return;
+    const clave = `${idEmpresa}:${limpio}`;
+    if (vistos.has(clave)) return;
+    vistos.add(clave);
+    rows.push({
+      codigo: limpio,
+      id_articulo: idArticulo,
+      id_empresa: idEmpresa,
+    });
+  };
   for (const item of items) {
     const idArticulo = String(item.id);
     for (const entry of item.codigos ?? []) {
-      const codigo = entry.codigo?.trim();
-      if (!codigo) continue;
-      rows.push({
-        codigo,
-        id_articulo: idArticulo,
-        id_empresa: idEmpresa,
-      });
+      agregar(idArticulo, entry.codigo ?? "");
     }
-    const interno = item.codigo_interno?.trim();
-    if (interno) {
-      rows.push({
-        codigo: interno,
-        id_articulo: idArticulo,
-        id_empresa: idEmpresa,
-      });
-    }
+    agregar(idArticulo, item.codigo_interno ?? "");
   }
   return rows;
 }
@@ -84,7 +85,8 @@ export async function refreshCatalogoCache(
     !options?.force &&
     meta &&
     meta.catalogo_version === remoteVersion &&
-    meta.catalogo_synced_at
+    meta.catalogo_synced_at &&
+    (meta.codigos_schema ?? 1) === ESQUEMA_CODIGOS_BARRAS
   ) {
     const count = await offlineDb.articulos.where("id_empresa").equals(idEmpresa).count();
     return {
@@ -118,6 +120,7 @@ export async function refreshCatalogoCache(
         catalogo_version: remoteVersion,
         catalogo_synced_at: syncedAt,
         stock_snapshot_at: syncedAt,
+        codigos_schema: ESQUEMA_CODIGOS_BARRAS,
       });
     },
   );
