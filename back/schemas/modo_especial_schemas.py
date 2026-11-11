@@ -141,6 +141,20 @@ class IngresoStockItem(BaseModel):
     observacion: Optional[str] = None
     precio_venta: Optional[float] = Field(default=None, ge=0)
     precio_costo: Optional[float] = Field(default=None, ge=0)
+    barcodes: Optional[List[str]] = None
+
+    @field_validator("barcodes")
+    @classmethod
+    def limpiar_barcodes_ingreso(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        if v is None:
+            return None
+        limpios = [b.strip() for b in v if b and str(b).strip()]
+        vistos: set[str] = set()
+        for codigo in limpios:
+            if codigo in vistos:
+                raise ValueError(f"El código de barras '{codigo}' está repetido en la lista ingresada.")
+            vistos.add(codigo)
+        return limpios
 
 
 class IngresoStockRequest(BaseModel):

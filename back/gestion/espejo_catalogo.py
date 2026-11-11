@@ -121,6 +121,27 @@ def _aplicar_categorias(db: Session, origen: Articulo, destino: Articulo) -> boo
     return cambio
 
 
+def _orden_por_codigo(articulo: Articulo) -> dict[str, int]:
+    return {
+        str(codigo.codigo): int(getattr(codigo, "orden", 0) or 0)
+        for codigo in (getattr(articulo, "codigos", None) or [])
+        if getattr(codigo, "codigo", None)
+    }
+
+
+def _copiar_orden_barcodes(origen: Articulo, destino: Articulo) -> bool:
+    origen_orden = _orden_por_codigo(origen)
+    cambio = False
+    for codigo_obj in list(getattr(destino, "codigos", None) or []):
+        if codigo_obj.codigo not in origen_orden:
+            continue
+        orden = origen_orden[codigo_obj.codigo]
+        if int(getattr(codigo_obj, "orden", 0) or 0) != orden:
+            codigo_obj.orden = orden
+            cambio = True
+    return cambio
+
+
 def _sincronizar_barcodes(db: Session, origen: Articulo, destino: Articulo) -> bool:
     origen_codes = _codigos_si_estan_cargados(origen)
     if origen_codes is None:
@@ -133,7 +154,7 @@ def _sincronizar_barcodes(db: Session, origen: Articulo, destino: Articulo) -> b
         destino_codes = set()
 
     if origen_codes == destino_codes:
-        return False
+        return _copiar_orden_barcodes(origen, destino)
 
     cambio = False
     for codigo_obj in list(getattr(destino, "codigos", None) or []):
@@ -143,17 +164,22 @@ def _sincronizar_barcodes(db: Session, origen: Articulo, destino: Articulo) -> b
             cambio = True
 
     actuales = _codigos_si_estan_cargados(destino) or set()
+    origen_orden = _orden_por_codigo(origen)
     for codigo in sorted(origen_codes - actuales):
         otro = articulo_con_barcode_en_empresa(db, codigo, destino.id, destino.id_empresa)
         if otro is not None:
             raise ValueError(mensaje_barcode_duplicado(codigo, otro))
-        nuevo = ArticuloCodigo(codigo=codigo, id_articulo=destino.id)
+        nuevo = ArticuloCodigo(
+            codigo=codigo,
+            id_articulo=destino.id,
+            orden=origen_orden.get(codigo, 0),
+        )
         if destino.codigos is None:
             destino.codigos = []
         destino.codigos.append(nuevo)
         db.add(nuevo)
         cambio = True
-    return cambio
+    return _copiar_orden_barcodes(origen, destino) or cambio
 
 
 def _aplicar_campos(origen: Articulo, destino: Articulo) -> bool:
