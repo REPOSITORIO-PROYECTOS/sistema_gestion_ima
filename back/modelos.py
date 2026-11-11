@@ -192,6 +192,8 @@ class ArticuloCodigo(SQLModel, table=True):
     __tablename__ = "articulo_codigos"
     codigo: str = Field(primary_key=True, index=True)
     id_articulo: int = Field(foreign_key="articulos.id", primary_key=True)
+    # 0 es el código principal. Los siguientes son alternativos, en el orden de carga.
+    orden: int = Field(default=0, sa_column_kwargs={"server_default": "0"})
     articulo: "Articulo" = Relationship(back_populates="codigos")
 
 # ===================================================================

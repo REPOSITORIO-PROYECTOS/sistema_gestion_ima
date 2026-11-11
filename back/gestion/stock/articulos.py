@@ -3,6 +3,7 @@
 
 from sqlmodel import Session, or_, select
 from typing import List, Optional
+from sqlalchemy import func
 from sqlalchemy.orm import selectinload
 
 # --- Modelos de la Base de Datos ---
@@ -77,24 +78,50 @@ def buscar_articulo_por_codigo(db: Session, id_empresa_actual: int, codigo: str)
     return db.exec(statement).first()
 
 
-def obtener_todos_los_articulos(db: Session, id_empresa_actual: int, skip: int = 0, limit: int = 100) -> List[Articulo]:
+def contar_articulos_activos(db: Session, id_empresa: int) -> int:
+    """Cantidad de artículos activos. Sirve para saber si una bajada paginada está completa."""
+    total = db.exec(
+        select(func.count(Articulo.id)).where(
+            Articulo.id_empresa == id_empresa,
+            Articulo.activo == True,  # noqa: E712
+        )
+    ).one()
+    if isinstance(total, (tuple, list)):
+        total = total[0]
+    return int(total or 0)
+
+
+def obtener_todos_los_articulos(
+    db: Session,
+    id_empresa_actual: int,
+    skip: int = 0,
+    limit: int = 100,
+    orden: str = "descripcion",
+) -> List[Articulo]:
     """
-    Obtiene una lista paginada de artículos, pre-cargando eficientemente sus códigos de barras.
-    Usa DISTINCT para evitar duplicados cuando hay múltiples códigos de barras.
+    Lista paginada de artículos activos, con códigos de barras.
+    `orden=id` es estable entre páginas (la caché de caja lo usa).
+    `orden=descripcion` mantiene el listado de stock.
     """
+    orden_normalizado = (orden or "descripcion").strip().lower()
+    if orden_normalizado not in ("id", "descripcion"):
+        raise ValueError("Orden de catálogo no válido. Usá id o descripcion.")
+
+    ordenar_por = Articulo.id if orden_normalizado == "id" else Articulo.descripcion
     statement = (
         select(Articulo)
         .where(
             Articulo.id_empresa == id_empresa_actual,
-            Articulo.activo == True
+            Articulo.activo == True,  # noqa: E712
         )
-        .order_by(Articulo.descripcion)
+        .order_by(ordenar_por.asc())
         .offset(skip)
         .limit(limit)
-        .distinct()
         .options(selectinload(Articulo.codigos))
     )
-    return db.exec(statement).all()
+    if orden_normalizado != "id":
+        statement = statement.distinct()
+    return list(db.exec(statement).all())
 
 def buscar_articulos_por_termino(
     db: Session, 
@@ -250,7 +277,9 @@ def anadir_codigo_a_articulo(db: Session, articulo_id: int, nuevo_codigo: str) -
     if obtener_codigo_barras_articulo(db, nuevo_codigo, articulo_id):
         raise ValueError(f"El código '{nuevo_codigo}' ya está asignado a este artículo.")
 
-    nuevo_codigo_obj = ArticuloCodigo(codigo=nuevo_codigo, id_articulo=articulo_id)
+    siguientes = list(articulo.codigos or [])
+    orden = max((int(getattr(codigo, "orden", 0) or 0) for codigo in siguientes), default=-1) + 1
+    nuevo_codigo_obj = ArticuloCodigo(codigo=nuevo_codigo, id_articulo=articulo_id, orden=orden)
     db.add(nuevo_codigo_obj)
     db.flush()
     db.refresh(articulo)
